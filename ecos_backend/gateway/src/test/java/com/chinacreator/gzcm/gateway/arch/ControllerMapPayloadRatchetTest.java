@@ -186,6 +186,12 @@ import org.junit.jupiter.api.Test;
  *       订正为<b>原始 manifest 文档</b>（旧双重 put 让摘要从未出网），字段改 {@code JsonNode}。
  *       同批把反退化下界 {@code MIN_LINES} 2000 → 1900（清退跨过整百线，下界不同步会把真清退
  *       判成「扫描面退化」）；键面由 {@code GatewayDiagnosticsWireShapeTest} 6 例钉住。</li>
+ *   <li>1901 ＝ #147CV（2026-11-05）HEAD 面复测值，差额 −18 行来自 gateway {@code TaskController}
+ *       （25→7）：任务 9 键/状态 6 键/列表 4 键/详情 2 键/提交·执行·批量回执/类型目录全部改 record；
+ *       旧实现用 {@code Map.of} 拼装（键序不确定），改后键序确定并由
+ *       {@code TaskControllerWireShapeTest} 5 例钉住。剩 7 枚为属主契约
+ *       （{@code queryTasks(Map condition)} 入参、{@code getTaskStats()}/{@code health()} 自由结果）
+ *       与自由 JSON {@code params}。变异实红（{@code progress} 改名 progressPct）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -197,7 +203,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -212,7 +218,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1919;
+    private static final int BASELINE_LINES = 1901;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -222,7 +228,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1919（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1901（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

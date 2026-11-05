@@ -1,26 +1,39 @@
 package com.chinacreator.gzcm.gateway.controller;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.sysman.security.RequirePermission;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-
+import com.chinacreator.gzcm.common.service.IAnalyticsService;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.TaskManagementException;
-import com.chinacreator.gzcm.common.service.IAnalyticsService;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * 任务中心 REST API
- * 
- * @author ECOS Sprint 5.3
+ * 任务管理端点（runtime-task 单源；详细设计-10 F10-11 调度面）。
+ *
+ * <p><b>读写载体（#147CV）</b>：任务/状态/列表/回执全部改 record，键名与旧 {@code Map} 时代
+ * 逐个一致（{@code taskId/category/statusMessage/startedAt/...}）。仍保留 {@code Map} 的两处是
+ * <b>属主契约</b>：{@code taskManagementService.queryTasks(Map condition, ...)} 的查询条件入参、
+ * {@code getTaskStats()} 与 {@code analyticsService.health()} 的自由统计结果；以及任务
+ * {@code params}（自由 JSON 配置，键面由提交方定义）。</p>
  */
 @RestController
 @RequestMapping("/api/v1/task")
@@ -35,10 +48,11 @@ public class TaskController {
     @Qualifier("pgAnalyticsService")
     private IAnalyticsService analyticsService;
 
-    // ─── 任务类型分类 ─────────────────────────────────────────
-
+    /** taskType → 分类 key（大小写不敏感；未知类型返回 null）。 */
     private static final Map<String, String> TASK_TYPE_CATEGORY = new LinkedHashMap<>();
-    private static final List<Map<String, Object>> TASK_TYPE_CATEGORIES = new ArrayList<>();
+
+    /** 任务类型分类目录（诊断/表单面单源）。 */
+    private static final List<TaskTypeCategoryVO> TASK_TYPE_CATEGORIES = new ArrayList<>();
 
     static {
         TASK_TYPE_CATEGORY.put("DORIS_SQL", "pipeline");
@@ -46,18 +60,15 @@ public class TaskController {
         TASK_TYPE_CATEGORY.put("DATA_SYNC", "pipeline");
         TASK_TYPE_CATEGORY.put("DATA_INGEST", "pipeline");
         TASK_TYPE_CATEGORY.put("PIPELINE", "pipeline");
-
         TASK_TYPE_CATEGORY.put("AGENT", "agent");
         TASK_TYPE_CATEGORY.put("AI_AGENT", "agent");
         TASK_TYPE_CATEGORY.put("LLM_TASK", "agent");
         TASK_TYPE_CATEGORY.put("KG_SYNC", "agent");
-
         TASK_TYPE_CATEGORY.put("REALTIME", "realtime");
         TASK_TYPE_CATEGORY.put("STREAMING", "realtime");
         TASK_TYPE_CATEGORY.put("MONITOR", "realtime");
         TASK_TYPE_CATEGORY.put("ALERT", "realtime");
         TASK_TYPE_CATEGORY.put("TELEMETRY", "realtime");
-
         TASK_TYPE_CATEGORY.put("DATA_QUALITY", "management");
         TASK_TYPE_CATEGORY.put("REPORT", "management");
         TASK_TYPE_CATEGORY.put("MAINTENANCE", "management");
@@ -75,12 +86,79 @@ public class TaskController {
                 "DATA_QUALITY", "REPORT", "MAINTENANCE", "BACKUP", "CONFIG", "ADMIN"));
     }
 
-    private static Map<String, Object> categoryEntry(String key, String label, String... types) {
-        Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("key", key);
-        entry.put("label", label);
-        entry.put("types", Arrays.asList(types));
-        return entry;
+    /** 任务类型分类条目（3 键）。 */
+    public record TaskTypeCategoryVO(@JsonProperty("key") String key,
+                                     @JsonProperty("label") String label,
+                                     @JsonProperty("types") List<String> types) {
+    }
+
+    /** 任务描述视图（9 键；{@code parameters} 为自由 JSON 配置）。 */
+    public record TaskVO(@JsonProperty("taskId") String taskId,
+                         @JsonProperty("taskName") String taskName,
+                         @JsonProperty("taskType") String taskType,
+                         @JsonProperty("category") String category,
+                         @JsonProperty("description") String description,
+                         @JsonProperty("priority") Integer priority,
+                         @JsonProperty("createTime") String createTime,
+                         @JsonProperty("createdBy") String createdBy,
+                         @JsonProperty("parameters") Map<String, Object> parameters) {
+    }
+
+    /** 任务状态视图（6 键）。 */
+    public record TaskStatusVO(@JsonProperty("taskId") String taskId,
+                               @JsonProperty("status") String status,
+                               @JsonProperty("statusMessage") String statusMessage,
+                               @JsonProperty("progress") Integer progress,
+                               @JsonProperty("startedAt") String startedAt,
+                               @JsonProperty("completedAt") String completedAt) {
+    }
+
+    /** 列表响应（4 键）。 */
+    public record TaskListVO(@JsonProperty("items") List<TaskVO> items,
+                             @JsonProperty("total") int total,
+                             @JsonProperty("offset") int offset,
+                             @JsonProperty("limit") int limit) {
+    }
+
+    /** 详情响应（task + status）。 */
+    public record TaskDetailVO(@JsonProperty("task") TaskVO task,
+                               @JsonProperty("status") TaskStatusVO status) {
+    }
+
+    /** 提交响应（2 键）。 */
+    public record SubmitResultVO(@JsonProperty("taskId") String taskId,
+                                 @JsonProperty("status") String status) {
+    }
+
+    /** 执行响应（2 键）。 */
+    public record ExecuteResultVO(@JsonProperty("taskId") String taskId,
+                                  @JsonProperty("result") String result) {
+    }
+
+    /** 操作回执（1 键）。 */
+    public record MessageVO(@JsonProperty("message") String message) {
+    }
+
+    /** 批量操作回执（2 键）。 */
+    public record BatchResultVO(@JsonProperty("successCount") int successCount,
+                                @JsonProperty("errors") List<String> errors) {
+    }
+
+    /** 任务类型目录（1 键）。 */
+    public record TaskTypesVO(@JsonProperty("categories") List<TaskTypeCategoryVO> categories) {
+    }
+
+    /** 提交请求体（params 为自由 JSON 配置，键面由提交方定义）。 */
+    public record SubmitTaskRequest(String taskName, String taskType, String description,
+                                    Map<String, Object> params, Integer priority) {
+    }
+
+    /** 批量操作请求体。 */
+    public record BatchOperationRequest(List<String> taskIds, String action) {
+    }
+
+    private static TaskTypeCategoryVO categoryEntry(String key, String label, String... types) {
+        return new TaskTypeCategoryVO(key, label, Arrays.asList(types));
     }
 
     /**
@@ -94,37 +172,32 @@ public class TaskController {
     // ─── 任务 CRUD ──────────────────────────────────────────
 
     @GetMapping("/list")
-    public ApiResponse<Map<String, Object>> listTasks(
+    public ApiResponse<TaskListVO> listTasks(
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam(required = false) String taskType,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String createdBy) {
 
-        Map<String, Object> condition = new HashMap<>();
+        Map<String, Object> condition = new LinkedHashMap<>();
         if (taskType != null) condition.put("taskType", taskType);
         if (status != null) condition.put("status", status);
         if (createdBy != null) condition.put("createdBy", createdBy);
 
         try {
             List<TaskDescription> tasks = taskManagementService.queryTasks(condition, offset, limit);
-            List<Map<String, Object>> items = tasks.stream()
-                .map(this::toMap)
+            List<TaskVO> items = tasks.stream()
+                .map(this::toVO)
                 .collect(Collectors.toList());
 
-            return ApiResponse.success(Map.of(
-                "items", items,
-                "total", items.size(),
-                "offset", offset,
-                "limit", limit
-            ));
+            return ApiResponse.success(new TaskListVO(items, items.size(), offset, limit));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @GetMapping("/{taskId}")
-    public ApiResponse<Map<String, Object>> getTask(@PathVariable String taskId) {
+    public ApiResponse<TaskDetailVO> getTask(@PathVariable String taskId) {
         try {
             TaskDescription task = taskManagementService.getTaskDescription(taskId);
             if (task == null) {
@@ -132,113 +205,100 @@ public class TaskController {
             }
             TaskStatus status = taskManagementService.getTaskStatus(taskId);
 
-            return ApiResponse.success(Map.of(
-                "task", toMap(task),
-                "status", toStatusMap(status)
-            ));
+            return ApiResponse.success(new TaskDetailVO(toVO(task), toStatusVO(status)));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @PostMapping("/submit")
-    public ApiResponse<Map<String, Object>> submitTask(@RequestBody Map<String, Object> body) {
+    public ApiResponse<SubmitResultVO> submitTask(@RequestBody SubmitTaskRequest body) {
         TaskDescription taskDesc = new TaskDescription();
-        taskDesc.setTaskName((String) body.get("taskName"));
-        taskDesc.setTaskType((String) body.get("taskType"));
-        taskDesc.setDescription((String) body.get("description"));
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> params = (Map<String, Object>) body.get("params");
-        taskDesc.setParameters(params);
-
-        if (body.get("priority") != null) {
-            taskDesc.setPriority(((Number) body.get("priority")).intValue());
+        taskDesc.setTaskName(body.taskName());
+        taskDesc.setTaskType(body.taskType());
+        taskDesc.setDescription(body.description());
+        taskDesc.setParameters(body.params());
+        if (body.priority() != null) {
+            taskDesc.setPriority(body.priority());
         }
 
         try {
             String taskId = taskManagementService.submitTask(taskDesc);
-            return ApiResponse.success(Map.of(
-                "taskId", taskId,
-                "status", "SUBMITTED"
-            ));
+            return ApiResponse.success(new SubmitResultVO(taskId, "SUBMITTED"));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @PostMapping("/{taskId}/execute")
-    public ApiResponse<Map<String, Object>> executeTask(@PathVariable String taskId) {
+    public ApiResponse<ExecuteResultVO> executeTask(@PathVariable String taskId) {
         try {
             String execResult = taskManagementService.executeTask(taskId);
-            return ApiResponse.success(Map.of(
-                "taskId", taskId,
-                "result", execResult != null ? execResult : "ASYNC_EXECUTING"
-            ));
+            return ApiResponse.success(new ExecuteResultVO(taskId,
+                    execResult != null ? execResult : "ASYNC_EXECUTING"));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @GetMapping("/{taskId}/status")
-    public ApiResponse<Map<String, Object>> getTaskStatus(@PathVariable String taskId) {
+    public ApiResponse<TaskStatusVO> getTaskStatus(@PathVariable String taskId) {
         try {
             TaskStatus status = taskManagementService.getTaskStatus(taskId);
             if (status == null) {
                 return ApiResponse.notFound("任务状态不存在: " + taskId);
             }
-            return ApiResponse.success(toStatusMap(status));
+            return ApiResponse.success(toStatusVO(status));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @PostMapping("/{taskId}/cancel")
-    public ApiResponse<Map<String, Object>> cancelTask(@PathVariable String taskId) {
+    public ApiResponse<MessageVO> cancelTask(@PathVariable String taskId) {
         try {
             taskManagementService.cancelTask(taskId);
-            return ApiResponse.success(Map.of("message", "Task " + taskId + " cancelled"));
+            return ApiResponse.success(new MessageVO("Task " + taskId + " cancelled"));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @PostMapping("/{taskId}/pause")
-    public ApiResponse<Map<String, Object>> pauseTask(@PathVariable String taskId) {
+    public ApiResponse<MessageVO> pauseTask(@PathVariable String taskId) {
         try {
             taskManagementService.pauseTask(taskId);
-            return ApiResponse.success(Map.of("message", "Task " + taskId + " paused"));
+            return ApiResponse.success(new MessageVO("Task " + taskId + " paused"));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @PostMapping("/{taskId}/resume")
-    public ApiResponse<Map<String, Object>> resumeTask(@PathVariable String taskId) {
+    public ApiResponse<MessageVO> resumeTask(@PathVariable String taskId) {
         try {
             taskManagementService.resumeTask(taskId);
-            return ApiResponse.success(Map.of("message", "Task " + taskId + " resumed"));
+            return ApiResponse.success(new MessageVO("Task " + taskId + " resumed"));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @PostMapping("/{taskId}/archive")
-    public ApiResponse<Map<String, Object>> archiveTask(@PathVariable String taskId) {
+    public ApiResponse<MessageVO> archiveTask(@PathVariable String taskId) {
         try {
             taskManagementService.cancelTask(taskId);
-            return ApiResponse.success(Map.of("message", "Task " + taskId + " archived"));
+            return ApiResponse.success(new MessageVO("Task " + taskId + " archived"));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }
     }
 
     @PostMapping("/batch")
-    public ApiResponse<Map<String, Object>> batchOperation(@RequestBody Map<String, Object> body) {
-        @SuppressWarnings("unchecked")
-        List<String> taskIds = (List<String>) body.get("taskIds");
-        String action = (String) body.get("action");
-        
+    public ApiResponse<BatchResultVO> batchOperation(@RequestBody BatchOperationRequest body) {
+        List<String> taskIds = body.taskIds();
+        String action = body.action();
+
         if (taskIds == null || taskIds.isEmpty()) {
             return ApiResponse.error(-1, "taskIds required");
         }
@@ -263,10 +323,7 @@ public class TaskController {
             }
         }
 
-        return ApiResponse.success(Map.of(
-            "successCount", successCount,
-            "errors", errors
-        ));
+        return ApiResponse.success(new BatchResultVO(successCount, errors));
     }
 
     // ─── 任务统计 ──────────────────────────────────────────
@@ -293,36 +350,24 @@ public class TaskController {
     // ─── 任务类型分类 ─────────────────────────────────────────
 
     @GetMapping("/types")
-    public ApiResponse<Map<String, Object>> taskTypes() {
-        return ApiResponse.success(Map.of(
-            "categories", TASK_TYPE_CATEGORIES
-        ));
+    public ApiResponse<TaskTypesVO> taskTypes() {
+        return ApiResponse.success(new TaskTypesVO(TASK_TYPE_CATEGORIES));
     }
 
     // ─── 辅助方法 ─────────────────────────────────────────
 
-    private Map<String, Object> toMap(TaskDescription task) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("taskId", task.getTaskId());
-        m.put("taskName", task.getTaskName());
-        m.put("taskType", task.getTaskType());
-        m.put("category", getCategory(task.getTaskType()));
-        m.put("description", task.getDescription());
-        m.put("priority", task.getPriority());
-        m.put("createTime", task.getCreateTime() != null ? task.getCreateTime().toString() : null);
-        m.put("createdBy", task.getCreatedBy());
-        m.put("parameters", task.getParameters());
-        return m;
+    private TaskVO toVO(TaskDescription task) {
+        return new TaskVO(task.getTaskId(), task.getTaskName(), task.getTaskType(),
+                getCategory(task.getTaskType()), task.getDescription(), task.getPriority(),
+                task.getCreateTime() != null ? task.getCreateTime().toString() : null,
+                task.getCreatedBy(), task.getParameters());
     }
 
-    private Map<String, Object> toStatusMap(TaskStatus status) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("taskId", status.getTaskId());
-        m.put("status", status.getStatus() != null ? status.getStatus().name() : "UNKNOWN");
-        m.put("statusMessage", status.getStatusMessage());
-        m.put("progress", status.getProgress());
-        m.put("startedAt", status.getStartTime() != null ? status.getStartTime().toString() : null);
-        m.put("completedAt", status.getEndTime() != null ? status.getEndTime().toString() : null);
-        return m;
+    private TaskStatusVO toStatusVO(TaskStatus status) {
+        return new TaskStatusVO(status.getTaskId(),
+                status.getStatus() != null ? status.getStatus().name() : "UNKNOWN",
+                status.getStatusMessage(), status.getProgress(),
+                status.getStartTime() != null ? status.getStartTime().toString() : null,
+                status.getEndTime() != null ? status.getEndTime().toString() : null);
     }
 }
