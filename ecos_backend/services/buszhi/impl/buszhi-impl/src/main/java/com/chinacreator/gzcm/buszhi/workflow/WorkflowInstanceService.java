@@ -1,17 +1,21 @@
 package com.chinacreator.gzcm.buszhi.workflow;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 工作流实例管理服务 — 启动/挂起/恢复/终止流程实例。
+ *
+ * <p><b>#147CZ 行面强类型</b>：实例行改 record（10 键；启动腿在尾部追加 {@code definition} 引用，
+ * 属性级 NON_NULL 保「列表行无该键」的旧形态）。</p>
  */
 @Service
 public class WorkflowInstanceService {
@@ -37,12 +41,33 @@ public class WorkflowInstanceService {
         this.workflowEngine = workflowEngine;
     }
 
+    /** 实例所属定义引用（3 键；仅启动腿出现）。 */
+    public record WorkflowDefinitionRef(@JsonProperty("id") String id,
+                                        @JsonProperty("name") String name,
+                                        @JsonProperty("status") String status) {
+    }
+
+    /** 实例行（10 键 + 可选 definition）。 */
+    public record WorkflowInstanceRow(@JsonProperty("id") String id,
+                                      @JsonProperty("workflowId") String workflowId,
+                                      @JsonProperty("workflowName") String workflowName,
+                                      @JsonProperty("status") String status,
+                                      @JsonProperty("triggerType") String triggerType,
+                                      @JsonProperty("triggeredBy") String triggeredBy,
+                                      @JsonProperty("startedAt") String startedAt,
+                                      @JsonProperty("completedAt") String completedAt,
+                                      @JsonProperty("errorMessage") String errorMessage,
+                                      @JsonProperty("createdAt") String createdAt,
+                                      @JsonInclude(JsonInclude.Include.NON_NULL)
+                                      @JsonProperty("definition") WorkflowDefinitionRef definition) {
+    }
+
     private String nextId() { return "pi" + ID_SEQ.incrementAndGet(); }
 
     /**
      * 启动工作流实例。
      */
-    public Optional<Map<String, Object>> startInstance(String workflowId, Map<String, Object> body) {
+    public Optional<WorkflowInstanceRow> startInstance(String workflowId, Map<String, Object> body) {
         Optional<WorkflowEntity> wfOpt = workflowRepo.findById(workflowId);
         if (wfOpt.isEmpty()) return Optional.empty();
 
@@ -95,33 +120,35 @@ public class WorkflowInstanceService {
                 "执行失败: " + e.getMessage(), null, null, traceId);
         }
 
-        return instanceRepo.findById(instanceId).map(inst -> toMap(inst, wf));
+        return instanceRepo.findById(instanceId)
+                .map(inst -> toRow(inst, new WorkflowDefinitionRef(wf.getId(), wf.getName(), wf.getStatus())));
     }
 
-    public List<Map<String, Object>> listInstances(int limit) {
-        return instanceRepo.findAll(limit).stream().map(this::toMap).collect(java.util.stream.Collectors.toList());
+    public List<WorkflowInstanceRow> listInstances(int limit) {
+        return instanceRepo.findAll(limit).stream().map(this::toRow)
+                .collect(java.util.stream.Collectors.toList());
     }
 
-    public Optional<Map<String, Object>> getInstance(String instanceId) {
-        return instanceRepo.findById(instanceId).map(this::toMap);
+    public Optional<WorkflowInstanceRow> getInstance(String instanceId) {
+        return instanceRepo.findById(instanceId).map(this::toRow);
     }
 
-    public Optional<Map<String, Object>> suspendInstance(String instanceId) {
+    public Optional<WorkflowInstanceRow> suspendInstance(String instanceId) {
         instanceRepo.updateStatus(instanceId, "Suspended", null);
         logRepo.log(instanceId, null, "workflow", "InstanceSuspended", "实例已挂起", null, null, null);
-        return instanceRepo.findById(instanceId).map(this::toMap);
+        return instanceRepo.findById(instanceId).map(this::toRow);
     }
 
-    public Optional<Map<String, Object>> resumeInstance(String instanceId) {
+    public Optional<WorkflowInstanceRow> resumeInstance(String instanceId) {
         instanceRepo.updateStatus(instanceId, "Running", null);
         logRepo.log(instanceId, null, "workflow", "InstanceResumed", "实例已恢复", null, null, null);
-        return instanceRepo.findById(instanceId).map(this::toMap);
+        return instanceRepo.findById(instanceId).map(this::toRow);
     }
 
-    public Optional<Map<String, Object>> terminateInstance(String instanceId) {
+    public Optional<WorkflowInstanceRow> terminateInstance(String instanceId) {
         instanceRepo.updateStatus(instanceId, "Terminated", "Manual termination");
         logRepo.log(instanceId, null, "workflow", "InstanceTerminated", "实例已终止", null, null, null);
-        return instanceRepo.findById(instanceId).map(this::toMap);
+        return instanceRepo.findById(instanceId).map(this::toRow);
     }
 
     // ── helpers ──
@@ -138,25 +165,18 @@ public class WorkflowInstanceService {
         } catch (Exception e) { return Collections.emptyList(); }
     }
 
-    private Map<String, Object> toMap(WorkflowInstanceEntity inst) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", inst.getId());
-        m.put("workflowId", inst.getWorkflowId());
-        m.put("workflowName", inst.getWorkflowName());
-        m.put("status", inst.getStatus());
-        m.put("triggerType", inst.getTriggerType());
-        m.put("triggeredBy", inst.getTriggeredBy());
-        m.put("startedAt", inst.getStartedAt() != null ? inst.getStartedAt().toString() : null);
-        m.put("completedAt", inst.getCompletedAt() != null ? inst.getCompletedAt().toString() : null);
-        m.put("errorMessage", inst.getErrorMessage());
-        m.put("createdAt", inst.getCreatedAt() != null ? inst.getCreatedAt().toString() : null);
-        return m;
+    private WorkflowInstanceRow toRow(WorkflowInstanceEntity inst) {
+        return toRow(inst, null);
     }
 
-    private Map<String, Object> toMap(WorkflowInstanceEntity inst, WorkflowEntity wf) {
-        Map<String, Object> m = toMap(inst);
-        m.put("definition", Map.of("id", wf.getId(), "name", wf.getName(), "status", wf.getStatus()));
-        return m;
+    private WorkflowInstanceRow toRow(WorkflowInstanceEntity inst, WorkflowDefinitionRef definition) {
+        return new WorkflowInstanceRow(inst.getId(), inst.getWorkflowId(), inst.getWorkflowName(),
+                inst.getStatus(), inst.getTriggerType(), inst.getTriggeredBy(),
+                inst.getStartedAt() != null ? inst.getStartedAt().toString() : null,
+                inst.getCompletedAt() != null ? inst.getCompletedAt().toString() : null,
+                inst.getErrorMessage(),
+                inst.getCreatedAt() != null ? inst.getCreatedAt().toString() : null,
+                definition);
     }
 
     private String toJson(Object obj) {

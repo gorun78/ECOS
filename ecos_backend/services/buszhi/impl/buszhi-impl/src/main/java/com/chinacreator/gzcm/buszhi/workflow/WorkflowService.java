@@ -1,6 +1,5 @@
 package com.chinacreator.gzcm.buszhi.workflow;
 
-import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,11 +11,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 工作流业务服务 — 定义 CRUD + 验证/预览/克隆/导出。
+ *
+ * <p><b>#147CZ 行面强类型</b>：定义行/预览/导出/校验四类结果改 record（键名与旧 Map 逐键一致），
+ * 供 {@code WorkflowController} 与 {@code OntologyWorkflowApiController} 双宿主直接消费。
+ * 仍返 {@code Map} 的只剩执行结果 {@code testWorkflow}——其 steps/context/activeNodes 由
+ * {@link WorkflowEngine} 按定义动态生成，属运行时动态结构。</p>
  */
 @Service
 public class WorkflowService {
@@ -38,13 +43,55 @@ public class WorkflowService {
         this.validationService = validationService;
     }
 
+    /** 工作流定义行（10 键；nodes/edges 仍为原样 JSON 文本，与旧 Map 同值）。 */
+    public record WorkflowRow(@JsonProperty("id") String id,
+                              @JsonProperty("name") String name,
+                              @JsonProperty("description") String description,
+                              @JsonProperty("status") String status,
+                              @JsonProperty("mode") String mode,
+                              @JsonProperty("nodes") String nodes,
+                              @JsonProperty("edges") String edges,
+                              @JsonProperty("publishedAt") String publishedAt,
+                              @JsonProperty("createdAt") String createdAt,
+                              @JsonProperty("updatedAt") String updatedAt) {
+    }
+
+    /** 预览展开结果（5 键；expandedSteps/context 为运行时动态结构）。 */
+    public record WorkflowPreviewRow(@JsonProperty("workflowId") String workflowId,
+                                     @JsonProperty("name") String name,
+                                     @JsonProperty("expandedSteps") Object expandedSteps,
+                                     @JsonProperty("estimatedPath") String estimatedPath,
+                                     @JsonProperty("context") Object context) {
+    }
+
+    /** 导出结果（11 键；{@code $schema} 键名由注解钉住）。 */
+    public record WorkflowExportRow(@JsonProperty("$schema") String schema,
+                                    @JsonProperty("id") String id,
+                                    @JsonProperty("name") String name,
+                                    @JsonProperty("description") String description,
+                                    @JsonProperty("version") String version,
+                                    @JsonProperty("mode") String mode,
+                                    @JsonProperty("status") String status,
+                                    @JsonProperty("nodes") Object nodes,
+                                    @JsonProperty("edges") Object edges,
+                                    @JsonProperty("createdAt") String createdAt,
+                                    @JsonProperty("updatedAt") String updatedAt) {
+    }
+
+    /** 校验结果（4 键；条目为 {code,nodeId,message}/{message} 动态集合）。 */
+    public record WorkflowValidationRow(@JsonProperty("valid") boolean valid,
+                                        @JsonProperty("errors") List<Map<String, String>> errors,
+                                        @JsonProperty("warnings") List<Map<String, String>> warnings,
+                                        @JsonProperty("suggestions") List<Map<String, String>> suggestions) {
+    }
+
     private String nextId() {
         return "wf" + ID_SEQ.incrementAndGet();
     }
 
-    public List<Map<String, Object>> listWorkflows(int pageSize) {
+    public List<WorkflowRow> listWorkflows(int pageSize) {
         return repository.findAll(pageSize).stream()
-            .map(this::toMap)
+            .map(this::toRow)
             .collect(Collectors.toList());
     }
 
@@ -52,11 +99,11 @@ public class WorkflowService {
         return repository.count();
     }
 
-    public Optional<Map<String, Object>> getWorkflow(String id) {
-        return repository.findById(id).map(this::toMap);
+    public Optional<WorkflowRow> getWorkflow(String id) {
+        return repository.findById(id).map(this::toRow);
     }
 
-    public Map<String, Object> createWorkflow(Map<String, Object> body) {
+    public WorkflowRow createWorkflow(Map<String, Object> body) {
         WorkflowEntity entity = new WorkflowEntity();
         String id = nextId();
         entity.setId(id);
@@ -68,10 +115,10 @@ public class WorkflowService {
         entity.setEdges(String.valueOf(body.getOrDefault("edges", "[]")));
         repository.insert(entity);
         log.info("Workflow created: {} [{}]", id, entity.getName());
-        return toMap(entity);
+        return toRow(entity);
     }
 
-    public Optional<Map<String, Object>> updateWorkflow(String id, Map<String, Object> body) {
+    public Optional<WorkflowRow> updateWorkflow(String id, Map<String, Object> body) {
         Optional<WorkflowEntity> existing = repository.findById(id);
         if (existing.isEmpty()) return Optional.empty();
 
@@ -82,15 +129,15 @@ public class WorkflowService {
         String edges = body.containsKey("edges") ? toJsonString(body.get("edges")) : null;
 
         repository.update(id, name, description, mode, nodes, edges);
-        return repository.findById(id).map(this::toMap);
+        return repository.findById(id).map(this::toRow);
     }
 
-    public Optional<Map<String, Object>> publishWorkflow(String id) {
+    public Optional<WorkflowRow> publishWorkflow(String id) {
         Optional<WorkflowEntity> existing = repository.findById(id);
         if (existing.isEmpty()) return Optional.empty();
         repository.publish(id);
         log.info("Workflow published: {}", id);
-        return repository.findById(id).map(this::toMap);
+        return repository.findById(id).map(this::toRow);
     }
 
     /**
@@ -121,10 +168,10 @@ public class WorkflowService {
     /**
      * 验证工作流定义 JSON Schema。
      */
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> validateWorkflow(Map<String, Object> definition) {
+    public WorkflowValidationRow validateWorkflow(Map<String, Object> definition) {
         WorkflowValidationService.ValidationResult result = validationService.validate(definition);
-        return result.toMap();
+        return new WorkflowValidationRow(result.isValid(), result.getErrors(),
+                result.getWarnings(), result.getSuggestions());
     }
 
     // ── 预览展开 ──────────────────────────────────────
@@ -132,26 +179,19 @@ public class WorkflowService {
     /**
      * 基于上下文预览展开工作流。
      */
-    @SuppressWarnings("unchecked")
-    public Optional<Map<String, Object>> previewWorkflow(String id, Map<String, Object> context) {
+    public Optional<WorkflowPreviewRow> previewWorkflow(String id, Map<String, Object> context) {
         return repository.findById(id)
             .map(entity -> {
                 // Run a quick dry-run with context to see what nodes would execute
                 WorkflowEngine.WorkflowExecutionResult result = workflowEngine.execute(entity, context);
-                Map<String, Object> map = new LinkedHashMap<>();
-                map.put("workflowId", id);
-                map.put("name", entity.getName());
-                map.put("expandedSteps", result.toMap().get("steps"));
-                map.put("estimatedPath", result.getStatus());
-                map.put("context", context);
-                return map;
+                return new WorkflowPreviewRow(id, entity.getName(),
+                        result.toMap().get("steps"), result.getStatus(), context);
             });
     }
 
     // ── 克隆 ──────────────────────────────────────────
 
-    @SuppressWarnings("unchecked")
-    public Optional<Map<String, Object>> cloneWorkflow(String id) {
+    public Optional<WorkflowRow> cloneWorkflow(String id) {
         Optional<WorkflowEntity> existing = repository.findById(id);
         if (existing.isEmpty()) return Optional.empty();
 
@@ -167,7 +207,7 @@ public class WorkflowService {
         repository.insert(clone);
 
         log.info("Workflow cloned: {} → {}", id, clone.getId());
-        return Optional.of(toMap(clone));
+        return Optional.of(toRow(clone));
     }
 
     // ── 导出 ──────────────────────────────────────────
@@ -175,44 +215,33 @@ public class WorkflowService {
     /**
      * 导出工作流定义为完整 JSON。
      */
-    @SuppressWarnings("unchecked")
-    public Optional<Map<String, Object>> exportWorkflow(String id) {
+    public Optional<WorkflowExportRow> exportWorkflow(String id) {
         return repository.findById(id)
             .map(entity -> {
-                Map<String, Object> export = new LinkedHashMap<>();
-                export.put("$schema", "https://ecos.nousresearch.com/schemas/workflow-definition-v1.json");
-                export.put("id", entity.getId());
-                export.put("name", entity.getName());
-                export.put("description", entity.getDescription());
-                export.put("version", "1.0.0");
-                export.put("mode", entity.getMode());
-                export.put("status", entity.getStatus());
+                Object nodes;
+                Object edges;
                 try {
-                    export.put("nodes", objectMapper.readValue(entity.getNodes(), List.class));
-                    export.put("edges", objectMapper.readValue(entity.getEdges(), List.class));
+                    nodes = objectMapper.readValue(entity.getNodes(), List.class);
+                    edges = objectMapper.readValue(entity.getEdges(), List.class);
                 } catch (Exception e) {
-                    export.put("nodes", entity.getNodes());
-                    export.put("edges", entity.getEdges());
+                    nodes = entity.getNodes();
+                    edges = entity.getEdges();
                 }
-                export.put("createdAt", entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
-                export.put("updatedAt", entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
-                return export;
+                return new WorkflowExportRow(
+                        "https://ecos.nousresearch.com/schemas/workflow-definition-v1.json",
+                        entity.getId(), entity.getName(), entity.getDescription(), "1.0.0",
+                        entity.getMode(), entity.getStatus(), nodes, edges,
+                        entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null,
+                        entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
             });
     }
 
-    private Map<String, Object> toMap(WorkflowEntity entity) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", entity.getId());
-        map.put("name", entity.getName());
-        map.put("description", entity.getDescription());
-        map.put("status", entity.getStatus());
-        map.put("mode", entity.getMode());
-        map.put("nodes", entity.getNodes());
-        map.put("edges", entity.getEdges());
-        map.put("publishedAt", entity.getPublishedAt() != null ? entity.getPublishedAt().toString() : null);
-        map.put("createdAt", entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
-        map.put("updatedAt", entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
-        return map;
+    private WorkflowRow toRow(WorkflowEntity entity) {
+        return new WorkflowRow(entity.getId(), entity.getName(), entity.getDescription(),
+                entity.getStatus(), entity.getMode(), entity.getNodes(), entity.getEdges(),
+                entity.getPublishedAt() != null ? entity.getPublishedAt().toString() : null,
+                entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null,
+                entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
     }
 
     private String toJsonString(Object obj) {
