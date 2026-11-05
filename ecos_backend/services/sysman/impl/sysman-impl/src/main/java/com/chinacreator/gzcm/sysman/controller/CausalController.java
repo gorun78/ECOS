@@ -1,28 +1,104 @@
 package com.chinacreator.gzcm.sysman.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import com.chinacreator.gzcm.sysman.service.CausalQueryService;
+import com.chinacreator.gzcm.sysman.service.CausalQueryService.CausalEdgeRow;
+import com.chinacreator.gzcm.sysman.service.CausalQueryService.CausalNodeRow;
 
+/**
+ * 因果图端点（graph / paths / compare）。
+ *
+ * <p><b>#147DE 载体</b>：节点/边/路径/场景/差异全部改 record（键名与旧 Map 逐键一致）；
+ * 请求体 {@code /compare} 仍为自由 Map（只读 {@code scenarioIds}）。</p>
+ */
 @RestController("sysmanCausalController")
 @RequestMapping("/api/v1/causal")
 public class CausalController {
 
-        private final CausalQueryService causalQueryService;
-private static final Logger log = LoggerFactory.getLogger(CausalController.class);
+    private final CausalQueryService causalQueryService;
+    private static final Logger log = LoggerFactory.getLogger(CausalController.class);
 
-    private final ConcurrentHashMap<String, Map<String, Object>> nodeStore = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Map<String, Object>> edgeStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CausalNodeRow> nodeStore = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CausalEdgeRow> edgeStore = new ConcurrentHashMap<>();
 
     public CausalController(CausalQueryService causalQueryService) {
         this.causalQueryService = causalQueryService;
         initSeedData();
+    }
+
+    /** 因果图（4 键）。 */
+    public record CausalGraphVO(@JsonProperty("nodes") List<CausalNodeRow> nodes,
+                                @JsonProperty("edges") List<CausalEdgeRow> edges,
+                                @JsonProperty("nodeCount") int nodeCount,
+                                @JsonProperty("edgeCount") int edgeCount) {
+    }
+
+    /** 因果路径（5 键）。 */
+    public record CausalPathVO(@JsonProperty("nodes") List<String> nodes,
+                               @JsonProperty("length") int length,
+                               @JsonProperty("edges") List<CausalEdgeRow> edges,
+                               @JsonProperty("totalWeight") double totalWeight,
+                               @JsonProperty("avgWeight") double avgWeight) {
+    }
+
+    /** 路径列表（2 键）。 */
+    public record CausalPathsVO(@JsonProperty("paths") List<CausalPathVO> paths,
+                                @JsonProperty("total") int total) {
+    }
+
+    /** 对比场景节点（原节点 4 键 + {@code impactFactor}）。 */
+    public record ProjectedNodeVO(@JsonProperty("id") String id,
+                                  @JsonProperty("name") String name,
+                                  @JsonProperty("type") String type,
+                                  @JsonProperty("group") String group,
+                                  @JsonProperty("impactFactor") double impactFactor) {
+    }
+
+    /** 对比场景边（原边 5 键 + {@code projectedWeight}）。 */
+    public record ProjectedEdgeVO(@JsonProperty("id") String id,
+                                  @JsonProperty("source") String source,
+                                  @JsonProperty("target") String target,
+                                  @JsonProperty("weight") double weight,
+                                  @JsonProperty("type") String type,
+                                  @JsonProperty("projectedWeight") double projectedWeight) {
+    }
+
+    /** 对比场景（4 键）。 */
+    public record CausalScenarioVO(@JsonProperty("id") String id,
+                                   @JsonProperty("name") String name,
+                                   @JsonProperty("nodes") List<ProjectedNodeVO> nodes,
+                                   @JsonProperty("edges") List<ProjectedEdgeVO> edges) {
+    }
+
+    /** 场景差异（4 键）。 */
+    public record CausalDiffVO(@JsonProperty("scenarioA") String scenarioA,
+                               @JsonProperty("scenarioB") String scenarioB,
+                               @JsonProperty("nodeCountDiff") int nodeCountDiff,
+                               @JsonProperty("edgeCountDiff") int edgeCountDiff) {
+    }
+
+    /** 对比响应（3 键）。 */
+    public record CausalCompareVO(@JsonProperty("scenarios") List<CausalScenarioVO> scenarios,
+                                  @JsonProperty("differences") List<CausalDiffVO> differences,
+                                  @JsonProperty("comparedCount") int comparedCount) {
     }
 
     private boolean dbAvailable() {
@@ -46,12 +122,7 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
                 {"n8", "流程自动化", "process", "运营域"},
         };
         for (String[] n : nodes) {
-            Map<String, Object> node = new LinkedHashMap<>();
-            node.put("id", n[0]);
-            node.put("name", n[1]);
-            node.put("type", n[2]);
-            node.put("group", n[3]);
-            nodeStore.put(n[0], node);
+            nodeStore.put(n[0], new CausalNodeRow(n[0], n[1], n[2], n[3]));
         }
 
         String[][] edges = {
@@ -67,23 +138,17 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
                 {"e10", "n5", "n6", "0.30", "feedback"},
         };
         for (String[] e : edges) {
-            Map<String, Object> edge = new LinkedHashMap<>();
-            edge.put("id", e[0]);
-            edge.put("source", e[1]);
-            edge.put("target", e[2]);
-            edge.put("weight", Double.parseDouble(e[3]));
-            edge.put("type", e[4]);
-            edgeStore.put(e[0], edge);
+            edgeStore.put(e[0], new CausalEdgeRow(e[0], e[1], e[2], Double.parseDouble(e[3]), e[4]));
         }
 
         log.info("CausalController 初始化完成，已加载 {} 个节点, {} 条边", nodeStore.size(), edgeStore.size());
     }
 
     @GetMapping("/graph")
-    public ApiResponse<Map<String, Object>> getGraph() {
+    public ApiResponse<CausalGraphVO> getGraph() {
         try {
-            List<Map<String, Object>> nodes;
-            List<Map<String, Object>> edges;
+            List<CausalNodeRow> nodes;
+            List<CausalEdgeRow> edges;
 
             if (dbAvailable()) {
                 nodes = causalQueryService.listNodes();
@@ -93,12 +158,7 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
                 edges = new ArrayList<>(edgeStore.values());
             }
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("nodes", nodes);
-            result.put("edges", edges);
-            result.put("nodeCount", nodes.size());
-            result.put("edgeCount", edges.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new CausalGraphVO(nodes, edges, nodes.size(), edges.size()));
         } catch (Exception e) {
             log.error("获取因果图失败", e);
             return ApiResponse.internalError("获取因果图失败");
@@ -106,12 +166,12 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
     }
 
     @GetMapping("/paths")
-    public ApiResponse<Map<String, Object>> getPaths(
+    public ApiResponse<CausalPathsVO> getPaths(
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String target,
             @RequestParam(required = false, defaultValue = "5") int maxDepth) {
         try {
-            List<Map<String, Object>> paths;
+            List<CausalPathVO> paths;
 
             if (source != null && target != null) {
                 paths = findPaths(source, target, maxDepth);
@@ -119,22 +179,18 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
                 paths = findAllPaths(maxDepth);
             }
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("paths", paths);
-            result.put("total", paths.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new CausalPathsVO(paths, paths.size()));
         } catch (Exception e) {
             log.error("获取因果路径失败", e);
             return ApiResponse.internalError("获取因果路径失败");
         }
     }
 
-    private List<Map<String, Object>> findPaths(String source, String target, int maxDepth) {
+    private List<CausalPathVO> findPaths(String source, String target, int maxDepth) {
         List<List<String>> rawPaths = new ArrayList<>();
         Deque<List<String>> queue = new ArrayDeque<>();
         queue.add(List.of(source));
 
-        Set<String> visited;
         while (!queue.isEmpty()) {
             List<String> current = queue.poll();
             String last = current.get(current.size() - 1);
@@ -148,10 +204,10 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
                 continue;
             }
 
-            for (Map<String, Object> edge : edgeStore.values()) {
-                if (edge.get("source").equals(last)) {
-                    String next = (String) edge.get("target");
-                    visited = new HashSet<>(current);
+            for (CausalEdgeRow edge : edgeStore.values()) {
+                if (edge.source().equals(last)) {
+                    String next = edge.target();
+                    Set<String> visited = new HashSet<>(current);
                     if (!visited.contains(next)) {
                         List<String> newPath = new ArrayList<>(current);
                         newPath.add(next);
@@ -161,48 +217,44 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
             }
         }
 
-        return rawPaths.stream().map(path -> {
-            Map<String, Object> p = new LinkedHashMap<>();
-            p.put("nodes", path);
-            p.put("length", path.size() - 1);
+        List<CausalPathVO> out = new ArrayList<>(rawPaths.size());
+        for (List<String> path : rawPaths) {
             double totalWeight = 0.0;
-            List<Map<String, Object>> pathEdges = new ArrayList<>();
+            List<CausalEdgeRow> pathEdges = new ArrayList<>();
             for (int i = 0; i < path.size() - 1; i++) {
                 String src = path.get(i);
                 String tgt = path.get(i + 1);
-                for (Map<String, Object> edge : edgeStore.values()) {
-                    if (edge.get("source").equals(src) && edge.get("target").equals(tgt)) {
-                        totalWeight += (Double) edge.get("weight");
+                for (CausalEdgeRow edge : edgeStore.values()) {
+                    if (edge.source().equals(src) && edge.target().equals(tgt)) {
+                        totalWeight += edge.weight();
                         pathEdges.add(edge);
                         break;
                     }
                 }
             }
-            p.put("edges", pathEdges);
-            p.put("totalWeight", totalWeight);
-            p.put("avgWeight", pathEdges.isEmpty() ? 0.0 : totalWeight / pathEdges.size());
-            return p;
-        }).collect(Collectors.toList());
+            out.add(new CausalPathVO(path, path.size() - 1, pathEdges, totalWeight,
+                    pathEdges.isEmpty() ? 0.0 : totalWeight / pathEdges.size()));
+        }
+        return out;
     }
 
-    private List<Map<String, Object>> findAllPaths(int maxDepth) {
-        List<Map<String, Object>> paths = new ArrayList<>();
+    private List<CausalPathVO> findAllPaths(int maxDepth) {
+        List<CausalPathVO> paths = new ArrayList<>();
         for (String sourceId : nodeStore.keySet()) {
             for (String targetId : nodeStore.keySet()) {
                 if (!sourceId.equals(targetId)) {
-                    List<Map<String, Object>> found = findPaths(sourceId, targetId, maxDepth);
-                    paths.addAll(found);
+                    paths.addAll(findPaths(sourceId, targetId, maxDepth));
                 }
             }
             if (paths.size() >= 50) {
                 break;
             }
         }
-        return paths.stream().limit(50).collect(Collectors.toList());
+        return paths.stream().limit(50).toList();
     }
 
     @PostMapping("/compare")
-    public ApiResponse<Map<String, Object>> compare(@RequestBody Map<String, Object> request) {
+    public ApiResponse<CausalCompareVO> compare(@RequestBody Map<String, Object> request) {
         try {
             @SuppressWarnings("unchecked")
             List<String> scenarioIds = (List<String>) request.get("scenarioIds");
@@ -210,57 +262,37 @@ private static final Logger log = LoggerFactory.getLogger(CausalController.class
                 return ApiResponse.badRequest("至少需要两个场景进行对比");
             }
 
-            List<Map<String, Object>> scenarios = new ArrayList<>();
+            List<CausalScenarioVO> scenarios = new ArrayList<>();
             for (String scenarioId : scenarioIds) {
-                Map<String, Object> scenario = new LinkedHashMap<>();
-                scenario.put("id", scenarioId);
-                scenario.put("name", "场景 " + scenarioId);
-
-                List<Map<String, Object>> scenarioNodes = new ArrayList<>();
-                for (Map<String, Object> node : nodeStore.values()) {
-                    Map<String, Object> projected = new LinkedHashMap<>(node);
+                List<ProjectedNodeVO> scenarioNodes = new ArrayList<>();
+                for (CausalNodeRow node : nodeStore.values()) {
                     double mod = 0.8 + Math.random() * 0.4;
-                    projected.put("impactFactor", Math.round(mod * 100.0) / 100.0);
-                    scenarioNodes.add(projected);
+                    scenarioNodes.add(new ProjectedNodeVO(node.id(), node.name(), node.type(),
+                            node.group(), Math.round(mod * 100.0) / 100.0));
                 }
-                scenario.put("nodes", scenarioNodes);
 
-                List<Map<String, Object>> scenarioEdges = new ArrayList<>();
-                for (Map<String, Object> edge : edgeStore.values()) {
-                    Map<String, Object> projected = new LinkedHashMap<>(edge);
-                    double baseWeight = (Double) edge.get("weight");
+                List<ProjectedEdgeVO> scenarioEdges = new ArrayList<>();
+                for (CausalEdgeRow edge : edgeStore.values()) {
                     double mod = 0.7 + Math.random() * 0.6;
-                    projected.put("projectedWeight", Math.round(baseWeight * mod * 100.0) / 100.0);
-                    scenarioEdges.add(projected);
+                    scenarioEdges.add(new ProjectedEdgeVO(edge.id(), edge.source(), edge.target(),
+                            edge.weight(), edge.type(),
+                            Math.round(edge.weight() * mod * 100.0) / 100.0));
                 }
-                scenario.put("edges", scenarioEdges);
 
-                scenarios.add(scenario);
+                scenarios.add(new CausalScenarioVO(scenarioId, "场景 " + scenarioId,
+                        scenarioNodes, scenarioEdges));
             }
 
-            List<Map<String, Object>> differences = new ArrayList<>();
+            List<CausalDiffVO> differences = new ArrayList<>();
             for (int i = 0; i < scenarios.size() - 1; i++) {
                 for (int j = i + 1; j < scenarios.size(); j++) {
-                    Map<String, Object> diff = new LinkedHashMap<>();
-                    diff.put("scenarioA", scenarioIds.get(i));
-                    diff.put("scenarioB", scenarioIds.get(j));
-                    diff.put("nodeCountDiff",
-                            scenarios.get(i).get("nodes") instanceof List<?> a
-                                    && scenarios.get(j).get("nodes") instanceof List<?> b
-                                    ? a.size() - b.size() : 0);
-                    diff.put("edgeCountDiff",
-                            scenarios.get(i).get("edges") instanceof List<?> a
-                                    && scenarios.get(j).get("edges") instanceof List<?> b
-                                    ? a.size() - b.size() : 0);
-                    differences.add(diff);
+                    differences.add(new CausalDiffVO(scenarioIds.get(i), scenarioIds.get(j),
+                            scenarios.get(i).nodes().size() - scenarios.get(j).nodes().size(),
+                            scenarios.get(i).edges().size() - scenarios.get(j).edges().size()));
                 }
             }
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("scenarios", scenarios);
-            result.put("differences", differences);
-            result.put("comparedCount", scenarios.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new CausalCompareVO(scenarios, differences, scenarios.size()));
         } catch (Exception e) {
             log.error("场景对比失败", e);
             return ApiResponse.internalError("场景对比失败");
