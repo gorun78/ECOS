@@ -8,6 +8,9 @@ import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.buszhi.workflow.WorkflowApprovalService;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowAddSignResultVO;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowApprovalResultVO;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowTransferResultVO;
 
 /**
  * 审批中心 REST API — approve/reject/transfer/addSign。
@@ -31,11 +34,11 @@ public class WorkflowApprovalController {
     }
 
     @PostMapping("/{taskId}/approve")
-    public ApiResponse<Map<String, Object>> approve(
+    public ApiResponse<WorkflowApprovalResultVO> approve(
             @PathVariable String taskId,
             @RequestBody Map<String, Object> body) {
         try {
-            Map<String, Object> result = approvalService.approve(taskId, body);
+            WorkflowApprovalResultVO result = approvalService.approve(taskId, body);
             log.info("Approval approved: task={}", taskId);
             return ApiResponse.success(result);
         } catch (RuntimeException e) {
@@ -45,11 +48,11 @@ public class WorkflowApprovalController {
     }
 
     @PostMapping("/{taskId}/reject")
-    public ApiResponse<Map<String, Object>> reject(
+    public ApiResponse<WorkflowApprovalResultVO> reject(
             @PathVariable String taskId,
             @RequestBody Map<String, Object> body) {
         try {
-            Map<String, Object> result = approvalService.reject(taskId, body);
+            WorkflowApprovalResultVO result = approvalService.reject(taskId, body);
             log.info("Approval rejected: task={}", taskId);
             return ApiResponse.success(result);
         } catch (RuntimeException e) {
@@ -59,11 +62,11 @@ public class WorkflowApprovalController {
     }
 
     @PostMapping("/{taskId}/transfer")
-    public ApiResponse<Map<String, Object>> transfer(
+    public ApiResponse<WorkflowTransferResultVO> transfer(
             @PathVariable String taskId,
             @RequestBody Map<String, Object> body) {
         try {
-            Map<String, Object> result = approvalService.transfer(taskId, body);
+            WorkflowTransferResultVO result = approvalService.transfer(taskId, body);
             log.info("Approval transferred: task={}", taskId);
             return ApiResponse.success(result);
         } catch (RuntimeException e) {
@@ -73,11 +76,11 @@ public class WorkflowApprovalController {
     }
 
     @PostMapping("/{taskId}/addSign")
-    public ApiResponse<Map<String, Object>> addSign(
+    public ApiResponse<WorkflowAddSignResultVO> addSign(
             @PathVariable String taskId,
             @RequestBody Map<String, Object> body) {
         try {
-            Map<String, Object> result = approvalService.addSign(taskId, body);
+            WorkflowAddSignResultVO result = approvalService.addSign(taskId, body);
             log.info("AddSign requested: task={}", taskId);
             return ApiResponse.success(result);
         } catch (RuntimeException e) {

@@ -135,7 +135,7 @@ public class WorkflowInstanceApprovalController {
                         + " 未指派审批人，服务端无法解析审批主语");
             }
             taskId = task.getId();
-            approvalId = String.valueOf(approvalService.approve(taskId, sanitized).get("approvalId"));
+            approvalId = String.valueOf(approvalService.approve(taskId, sanitized).approvalId());
         } catch (DataAccessException ex) {
             throw approvalChainUnreachable(ex);
         }

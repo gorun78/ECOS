@@ -100,7 +100,8 @@ class WorkflowInstanceApprovalContractTest {
     void clientSuppliedActorIsDropped() {
         givenInstance("inst-1");
         givenTasks(task("task-1", "Assigned", "zhangsan"));
-        when(approvalService.approve(eq("task-1"), any())).thenReturn(Map.of("approvalId", "appr-1"));
+        when(approvalService.approve(eq("task-1"), any()))
+                .thenReturn(new com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowApprovalResultVO("appr-1", "Approved"));
         when(approvalRepo.findById("appr-1")).thenReturn(Optional.of(row("appr-1", "task-1", "zhangsan")));
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -154,7 +155,8 @@ class WorkflowInstanceApprovalContractTest {
     void missingReadBackRowIsNotSilentSuccess() {
         givenInstance("inst-1");
         givenTasks(task("task-1", "New", "lisi"));
-        when(approvalService.approve(eq("task-1"), any())).thenReturn(Map.of("approvalId", "appr-9"));
+        when(approvalService.approve(eq("task-1"), any()))
+                .thenReturn(new com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowApprovalResultVO("appr-9", "Approved"));
         when(approvalRepo.findById("appr-9")).thenReturn(Optional.empty());
 
         DataBridgeException ex = assertThrows(DataBridgeException.class,
@@ -195,7 +197,8 @@ class WorkflowInstanceApprovalContractTest {
         givenTasks(task("task-1", "Completed", "zhangsan"),
                 task("task-2", "Assigned", "lisi"),
                 task("task-3", "New", "wangwu"));
-        when(approvalService.approve(eq("task-2"), any())).thenReturn(Map.of("approvalId", "appr-2"));
+        when(approvalService.approve(eq("task-2"), any()))
+                .thenReturn(new com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowApprovalResultVO("appr-2", "Approved"));
         when(approvalRepo.findById("appr-2")).thenReturn(Optional.of(row("appr-2", "task-2", "lisi")));
 
         controller.approveWorkflowInstance("inst-1", Map.of());
@@ -207,7 +210,8 @@ class WorkflowInstanceApprovalContractTest {
     void successReturnsTheApprovalRow() {
         givenInstance("inst-1");
         givenTasks(task("task-1", "New", "lisi"));
-        when(approvalService.approve(eq("task-1"), any())).thenReturn(Map.of("approvalId", "appr-7"));
+        when(approvalService.approve(eq("task-1"), any()))
+                .thenReturn(new com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowApprovalResultVO("appr-7", "Approved"));
         when(approvalRepo.findById("appr-7")).thenReturn(Optional.of(row("appr-7", "task-1", "lisi")));
 
         ApiResponse<Map<String, Object>> resp =

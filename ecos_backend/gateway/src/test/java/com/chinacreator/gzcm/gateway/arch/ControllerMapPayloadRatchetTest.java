@@ -358,6 +358,14 @@ import org.junit.jupiter.api.Test;
  *       剩 4 枚为流转请求体（完成表单自由字段）。键面与顺序由
  *       {@code WorkflowTaskWireShapeTest} 3 例钉住，变异实红（{@code instanceId}→instance_id）；
  *       {@code buszhi-impl} 全量 **26/0/0/0**。</li>
+ *   <li>1553 ＝ #147DQ（2026-11-05）HEAD 面复测值，差额 −8 行来自 buszhi 域
+ *       {@code WorkflowApprovalController}（12→4）：通过/驳回回执 2 键（approvalId/decision）、
+ *       转签 3 键（taskId/decision/newAssignee）、加签 2 键（taskId/status）改 record，
+ *       {@code WorkflowApprovalService} 四个方法同步返强类型；实例审批腿
+ *       {@code WorkflowInstanceApprovalController} 改读 {@code approvalId()}，
+ *       既有 {@code WorkflowInstanceApprovalContractTest} 9 例同步改桩复跑绿；剩 4 枚为
+ *       审批请求体（意见/表单自由字段）。键面由 {@code WorkflowApprovalWireShapeTest} 3 例钉住，
+ *       变异实红（{@code newAssignee}→new_assignee）；{@code buszhi-impl} 全量 **29/0/0/0**。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -369,7 +377,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11、1640 = 1629 + 11、1621 = 1610 + 11、1613 = 1602 + 11、1597 = 1586 + 11、1582 = 1571 + 11、1572 = 1561 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11、1640 = 1629 + 11、1621 = 1610 + 11、1613 = 1602 + 11、1597 = 1586 + 11、1582 = 1571 + 11、1572 = 1561 + 11、1564 = 1553 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -384,7 +392,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1561;
+    private static final int BASELINE_LINES = 1553;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -394,7 +402,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1561（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1553（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

@@ -1,5 +1,8 @@
 package com.chinacreator.gzcm.buszhi.workflow;
 
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowAddSignResultVO;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowApprovalResultVO;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowTransferResultVO;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -38,7 +41,7 @@ public class WorkflowApprovalService {
     /**
      * 审批通过。
      */
-    public Map<String, Object> approve(String taskId, Map<String, Object> body) {
+    public WorkflowApprovalResultVO approve(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
         if (taskOpt.isEmpty()) throw new NotFoundException("WF-009: 任务不存在: " + taskId);
 
@@ -65,16 +68,13 @@ public class WorkflowApprovalService {
         logRepo.log(task.getInstanceId(), task.getNodeId(), "userTask",
             "ApprovalApproved", "审批通过: " + approver, null, null, null);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("approvalId", approval.getId());
-        result.put("decision", "Approved");
-        return result;
+        return new WorkflowApprovalResultVO(approval.getId(), "Approved");
     }
 
     /**
      * 审批驳回。
      */
-    public Map<String, Object> reject(String taskId, Map<String, Object> body) {
+    public WorkflowApprovalResultVO reject(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
         if (taskOpt.isEmpty()) throw new NotFoundException("WF-009: 任务不存在: " + taskId);
 
@@ -98,16 +98,13 @@ public class WorkflowApprovalService {
         logRepo.log(task.getInstanceId(), task.getNodeId(), "userTask",
             "ApprovalRejected", "审批驳回: " + approver, null, null, null);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("approvalId", approval.getId());
-        result.put("decision", "Rejected");
-        return result;
+        return new WorkflowApprovalResultVO(approval.getId(), "Rejected");
     }
 
     /**
      * 审批转签。
      */
-    public Map<String, Object> transfer(String taskId, Map<String, Object> body) {
+    public WorkflowTransferResultVO transfer(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
         if (taskOpt.isEmpty()) throw new NotFoundException("WF-009: 任务不存在: " + taskId);
 
@@ -119,17 +116,13 @@ public class WorkflowApprovalService {
         logRepo.log(task.getInstanceId(), task.getNodeId(), "userTask",
             "ApprovalTransferred", "审批转签 → " + newAssignee, null, null, null);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("taskId", taskId);
-        result.put("decision", "Transferred");
-        result.put("newAssignee", newAssignee);
-        return result;
+        return new WorkflowTransferResultVO(taskId, "Transferred", newAssignee);
     }
 
     /**
      * 加签。
      */
-    public Map<String, Object> addSign(String taskId, Map<String, Object> body) {
+    public WorkflowAddSignResultVO addSign(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
         if (taskOpt.isEmpty()) throw new NotFoundException("WF-009: 任务不存在: " + taskId);
 
@@ -137,10 +130,7 @@ public class WorkflowApprovalService {
         logRepo.log(taskOpt.get().getInstanceId(), taskOpt.get().getNodeId(), "userTask",
             "AddSign", "加签请求: " + body, null, null, null);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("taskId", taskId);
-        result.put("status", "AddSignRequested");
-        return result;
+        return new WorkflowAddSignResultVO(taskId, "AddSignRequested");
     }
 
     private String toJson(Object obj) {
