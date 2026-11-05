@@ -1,13 +1,13 @@
 package com.chinacreator.gzcm.engine.ai.wagent.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentApiPaths;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentGoalDO;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.SlotFillingService;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentGoalService;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.Identity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -58,8 +57,23 @@ public class WAgentGoalController {
                                     String dueDate, String orgId, Map<String, String> slotsSource) {
     }
 
+    /** Goal 视图（12 键；旧 Map 逐键同名同序，全推断提醒位为确定性布尔）。 */
+    public record GoalVO(@JsonProperty("goal_id") String goalId,
+                         @JsonProperty("name") String name,
+                         @JsonProperty("goal_type") String goalType,
+                         @JsonProperty("status") String status,
+                         @JsonProperty("version_no") String versionNo,
+                         @JsonProperty("supersedes_goal_id") String supersedesGoalId,
+                         @JsonProperty("caliber_version") String caliberVersion,
+                         @JsonProperty("metric_id") String metricId,
+                         @JsonProperty("metric_version") String metricVersion,
+                         @JsonProperty("as_of_date") String asOfDate,
+                         @JsonProperty("inferred_count") Integer inferredCount,
+                         @JsonProperty("all_slots_inferred_warning") boolean allSlotsInferredWarning) {
+    }
+
     @PostMapping(WAgentApiPaths.GOALS_COLLECTION)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> createGoal(@RequestBody GoalCreateRequest req) {
+    public ResponseEntity<ApiResponse<GoalVO>> createGoal(@RequestBody GoalCreateRequest req) {
         Identity identity = identityResolver.require();
         WAgentGoalDO goal = goalService.create(new WAgentGoalService.GoalCreateCommand(
                 identity.tenantId(), req.orgId() == null ? identity.orgId() : req.orgId(),
@@ -70,19 +84,19 @@ public class WAgentGoalController {
         return ResponseEntity.status(201)
                 .header("Location", WAgentApiPaths.resolve(WAgentApiPaths.GOAL_REVISE,
                         WAgentApiPaths.P_GOAL_ID, goal.getId()))
-                .body(ok(view(goal)));
+                .body(WAgentRunController.ok(view(goal)));
     }
 
     /** #2 修订/运营更新（含口径字段 ⇒ 新版本链；否则就地更新且被引用即 409）。 */
     @PatchMapping(WAgentApiPaths.GOAL_REVISE)
-    public ApiResponse<Map<String, Object>> reviseGoal(@PathVariable(WAgentApiPaths.P_GOAL_ID) String goalId,
-                                                       @RequestBody Map<String, String> patch) {
+    public ApiResponse<GoalVO> reviseGoal(@PathVariable(WAgentApiPaths.P_GOAL_ID) String goalId,
+                                          @RequestBody Map<String, String> patch) {
         Identity identity = identityResolver.require();
         // 先触读取校验（存在性 + 租户掩蔽经 revise 内 load；就地面对象面自校验）
         WAgentGoalDO result = touchesCaliber(patch)
                 ? goalService.revise(goalId, patch, identity.operator(), identity.tenantId())
                 : goalService.updateInPlace(goalId, patch, identity.operator());
-        return ok(view(result));
+        return WAgentRunController.ok(view(result));
     }
 
     static boolean touchesCaliber(Map<String, String> patch) {
@@ -106,24 +120,11 @@ public class WAgentGoalController {
     }
 
     /** Goal 视图（只出受控字段；全推断提醒位 = AC-02 数据基，确定性布尔非 LLM）。 */
-    private Map<String, Object> view(WAgentGoalDO goal) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("goal_id", goal.getId());
-        m.put("name", goal.getName());
-        m.put("goal_type", goal.getGoalType());
-        m.put("status", goal.getStatus());
-        m.put("version_no", goal.getVersionNo());
-        m.put("supersedes_goal_id", goal.getSupersedesGoalId());
-        m.put("caliber_version", goal.getCaliberVersion());
-        m.put("metric_id", goal.getMetricId());
-        m.put("metric_version", goal.getMetricVersion());
-        m.put("as_of_date", goal.getAsOfDate() == null ? null : goal.getAsOfDate().toString());
-        m.put("inferred_count", goal.getInferredCount());
-        m.put("all_slots_inferred_warning", slotFillingService.raisesAllInferredWarning(goal));
-        return m;
-    }
-
-    static ApiResponse<Map<String, Object>> ok(Map<String, Object> data) {
-        return ApiResponse.success(data).withTraceId(AiTraceSupport.currentTraceId());
+    private GoalVO view(WAgentGoalDO goal) {
+        return new GoalVO(goal.getId(), goal.getName(), goal.getGoalType(), goal.getStatus(),
+                goal.getVersionNo(), goal.getSupersedesGoalId(), goal.getCaliberVersion(),
+                goal.getMetricId(), goal.getMetricVersion(),
+                goal.getAsOfDate() == null ? null : goal.getAsOfDate().toString(),
+                goal.getInferredCount(), slotFillingService.raisesAllInferredWarning(goal));
     }
 }
