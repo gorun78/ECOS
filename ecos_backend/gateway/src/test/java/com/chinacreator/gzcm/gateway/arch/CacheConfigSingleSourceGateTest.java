@@ -63,8 +63,8 @@ class CacheConfigSingleSourceGateTest {
     /** 合法配置键形态：点分或下划线，无空格。 */
     private static final Pattern KEY_SHAPE = Pattern.compile("[A-Za-z0-9_.\\-]+");
 
-    /** 资源面命中下限（防扫描根漂移把门变成空转）。#147Z-2 HEAD 实测 = 11。 */
-    private static final int MIN_RESOURCE_HITS = 11;
+    /** 资源面命中下限（防扫描根漂移把门变成空转）。#147EM 清退两枚幻影键后 HEAD 实测 = 9。 */
+    private static final int MIN_RESOURCE_HITS = 9;
     /** main java 文件扫描下限。#147Z-2 HEAD 实测 = 2483 枚。 */
     private static final int MIN_MAIN_JAVA_FILES = 2000;
     /** 底座属主去重命中数（只减不增）。#147Z-2 HEAD 实测 = 9。 */
@@ -122,11 +122,8 @@ class CacheConfigSingleSourceGateTest {
                 "DC-3 违例存量：决策缓存 TTL 走 System property；权限域缓存且未承流，接线前必须归口。");
         m.put("B|ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/gzcm/engine/security/policy/cache/impl/InMemoryDecisionCacheService.java|SECURITY_POLICY_DECISION_CACHE_TTL_MS",
                 "同上（环境变量形态）。");
-        // —— 幻影键：写了不生效（无 profile 前缀属主绑定，属主为 llm.*）——
-        m.put("A|ecos_backend/gateway/src/main/resources/application.yml|profile.cache-enabled|false",
-                "幻影配置：全仓无 profile 前缀的 @ConfigurationProperties 绑定 ⇒ 该键不生效，与底座无关。清退=删除或改挂 llm.* 属主。");
-        m.put("A|ecos_backend/gateway/src/main/resources/application.yml|profile.cache-ttl-minutes|30",
-                "同上（属主默认值在 LLMGatewayProperties，前缀 llm）。");
+        // —— 幻影键：已清退（DC-3 #147EM 删除网关 `profile.cache-enabled/cache-ttl-minutes`，
+        //    全仓无 profile 前缀绑定、属主默认值在 LLMGatewayProperties(llm.*)，删后白名单同步 −2）——
         // —— ORM 二级缓存开关：框架自身开关，不属 R8 知识缓存底座作用域，但必须同值同批 ——
         m.put("A|ecos_backend/gateway/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
         m.put("A|ecos_backend/services/aiming/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);

@@ -134,10 +134,6 @@ agent:
   default-max-iterations: 5
   default-system-prompt: "你是ECOS平台的AI助手。"
 
-profile:
-  cache-enabled: false
-  cache-ttl-minutes: 30
-
 logging:
   level:
     root: INFO
