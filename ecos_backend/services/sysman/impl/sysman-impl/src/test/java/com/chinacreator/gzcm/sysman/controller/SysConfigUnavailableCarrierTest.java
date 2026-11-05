@@ -132,7 +132,9 @@ class SysConfigUnavailableCarrierTest {
         SysConfigController controller = new SysConfigController(absentProvider());
 
         assertCarrier(() -> controller.listByGroup("", ""), "listByGroup");
-        assertCarrier(() -> controller.update("k", Map.of("value", "v")), "update");
+        SysConfigController.ConfigValueRequest valueRequest = new SysConfigController.ConfigValueRequest();
+        valueRequest.setValue("v");
+        assertCarrier(() -> controller.update("k", valueRequest), "update");
         assertCarrier(() -> controller.metadata(), "metadata");
         assertCarrier(() -> controller.audit(), "audit");
         // #146u：契约面 /group（第 5 枚腿）——凭证先过，再落未装配态，两态不得互折。
@@ -161,7 +163,7 @@ class SysConfigUnavailableCarrierTest {
                 410, "SystemParamController.get");
 
         SysConfigQueryService queryService = mock(SysConfigQueryService.class);
-        when(queryService.queryForList(anyString())).thenThrow(
+        when(queryService.queryMetadata()).thenThrow(
                 new DataBridgeException(503, 503, SystemErrorCode.ECOS_SYS_503 + ": dao down"));
         assertCarrier(() -> new SysConfigController(availableProvider(queryService)).metadata(),
                 503, "SysConfigController.metadata");
@@ -189,12 +191,12 @@ class SysConfigUnavailableCarrierTest {
         assertEquals(0, paramResp.getData().getTotal());
 
         SysConfigQueryService queryService = mock(SysConfigQueryService.class);
-        when(queryService.queryForList(anyString())).thenReturn(List.of());
-        ApiResponse<Map<String, Object>> sysResp = new SysConfigController(
+        when(queryService.listByGroup(any(), any(), any())).thenReturn(List.of());
+        ApiResponse<SysConfigController.ConfigListVO> sysResp = new SysConfigController(
                 availableProvider(queryService)).listByGroup("", "");
         assertEquals(ApiResponse.CODE_SUCCESS, sysResp.getCode(),
                 "§4.7.2：空结果走成功信封，只有「依赖不在」才走 503");
-        assertEquals(List.of(), sysResp.getData().get("data"));
+        assertEquals(List.of(), sysResp.getData().data());
     }
 
     @Test
@@ -211,8 +213,10 @@ class SysConfigUnavailableCarrierTest {
         assertEquals(1, resp.getData().getTotal(), "对照 A 的 0 必须来自空集而非恒 0");
 
         SysConfigQueryService queryService = mock(SysConfigQueryService.class);
-        when(queryService.queryForList(anyString())).thenReturn(List.of(Map.of("config_key", "k-1")));
-        ApiResponse<List<Map<String, Object>>> meta = new SysConfigController(
+        when(queryService.queryMetadata()).thenReturn(List.of(
+                new SysConfigQueryService.ConfigMetaRow(null, null, "k-1", null, null, null, null,
+                        null, null, null)));
+        ApiResponse<List<SysConfigController.ConfigMetaVO>> meta = new SysConfigController(
                 availableProvider(queryService)).metadata();
         assertEquals(ApiResponse.CODE_SUCCESS, meta.getCode());
         assertEquals(1, meta.getData().size());

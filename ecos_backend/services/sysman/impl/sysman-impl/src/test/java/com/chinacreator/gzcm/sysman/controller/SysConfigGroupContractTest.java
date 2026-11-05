@@ -105,40 +105,35 @@ class SysConfigGroupContractTest {
     @DisplayName("命中行投影契约键：versionNo 恒 null＋versionNoApplicable=false；missingKeys 逐枚留痕；subsystem 回显自证")
     void contractPayloadIsHonestAndFilteringIsReal() {
         SysConfigQueryService service = mock(SysConfigQueryService.class);
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("config_key", "default_page_size");
-        row.put("config_value", "20");
-        row.put("config_type", "number");
-        row.put("edition", "all");
-        row.put("updated_at", Timestamp.from(Instant.parse("2026-10-28T02:03:04Z")));
+        SysConfigQueryService.ConfigContractRow row = new SysConfigQueryService.ConfigContractRow(
+                "default_page_size", "20", "number", "general", "all", "2026-10-28T02:03:04Z");
         when(service.listByConfigGroupForContract(eq("general"), any(), eq(""), any()))
                 .thenReturn(List.of(row));
 
         SysConfigController controller = new SysConfigController(availableProvider(service));
-        ApiResponse<Map<String, Object>> resp = controller.getConfigByGroup(
+        ApiResponse<SysConfigController.ConfigGroupResultVO> resp = controller.getConfigByGroup(
                 "", "general", List.of("default_page_size", "no_such_key"), "", VALID_CREDENTIAL);
 
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode());
-        Map<String, Object> data = resp.getData();
-        assertEquals("general", data.get("configGroup"));
-        assertEquals("general", data.get("subsystem"), "subsystem 按 §十.1 与 config_group 同名回显");
-        assertEquals("config_group_alignment", data.get("subsystemSource"),
+        SysConfigController.ConfigGroupResultVO data = resp.getData();
+        assertEquals("general", data.configGroup());
+        assertEquals("general", data.subsystem(), "subsystem 按 §十.1 与 config_group 同名回显");
+        assertEquals("config_group_alignment", data.subsystemSource(),
                 "回显必须自证是「同名对齐」而非独立列");
-        assertEquals(List.of("default_page_size", "no_such_key"), data.get("requestedKeys"));
-        assertEquals(1, data.get("itemCount"));
+        assertEquals(List.of("default_page_size", "no_such_key"), data.requestedKeys());
+        assertEquals(1, data.itemCount());
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> items = (List<Map<String, Object>>) data.get("items");
+        List<SysConfigController.ConfigGroupItemVO> items = data.items();
         assertEquals(1, items.size());
-        Map<String, Object> item = items.get(0);
-        assertEquals("default_page_size", item.get("key"));
-        assertEquals("20", item.get("value"));
-        assertEquals("number", item.get("valueType"));
-        assertNull(item.get("versionNo"), "sys_config 无版本列 ⇒ 该键必须为空，禁合成版本号");
-        assertEquals(false, item.get("versionNoApplicable"), "空版本面必须带 applicability 自证位");
-        assertEquals("2026-10-28T02:03:04Z", item.get("updatedAt"), "真实时间面交付 ISO-8601");
+        SysConfigController.ConfigGroupItemVO item = items.get(0);
+        assertEquals("default_page_size", item.key());
+        assertEquals("20", item.value());
+        assertEquals("number", item.valueType());
+        assertNull(item.versionNo(), "sys_config 无版本列 ⇒ 该键必须为空，禁合成版本号");
+        assertEquals(false, item.versionNoApplicable(), "空版本面必须带 applicability 自证位");
+        assertEquals("2026-10-28T02:03:04Z", item.updatedAt(), "真实时间面交付 ISO-8601");
 
-        assertEquals(List.of("no_such_key"), data.get("missingKeys"),
+        assertEquals(List.of("no_such_key"), data.missingKeys(),
                 "请求键未命中必须逐枚留痕，不得静默丢弃也不得补空值");
     }
 
@@ -151,11 +146,11 @@ class SysConfigGroupContractTest {
                 .thenReturn(List.of());
 
         SysConfigController controller = new SysConfigController(availableProvider(service));
-        ApiResponse<Map<String, Object>> resp = controller.getConfigByGroup(
+        ApiResponse<SysConfigController.ConfigGroupResultVO> resp = controller.getConfigByGroup(
                 "cognitive", "", List.of(" a , b", "a", "  "), "enterprise", VALID_CREDENTIAL);
 
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode());
-        assertEquals(List.of("a", "b"), resp.getData().get("requestedKeys"));
+        assertEquals(List.of("a", "b"), resp.getData().requestedKeys());
         @SuppressWarnings("unchecked")
         org.mockito.ArgumentCaptor<List<String>> captor =
                 org.mockito.ArgumentCaptor.forClass(List.class);

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.sysman.service;
 
 import com.chinacreator.gzcm.sysman.dao.SysConfigDao;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -9,7 +10,14 @@ import java.util.*;
 
 /**
  * 系统配置查询服务 — 从 SysConfigController 下沉的 JdbcTemplate 访问。
- * <p>铁律 §2.5：SQL 与数据访问下沉到 DAO（{@link SysConfigDao}），本类保留 JSONB 反序列化。
+ * <p>铁律 §2.5：SQL 与数据访问下沉到 DAO（{@link SysConfigDao}），本类保留 JSONB 反序列化与
+ * 行→强类型记录映射。</p>
+ *
+ * <p><b>#147CA（DoD DI-2 第六批）</b>：行面由 {@code List<Map<String,Object>>} 改强类型 record
+ * （{@link ConfigGroupRow}/{@link ConfigMetaRow}/{@link ConfigAuditRow}/{@link ConfigContractRow}），
+ * 使 Controller 不再持有弱类型 Map；SQL 亦从 Controller 收回本类（原 metadata/audit/update 三条
+ * 腿在 Controller 里拼 SQL，违「SQL 下沉 DAO」口径）。record 组件用 {@code @JsonProperty} 钉住
+ * 旧列名（snake_case），保证 wire 键面逐字不变。</p>
  */
 @Service
 public class SysConfigQueryService {
@@ -27,15 +35,46 @@ public class SysConfigQueryService {
         return dao != null;
     }
 
+    /** 列表行（GET /api/v1/system/config 的 data 元素；键面＝旧原始列名）。 */
+    public record ConfigGroupRow(
+            @JsonProperty("id") String id,
+            @JsonProperty("config_group") String configGroup,
+            @JsonProperty("config_key") String configKey,
+            @JsonProperty("config_value") String configValue,
+            @JsonProperty("config_type") String configType,
+            @JsonProperty("config_label") String configLabel,
+            @JsonProperty("config_label_en") String configLabelEn,
+            @JsonProperty("description") String description,
+            @JsonProperty("sort_order") Integer sortOrder,
+            @JsonProperty("config_options") List<String> configOptions,
+            @JsonProperty("impact_scope") String impactScope,
+            @JsonProperty("edition") String edition) {
+    }
+
+    /** 元数据行（/metadata 的数据源）。 */
+    public record ConfigMetaRow(String id, String configGroup, String configKey, String configValue,
+                                String configType, String configLabel, String configLabelEn,
+                                String description, String impactScope, String edition) {
+    }
+
+    /** 消费审计行（/audit 的数据源）。 */
+    public record ConfigAuditRow(String configKey, String configGroup, String configLabel,
+                                 String description) {
+    }
+
+    /** 契约面行（/group 的数据源；{@code updatedAt} 已转 ISO-8601，空值保持 null）。 */
+    public record ConfigContractRow(String configKey, String configValue, String configType,
+                                    String configGroup, String edition, String updatedAt) {
+    }
+
     /**
-     * 按分组/edition 列出配置项；返回的每行已将 config_options JSONB 解析为 List。
+     * 按分组/edition 列出配置项；{@code config_options} JSONB 已解析为 List。
      *
      * @param group   配置分组，可为空
      * @param edition 版本过滤，可为空
      * @param currentEdition 当前版本标识（来自 Maven profile）
      */
-    public List<Map<String, Object>> listByGroup(String group, String edition, String currentEdition) {
-        // 构建 SQL: 包含 config_options, impact_scope, edition 字段
+    public List<ConfigGroupRow> listByGroup(String group, String edition, String currentEdition) {
         StringBuilder sqlBuilder = new StringBuilder(
             "SELECT id, config_group, config_key, config_value, config_type, " +
             "config_label, config_label_en, description, sort_order, " +
@@ -61,26 +100,23 @@ public class SysConfigQueryService {
             sqlBuilder.append(" ORDER BY config_group, sort_order");
         }
 
-        List<Map<String, Object>> rows = dao.queryForList(
-                sqlBuilder.toString(), params.toArray());
-
-        // Post-process: parse config_options JSONB → List
-        for (Map<String, Object> row : rows) {
-            Object opts = row.get("config_options");
-            if (opts instanceof String && !((String) opts).isBlank()) {
-                try {
-                    List<String> parsed = objectMapper.readValue(
-                            (String) opts, new TypeReference<List<String>>() {});
-                    row.put("config_options", parsed);
-                } catch (Exception e) {
-                    row.put("config_options", List.of());
-                }
-            } else if (opts == null) {
-                row.put("config_options", List.of());
-            }
+        List<ConfigGroupRow> result = new ArrayList<>();
+        for (Map<String, Object> row : dao.queryForList(sqlBuilder.toString(), params.toArray())) {
+            result.add(new ConfigGroupRow(
+                    asString(row.get("id")),
+                    asString(row.get("config_group")),
+                    asString(row.get("config_key")),
+                    asString(row.get("config_value")),
+                    asString(row.get("config_type")),
+                    asString(row.get("config_label")),
+                    asString(row.get("config_label_en")),
+                    asString(row.get("description")),
+                    asInt(row.get("sort_order")),
+                    parseOptions(row.get("config_options")),
+                    asString(row.get("impact_scope")),
+                    asString(row.get("edition"))));
         }
-
-        return rows;
+        return result;
     }
 
     /** 更新单个配置值；返回受影响行数 */
@@ -91,11 +127,25 @@ public class SysConfigQueryService {
     }
 
     /** 查询配置元数据（带定义、影响范围） */
-    public List<Map<String, Object>> queryMetadata() {
+    public List<ConfigMetaRow> queryMetadata() {
         String sql = "SELECT id, config_group, config_key, config_value, config_type, " +
                      "config_label, config_label_en, description, impact_scope, edition " +
                      "FROM sys_config ORDER BY config_group, sort_order";
-        return dao.queryForList(sql);
+        List<ConfigMetaRow> result = new ArrayList<>();
+        for (Map<String, Object> row : dao.queryForList(sql)) {
+            result.add(new ConfigMetaRow(
+                    asString(row.get("id")),
+                    asString(row.get("config_group")),
+                    asString(row.get("config_key")),
+                    asString(row.get("config_value")),
+                    asString(row.get("config_type")),
+                    asString(row.get("config_label")),
+                    asString(row.get("config_label_en")),
+                    asString(row.get("description")),
+                    asString(row.get("impact_scope")),
+                    asString(row.get("edition"))));
+        }
+        return result;
     }
 
     /**
@@ -116,8 +166,8 @@ public class SysConfigQueryService {
      * @param edition         调用方指定的版本档；空＝用 {@code currentEdition}
      * @param currentEdition  当前部署档位（Maven profile）
      */
-    public List<Map<String, Object>> listByConfigGroupForContract(String configGroup, List<String> keys,
-                                                                 String edition, String currentEdition) {
+    public List<ConfigContractRow> listByConfigGroupForContract(String configGroup, List<String> keys,
+                                                               String edition, String currentEdition) {
         StringBuilder sqlBuilder = new StringBuilder(
             "SELECT config_key, config_value, config_type, config_group, edition, updated_at " +
             "FROM sys_config WHERE status='active' AND config_group=?");
@@ -138,20 +188,71 @@ public class SysConfigQueryService {
         }
 
         sqlBuilder.append(" ORDER BY sort_order, config_key");
-        return dao.queryForList(sqlBuilder.toString(), params.toArray());
+        List<ConfigContractRow> result = new ArrayList<>();
+        for (Map<String, Object> row : dao.queryForList(sqlBuilder.toString(), params.toArray())) {
+            result.add(new ConfigContractRow(
+                    asString(row.get("config_key")),
+                    asString(row.get("config_value")),
+                    asString(row.get("config_type")),
+                    asString(row.get("config_group")),
+                    asString(row.get("edition")),
+                    isoTime(row.get("updated_at"))));
+        }
+        return result;
     }
 
     /** 查询用于消费审计的配置项基本信息 */
-    public List<Map<String, Object>> queryForAudit() {
+    public List<ConfigAuditRow> queryForAudit() {
         String sql = "SELECT config_key, config_group, config_label, description FROM sys_config ORDER BY config_group, sort_order";
-        return dao.queryForList(sql);
+        List<ConfigAuditRow> result = new ArrayList<>();
+        for (Map<String, Object> row : dao.queryForList(sql)) {
+            result.add(new ConfigAuditRow(
+                    asString(row.get("config_key")),
+                    asString(row.get("config_group")),
+                    asString(row.get("config_label")),
+                    asString(row.get("description"))));
+        }
+        return result;
     }
 
-    // ── PMO-E2 通用委托方法（供 Controller 调用）──
-    public List<Map<String, Object>> queryForList(String sql, Object... args) {
-        return dao.queryForList(sql, args);
+    // ── 行值归一（守住旧 Controller 的取值口径） ──
+
+    private static String asString(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
-    public int update(String sql, Object... args) {
-        return dao.update(sql, args);
+
+    private static Integer asInt(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return null;
+    }
+
+    private static List<String> parseOptions(Object opts) {
+        if (opts instanceof String text && !text.isBlank()) {
+            try {
+                return objectMapper.readValue(text, new TypeReference<List<String>>() { });
+            } catch (Exception e) {
+                return List.of();
+            }
+        }
+        return List.of();
+    }
+
+    /** 时间列 → ISO-8601 文本；空值保持 null（不写 1970 之类的占位值）。 */
+    private static String isoTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant().toString();
+        }
+        if (value instanceof java.time.OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toString();
+        }
+        if (value instanceof java.time.LocalDateTime localDateTime) {
+            return localDateTime.toString();
+        }
+        return String.valueOf(value);
     }
 }
