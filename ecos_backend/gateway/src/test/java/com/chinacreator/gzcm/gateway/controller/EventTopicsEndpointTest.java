@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.event.TopicLagSource;
+import com.chinacreator.gzcm.gateway.controller.SystemEventTopicsV1Controller.TopicEntryVO;
+import com.chinacreator.gzcm.gateway.controller.SystemEventTopicsV1Controller.TopicListVO;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,20 +65,19 @@ class EventTopicsEndpointTest {
     @Test
     @DisplayName("清单与 compose 11 条逐条对等（BUSINESS 类反射单源，禁内联第二套真值）")
     void businessTopicsMatchComposeMirror() throws Exception {
-        ApiResponse<Map<String, Object>> resp = withoutLagSource().listEventTopics();
+        ApiResponse<TopicListVO> resp = withoutLagSource().listEventTopics();
         assertEquals(0, resp.getCode(), "取单源成功必须 code=0，实际 errorCode=" + resp.getErrorCode());
-        Map<String, Object> data = resp.getData();
+        TopicListVO data = resp.getData();
         assertNotNull(data);
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> topics = (List<Map<String, Object>>) data.get("topics");
+        List<TopicEntryVO> topics = data.topics();
         Set<String> business = new TreeSet<>();
-        for (Map<String, Object> t : topics) {
-            if ("BUSINESS".equals(t.get("category"))) business.add(String.valueOf(t.get("name")));
+        for (TopicEntryVO t : topics) {
+            if ("BUSINESS".equals(t.category())) business.add(t.name());
         }
         assertEquals(new TreeSet<>(composeMirror()), business,
                 "端点 BUSINESS topic 清单必须与 KafkaTopicParityTest.COMPOSE_MIRROR 完全一致");
-        assertEquals(topics.size(), data.get("total"),
+        assertEquals(topics.size(), data.total(),
                 "total 必须等于实际枚举出的条数（含 OPERATIONAL 类，禁只数业务条数造成 total 与 items 不符）");
         assertEquals(composeMirror().size() + 1, topics.size(),
                 "清单 = compose 11 条业务 + 1 条 OPERATIONAL 探活");
@@ -86,30 +87,24 @@ class EventTopicsEndpointTest {
     @Test
     @DisplayName("探活 topic 作为 OPERATIONAL 类在名录内，并指回单源出处")
     void operationalProbeTopicIsListedWithItsDeclarationSite() {
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> topics =
-                (List<Map<String, Object>>) withoutLagSource().listEventTopics().getData().get("topics");
-        Map<String, Object> probe = topics.stream()
-                .filter(t -> "ecos.health.probe".equals(t.get("name")))
+        List<TopicEntryVO> topics = withoutLagSource().listEventTopics().getData().topics();
+        TopicEntryVO probe = topics.stream()
+                .filter(t -> "ecos.health.probe".equals(t.name()))
                 .findFirst().orElse(null);
         assertNotNull(probe, "KafkaEventBusServiceImpl.PROBE_TOPIC 真实投递的 topic 必须可见，否则清单口径与实际投递面不一致");
-        assertEquals("OPERATIONAL", probe.get("category"));
-        assertEquals("KafkaEventBusServiceImpl.PROBE_TOPIC", probe.get("declaredIn"));
+        assertEquals("OPERATIONAL", probe.category());
+        assertEquals("KafkaEventBusServiceImpl.PROBE_TOPIC", probe.declaredIn());
     }
 
     @Test
     @DisplayName("契约四字段齐备 + dltTopic 严格 <topic>.DLT")
     void contractFieldsAndDltNaming() {
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> topics =
-                (List<Map<String, Object>>) withoutLagSource().listEventTopics().getData().get("topics");
+        List<TopicEntryVO> topics = withoutLagSource().listEventTopics().getData().topics();
         assertFalse(topics.isEmpty());
-        for (Map<String, Object> t : topics) {
-            assertTrue(t.containsKey("name"), "缺 name");
-            assertTrue(t.containsKey("dltTopic"), "缺 dltTopic");
-            assertTrue(t.containsKey("lag"), "缺 lag 键（值可为 null，键必须在位）");
-            assertTrue(t.containsKey("lastProducedAt"), "缺 lastProducedAt 键");
-            assertEquals(t.get("name") + ".DLT", t.get("dltTopic"),
+        for (TopicEntryVO t : topics) {
+            assertNotNull(t.name(), "缺 name");
+            assertNotNull(t.dltTopic(), "缺 dltTopic");
+            assertEquals(t.name() + ".DLT", t.dltTopic(),
                     "DLQ 命名必须与 DltConsumer.baseTopic() 的 .DLT 后缀同形");
         }
     }
@@ -117,18 +112,15 @@ class EventTopicsEndpointTest {
     @Test
     @DisplayName("指标未接：lag=null 且禁为 0；顶层声明 NOT_WIRED + metricNotes")
     void lagIsNullNotZeroWhenSourceAbsent() {
-        Map<String, Object> data = withoutLagSource().listEventTopics().getData();
-        assertEquals(SystemEventTopicsV1Controller.LAG_SOURCE_NOT_WIRED, data.get("lagSource"));
-        assertEquals("NOT_WIRED", data.get("lastProducedAtSource"));
+        TopicListVO data = withoutLagSource().listEventTopics().getData();
+        assertEquals(SystemEventTopicsV1Controller.LAG_SOURCE_NOT_WIRED, data.lagSource());
+        assertEquals("NOT_WIRED", data.lastProducedAtSource());
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> topics = (List<Map<String, Object>>) data.get("topics");
-        for (Map<String, Object> t : topics) {
-            assertNull(t.get("lag"), "无指标源时 lag 必须为 null（填 0＝冒充无积压，假绿）");
-            assertNull(t.get("lastProducedAt"), "AdminClient 不暴露记录时间戳，禁造 lastProducedAt");
+        for (TopicEntryVO t : data.topics()) {
+            assertNull(t.lag(), "无指标源时 lag 必须为 null（填 0＝冒充无积压，假绿）");
+            assertNull(t.lastProducedAt(), "AdminClient 不暴露记录时间戳，禁造 lastProducedAt");
         }
-        @SuppressWarnings("unchecked")
-        List<String> notes = (List<String>) data.get("metricNotes");
+        List<String> notes = data.metricNotes();
         assertNotNull(notes);
         assertTrue(notes.stream().anyMatch(s -> s.contains("不等于 0")),
                 "响应必须自带「null≠0」的解释，防止消费方误读");
@@ -138,16 +130,15 @@ class EventTopicsEndpointTest {
     @DisplayName("接入 lag 源时逐条取真实值，源名取自 sourceId")
     void lagValuesArePassedThroughWhenSourceWired() {
         TopicLagSource stub = () -> Map.of("ecos.audit", 7L, "ecos.ontology", 42L);
-        Map<String, Object> data = new SystemEventTopicsV1Controller(Optional.of(stub))
+        TopicListVO data = new SystemEventTopicsV1Controller(Optional.of(stub))
                 .listEventTopics().getData();
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> topics = (List<Map<String, Object>>) data.get("topics");
-        assertEquals(7L, byName(topics, "ecos.audit").get("lag"));
-        assertEquals(42L, byName(topics, "ecos.ontology").get("lag"));
+        List<TopicEntryVO> topics = data.topics();
+        assertEquals(7L, byName(topics, "ecos.audit").lag());
+        assertEquals(42L, byName(topics, "ecos.ontology").lag());
         // 快照里没有的 topic 仍是 null（缺数据≠0），不被真实值「顺带补全」
-        assertNull(byName(topics, "ecos.knowledge").get("lag"));
-        assertEquals("UNKNOWN", data.get("lagSource"), "sourceId 默认值必须如实呈现，不冒充 KAFKA_ADMIN");
+        assertNull(byName(topics, "ecos.knowledge").lag());
+        assertEquals("UNKNOWN", data.lagSource(), "sourceId 默认值必须如实呈现，不冒充 KAFKA_ADMIN");
     }
 
     @Test
@@ -156,14 +147,12 @@ class EventTopicsEndpointTest {
         TopicLagSource broken = () -> {
             throw new IllegalStateException("broker unreachable");
         };
-        ApiResponse<Map<String, Object>> resp =
+        ApiResponse<TopicListVO> resp =
                 new SystemEventTopicsV1Controller(Optional.of(broken)).listEventTopics();
         assertEquals(0, resp.getCode());
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> topics =
-                (List<Map<String, Object>>) resp.getData().get("topics");
+        List<TopicEntryVO> topics = resp.getData().topics();
         assertFalse(topics.isEmpty(), "指标面失败不得清空清单");
-        assertTrue(topics.stream().allMatch(t -> t.get("lag") == null));
+        assertTrue(topics.stream().allMatch(t -> t.lag() == null));
     }
 
     @Test
@@ -175,7 +164,7 @@ class EventTopicsEndpointTest {
                 throw new IllegalStateException("反射面退化（夹具）");
             }
         };
-        ApiResponse<Map<String, Object>> resp = broken.listEventTopics();
+        ApiResponse<TopicListVO> resp = broken.listEventTopics();
         assertEquals(503, resp.getCode());
         assertEquals(SystemEventTopicsV1Controller.ERROR_SYS_UNAVAILABLE, resp.getErrorCode());
         assertNull(resp.getData(), "DENY 面禁带 data，空 topics 同样属冒充");
@@ -205,8 +194,8 @@ class EventTopicsEndpointTest {
                 "双路径必须各写一遍（三滤波器约定），实际=" + paths);
     }
 
-    private static Map<String, Object> byName(List<Map<String, Object>> topics, String name) {
-        return topics.stream().filter(t -> name.equals(t.get("name"))).findFirst()
+    private static TopicEntryVO byName(List<TopicEntryVO> topics, String name) {
+        return topics.stream().filter(t -> name.equals(t.name())).findFirst()
                 .orElseThrow(() -> new AssertionError("清单缺 topic: " + name));
     }
 }

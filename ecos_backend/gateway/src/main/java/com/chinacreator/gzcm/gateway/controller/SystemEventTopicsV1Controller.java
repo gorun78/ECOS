@@ -116,11 +116,11 @@ public class SystemEventTopicsV1Controller {
 
     @GetMapping("/topics")
     @MinimumClearance(level = 1)
-    public ApiResponse<Map<String, Object>> listEventTopics() {
+    public ApiResponse<TopicListVO> listEventTopics() {
         try {
             Map<String, Long> lagByTopic = readLagSnapshot();
 
-            List<Map<String, Object>> topics = new ArrayList<>();
+            List<TopicEntryVO> topics = new ArrayList<>();
             for (String name : businessTopicNames()) {
                 topics.add(entry(name, "BUSINESS", "KafkaTopics", lagByTopic));
             }
@@ -129,20 +129,17 @@ public class SystemEventTopicsV1Controller {
             }
 
             TopicLagSource source = lagSource.orElse(null);
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("topics", topics);
-            out.put("total", topics.size());
-            out.put("dltSuffix", DLT_SUFFIX);
-            out.put("lagSource", source == null ? LAG_SOURCE_NOT_WIRED : source.sourceId());
-            out.put("lastProducedAtSource", LAG_SOURCE_NOT_WIRED);
-            out.put("metricNotes", List.of(
-                    "lag=null 表示指标源未装配或该 topic 无已提交位点，不等于 0（无积压）",
-                    "lastProducedAt 无可用来源：AdminClient 仅暴露 offset，不含记录时间戳",
-                    "dltTopic 按 DltConsumer 的 <topic>.DLT 命名约定推导，不代表该 DLT 已在 broker 建立"));
+            TopicListVO out = new TopicListVO(topics, topics.size(), DLT_SUFFIX,
+                    source == null ? LAG_SOURCE_NOT_WIRED : source.sourceId(),
+                    LAG_SOURCE_NOT_WIRED,
+                    List.of(
+                            "lag=null 表示指标源未装配或该 topic 无已提交位点，不等于 0（无积压）",
+                            "lastProducedAt 无可用来源：AdminClient 仅暴露 offset，不含记录时间戳",
+                            "dltTopic 按 DltConsumer 的 <topic>.DLT 命名约定推导，不代表该 DLT 已在 broker 建立"));
             return trace(ApiResponse.success(out));
         } catch (Exception ex) {
             log.error("listEventTopics 取 topic 单源失败（fail-closed，不返回空清单）: {}", ex.getMessage());
-            return trace(ApiResponse.<Map<String, Object>>error(503, ERROR_SYS_UNAVAILABLE,
+            return trace(ApiResponse.<TopicListVO>error(503, ERROR_SYS_UNAVAILABLE,
                     "事件 topic 清单不可用，请稍后重试"));
         }
     }
@@ -155,7 +152,7 @@ public class SystemEventTopicsV1Controller {
      * 与 {@code ImpersonateController.resolveTraceId()}「保证 428/501 必带可追踪 id」同形。
      * 这是<b>关联 id</b>而非业务数据，不构成造假。</p>
      */
-    private static ApiResponse<Map<String, Object>> trace(ApiResponse<Map<String, Object>> resp) {
+    private static <T> ApiResponse<T> trace(ApiResponse<T> resp) {
         resp.withTraceIdFromMdc();
         if (resp.getTraceId() == null) {
             resp.withTraceId("t-" + java.util.UUID.randomUUID());
@@ -164,16 +161,21 @@ public class SystemEventTopicsV1Controller {
     }
 
     /** 单 topic 投影：契约四字段（name/dltTopic/lag/lastProducedAt）+ 溯源两字段。 */
-    private Map<String, Object> entry(String name, String category, String declaredIn,
-                                      Map<String, Long> lagByTopic) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("name", name);
-        m.put("dltTopic", name + DLT_SUFFIX);
-        m.put("lag", lagByTopic.get(name));
-        m.put("lastProducedAt", null);
-        m.put("category", category);
-        m.put("declaredIn", declaredIn);
-        return m;
+    private TopicEntryVO entry(String name, String category, String declaredIn,
+                               Map<String, Long> lagByTopic) {
+        return new TopicEntryVO(name, name + DLT_SUFFIX, lagByTopic.get(name), null, category,
+                declaredIn);
+    }
+
+    /** 单 topic 投影（6 键，DI-2 #147ES）：name/dltTopic/lag/lastProducedAt/category/declaredIn。 */
+    public record TopicEntryVO(String name, String dltTopic, Long lag, Object lastProducedAt,
+                               String category, String declaredIn) {
+    }
+
+    /** topic 清单回执（6 键）：topics/total/dltSuffix/lagSource/lastProducedAtSource/metricNotes。 */
+    public record TopicListVO(List<TopicEntryVO> topics, int total, String dltSuffix,
+                              String lagSource, String lastProducedAtSource,
+                              List<String> metricNotes) {
     }
 
     /** lag 快照读取：Bean 缺席或抛异常 ⇒ 空快照（各条 {@code lag} 因此为 null）。 */
