@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.gateway.dto.TelemetryHealthVO;
+import com.chinacreator.gzcm.gateway.dto.TelemetryTokenSummaryVO;
 import com.chinacreator.gzcm.gateway.service.TelemetryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,22 +31,18 @@ public class TelemetryController {
 
     @Operation(summary = "遥测系统状态", description = "检查遥测系统的数据库连接和数据存储状态")
     @GetMapping("/health")
-    public ApiResponse<Map<String, Object>> health() {
-        Map<String, Object> status = new LinkedHashMap<>();
-        status.put("service", "ecos-telemetry");
-        status.put("status", "UP");
-        status.put("timestamp", Instant.now().toString());
-
+    public ApiResponse<TelemetryHealthVO> health() {
+        String service = "ecos-telemetry";
+        String ts = Instant.now().toString();
         try {
-            Map<String, Object> counts = telemetryService.queryHealthCounts();
-            status.put("spans_stored", counts.get("spans_stored"));
-            status.put("token_records", counts.get("token_records"));
-            status.put("db", "connected");
+            var counts = telemetryService.queryHealthCounts();
+            return ApiResponse.success(new TelemetryHealthVO(
+                    service, "UP", ts,
+                    counts.get("spans_stored"), counts.get("token_records"), "connected"));
         } catch (Exception e) {
-            status.put("db", "error: " + e.getMessage());
+            return ApiResponse.success(new TelemetryHealthVO(
+                    service, "UP", ts, null, null, "error: " + e.getMessage()));
         }
-
-        return ApiResponse.success(status);
     }
 
     @Operation(summary = "Trace 列表", description = "获取最近的 Trace 列表")
@@ -76,31 +74,24 @@ public class TelemetryController {
 
     @Operation(summary = "Token 用量汇总", description = "按天汇总 LLM Token 的使用量")
     @GetMapping("/tokens/summary")
-    public ApiResponse<Map<String, Object>> getTokenSummary(
+    public ApiResponse<TelemetryTokenSummaryVO> getTokenSummary(
             @RequestParam(defaultValue = "7d") String range) {
-        Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("range", range);
-
         try {
             int days = 7;
             if (range.endsWith("d")) {
                 days = Integer.parseInt(range.replace("d", ""));
             }
 
-            Map<String, Object> totals = telemetryService.queryTokenSummaryTotals(days);
-            summary.put("totals", totals);
+            var totals = telemetryService.queryTokenSummaryTotals(days);
+            var byModel = telemetryService.queryTokenSummaryByModel(days);
+            var byOperation = telemetryService.queryTokenSummaryByOperation(days);
 
-            List<Map<String, Object>> byModel = telemetryService.queryTokenSummaryByModel(days);
-            summary.put("by_model", byModel);
-
-            List<Map<String, Object>> byOperation = telemetryService.queryTokenSummaryByOperation(days);
-            summary.put("by_operation", byOperation);
-
+            return ApiResponse.success(new TelemetryTokenSummaryVO(
+                    range, totals, byModel, byOperation, null));
         } catch (Exception e) {
             log.warn("Failed to query token summary: {}", e.getMessage());
-            summary.put("error", e.getMessage());
+            return ApiResponse.success(new TelemetryTokenSummaryVO(
+                    range, null, null, null, e.getMessage()));
         }
-
-        return ApiResponse.success(summary);
     }
 }
