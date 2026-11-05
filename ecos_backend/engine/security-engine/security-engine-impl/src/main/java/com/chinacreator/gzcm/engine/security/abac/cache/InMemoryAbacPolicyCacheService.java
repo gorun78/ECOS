@@ -27,12 +27,13 @@ public class InMemoryAbacPolicyCacheService implements AbacPolicyCacheService {
     private volatile long lastRefreshTime = 0;
     private final ScheduledExecutorService refreshExecutor;
     
-    public InMemoryAbacPolicyCacheService() {
-        this(resolveDefaultTtlMillis());
-    }
-    
+    /**
+     * @param defaultTtlMillis 缓存默认 TTL；{@code <=0} 回落 15 分钟。
+     *                         <p>DC-3 #147EP：本类不再自读 System property/环境变量，
+     *                         归口由装配方从 runtime 缓存底座（sys_config {@code cache} 组）取参注入。</p>
+     */
     public InMemoryAbacPolicyCacheService(long defaultTtlMillis) {
-        long resolved = defaultTtlMillis > 0 ? defaultTtlMillis : resolveDefaultTtlMillis();
+        long resolved = defaultTtlMillis > 0 ? defaultTtlMillis : TimeUnit.MINUTES.toMillis(15);
         // TTL 限制在 5~30 分钟之间
         long min = TimeUnit.MINUTES.toMillis(5);
         long max = TimeUnit.MINUTES.toMillis(30);
@@ -99,23 +100,6 @@ public class InMemoryAbacPolicyCacheService implements AbacPolicyCacheService {
     public void shutdown() {
         if (refreshExecutor != null && !refreshExecutor.isShutdown()) {
             refreshExecutor.shutdown();
-        }
-    }
-    
-    private static long resolveDefaultTtlMillis() {
-        String sysProp = System.getProperty("security.abac.policy.cache.ttl-ms");
-        String envProp = System.getenv("SECURITY_ABAC_POLICY_CACHE_TTL_MS");
-        return parseLongOrDefault(sysProp, parseLongOrDefault(envProp, TimeUnit.MINUTES.toMillis(15)));
-    }
-    
-    private static long parseLongOrDefault(String source, long defaultValue) {
-        if (source == null || source.trim().isEmpty()) {
-            return defaultValue;
-        }
-        try {
-            return Long.parseLong(source.trim());
-        } catch (NumberFormatException ignore) {
-            return defaultValue;
         }
     }
 }

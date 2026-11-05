@@ -113,15 +113,9 @@ class CacheConfigSingleSourceGateTest {
                 "DC-3 违例存量：同上。");
         m.put("A|ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/resources/ontology-defaults.yml|ontology.cache.ttl_seconds|300",
                 "DC-3 违例存量 + 原判据盲区实锤：非 application*.yml，#147BN 的扫描面从未包含本文件。");
-        // —— 自建缓存直读环境变量/系统属性（绕开 sysman 字典与底座）——
-        m.put("B|ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/gzcm/engine/security/abac/cache/InMemoryAbacPolicyCacheService.java|security.abac.policy.cache.ttl-ms",
-                "DC-3 违例存量：策略缓存 TTL 走 System property。该链当前未承流（见 §2.9.8 回写），键面在册即欠清退。");
-        m.put("B|ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/gzcm/engine/security/abac/cache/InMemoryAbacPolicyCacheService.java|SECURITY_ABAC_POLICY_CACHE_TTL_MS",
-                "同上（环境变量形态）。");
-        m.put("B|ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/gzcm/engine/security/policy/cache/impl/InMemoryDecisionCacheService.java|security.policy.decision.cache.ttl-ms",
-                "DC-3 违例存量：决策缓存 TTL 走 System property；权限域缓存且未承流，接线前必须归口。");
-        m.put("B|ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/gzcm/engine/security/policy/cache/impl/InMemoryDecisionCacheService.java|SECURITY_POLICY_DECISION_CACHE_TTL_MS",
-                "同上（环境变量形态）。");
+        // —— 自建缓存直读环境变量/系统属性：已清退（DC-3 #147EP 删除 security 两个
+        //    内存缓存的 System property/环境变量 TTL 自读，改由装配方注入；该链未承流，
+        //    无运行时消费方受影响，白名单同步 −4）——
         // —— 幻影键：已清退（DC-3 #147EM 删除网关 `profile.cache-enabled/cache-ttl-minutes`，
         //    全仓无 profile 前缀绑定、属主默认值在 LLMGatewayProperties(llm.*)，删后白名单同步 −2）——
         // —— ORM 二级缓存开关：框架自身开关，不属 R8 知识缓存底座作用域，但必须同值同批 ——
