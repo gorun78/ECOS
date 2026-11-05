@@ -3,15 +3,15 @@ package com.chinacreator.gzcm.engine.security.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.audit.crypto.CryptoAuditLedger;
 import com.chinacreator.gzcm.sysman.audit.crypto.CryptoAuditService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,9 +19,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * CryptoAuditControllerTest — AES-256 加解密过程 aud 留痕。
  *
  * <p>Wave-5.1 T-05：直接构造真实 {@link CryptoAuditService} 与 controller，
- * 验证 record/list/get/verify 四步全留痕，且链式哈希完整。
+ * 验证 record/list/get/verify 四步全留痕，且链式哈希完整。</p>
+ *
+ * <p>#147CH：载荷位改 record（{@code RecordResultVO}/{@code CryptoAuditPageVO}/
+ * {@code ChainVerifyResult}），本类同步改用访问器 + 序列化键集断言（判据零放宽），
+ * 请求体改 {@code CryptoAuditRecordRequest}。</p>
  */
 class CryptoAuditControllerTest {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private CryptoAuditService auditService;
     private CryptoAuditController controller;
@@ -30,6 +36,26 @@ class CryptoAuditControllerTest {
     void setUp() {
         this.auditService = new CryptoAuditService();
         this.controller = new CryptoAuditController(auditService);
+    }
+
+    private static CryptoAuditController.CryptoAuditRecordRequest request(String eventType,
+                                                                          String resource,
+                                                                          String action,
+                                                                          String operatorId,
+                                                                          String payload) {
+        CryptoAuditController.CryptoAuditRecordRequest req =
+                new CryptoAuditController.CryptoAuditRecordRequest();
+        req.setEventType(eventType);
+        req.setResource(resource);
+        req.setAction(action);
+        req.setOperatorId(operatorId);
+        req.setPayload(payload);
+        return req;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Object value) {
+        return MAPPER.convertValue(value, Map.class);
     }
 
     @Test
@@ -74,34 +100,33 @@ class CryptoAuditControllerTest {
         auditService.record(e4);
 
         // 1. record
-        ApiResponse<Map<String, Object>> recordResp = controller.record(Map.of(
-                "eventType", "AES_ENCRYPT",
-                "resource", "secret-key-1",
-                "action", "encrypt",
-                "operatorId", "admin",
-                "payload", "{}"));
+        ApiResponse<CryptoAuditController.RecordResultVO> recordResp = controller.record(
+                request("AES_ENCRYPT", "secret-key-1", "encrypt", "admin", "{}"));
         assertTrue(recordResp.isSuccess());
+        assertEquals(Set.of("id", "currentHash", "timestamp"), asMap(recordResp.getData()).keySet());
+        assertNotNull(recordResp.getData().id());
 
-        // 2. list — keyword AES 仅过滤 eventType/ACTION/OPERATOR 含 "AES" 的记录
-        //    前 4 条直接 record: AES_ENCRYPT/KEY_ROTATE"AES_DECRYPT" + AES_ENCRYPT
-        //    加上 controller.record 的 AES_ENCRYPT，共 4 条 keyword 命中
-        ApiResponse<Map<String, Object>> listResp = controller.list("AES", 1, 10);
+        // 2. list — keyword AES 仅过滤 eventType/ACTION/OPERATOR 含 "AES" 的记录（共 4 条）
+        ApiResponse<CryptoAuditController.CryptoAuditPageVO> listResp = controller.list("AES", 1, 10);
         assertTrue(listResp.isSuccess());
         assertNotNull(listResp.getData());
-        assertEquals(4, (int) listResp.getData().get("total"));
+        assertEquals(4, listResp.getData().total());
+        assertEquals(Set.of("data", "total", "page", "pageSize"), asMap(listResp.getData()).keySet());
 
         // 3. get by id
         ApiResponse<?> getResp = controller.get(saved2.getId());
         assertTrue(getResp.isSuccess());
 
         // 4. verify
-        ApiResponse<Map<String, Object>> verifyResp = controller.verify();
+        ApiResponse<CryptoAuditService.ChainVerifyResult> verifyResp = controller.verify();
         assertTrue(verifyResp.isSuccess());
-        Map<String, Object> verifyData = verifyResp.getData();
-        assertEquals(5, (int) verifyData.get("total"));
-        assertEquals(5, (int) verifyData.get("pass"));
-        assertEquals(0, (int) verifyData.get("fail"));
-        assertTrue((Boolean) verifyData.get("intact"));
+        CryptoAuditService.ChainVerifyResult verifyData = verifyResp.getData();
+        assertEquals(5, verifyData.total());
+        assertEquals(5, verifyData.pass());
+        assertEquals(0, verifyData.fail());
+        assertTrue(verifyData.intact());
+        assertEquals(Set.of("total", "pass", "fail", "intact", "tampered"),
+                asMap(verifyData).keySet(), "链验证回执必须恰为契约五键");
     }
 
     @Test
@@ -115,7 +140,8 @@ class CryptoAuditControllerTest {
             }
         };
         CryptoAuditController failingController = new CryptoAuditController(failing);
-        ApiResponse<Map<String, Object>> resp = failingController.record(Map.of("eventType", "X"));
+        ApiResponse<CryptoAuditController.RecordResultVO> resp =
+                failingController.record(request("X", null, null, null, null));
         assertEquals(ApiResponse.CODE_INTERNAL_ERROR, resp.getCode());
         assertTrue(resp.getMessage().contains("记录失败"));
     }

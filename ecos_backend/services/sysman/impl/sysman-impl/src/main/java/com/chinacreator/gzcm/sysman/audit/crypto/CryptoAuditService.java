@@ -64,8 +64,12 @@ public class CryptoAuditService {
         return entry;
     }
 
-    public Map<String, Object> chainVerify() {
-        List<Map<String, Object>> tampered = new ArrayList<>();
+    /**
+     * 链式完整性验证（#147CH：结果由 Map 改 {@link ChainVerifyResult} record，键集/键序逐字不变；
+     * {@code tampered[].issue} 仍只在异常时出现）。
+     */
+    public ChainVerifyResult chainVerify() {
+        List<TamperDetail> tampered = new ArrayList<>();
         int total = 0;
         int pass = 0;
 
@@ -79,46 +83,47 @@ public class CryptoAuditService {
         for (int i = 0; i < chain.size(); i++) {
             CryptoAuditLedger e = chain.get(i);
             total++;
-            boolean ok = true;
-            Map<String, Object> detail = new LinkedHashMap<>();
-            detail.put("id", e.getId());
+            String issue = null;
 
             if (i == 0) {
                 if (e.getPrevHash() != null) {
-                    ok = false;
-                    detail.put("issue", "链首 prevHash 应为 null，实际: " + e.getPrevHash());
+                    issue = "链首 prevHash 应为 null，实际: " + e.getPrevHash();
                 }
             } else {
                 if (!Objects.equals(expectedPrev, e.getPrevHash())) {
-                    ok = false;
-                    detail.put("issue", "prevHash 断裂: 期望=" + expectedPrev + " 实际=" + e.getPrevHash());
+                    issue = "prevHash 断裂: 期望=" + expectedPrev + " 实际=" + e.getPrevHash();
                 }
             }
 
             String recomputed = computeHash(e);
             if (!Objects.equals(recomputed, e.getCurrentHash())) {
-                ok = false;
-                detail.put("issue", (detail.containsKey("issue") ? detail.get("issue") + "; " : "")
-                        + "currentHash 不匹配: 期望=" + recomputed + " 实际=" + e.getCurrentHash());
+                issue = (issue != null ? issue + "; " : "")
+                        + "currentHash 不匹配: 期望=" + recomputed + " 实际=" + e.getCurrentHash();
             }
 
-            if (ok) {
+            if (issue == null) {
                 e.setVerified(true);
                 pass++;
             } else {
                 e.setVerified(false);
-                tampered.add(detail);
+                tampered.add(new TamperDetail(e.getId(), issue));
             }
             expectedPrev = e.getCurrentHash();
         }
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("total", total);
-        result.put("pass", pass);
-        result.put("fail", tampered.size());
-        result.put("intact", tampered.isEmpty());
-        result.put("tampered", tampered);
-        return result;
+        return new ChainVerifyResult(total, pass, tampered.size(), tampered.isEmpty(), tampered);
+    }
+
+    /** 链验证结果（5 键，键序 total/pass/fail/intact/tampered）。 */
+    public record ChainVerifyResult(int total, int pass, int fail, boolean intact,
+                                    List<TamperDetail> tampered) {
+    }
+
+    /** 被篡改明细（{@code issue} 仅在确有异常时出现）。 */
+    public record TamperDetail(String id,
+                               @com.fasterxml.jackson.annotation.JsonInclude(
+                                       com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                               String issue) {
     }
 
     public List<CryptoAuditLedger> list(String keyword, int page, int pageSize) {
