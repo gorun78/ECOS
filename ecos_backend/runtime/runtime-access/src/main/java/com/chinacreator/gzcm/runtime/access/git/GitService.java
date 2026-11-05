@@ -117,12 +117,39 @@ public interface GitService {
     class GitException extends Exception {
         private static final long serialVersionUID = 1L;
 
+        /**
+         * 失败分类（#147BU · G8 登记缺陷）：决定调用方的状态行分档。
+         *
+         * <p>{@link #NOT_AVAILABLE}＝服务端侧未就绪（仓库本地目录不在位、localPath 未解析），
+         * 换参数重试无用 ⇒ 调用方落 503；{@link #OPERATION_FAILED}＝仓库已就位但对象库操作失败
+         * ⇒ 500。缺省保 {@link #OPERATION_FAILED}，既有构造点语义不变。</p>
+         */
+        public enum Kind {
+            OPERATION_FAILED,
+            NOT_AVAILABLE
+        }
+
+        private final Kind kind;
+
         public GitException(String message) {
-            super(message);
+            this(message, Kind.OPERATION_FAILED, null);
         }
 
         public GitException(String message, Throwable cause) {
+            this(message, Kind.OPERATION_FAILED, cause);
+        }
+
+        public GitException(String message, Kind kind) {
+            this(message, kind, null);
+        }
+
+        public GitException(String message, Kind kind, Throwable cause) {
             super(message, cause);
+            this.kind = kind == null ? Kind.OPERATION_FAILED : kind;
+        }
+
+        public Kind getKind() {
+            return kind;
         }
     }
 }

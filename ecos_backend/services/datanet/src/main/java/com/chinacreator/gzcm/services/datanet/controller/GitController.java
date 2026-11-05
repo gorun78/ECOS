@@ -110,6 +110,26 @@ public class GitController {
         return failure(ApiResponse.error(status, machineCode, e.getMessage()));
     }
 
+    /**
+     * Git 底座失败 → 状态行出口（#147BU · G8 登记缺陷）。
+     *
+     * <p>分类权在属主异常：{@link GitService.GitException.Kind#NOT_AVAILABLE}（本地目录不在位 /
+     * localPath 未解析）＝<b>服务端未就绪</b> ⇒ 503＋{@link #CODE_GIT_UNAVAILABLE}，换参数重试无用；
+     * {@link GitService.GitException.Kind#OPERATION_FAILED}（仓库已就位、对象库操作异常）⇒ 500。
+     * 此前一律 500，把「目录没准备好」报成「操作失败」，客户端无法区分该重试还是该找运维。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> gitFailure(
+            String leg, String repoId, String operation, GitService.GitException e) {
+        if (e.getKind() == GitService.GitException.Kind.NOT_AVAILABLE) {
+            log.warn("Git 底座未就绪（{}）: repoId={}, reason={}", leg, repoId, e.getMessage());
+            return failure(ApiResponse.error(503, CODE_GIT_UNAVAILABLE,
+                    operation + "（Git 底座未就绪）: " + e.getMessage()));
+        }
+        log.error("{}（{}）: repoId={}", operation, leg, repoId, e);
+        return failure(ApiResponse.error(500, CODE_GIT_OPERATION_FAILED,
+                operation + ": " + e.getMessage()));
+    }
+
     @GetMapping("/status")
     public ResponseEntity<ApiResponse<GitStatusVO>> status(@RequestParam String repoId) {
         GitRepository repo;
@@ -126,8 +146,7 @@ public class GitController {
             data.setBranch(repo.getDefaultBranch() != null ? repo.getDefaultBranch() : "main");
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
-            log.error("获取仓库状态失败: repoId={}", repoId, e);
-            return failure(ApiResponse.error(500, CODE_GIT_OPERATION_FAILED, "获取仓库状态失败: " + e.getMessage()));
+            return gitFailure("status", repoId, "获取仓库状态失败", e);
         }
     }
 
@@ -178,8 +197,7 @@ public class GitController {
             }
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
-            log.error("查询提交历史失败: repoId={}", repoId, e);
-            return failure(ApiResponse.error(500, CODE_GIT_OPERATION_FAILED, "查询提交历史失败: " + e.getMessage()));
+            return gitFailure("commits", repoId, "查询提交历史失败", e);
         }
     }
 
@@ -201,8 +219,7 @@ public class GitController {
                     gitService.diff(repo, fromRef, toRef));
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
-            log.error("获取差异失败: repoId={}", repoId, e);
-            return failure(ApiResponse.error(500, CODE_GIT_OPERATION_FAILED, "获取差异失败: " + e.getMessage()));
+            return gitFailure("diff", repoId, "获取差异失败", e);
         }
     }
 
@@ -232,8 +249,7 @@ public class GitController {
             data.setCommittedAt(Instant.now().toString());
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
-            log.error("提交失败: repoId={}", repoId, e);
-            return failure(ApiResponse.error(500, CODE_GIT_OPERATION_FAILED, "提交失败: " + e.getMessage()));
+            return gitFailure("commit", repoId, "提交失败", e);
         }
     }
 
@@ -262,8 +278,7 @@ public class GitController {
             data.setCreatedAt(Instant.now().toString());
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
-            log.error("创建标签失败: repoId={}", repoId, e);
-            return failure(ApiResponse.error(500, CODE_GIT_OPERATION_FAILED, "创建标签失败: " + e.getMessage()));
+            return gitFailure("tag", repoId, "创建标签失败", e);
         }
     }
 
@@ -298,7 +313,9 @@ public class GitController {
      * 或未注册/停用一律走显式失败，不返回空列表冒充「没有分支」。</p>
      *
      * <p>{@code localPath} 未解析＝<b>服务端侧未就绪</b>（仓根配置 {@code ecos_git_repo_root} 缺位），
-     * 原记 404 是把「配置没配」说成「仓库没注册」，本批改 503＋{@link #CODE_GIT_UNAVAILABLE}。</p>
+     * 原记 404 是把「配置没配」说成「仓库没注册」，#147C 起改 503＋{@link #CODE_GIT_UNAVAILABLE}。
+     * #147BU 起「目录不在位」由属主 {@link GitService#listBranches} 抛
+     * {@link GitService.GitException.Kind#NOT_AVAILABLE} 同一分档（本层空路径预检保留，两路同码同态）。</p>
      */
     @GetMapping("/branches")
     public ResponseEntity<ApiResponse<GitBranchesVO>> branches(@RequestParam String repoId) {
@@ -322,8 +339,7 @@ public class GitController {
             data.setStatus(STATUS_OK);
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
-            log.error("枚举分支失败: repoId={}", repoId, e);
-            return failure(ApiResponse.error(500, CODE_GIT_OPERATION_FAILED, "枚举分支失败: " + e.getMessage()));
+            return gitFailure("branches", repoId, "枚举分支失败", e);
         }
     }
 

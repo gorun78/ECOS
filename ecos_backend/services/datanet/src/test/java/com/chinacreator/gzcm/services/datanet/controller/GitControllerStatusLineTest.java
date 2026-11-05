@@ -119,6 +119,19 @@ class GitControllerStatusLineTest {
                 new Class<?>[] { GitService.class }, handler);
     }
 
+    /**
+     * 「底座未就绪」假面（#147BU）：所有腿抛 {@link GitService.GitException.Kind#NOT_AVAILABLE}，
+     * 模拟属主对「本地目录不在位 / localPath 未解析」的分类结果。
+     */
+    private static GitService unavailableGitService() {
+        InvocationHandler handler = (proxy, method, args) -> {
+            throw new GitService.GitException("Git 仓库本地目录不在位: /data/ecos-git-repos/pipeline-core",
+                    GitService.GitException.Kind.NOT_AVAILABLE);
+        };
+        return (GitService) Proxy.newProxyInstance(GitService.class.getClassLoader(),
+                new Class<?>[] { GitService.class }, handler);
+    }
+
     private static GitRepository registeredRepo(String localPath) {
         GitRepository repo = new GitRepository();
         repo.setRepositoryId("pipeline-core");
@@ -312,6 +325,24 @@ class GitControllerStatusLineTest {
             GitController controller = new GitController(fakeGitService(Set.of(), Map.of()), registry);
 
             assertStatusAndSameCode(controller.branches("pipeline-core"), 503, "ECOS_GIT_UNAVAILABLE");
+        }
+
+        @Test
+        @DisplayName("Git 底座未就绪（NOT_AVAILABLE：本地目录不在位）⇒ 503，不再一律 500（#147BU/G8）")
+        void notAvailableKindIs503() {
+            FakeRegistry registry = new FakeRegistry();
+            registry.row = registeredRepo("/data/ecos-git-repos/pipeline-core");
+            GitController controller = new GitController(unavailableGitService(), registry);
+
+            for (ResponseEntity<?> r : List.of(
+                    controller.status("pipeline-core"),
+                    controller.commits("pipeline-core", 0, 20),
+                    controller.diff("pipeline-core", "HEAD~1", "HEAD"),
+                    controller.branches("pipeline-core"),
+                    controller.commit("pipeline-core", commitRequest("msg")),
+                    controller.tag("pipeline-core", tagRequest("v1")))) {
+                assertStatusAndSameCode(r, 503, "ECOS_GIT_UNAVAILABLE");
+            }
         }
     }
 

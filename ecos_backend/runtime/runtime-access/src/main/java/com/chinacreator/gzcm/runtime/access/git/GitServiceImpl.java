@@ -253,6 +253,10 @@ public class GitServiceImpl implements GitService {
      * <p>{@code localPath} 是 {@link GitRepoPathResolver} 的解析产物；未装配/解析不出时为
      * {@code null}（见 {@code GitRepositoryServiceImpl} 禁伪造路径口径）——此处必须拒绝执行，
      * 禁止 {@code new File(null)} 的 NPE 或空结果冒充成功。</p>
+     *
+     * <p>#147BU（G8 登记缺陷）：路径未解析／目录不在位一律 {@link GitException.Kind#NOT_AVAILABLE}
+     * ——这两态是「服务端未就绪」，调用方应落 503，不再由 JGit 抛成
+     * {@code RepositoryNotFoundException} 导致的 500「操作失败」。</p>
      */
     private String requireLocalPath(GitRepository repository) throws GitException {
         if (repository == null) {
@@ -261,9 +265,20 @@ public class GitServiceImpl implements GitService {
         String localPath = repository.getLocalPath();
         if (isBlank(localPath)) {
             throw new GitException("Git 仓库本地路径未解析：repositoryId=" + repository.getRepositoryId()
-                    + "（检查 sys_config:ecos_git_repo_root 与注册表 repo_root，禁回退进程内伪造路径）");
+                    + "（检查 sys_config:ecos_git_repo_root 与注册表 repo_root，禁回退进程内伪造路径）",
+                    GitException.Kind.NOT_AVAILABLE);
         }
-        return localPath.trim();
+        return requireDirectory(localPath.trim());
+    }
+
+    /** 目录在位性守卫（#147BU）：不在位＝服务端未就绪，不得折叠成 500「操作失败」。 */
+    private String requireDirectory(String localPath) throws GitException {
+        if (!java.nio.file.Files.isDirectory(java.nio.file.Paths.get(localPath))) {
+            throw new GitException("Git 仓库本地目录不在位: " + localPath
+                    + "（目录缺失＝服务端未就绪；禁把「没准备好」报成「操作失败」）",
+                    GitException.Kind.NOT_AVAILABLE);
+        }
+        return localPath;
     }
 
     private static boolean isBlank(String s) {
@@ -395,7 +410,7 @@ public class GitServiceImpl implements GitService {
      */
     @Override
     public List<String> listBranches(String localPath) throws GitException {
-        localPath = requirePath(localPath, "listBranches");
+        localPath = requireDirectory(requirePath(localPath, "listBranches"));
         try (Git git = Git.open(new File(localPath))) {
             List<String> names = new ArrayList<>();
             for (Ref ref : git.branchList().call()) {
@@ -411,7 +426,7 @@ public class GitServiceImpl implements GitService {
     @Override
     public List<String> listCommitShasForPath(String localPath, String relativePath, int limit)
             throws GitException {
-        localPath = requirePath(localPath, "listCommitShasForPath");
+        localPath = requireDirectory(requirePath(localPath, "listCommitShasForPath"));
         if (isBlank(relativePath)) {
             throw new GitException("listCommitShasForPath 失败：relativePath 为空（路径过滤读面必须有明确路径）");
         }
