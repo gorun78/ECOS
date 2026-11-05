@@ -2,6 +2,11 @@ package com.chinacreator.gzcm.engine.cognitive2.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.cognitive2.DecisionService;
+import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveDecisionVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.DecisionCheckVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.DecisionImpactVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.DecisionLinkResultVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.DecisionRecordResultVO;
 import com.chinacreator.gzcm.engine.cognitive2.model.Decision;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +39,7 @@ public class DecisionController {
 
     /** POST /record — 记录决策 */
     @PostMapping("/record")
-    public ApiResponse<Map<String, Object>> record(@RequestBody Map<String, Object> body) {
+    public ApiResponse<DecisionRecordResultVO> record(@RequestBody Map<String, Object> body) {
         try {
             String category = (String) body.get("category");
             String scenario = (String) body.get("scenario");
@@ -51,9 +56,7 @@ public class DecisionController {
             String id = decisionService.recordDecision(category, scenario, reasoning,
                                                        outcome, confidence, decisionMaker);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("decisionId", id);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new DecisionRecordResultVO(id));
         } catch (Exception e) {
             log.error("Failed to record decision", e);
             return ApiResponse.internalError("Failed to record decision");
@@ -62,7 +65,7 @@ public class DecisionController {
 
     /** POST /{id}/link — 添加因果关系 */
     @PostMapping("/{id}/link")
-    public ApiResponse<Map<String, Object>> link(@PathVariable String id,
+    public ApiResponse<DecisionLinkResultVO> link(@PathVariable String id,
                                                   @RequestBody Map<String, Object> body) {
         try {
             String targetId = (String) body.get("targetId");
@@ -74,11 +77,7 @@ public class DecisionController {
 
             decisionService.addCausalRelationship(id, targetId, relationship);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("linked", true);
-            result.put("sourceId", id);
-            result.put("targetId", targetId);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new DecisionLinkResultVO(true, id, targetId));
         } catch (Exception e) {
             log.error("Failed to add causal relationship", e);
             return ApiResponse.internalError("Failed to link");
@@ -87,14 +86,14 @@ public class DecisionController {
 
     /** GET /similar?query=... — 查找相似决策 */
     @GetMapping("/similar")
-    public ApiResponse<List<Map<String, Object>>> similar(
+    public ApiResponse<List<CognitiveDecisionVO>> similar(
             @RequestParam String query,
             @RequestParam(defaultValue = "10") int maxResults) {
         try {
             List<Decision> decisions = decisionService.findSimilarDecisions(query, maxResults);
-            List<Map<String, Object>> data = new ArrayList<>();
+            var data = new ArrayList<CognitiveDecisionVO>();
             for (Decision d : decisions) {
-                data.add(decisionToMap(d));
+                data.add(CognitiveDecisionVO.of(d));
             }
             return ApiResponse.success(data);
         } catch (Exception e) {
@@ -105,12 +104,12 @@ public class DecisionController {
 
     /** GET /{id}/chain — 追溯决策因果祖先链 */
     @GetMapping("/{id}/chain")
-    public ApiResponse<List<Map<String, Object>>> chain(@PathVariable String id) {
+    public ApiResponse<List<CognitiveDecisionVO>> chain(@PathVariable String id) {
         try {
             List<Decision> decisions = decisionService.traceDecisionChain(id);
-            List<Map<String, Object>> data = new ArrayList<>();
+            var data = new ArrayList<CognitiveDecisionVO>();
             for (Decision d : decisions) {
-                data.add(decisionToMap(d));
+                data.add(CognitiveDecisionVO.of(d));
             }
             return ApiResponse.success(data);
         } catch (Exception e) {
@@ -121,10 +120,10 @@ public class DecisionController {
 
     /** GET /{id}/impact — 分析下游影响图 */
     @GetMapping("/{id}/impact")
-    public ApiResponse<Map<String, Object>> impact(@PathVariable String id) {
+    public ApiResponse<DecisionImpactVO> impact(@PathVariable String id) {
         try {
-            Map<String, Object> impact = decisionService.analyzeDecisionImpact(id);
-            return ApiResponse.success(impact);
+            var impact = decisionService.analyzeDecisionImpact(id);
+            return ApiResponse.success(DecisionImpactVO.of(impact));
         } catch (Exception e) {
             log.error("Failed to analyze impact", e);
             return ApiResponse.internalError("Failed to analyze impact");
@@ -133,26 +132,14 @@ public class DecisionController {
 
     /** POST /{id}/check-rules — 策略合规门检查 */
     @PostMapping("/{id}/check-rules")
-    public ApiResponse<Map<String, Object>> checkRules(@PathVariable String id) {
+    public ApiResponse<DecisionCheckVO> checkRules(@PathVariable String id) {
         try {
-            Map<String, Object> result = decisionService.checkDecisionRules(id);
-            return ApiResponse.success(result);
+            var result = decisionService.checkDecisionRules(id);
+            return ApiResponse.success(DecisionCheckVO.of(result));
         } catch (Exception e) {
             log.error("Failed to check decision rules", e);
             return ApiResponse.internalError("Failed to check rules");
         }
     }
 
-    private Map<String, Object> decisionToMap(Decision d) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", d.getId());
-        m.put("category", d.getCategory());
-        m.put("scenario", d.getScenario());
-        m.put("reasoning", d.getReasoning());
-        m.put("outcome", d.getOutcome());
-        m.put("confidence", d.getConfidence());
-        m.put("decisionMaker", d.getDecisionMaker());
-        m.put("createdAt", d.getCreatedAt());
-        return m;
-    }
 }
