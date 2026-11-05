@@ -51,7 +51,7 @@ public class OntologyEntityGlobalController {
      * sortOrder / mapping / createdAt / updatedAt / status}</p>
      */
     @GetMapping("/entities")
-    public ApiResponse<List<Map<String, Object>>> listAllEntities() {
+    public ApiResponse<List<OntologyService.OntologyEntityRow>> listAllEntities() {
         return ApiResponse.success(ontologyService.listAllObjects());
     }
 }

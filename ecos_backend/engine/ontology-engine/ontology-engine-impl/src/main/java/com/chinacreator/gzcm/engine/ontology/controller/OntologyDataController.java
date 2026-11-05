@@ -123,7 +123,7 @@ public class OntologyDataController {
      * 委托 {@link OntologyService#listAllObjects()}，确保数据记录绑定到已定义的本体对象。
      */
     @GetMapping("/objects")
-    public ApiResponse<List<Map<String, Object>>> listObjectTypes() {
+    public ApiResponse<List<OntologyService.OntologyEntityRow>> listObjectTypes() {
         return ApiResponse.success(ontologyService.listAllObjects());
     }
 

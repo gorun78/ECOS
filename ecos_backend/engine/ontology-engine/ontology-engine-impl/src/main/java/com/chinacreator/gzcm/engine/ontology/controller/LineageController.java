@@ -244,7 +244,7 @@ public class LineageController {
      * <p>委托 {@link OntologyService#listAllObjects()} 返回全部实体，前端据此选择血缘节点。</p>
      */
     @GetMapping("/entities")
-    public ApiResponse<List<Map<String, Object>>> listLineageEntities() {
+    public ApiResponse<List<OntologyService.OntologyEntityRow>> listLineageEntities() {
         return ApiResponse.success(ontologyService.listAllObjects());
     }
 

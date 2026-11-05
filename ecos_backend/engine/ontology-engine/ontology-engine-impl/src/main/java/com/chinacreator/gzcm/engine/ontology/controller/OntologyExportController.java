@@ -283,14 +283,14 @@ public class OntologyExportController {
     @GetMapping
     public ApiResponse<OntologyExportFullVO> exportFull() {
         try {
-            List<Map<String, Object>> allObjects = ontologyService.listAllObjects();
+            List<OntologyService.OntologyEntityRow> allObjects = ontologyService.listAllObjects();
             List<OntologyEntityVO> objectTypes = new ArrayList<>();
             List<Object> linkTypes = new ArrayList<>();
             List<OntologyEntityVO> actionTypes = new ArrayList<>();
             List<OntologyEntityVO> functionTypes = new ArrayList<>();
 
-            for (Map<String, Object> obj : allObjects) {
-                String entityType = String.valueOf(obj.getOrDefault("entityType", ""));
+            for (OntologyService.OntologyEntityRow obj : allObjects) {
+                String entityType = obj.entityType() == null ? "" : obj.entityType();
                 switch (entityType) {
                     case "MASTER":
                     case "OBJECT":

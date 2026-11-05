@@ -424,13 +424,30 @@ public class OntologyService {
     }
 
     /**
+     * 实体行视图（11 键；与 {@link #entityToMap} 同键同序，mapping 为关联映射配置文档）。
+     */
+    public record OntologyEntityRow(String id, String ontologyId, String code, String name,
+                                    String description, String entityType, String domainId,
+                                    Object mapping, Integer sortOrder, String createdAt,
+                                    String updatedAt) {
+    }
+
+    /**
      * 列出所有对象类型（ObjectType）— 返回全部实体，含 mapping + domainId 字段。
      * 供 /api/v1/ontology/objects 端点使用。
      */
-    public List<Map<String, Object>> listAllObjects() {
+    public List<OntologyEntityRow> listAllObjects() {
         return repository.findAllEntities().stream()
-            .map(this::entityToMap)
+            .map(this::entityToRow)
             .collect(Collectors.toList());
+    }
+
+    private OntologyEntityRow entityToRow(OntologyEntity e) {
+        Map<String, Object> m = entityToMap(e);
+        return new OntologyEntityRow((String) m.get("id"), (String) m.get("ontologyId"),
+                (String) m.get("code"), (String) m.get("name"), (String) m.get("description"),
+                (String) m.get("entityType"), (String) m.get("domainId"), m.get("mapping"),
+                (Integer) m.get("sortOrder"), (String) m.get("createdAt"), (String) m.get("updatedAt"));
     }
 
     public Map<String, Object> createEntity(String ontologyId, Map<String, Object> body) {
