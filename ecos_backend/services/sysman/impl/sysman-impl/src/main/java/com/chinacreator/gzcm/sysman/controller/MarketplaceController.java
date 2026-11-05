@@ -1,6 +1,11 @@
 package com.chinacreator.gzcm.sysman.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.sysman.dto.MarketplaceAccessRequestVO;
+import com.chinacreator.gzcm.sysman.dto.MarketplaceAssetListVO;
+import com.chinacreator.gzcm.sysman.dto.MarketplaceAssetSearchVO;
+import com.chinacreator.gzcm.sysman.dto.MarketplaceAssetVO;
+import com.chinacreator.gzcm.sysman.dto.MarketplaceDashboardVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -14,7 +19,8 @@ public class MarketplaceController {
 
     private static final Logger log = LoggerFactory.getLogger(MarketplaceController.class);
 
-    private final ConcurrentHashMap<String, Map<String, Object>> store = new ConcurrentHashMap<>();
+    /** 内存资产 store（行模型强类型 {@link MarketplaceAssetVO}，键集固定 11 枚）。 */
+    private final ConcurrentHashMap<String, MarketplaceAssetVO> store = new ConcurrentHashMap<>();
 
     public MarketplaceController() {
         long now = System.currentTimeMillis();
@@ -44,38 +50,24 @@ public class MarketplaceController {
     private void seed(String id, String name, String nameZh, String description,
                       String category, String status, String owner, String version,
                       List<String> tags, long now) {
-        Map<String, Object> asset = new LinkedHashMap<>();
-        asset.put("id", id);
-        asset.put("name", name);
-        asset.put("nameZh", nameZh);
-        asset.put("description", description);
-        asset.put("category", category);
-        asset.put("status", status);
-        asset.put("owner", owner);
-        asset.put("version", version);
-        asset.put("tags", tags);
-        asset.put("createdAt", now);
-        asset.put("updatedAt", now);
-        store.put(id, asset);
+        store.put(id, new MarketplaceAssetVO(id, name, nameZh, description, category,
+                status, owner, version, tags, now, now));
     }
 
     @GetMapping("/assets")
-    public ApiResponse<Map<String, Object>> listAssets(
+    public ApiResponse<MarketplaceAssetListVO> listAssets(
             @RequestParam(value = "category", required = false) String category,
             @RequestParam(value = "status", required = false) String status) {
         try {
-            List<Map<String, Object>> all = new ArrayList<>(store.values());
+            List<MarketplaceAssetVO> all = new ArrayList<>(store.values());
             if (category != null && !category.isBlank()) {
-                all.removeIf(a -> !category.equals(a.get("category")));
+                all.removeIf(a -> !category.equals(a.category()));
             }
             if (status != null && !status.isBlank()) {
-                all.removeIf(a -> !status.equals(a.get("status")));
+                all.removeIf(a -> !status.equals(a.status()));
             }
-            all.sort((a, b) -> Long.compare((Long) b.get("updatedAt"), (Long) a.get("updatedAt")));
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("data", all);
-            result.put("total", all.size());
-            return ApiResponse.success(result);
+            all.sort((a, b) -> Long.compare(b.updatedAt(), a.updatedAt()));
+            return ApiResponse.success(new MarketplaceAssetListVO(all, all.size()));
         } catch (Exception e) {
             log.error("查询资产列表失败", e);
             return ApiResponse.internalError("查询失败");
@@ -83,9 +75,9 @@ public class MarketplaceController {
     }
 
     @GetMapping("/assets/{id}")
-    public ApiResponse<?> getAsset(@PathVariable String id) {
+    public ApiResponse<MarketplaceAssetVO> getAsset(@PathVariable String id) {
         try {
-            Map<String, Object> asset = store.get(id);
+            MarketplaceAssetVO asset = store.get(id);
             if (asset == null) {
                 return ApiResponse.notFound("资产不存在: " + id);
             }
@@ -97,24 +89,26 @@ public class MarketplaceController {
     }
 
     @PostMapping("/assets")
-    public ApiResponse<?> publishAsset(@RequestBody Map<String, Object> body) {
+    public ApiResponse<MarketplaceAssetVO> publishAsset(@RequestBody Map<String, Object> body) {
         try {
             String id = UUID.randomUUID().toString().replace("-", "");
             long now = System.currentTimeMillis();
-            Map<String, Object> asset = new LinkedHashMap<>();
-            asset.put("id", id);
-            asset.put("name", body.getOrDefault("name", "Asset " + id.substring(0, 8)));
-            asset.put("nameZh", body.getOrDefault("nameZh", ""));
-            asset.put("description", body.getOrDefault("description", ""));
-            asset.put("category", body.getOrDefault("category", "data"));
-            asset.put("status", body.getOrDefault("status", "draft"));
-            asset.put("owner", body.getOrDefault("owner", "anonymous"));
-            asset.put("version", body.getOrDefault("version", "1.0.0"));
-            asset.put("tags", body.getOrDefault("tags", new ArrayList<>()));
-            asset.put("createdAt", now);
-            asset.put("updatedAt", now);
+            Object rawTags = body.getOrDefault("tags", List.of());
+            List<String> tags = rawTags instanceof List<?> list
+                    ? list.stream().filter(Objects::nonNull).map(String::valueOf).toList()
+                    : List.of();
+            MarketplaceAssetVO asset = new MarketplaceAssetVO(
+                    id,
+                    String.valueOf(body.getOrDefault("name", "Asset " + id.substring(0, 8))),
+                    String.valueOf(body.getOrDefault("nameZh", "")),
+                    String.valueOf(body.getOrDefault("description", "")),
+                    String.valueOf(body.getOrDefault("category", "data")),
+                    String.valueOf(body.getOrDefault("status", "draft")),
+                    String.valueOf(body.getOrDefault("owner", "anonymous")),
+                    String.valueOf(body.getOrDefault("version", "1.0.0")),
+                    tags, now, now);
             store.put(id, asset);
-            log.info("资产发布成功, id={}, name={}", id, asset.get("name"));
+            log.info("资产发布成功, id={}, name={}", id, asset.name());
             return ApiResponse.success(asset);
         } catch (Exception e) {
             log.error("发布资产失败", e);
@@ -123,34 +117,30 @@ public class MarketplaceController {
     }
 
     @GetMapping("/search")
-    public ApiResponse<Map<String, Object>> searchAssets(@RequestParam(value = "q", required = false) String query) {
+    public ApiResponse<MarketplaceAssetSearchVO> searchAssets(
+            @RequestParam(value = "q", required = false) String query) {
         try {
-            List<Map<String, Object>> results;
+            List<MarketplaceAssetVO> results;
             if (query == null || query.isBlank()) {
                 results = new ArrayList<>(store.values());
             } else {
                 String lowerQ = query.toLowerCase();
                 results = new ArrayList<>();
-                for (Map<String, Object> asset : store.values()) {
-                    String name = String.valueOf(asset.getOrDefault("name", "")).toLowerCase();
-                    String nameZh = String.valueOf(asset.getOrDefault("nameZh", "")).toLowerCase();
-                    String desc = String.valueOf(asset.getOrDefault("description", "")).toLowerCase();
-                    String category = String.valueOf(asset.getOrDefault("category", "")).toLowerCase();
-                    @SuppressWarnings("unchecked")
-                    List<String> tags = (List<String>) asset.getOrDefault("tags", new ArrayList<>());
-                    boolean tagMatch = tags.stream().anyMatch(t -> t.toLowerCase().contains(lowerQ));
+                for (MarketplaceAssetVO asset : store.values()) {
+                    String name = nullToEmpty(asset.name()).toLowerCase();
+                    String nameZh = nullToEmpty(asset.nameZh()).toLowerCase();
+                    String desc = nullToEmpty(asset.description()).toLowerCase();
+                    String category = nullToEmpty(asset.category()).toLowerCase();
+                    List<String> tags = asset.tags() != null ? asset.tags() : List.of();
+                    boolean tagMatch = tags.stream().anyMatch(t -> nullToEmpty(t).toLowerCase().contains(lowerQ));
                     if (name.contains(lowerQ) || nameZh.contains(lowerQ)
                             || desc.contains(lowerQ) || category.contains(lowerQ) || tagMatch) {
                         results.add(asset);
                     }
                 }
             }
-            results.sort((a, b) -> Long.compare((Long) b.get("updatedAt"), (Long) a.get("updatedAt")));
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("data", results);
-            result.put("total", results.size());
-            result.put("query", query);
-            return ApiResponse.success(result);
+            results.sort((a, b) -> Long.compare(b.updatedAt(), a.updatedAt()));
+            return ApiResponse.success(new MarketplaceAssetSearchVO(results, results.size(), query));
         } catch (Exception e) {
             log.error("搜索资产失败, q={}", query, e);
             return ApiResponse.internalError("搜索失败");
@@ -158,29 +148,24 @@ public class MarketplaceController {
     }
 
     @GetMapping("/dashboard")
-    public ApiResponse<Map<String, Object>> dashboard() {
+    public ApiResponse<MarketplaceDashboardVO> dashboard() {
         try {
             int total = store.size();
             Map<String, Long> byCategory = new LinkedHashMap<>();
             Map<String, Long> byStatus = new LinkedHashMap<>();
-            for (Map<String, Object> asset : store.values()) {
-                String cat = String.valueOf(asset.getOrDefault("category", "unknown"));
-                String stat = String.valueOf(asset.getOrDefault("status", "unknown"));
+            for (MarketplaceAssetVO asset : store.values()) {
+                String cat = asset.category() != null ? asset.category() : "unknown";
+                String stat = asset.status() != null ? asset.status() : "unknown";
                 byCategory.merge(cat, 1L, Long::sum);
                 byStatus.merge(stat, 1L, Long::sum);
             }
-            List<Map<String, Object>> recent = new ArrayList<>(store.values());
-            recent.sort((a, b) -> Long.compare((Long) b.get("updatedAt"), (Long) a.get("updatedAt")));
+            List<MarketplaceAssetVO> recent = new ArrayList<>(store.values());
+            recent.sort((a, b) -> Long.compare(b.updatedAt(), a.updatedAt()));
             if (recent.size() > 5) {
                 recent = recent.subList(0, 5);
             }
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("totalAssets", total);
-            result.put("byCategory", byCategory);
-            result.put("byStatus", byStatus);
-            result.put("recentAssets", recent);
-            result.put("timestamp", System.currentTimeMillis());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new MarketplaceDashboardVO(
+                    total, byCategory, byStatus, recent, System.currentTimeMillis()));
         } catch (Exception e) {
             log.error("获取仪表盘数据失败", e);
             return ApiResponse.internalError("获取仪表盘失败");
@@ -188,7 +173,7 @@ public class MarketplaceController {
     }
 
     @PostMapping("/request-access")
-    public ApiResponse<Map<String, Object>> requestAccess(@RequestBody Map<String, Object> body) {
+    public ApiResponse<MarketplaceAccessRequestVO> requestAccess(@RequestBody Map<String, Object> body) {
         try {
             String assetId = String.valueOf(body.getOrDefault("assetId", ""));
             String requester = String.valueOf(body.getOrDefault("requester", "anonymous"));
@@ -197,18 +182,16 @@ public class MarketplaceController {
                 return ApiResponse.badRequest("资产不存在: " + assetId);
             }
             String requestId = UUID.randomUUID().toString().replace("-", "");
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("requestId", requestId);
-            result.put("assetId", assetId);
-            result.put("requester", requester);
-            result.put("reason", reason);
-            result.put("status", "pending");
-            result.put("createdAt", System.currentTimeMillis());
             log.info("访问请求已提交, requestId={}, assetId={}, requester={}", requestId, assetId, requester);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new MarketplaceAccessRequestVO(
+                    requestId, assetId, requester, reason, "pending", System.currentTimeMillis()));
         } catch (Exception e) {
             log.error("提交访问请求失败", e);
             return ApiResponse.internalError("请求失败");
         }
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 }
