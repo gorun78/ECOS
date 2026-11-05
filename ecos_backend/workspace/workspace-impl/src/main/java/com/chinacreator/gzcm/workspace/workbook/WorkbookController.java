@@ -1,6 +1,10 @@
 package com.chinacreator.gzcm.workspace.workbook;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.workspace.dto.WorkbookEnvStatusVO;
+import com.chinacreator.gzcm.workspace.dto.WorkbookExecutionRecordVO;
+import com.chinacreator.gzcm.workspace.dto.WorkbookHealthVO;
+import com.chinacreator.gzcm.workspace.dto.WorkbookSessionVO;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,7 +27,7 @@ public class WorkbookController {
     private final WorkbookExecutionEngine engine;
     private final RRuntime rRuntime;
 
-    private final Cache<String, List<Map<String, Object>>> history = Caffeine.newBuilder()
+    private final Cache<String, List<WorkbookExecutionRecordVO>> history = Caffeine.newBuilder()
             .maximumSize(1000)
             .expireAfterWrite(1, TimeUnit.HOURS)
             .build();
@@ -61,17 +65,15 @@ public class WorkbookController {
         String sessionId = req.getSessionId() != null ? req.getSessionId() : "default";
 
         try {
-            Map<String, Object> result = engine.execute(req.getLanguage(), req.getCode(), sessionId);
+            var result = engine.execute(req.getLanguage(), req.getCode(), sessionId);
 
-            Map<String, Object> record = new LinkedHashMap<>();
-            record.put("id", UUID.randomUUID().toString().substring(0, 8));
-            record.put("language", req.getLanguage());
-            record.put("code", req.getCode());
-            record.put("sessionId", sessionId);
-            record.put("timestamp", LocalDateTime.now().toString());
-            record.put("result", result);
-
-            history.get(sessionId, k -> new ArrayList<>()).add(record);
+            history.get(sessionId, k -> new ArrayList<>()).add(new WorkbookExecutionRecordVO(
+                    UUID.randomUUID().toString().substring(0, 8),
+                    req.getLanguage(),
+                    req.getCode(),
+                    sessionId,
+                    LocalDateTime.now().toString(),
+                    result));
 
             return ApiResponse.success(result);
 
@@ -79,56 +81,42 @@ public class WorkbookController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.error("Workbook execute error", e);
-            Map<String, Object> err = new LinkedHashMap<>();
-            err.put("error", e.getMessage());
             return ApiResponse.internalError("Execution failed");
         }
     }
 
     @Operation(summary = "会话列表", description = "获取所有活动会话列表")
     @GetMapping("/sessions")
-    public ApiResponse<List<Map<String, Object>>> sessions() {
-        List<Map<String, Object>> list = new ArrayList<>();
+    public ApiResponse<List<WorkbookSessionVO>> sessions() {
+        List<WorkbookSessionVO> list = new ArrayList<>();
         for (var entry : history.asMap().entrySet()) {
-            Map<String, Object> s = new LinkedHashMap<>();
-            s.put("sessionId", entry.getKey());
-            s.put("executionCount", entry.getValue().size());
-            list.add(s);
+            list.add(new WorkbookSessionVO(entry.getKey(), entry.getValue().size()));
         }
         return ApiResponse.success(list);
     }
 
     @Operation(summary = "历史记录", description = "获取指定会话的历史执行记录")
     @GetMapping("/history")
-    public ApiResponse<List<Map<String, Object>>> history(
+    public ApiResponse<List<WorkbookExecutionRecordVO>> history(
             @RequestParam(value = "sessionId", defaultValue = "default") String sessionId) {
-        List<Map<String, Object>> records = history.getIfPresent(sessionId);
+        var records = history.getIfPresent(sessionId);
         return ApiResponse.success(records != null ? records : List.of());
     }
 
     @Operation(summary = "运行环境状态", description = "检查各语言运行环境的可用性")
     @GetMapping("/health")
-    public ApiResponse<Map<String, Object>> health() {
-        Map<String, Object> health = new LinkedHashMap<>();
-
-        Map<String, Object> sqlInfo = new LinkedHashMap<>();
-        sqlInfo.put("available", true);
-        health.put("sql", sqlInfo);
-
-        Map<String, Object> pyInfo = new LinkedHashMap<>();
+    public ApiResponse<WorkbookHealthVO> health() {
+        WorkbookEnvStatusVO pyInfo;
         try {
             ProcessBuilder pb = new ProcessBuilder("python3", "--version");
             Process process = pb.start();
             boolean ok = process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
-            pyInfo.put("available", ok && process.exitValue() == 0);
+            pyInfo = new WorkbookEnvStatusVO(ok && process.exitValue() == 0, null);
         } catch (Exception e) {
-            pyInfo.put("available", false);
-            pyInfo.put("message", e.getMessage());
+            pyInfo = new WorkbookEnvStatusVO(false, e.getMessage());
         }
-        health.put("python", pyInfo);
 
-        health.put("r", rRuntime.availabilityInfo());
-
-        return ApiResponse.success(health);
+        return ApiResponse.success(new WorkbookHealthVO(
+                new WorkbookEnvStatusVO(true, null), pyInfo, rRuntime.availabilityInfo()));
     }
 }
