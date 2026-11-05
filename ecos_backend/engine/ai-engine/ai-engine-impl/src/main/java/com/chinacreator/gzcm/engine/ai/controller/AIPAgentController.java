@@ -32,6 +32,7 @@ import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
 import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
 import com.chinacreator.gzcm.runtime.access.git.archive.OptionalArchiver;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -76,13 +77,41 @@ public class AIPAgentController {
     /** 注册表 repositoryId（V300 种子）。 */
     private static final String GIT_REPO_AGENT = "agent-collab";
 
+    /** 列表摘要（6 键；旧 Map 逐键同名同序）。 */
+    public record AgentSummaryVO(@JsonProperty("id") String id,
+                                 @JsonProperty("name") String name,
+                                 @JsonProperty("status") String status,
+                                 @JsonProperty("createdAt") String createdAt,
+                                 @JsonProperty("modelProvider") String modelProvider,
+                                 @JsonProperty("modelName") String modelName) {
+    }
+
+    /** 详情（11 键；{@code tools} 来自 capability JSON，形态由登记方决定）。 */
+    public record AgentDetailVO(@JsonProperty("id") String id,
+                                @JsonProperty("name") String name,
+                                @JsonProperty("status") String status,
+                                @JsonProperty("role") String role,
+                                @JsonProperty("description") String description,
+                                @JsonProperty("modelProvider") String modelProvider,
+                                @JsonProperty("modelName") String modelName,
+                                @JsonProperty("systemPrompt") String systemPrompt,
+                                @JsonProperty("tools") List<Object> tools,
+                                @JsonProperty("createdAt") String createdAt,
+                                @JsonProperty("updatedAt") String updatedAt) {
+    }
+
+    /** 删除回执（2 键）。 */
+    public record AgentDeleteVO(@JsonProperty("deleted") boolean deleted,
+                                @JsonProperty("id") String id) {
+    }
+
     // ═══════════════ 列表 ═══════════════════
 
     @GetMapping("/agents")
-    public ApiResponse<List<Map<String, Object>>> listAgents() {
+    public ApiResponse<List<AgentSummaryVO>> listAgents() {
         if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
-        List<Map<String, Object>> result = agentRepo.findAll().stream()
-            .map(this::toSummaryMap)
+        List<AgentSummaryVO> result = agentRepo.findAll().stream()
+            .map(this::toSummaryVO)
             .collect(Collectors.toList());
         return ApiResponse.success(result);
     }
@@ -90,17 +119,17 @@ public class AIPAgentController {
     // ═══════════════ 详情 ═══════════════════
 
     @GetMapping("/agents/{id}")
-    public ApiResponse<Map<String, Object>> getAgent(@PathVariable String id) {
+    public ApiResponse<AgentDetailVO> getAgent(@PathVariable String id) {
         if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
         AgentRegistryEntity a = agentRepo.findById(id);
         if (a == null) return ApiResponse.notFound("Agent " + id + " 不存在");
-        return ApiResponse.success(toDetailMap(a));
+        return ApiResponse.success(toDetailVO(a));
     }
 
     // ═══════════════ 创建 ═══════════════════
 
     @PostMapping("/agents")
-    public ApiResponse<Map<String, Object>> createAgent(@RequestBody Map<String, Object> body)
+    public ApiResponse<AgentDetailVO> createAgent(@RequestBody Map<String, Object> body)
             throws JsonProcessingException {
         if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
 
@@ -132,13 +161,13 @@ public class AIPAgentController {
         agentRepo.insert(entity);
         log.info("AIP Agent created: {} [{}]", id, name);
         archiveAgent(entity, "Create agent " + id);
-        return ApiResponse.success(toDetailMap(entity));
+        return ApiResponse.success(toDetailVO(entity));
     }
 
     // ═══════════════ 更新 ═══════════════════
 
     @PutMapping("/agents/{id}")
-    public ApiResponse<Map<String, Object>> updateAgent(
+    public ApiResponse<AgentDetailVO> updateAgent(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) throws JsonProcessingException {
         if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
@@ -165,7 +194,7 @@ public class AIPAgentController {
         agentRepo.update(existing);
         log.info("AIP Agent updated: {}", id);
         archiveAgent(existing, "Update agent " + id);
-        return ApiResponse.success(toDetailMap(existing));
+        return ApiResponse.success(toDetailVO(existing));
     }
 
     /**
@@ -255,7 +284,7 @@ public class AIPAgentController {
     // ═══════════════ 删除 ═══════════════════
 
     @DeleteMapping("/agents/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> deleteAgent(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<AgentDeleteVO>> deleteAgent(@PathVariable String id) {
         if (agentRepo == null) return failure(AiResponseSupport.dependencyUnavailable("AgentRegistryRepository"));
 
         // 内置 Agent 删除保护
@@ -269,7 +298,7 @@ public class AIPAgentController {
         int rows = agentRepo.delete(id);
         if (rows > 0) {
             log.info("AIP Agent deleted: {}", id);
-            return ok(ApiResponse.success(Map.of("deleted", true, "id", id)));
+            return ok(ApiResponse.success(new AgentDeleteVO(true, id)));
         }
         return failure(ApiResponse.notFound("Agent " + id + " 不存在"));
     }
@@ -303,7 +332,7 @@ public class AIPAgentController {
     // ═══════════════ 模板实例化 ═══════════════════
 
     @PostMapping("/agents/instantiate")
-    public ApiResponse<Map<String, Object>> instantiateAgent(@RequestBody Map<String, Object> body) {
+    public ApiResponse<AgentDetailVO> instantiateAgent(@RequestBody Map<String, Object> body) {
         if (templateService == null) return AiResponseSupport.dependencyUnavailable("AgentTemplateService");
 
         String templateId = String.valueOf(body.getOrDefault("templateId", "")).trim();
@@ -315,7 +344,7 @@ public class AIPAgentController {
 
         try {
             AgentRegistryEntity entity = templateService.instantiate(templateId, userId, body);
-            return ApiResponse.success(toDetailMap(entity));
+            return ApiResponse.success(toDetailVO(entity));
         } catch (IllegalArgumentException e) {
             log.warn("[AIPAgent] 实例化请求不合法: templateId={}", templateId, e);
             return ApiResponse.badRequest("Agent 实例化请求不合法");
@@ -391,50 +420,43 @@ public class AIPAgentController {
 
     // ═══════════════ 内部方法 ═══════════════════
 
-    /** 从 AgentRegistryEntity 提取列表摘要字段 */
-    private Map<String, Object> toSummaryMap(AgentRegistryEntity entity) {
-        Map<String, Object> s = new LinkedHashMap<>();
-        s.put("id", entity.getId());
-        s.put("name", entity.getName());
-        s.put("status", entity.getStatus());
-        s.put("createdAt", entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
-
+    /** 从 AgentRegistryEntity 提取列表摘要字段（6 键）。 */
+    private AgentSummaryVO toSummaryVO(AgentRegistryEntity entity) {
         Map<String, Object> meta = parseMetadata(entity.getMetadata());
-        s.put("modelProvider", meta.getOrDefault("modelProvider", ""));
-        s.put("modelName", meta.getOrDefault("modelName", ""));
-        return s;
+        return new AgentSummaryVO(entity.getId(), entity.getName(), entity.getStatus(),
+                entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null,
+                String.valueOf(meta.getOrDefault("modelProvider", "")),
+                String.valueOf(meta.getOrDefault("modelName", "")));
     }
 
-    /** 从 AgentRegistryEntity 提取详情字段（兼容旧 Map 格式） */
-    private Map<String, Object> toDetailMap(AgentRegistryEntity entity) {
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("id", entity.getId());
-        detail.put("name", entity.getName());
-        detail.put("status", entity.getStatus());
-        detail.put("role", entity.getRole());
-
+    /** 从 AgentRegistryEntity 提取详情字段（11 键；工具清单来自 capability JSON）。 */
+    @SuppressWarnings("unchecked")
+    private AgentDetailVO toDetailVO(AgentRegistryEntity entity) {
         Map<String, Object> meta = parseMetadata(entity.getMetadata());
-        detail.put("description", meta.getOrDefault("description", ""));
-        detail.put("modelProvider", meta.getOrDefault("modelProvider", "deepseek"));
-        detail.put("modelName", meta.getOrDefault("modelName", "deepseek-v4-flash"));
-        detail.put("systemPrompt", meta.getOrDefault("systemPrompt", ""));
 
         // Parse tools from capability JSON — F06-15：解析失败重抛（受检异常仅按具体类型接），禁空列表掩蔽
+        List<Object> tools;
         try {
             if (entity.getCapability() != null && !entity.getCapability().isEmpty()) {
                 var node = mapper.readTree(entity.getCapability());
-                if (node.has("tools")) detail.put("tools", mapper.treeToValue(node.get("tools"), List.class));
-                else detail.put("tools", List.of());
+                tools = node.has("tools")
+                        ? mapper.treeToValue(node.get("tools"), List.class)
+                        : List.of();
             } else {
-                detail.put("tools", List.of());
+                tools = List.of();
             }
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Agent capability 反序列化失败: id=" + entity.getId(), e);
         }
 
-        detail.put("createdAt", entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
-        detail.put("updatedAt", entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
-        return detail;
+        return new AgentDetailVO(entity.getId(), entity.getName(), entity.getStatus(), entity.getRole(),
+                String.valueOf(meta.getOrDefault("description", "")),
+                String.valueOf(meta.getOrDefault("modelProvider", "deepseek")),
+                String.valueOf(meta.getOrDefault("modelName", "deepseek-v4-flash")),
+                String.valueOf(meta.getOrDefault("systemPrompt", "")),
+                tools,
+                entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null,
+                entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
     }
 
     @SuppressWarnings("unchecked")

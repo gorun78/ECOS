@@ -209,6 +209,12 @@ import org.junit.jupiter.api.Test;
  *       （{@code arguments}/{@code body}/{@code parseJson} 入口）与 {@code functionCallSchema}、
  *       {@code obligations} 属主契约。键面由 {@code AgentToolWireShapeTest} 4 例钉住，
  *       变异实红（{@code functionCallSchema}→functionCallSchemaX）。</li>
+ *   <li>1856 ＝ #147CY（2026-11-05）HEAD 面复测值，差额 −9 行来自 ai 域
+ *       {@code AIPAgentController}（26→17）：列表摘要 6 键 / 详情 11 键 / 删除回执 2 键改 record；
+ *       请求体与 {@code metadata}/{@code capability} JSON、模板目录、{@code AgentTestResult#toMap}
+ *       等自由面与属主契约保留。{@code containsKey}/{@code getOrDefault} 语义与归档/审计腿零改动；
+ *       {@code AipDeleteAgentStatusFidelityTest} 6 例随签名改写、状态行判据未放宽；
+ *       键面由 {@code AipAgentWireShapeTest} 3 例钉住，变异实红（{@code modelProvider}→model_provider）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -220,7 +226,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -235,7 +241,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1865;
+    private static final int BASELINE_LINES = 1856;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -245,7 +251,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1865（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1856（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

@@ -50,8 +50,8 @@ class AipDeleteAgentStatusFidelityTest {
         return controller;
     }
 
-    private ApiResponse<Map<String, Object>> envelope(
-            ResponseEntity<ApiResponse<Map<String, Object>>> resp) {
+    private ApiResponse<AIPAgentController.AgentDeleteVO> envelope(
+            ResponseEntity<ApiResponse<AIPAgentController.AgentDeleteVO>> resp) {
         assertNotNull(resp.getBody(), "ResponseEntity 的 body 不得为 null（状态行有了、信封丢了）");
         return resp.getBody();
     }
@@ -59,7 +59,7 @@ class AipDeleteAgentStatusFidelityTest {
     @Test
     @DisplayName("依赖未装配腿：状态行 502＝D.5 TOOL_BACKEND_ERROR，与信封同号")
     void dependencyMissingCarries502() {
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp =
+        ResponseEntity<ApiResponse<AIPAgentController.AgentDeleteVO>> resp =
                 new AIPAgentController().deleteAgent("a-1");
 
         assertEquals(AiErrorClass.TOOL_BACKEND_ERROR.httpStatus(), resp.getStatusCode().value(),
@@ -75,7 +75,7 @@ class AipDeleteAgentStatusFidelityTest {
         builtin.setRole("builtin");
         when(repo.findById("builtin-agent")).thenReturn(builtin);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp =
+        ResponseEntity<ApiResponse<AIPAgentController.AgentDeleteVO>> resp =
                 controllerWithRepo().deleteAgent("builtin-agent");
 
         assertEquals(HttpStatus.FORBIDDEN.value(), resp.getStatusCode().value(),
@@ -89,7 +89,7 @@ class AipDeleteAgentStatusFidelityTest {
     void unknownAgentCarries404() {
         when(repo.findById(anyString())).thenReturn(null);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp =
+        ResponseEntity<ApiResponse<AIPAgentController.AgentDeleteVO>> resp =
                 controllerWithRepo().deleteAgent("nope");
 
         assertEquals(HttpStatus.NOT_FOUND.value(), resp.getStatusCode().value());
@@ -104,7 +104,7 @@ class AipDeleteAgentStatusFidelityTest {
         when(repo.findById("a-1")).thenReturn(custom);
         when(repo.delete("a-1")).thenReturn(1);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp =
+        ResponseEntity<ApiResponse<AIPAgentController.AgentDeleteVO>> resp =
                 controllerWithRepo().deleteAgent("a-1");
 
         assertEquals(HttpStatus.OK.value(), resp.getStatusCode().value());
@@ -119,7 +119,7 @@ class AipDeleteAgentStatusFidelityTest {
         when(repo.findById("a-2")).thenReturn(custom);
         when(repo.delete("a-2")).thenReturn(0);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp =
+        ResponseEntity<ApiResponse<AIPAgentController.AgentDeleteVO>> resp =
                 controllerWithRepo().deleteAgent("a-2");
 
         assertEquals(HttpStatus.NOT_FOUND.value(), resp.getStatusCode().value(),
