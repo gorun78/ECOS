@@ -67,10 +67,10 @@ class SecurityEngineStatusControllerTest {
     @Test
     @DisplayName("GET /api/v1/engine/security/status — 200 且 status=RUNNING")
     void statusReturns200() {
-        ApiResponse<Map<String, Object>> resp = controller.status();
+        ApiResponse<SecurityEngineStatusController.SecurityStatusVO> resp = controller.status();
         assertTrue(resp.isSuccess());
         assertNotNull(resp.getData());
-        assertEquals("security-engine", resp.getData().get("name"));
-        assertEquals("RUNNING", resp.getData().get("status"));
+        assertEquals("security-engine", resp.getData().name());
+        assertEquals("RUNNING", resp.getData().status());
     }
 }
