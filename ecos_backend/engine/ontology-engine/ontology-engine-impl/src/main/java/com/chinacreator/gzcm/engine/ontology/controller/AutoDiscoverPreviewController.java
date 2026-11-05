@@ -3,6 +3,8 @@ package com.chinacreator.gzcm.engine.ontology.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.SystemErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.engine.ontology.dto.AutoDiscoverEntityPreviewVO;
+import com.chinacreator.gzcm.engine.ontology.dto.AutoDiscoverPreviewVO;
 import com.chinacreator.gzcm.engine.ontology.service.AutoDiscoverPreviewQueryService;
 import com.chinacreator.gzcm.engine.ontology.service.AutoDiscoverService;
 import org.slf4j.Logger;
@@ -91,7 +93,7 @@ public class AutoDiscoverPreviewController {
      * @param body        包含 datasourceId + resourceNames
      */
     @PostMapping("/{domainCode}/auto-discover/preview")
-    public ApiResponse<Map<String, Object>> preview(
+    public ApiResponse<AutoDiscoverPreviewVO> preview(
             @PathVariable String domainCode,
             @RequestBody Map<String, Object> body) {
         try {
@@ -110,26 +112,22 @@ public class AutoDiscoverPreviewController {
                     "数据源不存在: " + datasourceId);
             }
 
-            List<Map<String, Object>> entityPreviews = new ArrayList<>();
+            List<AutoDiscoverEntityPreviewVO> entityPreviews = new ArrayList<>();
             int totalFields = 0;
 
             // DW(CURATED) 层资源清单一次拉取（data-engine 不可达时抛 DataAccessException → 默认拒绝）
-            List<Map<String, Object>> curatedResources = autoDiscoverService.loadCuratedResources();
+            var curatedResources = autoDiscoverService.loadCuratedResources();
             // 列定义缓存（resource_id → 字段列表），避免循环请求
             Map<String, List<Map<String, Object>>> fieldsCache = new LinkedHashMap<>();
 
             for (String resourceName : resourceNames) {
                 // 1) 列定义（只读，不写库）—— 走 data-engine REST，禁直查 td_data_*
-                List<Map<String, Object>> fields = autoDiscoverService.resolveResourceFields(
+                var fields = autoDiscoverService.resolveResourceFields(
                         curatedResources, fieldsCache, datasourceId, resourceName);
 
                 if (fields.isEmpty()) {
-                    Map<String, Object> skip = new LinkedHashMap<>();
-                    skip.put("resourceName", resourceName);
-                    skip.put("entityCode", toEntityCode(resourceName));
-                    skip.put("discovered", false);
-                    skip.put("reason", "无字段数据");
-                    entityPreviews.add(skip);
+                    entityPreviews.add(AutoDiscoverEntityPreviewVO.skipped(
+                            resourceName, toEntityCode(resourceName)));
                     continue;
                 }
 
@@ -137,7 +135,7 @@ public class AutoDiscoverPreviewController {
                 int fieldCount = fields.size();
                 totalFields += fieldCount;
                 Map<String, Integer> typeCounts = new LinkedHashMap<>();
-                for (Map<String, Object> f : fields) {
+                for (var f : fields) {
                     Object dt = f.get("dataType");
                     String mapped = dt != null ? mapSqlType(dt.toString()) : "STRING";
                     typeCounts.merge(mapped, 1, Integer::sum);
@@ -153,28 +151,15 @@ public class AutoDiscoverPreviewController {
                     alreadyExists = false;
                 }
 
-                Map<String, Object> preview = new LinkedHashMap<>();
-                preview.put("resourceName", resourceName);
-                preview.put("entityCode", toEntityCode(resourceName));
-                preview.put("entityName", resourceName);
-                preview.put("domainCode", domainCode);
-                preview.put("discovered", true);
-                preview.put("fieldCount", fieldCount);
-                preview.put("typeDistribution", typeCounts);
-                preview.put("alreadyExists", alreadyExists);
-                entityPreviews.add(preview);
+                entityPreviews.add(AutoDiscoverEntityPreviewVO.discovered(
+                        resourceName, toEntityCode(resourceName), domainCode,
+                        fieldCount, typeCounts, alreadyExists));
             }
 
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("domainCode", domainCode);
-            data.put("datasourceId", datasourceId);
-            data.put("dryRun", true);
-            data.put("entities", entityPreviews);
-            data.put("totalResources", entityPreviews.size());
-            data.put("totalFields", totalFields);
-            data.put("note", "预览模式（dryRun=true），未写入数据库");
-
-            return ApiResponse.success(data);
+            return ApiResponse.success(new AutoDiscoverPreviewVO(
+                    domainCode, datasourceId, true, entityPreviews,
+                    entityPreviews.size(), totalFields,
+                    "预览模式（dryRun=true），未写入数据库"));
         } catch (DataBridgeException e) {
             // #142/B4-3e-58（D-B4-88）：承载型不可用（判定通道故障＝503）显式上抛，
             // 由 gateway GlobalExceptionHandler 按 getHttpStatus() 透出状态行，

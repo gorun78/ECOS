@@ -92,7 +92,7 @@ class AutoDiscoverPreviewProbeCarryTest {
         when(previewQueryService.countDatasourceById("ds-2"))
                 .thenThrow(new IllegalStateException("boom"));
         try {
-            ApiResponse<Map<String, Object>> r = controller.preview("DOM",
+            ApiResponse<?> r = controller.preview("DOM",
                     body("ds-2", List.of("t_order")));
             // 走到这里＝载体被折叠成了信封；internalError 的 code=-1 面正是 D-B4-88 要消灭的
             throw new AssertionError("载体被端点兜底折叠，实得 code=" + r.getCode()
@@ -128,7 +128,7 @@ class AutoDiscoverPreviewProbeCarryTest {
         when(autoDiscoverService.resolveResourceFields(anyList(), anyMap(), eq("ds-4"), anyString()))
                 .thenReturn(List.of());
 
-        ApiResponse<Map<String, Object>> r = controller.preview("DOM",
+        ApiResponse<?> r = controller.preview("DOM",
                 body("ds-4", List.of("t_order")));
         // 本机信封成功码 = ApiResponse.CODE_SUCCESS（0），不是 HTTP 状态行 200
         assertEquals(ApiResponse.CODE_SUCCESS, r.getCode(),
