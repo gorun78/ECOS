@@ -9,6 +9,7 @@ import com.chinacreator.gzcm.engine.cognitive2.controller.DiagnosisController;
 import com.chinacreator.gzcm.engine.cognitive2.controller.ScenarioController;
 import com.chinacreator.gzcm.engine.cognitive2.controller.Wave3DemoController;
 import com.chinacreator.gzcm.engine.cognitive2.controller.WorldModelController;
+import com.chinacreator.gzcm.engine.cognitive2.dto.ScenarioTemplateVO;
 import com.chinacreator.gzcm.engine.cognitive2.guard.CogScope;
 import com.chinacreator.gzcm.engine.cognitive2.model.Scenario;
 import com.chinacreator.gzcm.engine.cognitive2.service.CognitiveConfigQueryService;
@@ -237,13 +238,13 @@ class CognitiveStubHonestyTest {
         ScenarioController on = new ScenarioController(mock(ScenarioSimulatorService.class),
                 noForecastSeam(), configWithDemo(true));
         @SuppressWarnings("unchecked")
-        ResponseEntity<ApiResponse<List<Map<String, Object>>>> allowed =
-                (ResponseEntity<ApiResponse<List<Map<String, Object>>>>) (ResponseEntity<?>) on.listTemplates();
+        ResponseEntity<ApiResponse<List<ScenarioTemplateVO>>> allowed =
+                (ResponseEntity<ApiResponse<List<ScenarioTemplateVO>>>) (ResponseEntity<?>) on.listTemplates();
         assertEquals(HttpStatus.OK, allowed.getStatusCode());
-        List<Map<String, Object>> templates = allowed.getBody().getData();
+        List<ScenarioTemplateVO> templates = allowed.getBody().getData();
         assertTrue(templates.size() > 0);
-        for (Map<String, Object> t : templates) {
-            assertEquals(Boolean.TRUE, t.get("demo"), "demo 模板必须标 demo=true");
+        for (ScenarioTemplateVO t : templates) {
+            assertEquals(Boolean.TRUE, t.demo(), "demo 模板必须标 demo=true");
         }
     }
 

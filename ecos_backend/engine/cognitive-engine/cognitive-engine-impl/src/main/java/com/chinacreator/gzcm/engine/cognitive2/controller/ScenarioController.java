@@ -8,6 +8,9 @@ import com.chinacreator.gzcm.engine.cognitive2.model.*;
 import com.chinacreator.gzcm.engine.cognitive2.service.CognitiveConfigQueryService;
 import com.chinacreator.gzcm.engine.cognitive2.service.forecast.ForecastDiagnosisService;
 import com.chinacreator.gzcm.engine.cognitive2.service.scenario.CognitiveGuardException;
+import com.chinacreator.gzcm.engine.cognitive2.dto.ScenarioCompareItemVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.ScenarioCompareRequest;
+import com.chinacreator.gzcm.engine.cognitive2.dto.ScenarioTemplateVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +36,10 @@ import java.util.UUID;
  * 默认（未配置）/生产返回真实 HTTP 404（端点不可达），禁 200 + 内置数据。</p>
  *
  * <p>{@code /simulate} 与 {@code /compare} 走 {@link ScenarioSimulatorService} 真实推演，不受开关影响。</p>
+ *
+ * <p>DI-2 #147EK：模板目录 5 键与对比条目 4 键改 record，对比请求体改
+ * {@code ScenarioCompareRequest}；{@code /simulate} 请求体（mode/variables/overrides 自由位）
+ * 保留泛型 Map。</p>
  */
 @RestController("cognitiveScenarioController")
 @RequestMapping("/api/v1/cognitive/scenario")
@@ -133,11 +140,11 @@ public class ScenarioController {
      * {@code demo=true}，前端不得当作真实场景台账渲染。</p>
      */
     @GetMapping("/list")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listTemplates() {
+    public ResponseEntity<ApiResponse<List<ScenarioTemplateVO>>> listTemplates() {
         if (!configQueryService.demoEnabled()) {
             return ResponseEntity.notFound().build();
         }
-        List<Map<String, Object>> templates = new ArrayList<>();
+        List<ScenarioTemplateVO> templates = new ArrayList<>();
 
         addTemplate(templates, "原材料涨价10%", "供应链",
             Map.of("raw_material_cost", "+10%"), "模拟原材料成本上涨对利润的影响");
@@ -153,45 +160,32 @@ public class ScenarioController {
         return ResponseEntity.ok(ApiResponse.success(templates));
     }
 
-    private void addTemplate(List<Map<String, Object>> list, String name,
+    private void addTemplate(List<ScenarioTemplateVO> list, String name,
             String domain, Map<String, String> vars, String desc) {
-        Map<String, Object> t = new LinkedHashMap<>();
-        t.put("name", name);
-        t.put("domain", domain);
-        t.put("variables", vars);
-        t.put("description", desc);
-        t.put("demo", true);
-        list.add(t);
+        list.add(new ScenarioTemplateVO(name, domain, vars, desc, true));
     }
 
     @PostMapping("/compare")
-    public ApiResponse<List<Map<String, Object>>> compare(@RequestBody Map<String, Object> request) {
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> scenarios = (List<Map<String, Object>>) request.get("scenarios");
+    public ApiResponse<List<ScenarioCompareItemVO>> compare(@RequestBody ScenarioCompareRequest request) {
+        List<ScenarioCompareRequest.ItemSpec> scenarios = request.getScenarios();
 
         if (scenarios == null || scenarios.isEmpty()) {
             return ApiResponse.success(Collections.emptyList());
         }
 
-        List<Map<String, Object>> results = new ArrayList<>();
-        for (Map<String, Object> s : scenarios) {
-            String name = (String) s.get("name");
-            @SuppressWarnings("unchecked")
-            Map<String, Object> vars = (Map<String, Object>) s.getOrDefault("variables", new HashMap<>());
+        List<ScenarioCompareItemVO> results = new ArrayList<>();
+        for (ScenarioCompareRequest.ItemSpec s : scenarios) {
+            String name = s.getName();
 
             Scenario scenario = new Scenario();
             scenario.setId(UUID.randomUUID().toString());
             scenario.setName(name);
             scenario.setType(ScenarioType.CUSTOM);
-            scenario.setAssumptions(new HashMap<>(vars));
+            scenario.setAssumptions(new HashMap<>(s.getVariables() != null ? s.getVariables() : Map.of()));
 
             SimulationResult result = simulatorService.runSimulation(scenario);
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("name", name);
-            entry.put("confidence", result.getConfidence());
-            entry.put("summary", result.getSummary());
-            entry.put("predictions", result.getPredictions());
-            results.add(entry);
+            results.add(new ScenarioCompareItemVO(name, result.getConfidence(),
+                    result.getSummary(), result.getPredictions()));
         }
 
         return ApiResponse.success(results);
