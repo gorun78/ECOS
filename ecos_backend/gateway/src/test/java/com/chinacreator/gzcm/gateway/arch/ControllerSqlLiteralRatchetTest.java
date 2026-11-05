@@ -35,7 +35,12 @@ class ControllerSqlLiteralRatchetTest {
     /** SQL 字面量判据：字符串字面量以 SELECT/INSERT/UPDATE/DELETE + 空格开头（与人工复扫同口径）。 */
     private static final Pattern SQL_LITERAL = Pattern.compile("\"(SELECT|INSERT|UPDATE|DELETE) ");
 
-    /** 基线（2026-11-04 实扫；路径相对 ecos_backend，计数=该文件 SQL 字面量处数；合计 98）。 */
+    /**
+     * 基线（2026-11-04 实扫；路径相对 ecos_backend，计数=该文件 SQL 字面量处数；合计 <b>72</b>）。
+     *
+     * <p>2026-11-05 同批下调两处（DI-2 #147CI/#147CJ 把 SQL 收回服务层）：{@code UserController}
+     * 9→6、{@code TenantController} 20→1；两处均为「SQL 下沉 DAO/Service」的真清退，非判据放宽。</p>
+     */
     private static final Map<String, Integer> BASELINE = new LinkedHashMap<>();
 
     static {
@@ -48,9 +53,8 @@ class ControllerSqlLiteralRatchetTest {
         BASELINE.put("gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/SysConfigController.java", 2);
         BASELINE.put("services/datanet/src/main/java/com/chinacreator/gzcm/services/datanet/controller/DqDashboardController.java", 13);
         BASELINE.put("services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/EntityTableMappingController.java", 7);
-        BASELINE.put("services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/SysConfigController.java", 4);
-        BASELINE.put("services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/TenantController.java", 20);
-        BASELINE.put("services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/UserController.java", 9);
+        BASELINE.put("services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/TenantController.java", 1);
+        BASELINE.put("services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/UserController.java", 6);
         BASELINE.put("workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ObjectActionController.java", 2);
         BASELINE.put("workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ObjectController.java", 21);
         BASELINE.put("workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ObjectQLController.java", 1);

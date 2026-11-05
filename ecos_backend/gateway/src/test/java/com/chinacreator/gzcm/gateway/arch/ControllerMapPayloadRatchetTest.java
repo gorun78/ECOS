@@ -180,6 +180,12 @@ import org.junit.jupiter.api.Test;
  *       {@code QuestionCreateRequest.slots} 自由 JSON 入参（§5.2 #3 键面由调用方定义）。
  *       键面由 {@code WAgentQuestionWireShapeTest} 5 例钉住（含「行缺失但键仍在、值为 null」），
  *       变异实红（去掉存在位的 {@code @JsonIgnore} ⇒ {@code latestRunPresent} 泄漏成键）。</li>
+ *   <li>1919 ＝ #147CU（2026-11-05）HEAD 面复测值，差额 −19 行<b>全部</b>来自 gateway
+ *       {@code GatewayDiagnosticsController}（19→0）：制品/过滤链/档位矩阵/总响应改 record，
+ *       {@code ORDER} 大写键与 {@code traceId} 恒在键位逐字保旧；{@code routeManifest} 按实测
+ *       订正为<b>原始 manifest 文档</b>（旧双重 put 让摘要从未出网），字段改 {@code JsonNode}。
+ *       同批把反退化下界 {@code MIN_LINES} 2000 → 1900（清退跨过整百线，下界不同步会把真清退
+ *       判成「扫描面退化」）；键面由 {@code GatewayDiagnosticsWireShapeTest} 6 例钉住。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -191,7 +197,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -206,16 +212,17 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1938;
+    private static final int BASELINE_LINES = 1919;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
-    private static final int MIN_LINES = 2000;
+    // 反退化下界（非目标值）：清退跨过整百线时同步下调，防止扫描面塌成空集仍判绿。
+    private static final int MIN_LINES = 1900;
 
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1938（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1919（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;
