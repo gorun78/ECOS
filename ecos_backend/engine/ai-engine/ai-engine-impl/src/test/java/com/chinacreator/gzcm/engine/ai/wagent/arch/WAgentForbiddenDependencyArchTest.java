@@ -148,8 +148,11 @@ class WAgentForbiddenDependencyArchTest {
      *  对应表 ecos_agent_version 一并清退；本基线是"删面"而非"扫描面失真"）。</p>
      * <p>2026-11-05 +1（264→265）＝ #147DW DI-2 对话回执强类型化批：新增
      * {@code ai.dto.AgentChatResultVO}（chat/chatInSession 共用载荷，属"增面"，非扫描面失真）。</p>
+     * <p>2026-11-05 +3（265→268）＝ #147DX DI-2 护栏面强类型化批：新增
+     * {@code ai.dto.AipGuardrailVO}／{@code AipAuditLogVO}／{@code AipDeleteResultVO}
+     * （同属"增面"登记）。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 265;
+    private static final int AI_SOURCE_FILE_FLOOR = 268;
 
     /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
      *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */
