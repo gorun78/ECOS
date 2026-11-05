@@ -192,6 +192,15 @@ import org.junit.jupiter.api.Test;
  *       {@code TaskControllerWireShapeTest} 5 例钉住。剩 7 枚为属主契约
  *       （{@code queryTasks(Map condition)} 入参、{@code getTaskStats()}/{@code health()} 自由结果）
  *       与自由 JSON {@code params}。变异实红（{@code progress} 改名 progressPct）。</li>
+ *   <li>1879 ＝ #147CW（2026-11-05）HEAD 面复测值，差额 −22 行来自 gateway
+ *       {@code RuntimeAlertV1Controller}（28→6）：列表页 4 键 + 告警行 12 键 / DLQ 行 8 键
+ *       （V242/V243 显式 SELECT 列，snake 键与 JDBC 时间值逐字保留）、ack/关闭/重放回执改 record；
+ *       属主 {@code RuntimeAlertRepository} 的列表两腿同步改强类型行（详情腿
+ *       {@code findAlertById} 是 {@code SELECT *}，动态列<b>不</b>冻结，保留 Map）。
+ *       剩 6 枚全部来自该 {@code SELECT *} 详情腿与 {@code closeTime} 回查。状态行与 404/400/503
+ *       分支判据零改动（既有 {@code AlertCloseEndpointContractTest} 9 例随新签名改写、判据未放宽）；
+ *       键面由 {@code RuntimeAlertWireShapeTest} 3 例钉住，变异实红（{@code rule_code}→ruleCode）。
+ *       反退化下界同批 1900 → 1800（跨整百线）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -203,7 +212,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -218,17 +227,17 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1901;
+    private static final int BASELINE_LINES = 1879;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
     // 反退化下界（非目标值）：清退跨过整百线时同步下调，防止扫描面塌成空集仍判绿。
-    private static final int MIN_LINES = 1900;
+    private static final int MIN_LINES = 1800;
 
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1901（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1879（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

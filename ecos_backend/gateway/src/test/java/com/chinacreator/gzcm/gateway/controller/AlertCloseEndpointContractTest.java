@@ -51,21 +51,21 @@ class AlertCloseEndpointContractTest {
     private static final Timestamp CLOSE_TS = Timestamp.valueOf("2026-10-15 09:30:00");
 
     /** 成功腿：状态行 200 且信封 code=0（写状态行不得把成功腿一起改判）。 */
-    private static ApiResponse<Map<String, Object>> okEnvelope(
-            ResponseEntity<ApiResponse<Map<String, Object>>> resp) {
+    private static ApiResponse<RuntimeAlertV1Controller.CloseVO> okEnvelope(
+            ResponseEntity<ApiResponse<RuntimeAlertV1Controller.CloseVO>> resp) {
         assertEquals(200, resp.getStatusCode().value(), "成功腿状态行必须仍是 200");
-        ApiResponse<Map<String, Object>> body = resp.getBody();
+        ApiResponse<RuntimeAlertV1Controller.CloseVO> body = resp.getBody();
         assertNotNull(body, "ResponseEntity 必须携带信封");
         assertEquals(0, body.getCode(), "关闭成功必须 code=0，实际 errorCode=" + body.getErrorCode());
         return body;
     }
 
     /** 失败腿：状态行与信封 code 同号（裸回时代状态行恒 200，此处即变红点）。 */
-    private static ApiResponse<Map<String, Object>> failureEnvelope(
-            ResponseEntity<ApiResponse<Map<String, Object>>> resp, int expected) {
+    private static ApiResponse<RuntimeAlertV1Controller.CloseVO> failureEnvelope(
+            ResponseEntity<ApiResponse<RuntimeAlertV1Controller.CloseVO>> resp, int expected) {
         assertEquals(expected, resp.getStatusCode().value(),
                 "状态行必须等于契约期望的 " + expected + "，实际=" + resp.getStatusCode().value());
-        ApiResponse<Map<String, Object>> body = resp.getBody();
+        ApiResponse<RuntimeAlertV1Controller.CloseVO> body = resp.getBody();
         assertNotNull(body, "ResponseEntity 必须携带信封");
         assertEquals(expected, body.getCode(), "信封 code 必须与状态行同号，实际=" + body.getCode());
         return body;
@@ -102,14 +102,14 @@ class AlertCloseEndpointContractTest {
         repo.closeUpdated = 1;
         repo.found = List.of(Map.of("id", "a-1", "status", "closed", "close_time", CLOSE_TS));
 
-        ApiResponse<Map<String, Object>> resp =
+        ApiResponse<RuntimeAlertV1Controller.CloseVO> resp =
                 okEnvelope(new RuntimeAlertV1Controller(repo).close("a-1"));
 
-        Map<String, Object> data = resp.getData();
+        RuntimeAlertV1Controller.CloseVO data = resp.getData();
         assertNotNull(data);
-        assertEquals("a-1", data.get("id"));
-        assertEquals("closed", data.get("status"));
-        assertEquals(CLOSE_TS, data.get("closeTime"),
+        assertEquals("a-1", data.id());
+        assertEquals("closed", data.status());
+        assertEquals(CLOSE_TS, data.closeTime(),
                 "closeTime 必须是 ecos_runtime_alert_record.close_time 的真实值（契约 L2124）");
         assertEquals(1, repo.closeCalls);
     }
@@ -120,9 +120,9 @@ class AlertCloseEndpointContractTest {
         FakeRepo repo = new FakeRepo();
         repo.closeUpdated = 1;
         repo.found = List.of(Map.of("close_time", CLOSE_TS));
-        ApiResponse<Map<String, Object>> resp =
+        ApiResponse<RuntimeAlertV1Controller.CloseVO> resp =
                 okEnvelope(new RuntimeAlertV1Controller(repo).close("a-1"));
-        assertEquals(java.util.Set.of("id", "status", "closeTime"), resp.getData().keySet(),
+        assertEquals(java.util.Set.of("id", "status", "closeTime"), closeKeySet(resp.getData()),
                 "V242 实存列只有 close_time 没有 close_by，响应多出 closeBy 即臆造字段");
     }
 
@@ -132,10 +132,10 @@ class AlertCloseEndpointContractTest {
         FakeRepo repo = new FakeRepo();
         repo.closeUpdated = 1;
         repo.found = List.of(Map.of("id", "a-1", "status", "closed"));
-        ApiResponse<Map<String, Object>> resp =
+        ApiResponse<RuntimeAlertV1Controller.CloseVO> resp =
                 okEnvelope(new RuntimeAlertV1Controller(repo).close("a-1"));
-        assertTrue(resp.getData().containsKey("closeTime"));
-        assertNull(resp.getData().get("closeTime"), "回查不到列值时必须如实 null");
+        assertTrue(closeKeySet(resp.getData()).contains("closeTime"));
+        assertNull(resp.getData().closeTime(), "回查不到列值时必须如实 null");
     }
 
     @Test
@@ -144,7 +144,7 @@ class AlertCloseEndpointContractTest {
         FakeRepo repo = new FakeRepo();
         repo.closeUpdated = 0;
         repo.found = List.of();
-        ApiResponse<Map<String, Object>> resp =
+        ApiResponse<RuntimeAlertV1Controller.CloseVO> resp =
                 failureEnvelope(new RuntimeAlertV1Controller(repo).close("ghost"), 404);
         assertTrue(resp.getMessage().contains("不存在"));
     }
@@ -155,7 +155,7 @@ class AlertCloseEndpointContractTest {
         FakeRepo repo = new FakeRepo();
         repo.closeUpdated = 0;
         repo.found = List.of(Map.of("id", "a-1", "status", "closed", "close_time", CLOSE_TS));
-        ApiResponse<Map<String, Object>> resp =
+        ApiResponse<RuntimeAlertV1Controller.CloseVO> resp =
                 failureEnvelope(new RuntimeAlertV1Controller(repo).close("a-1"), 400);
         assertTrue(resp.getMessage().contains("open"), "400 文案必须给出可达状态集合，实际=" + resp.getMessage());
     }
@@ -165,7 +165,7 @@ class AlertCloseEndpointContractTest {
     void repositoryFailureIs503() {
         FakeRepo repo = new FakeRepo();
         repo.throwOnClose = new RuntimeException("db down");
-        ApiResponse<Map<String, Object>> resp =
+        ApiResponse<RuntimeAlertV1Controller.CloseVO> resp =
                 failureEnvelope(new RuntimeAlertV1Controller(repo).close("a-1"), 503);
         assertNull(resp.getData());
     }
@@ -202,6 +202,14 @@ class AlertCloseEndpointContractTest {
         assertTrue(sql.contains("close_time=NOW()"), "close_time 必须由 DB 时钟写入（V242 实存列，此前零写者）");
         assertTrue(sql.contains("status IN ('open','acked')"), "可达状态集合必须限定 open/acked");
         assertTrue(sql.contains("is_deleted = 0"), "写通道必须带软删过滤（IR03 口径下新增写入面一律带）");
+    }
+
+    /** 回执的**出网键集**（序列化后判等，与旧 Map 时代的 keySet 同尺）。 */
+    @SuppressWarnings("unchecked")
+    private static java.util.Set<String> closeKeySet(RuntimeAlertV1Controller.CloseVO vo) {
+        java.util.Map<String, Object> m =
+                new com.fasterxml.jackson.databind.ObjectMapper().convertValue(vo, java.util.Map.class);
+        return m.keySet();
     }
 
     /** 取 {@code RuntimeAlertDao.closeAlert} 的 SQL 文本（同 commit 单源，禁测试里另抄一份 SQL）。 */

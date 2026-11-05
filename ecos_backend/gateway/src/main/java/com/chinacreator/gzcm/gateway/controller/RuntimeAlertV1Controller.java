@@ -4,7 +4,10 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AuthErrorCode;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.gateway.service.RuntimeAlertRepository;
+import com.chinacreator.gzcm.gateway.service.RuntimeAlertRepository.AlertRow;
+import com.chinacreator.gzcm.gateway.service.RuntimeAlertRepository.DlqRow;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -18,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +41,10 @@ import java.util.Map;
  * <b>路径、入参、信封字段三样零改动</b>（API 只增不改红线：只补状态行，同 D-B4-59 属主端点先例）。
  * {@code detail}／{@code ack}／{@code replay} 腿本批未动——它们不含安全裁决线出口，
  * 属非拒绝态裸回登记面（判据 B 只减不增），改判随该面另批。</p>
+ *
+ * <p><b>#147CW 载体</b>：列表/回执改 record（键名与旧 {@code Map} 逐键一致）；详情腿因
+ * {@code RuntimeAlertDao#findAlertById} 为 {@code SELECT *}（列集随 DDL 变）保留 {@code Map}——
+ * 把动态列冻结成固定键面会凭空丢列，属本批明确拒绝的假清退。</p>
  */
 @RestController
 @RequestMapping("/api/v1/monitor")
@@ -52,31 +58,58 @@ public class RuntimeAlertV1Controller {
         this.repo = repo;
     }
 
+    /** 告警分页（rows/total/page/size 四键）。 */
+    public record AlertPageVO(@JsonProperty("rows") List<AlertRow> rows,
+                              @JsonProperty("total") int total,
+                              @JsonProperty("page") int page,
+                              @JsonProperty("size") int size) {
+    }
+
+    /** DLQ 分页（rows/total/page/size 四键）。 */
+    public record DlqPageVO(@JsonProperty("rows") List<DlqRow> rows,
+                            @JsonProperty("total") int total,
+                            @JsonProperty("page") int page,
+                            @JsonProperty("size") int size) {
+    }
+
+    /** ack 回执（id/status 两键）。 */
+    public record AckVO(@JsonProperty("id") String id,
+                        @JsonProperty("status") String status) {
+    }
+
+    /** 关闭回执（id/status/closeTime 三键；closeTime 取写后回查真实列值）。 */
+    public record CloseVO(@JsonProperty("id") String id,
+                          @JsonProperty("status") String status,
+                          @JsonProperty("closeTime") Object closeTime) {
+    }
+
+    /** DLQ 重放回执（id/status 两键）。 */
+    public record ReplayVO(@JsonProperty("id") String id,
+                           @JsonProperty("status") String status) {
+    }
+
     @GetMapping("/alerts")
     @PreAuthorize("hasAuthority('platform:alert:read') or hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> list(
+    public ResponseEntity<ApiResponse<AlertPageVO>> list(
             @RequestParam(required = false) String severity,
             @RequestParam(required = false, defaultValue = "open") String status,
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "20") int size) {
         int offset = Math.max(0, (page - 1) * size);
         try {
-            List<Map<String, Object>> rows = repo.listAlerts(severity, status, size, offset);
+            List<AlertRow> rows = repo.listAlerts(severity, status, size, offset);
             int total = repo.countAlerts(severity, status);
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("rows", rows);
-            out.put("total", total);
-            out.put("page", page);
-            out.put("size", size);
-            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success(out).withTraceIdFromMdc());
+            return ResponseEntity.ok(ApiResponse.<AlertPageVO>success(
+                    new AlertPageVO(rows, total, page, size)).withTraceIdFromMdc());
         } catch (Exception ex) {
             log.error("RuntimeAlertV1 list failed (fail-closed): {}", ex.getMessage());
             return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
-                    .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                    .body(ApiResponse.<AlertPageVO>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
                             AuthErrorCode.ECOS_AUTH_005, "用户权限依赖不可用，请稍后重试").withTraceIdFromMdc());
         }
     }
 
+    /** 详情（{@code SELECT *} 动态列，保持 Map 载体；见类注释）。 */
     @GetMapping("/alerts/{id}")
     @PreAuthorize("hasAuthority('platform:alert:read') or hasRole('ADMIN')")
     public ApiResponse<Map<String, Object>> detail(@PathVariable String id) {
@@ -90,17 +123,14 @@ public class RuntimeAlertV1Controller {
     @PostMapping("/alerts/{id}/ack")
     @MinimumClearance(level = 2)
     @PreAuthorize("hasAuthority('platform:alert:ack') or hasRole('ADMIN')")
-    public ApiResponse<Map<String, Object>> ack(@PathVariable String id) {
+    public ApiResponse<AckVO> ack(@PathVariable String id) {
         String by = MDC.get("userId");
         if (by == null) by = "sys";
         int updated = repo.ackAlert(id, by);
         if (updated == 0) {
-            return ApiResponse.<Map<String, Object>>badRequest("告警已被 ack 或不存在").withTraceIdFromMdc();
+            return ApiResponse.<AckVO>badRequest("告警已被 ack 或不存在").withTraceIdFromMdc();
         }
-        Map<String, Object> ack = new LinkedHashMap<>();
-        ack.put("id", id);
-        ack.put("status", "acked");
-        return ApiResponse.success(ack).withTraceIdFromMdc();
+        return ApiResponse.success(new AckVO(id, "acked")).withTraceIdFromMdc();
     }
 
     /**
@@ -128,28 +158,25 @@ public class RuntimeAlertV1Controller {
     @PostMapping("/alerts/{id}/close")
     @MinimumClearance(level = 2)
     @PreAuthorize("hasAuthority('platform:alert:close') or hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> close(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<CloseVO>> close(@PathVariable String id) {
         try {
             int updated = repo.closeAlert(id);
             if (updated == 0) {
                 List<Map<String, Object>> rows = repo.findAlertById(id);
                 if (rows.isEmpty()) {
                     return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body(ApiResponse.<Map<String, Object>>notFound("告警不存在或已删除").withTraceIdFromMdc());
+                            .body(ApiResponse.<CloseVO>notFound("告警不存在或已删除").withTraceIdFromMdc());
                 }
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(ApiResponse.<Map<String, Object>>badRequest(
+                        .body(ApiResponse.<CloseVO>badRequest(
                                 "告警状态不可关闭（仅 open/acked 可关闭）").withTraceIdFromMdc());
             }
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("id", id);
-            out.put("status", "closed");
-            out.put("closeTime", readCloseTime(id));
-            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success(out).withTraceIdFromMdc());
+            return ResponseEntity.ok(ApiResponse.<CloseVO>success(
+                    new CloseVO(id, "closed", readCloseTime(id))).withTraceIdFromMdc());
         } catch (Exception ex) {
             log.error("RuntimeAlertV1 close failed (fail-closed): {}", ex.getMessage());
             return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
-                    .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                    .body(ApiResponse.<CloseVO>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
                             AuthErrorCode.ECOS_AUTH_005, "告警关闭依赖不可用，请稍后重试").withTraceIdFromMdc());
         }
     }
@@ -166,38 +193,31 @@ public class RuntimeAlertV1Controller {
     /** DLQ 列表（W13；表由 V243 建立）。 */
     @GetMapping("/dlq")
     @PreAuthorize("hasAuthority('platform:alert:read') or hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> dlq(
+    public ResponseEntity<ApiResponse<DlqPageVO>> dlq(
             @RequestParam(required = false, defaultValue = "pending") String status,
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "20") int size) {
         int offset = Math.max(0, (page - 1) * size);
         try {
-            List<Map<String, Object>> rows = repo.listDlq(status, size, offset);
+            List<DlqRow> rows = repo.listDlq(status, size, offset);
             int total = repo.countDlq(status);
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("rows", rows);
-            out.put("total", total);
-            out.put("page", page);
-            out.put("size", size);
-            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success(out).withTraceIdFromMdc());
+            return ResponseEntity.ok(ApiResponse.<DlqPageVO>success(
+                    new DlqPageVO(rows, total, page, size)).withTraceIdFromMdc());
         } catch (Exception ex) {
             log.error("dlq list failed: {}", ex.getMessage());
             return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
-                    .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                    .body(ApiResponse.<DlqPageVO>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
                             AuthErrorCode.ECOS_AUTH_005, "dlq 依赖不可用").withTraceIdFromMdc());
         }
     }
 
     @PostMapping("/dlq/{id}/replay")
     @PreAuthorize("hasAuthority('platform:alert:ack') or hasRole('ADMIN')")
-    public ApiResponse<Map<String, Object>> replay(@PathVariable String id) {
+    public ApiResponse<ReplayVO> replay(@PathVariable String id) {
         int updated = repo.replayDlq(id);
         if (updated == 0) {
-            return ApiResponse.<Map<String, Object>>badRequest("DLQ 消费失败：记录不存在或已处理").withTraceIdFromMdc();
+            return ApiResponse.<ReplayVO>badRequest("DLQ 消费失败：记录不存在或已处理").withTraceIdFromMdc();
         }
-        Map<String, Object> rep = new LinkedHashMap<>();
-        rep.put("id", id);
-        rep.put("status", "replayed");
-        return ApiResponse.success(rep).withTraceIdFromMdc();
+        return ApiResponse.success(new ReplayVO(id, "replayed")).withTraceIdFromMdc();
     }
 }
