@@ -1,6 +1,10 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ai.dto.AgentEvalListVO;
+import com.chinacreator.gzcm.engine.ai.dto.AgentEvalReportVO;
+import com.chinacreator.gzcm.engine.ai.dto.AgentEvalRunVO;
+import com.chinacreator.gzcm.engine.ai.dto.AgentEvalSummaryVO;
 import com.chinacreator.gzcm.engine.ai.service.AgentEvaluator;
 import com.chinacreator.gzcm.engine.ai.service.AgentEvaluator.DimensionScores;
 import com.chinacreator.gzcm.engine.ai.service.AgentEvaluator.EvalItemResult;
@@ -11,9 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -59,20 +61,19 @@ public class AgentEvalController {
      * <p>启动失败不再返回 internalError，由 {@link AiErrorAdvice} 分类为 ECOS-AI-* 响应。</p>
      */
     @PostMapping("/run")
-    public ApiResponse<Map<String, Object>> runEvaluation(@RequestBody(required = false) Map<String, Object> body) {
+    public ApiResponse<AgentEvalRunVO> runEvaluation(
+            @RequestBody(required = false) java.util.Map<String, Object> body) {
         String questionSet = null;
         if (body != null && body.containsKey("questionSet")) {
             questionSet = String.valueOf(body.get("questionSet"));
         }
         String evalId = agentEvaluator.startEvaluation(questionSet);
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("evalId", evalId);
-        data.put("questionSet", questionSet != null ? questionSet : "default");
-        data.put("message", "评估已启动，通过 GET /api/v1/aip/eval/" + evalId + "/report 查询结果");
-
         log.info("Eval run triggered: evalId={} questionSet={}", evalId, questionSet);
-        return ApiResponse.success(data);
+        return ApiResponse.success(new AgentEvalRunVO(
+                evalId,
+                questionSet != null ? questionSet : "default",
+                "评估已启动，通过 GET /api/v1/aip/eval/" + evalId + "/report 查询结果"));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -107,29 +108,15 @@ public class AgentEvalController {
      * <p>查询失败不再返回 internalError，由 {@link AiErrorAdvice} 分类为 ECOS-AI-* 响应。</p>
      */
     @GetMapping("/list")
-    public ApiResponse<Map<String, Object>> listEvaluations() {
+    public ApiResponse<AgentEvalListVO> listEvaluations() {
         List<EvalReport> reports = agentEvaluator.listReports();
 
-        List<Map<String, Object>> items = new ArrayList<>();
+        List<AgentEvalSummaryVO> items = new ArrayList<>();
         for (EvalReport report : reports) {
-            Map<String, Object> summary = new LinkedHashMap<>();
-            summary.put("evalId", report.getEvalId());
-            summary.put("questionSet", report.getQuestionSet());
-            summary.put("status", report.getStatus());
-            summary.put("totalQuestions", report.getTotalQuestions());
-            summary.put("avgScore", report.getAvgScore());
-            summary.put("grade", report.getGrade());
-            summary.put("startedAt", report.getStartedAt());
-            summary.put("completedAt", report.getCompletedAt());
-            summary.put("totalDurationMs", report.getTotalDurationMs());
-            items.add(summary);
+            items.add(AgentEvalSummaryVO.of(report));
         }
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("total", items.size());
-        data.put("items", items);
-
-        return ApiResponse.success(data);
+        return ApiResponse.success(new AgentEvalListVO(items.size(), items));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -182,74 +169,13 @@ public class AgentEvalController {
      * <p>查询失败不再返回 internalError，由 {@link AiErrorAdvice} 分类为 ECOS-AI-* 响应。</p>
      */
     @GetMapping("/{id}/report")
-    public ApiResponse<Map<String, Object>> getReport(@PathVariable String id) {
+    public ApiResponse<AgentEvalReportVO> getReport(@PathVariable String id) {
         EvalReport report = agentEvaluator.getReport(id);
 
         if (report == null) {
             return ApiResponse.notFound("评估 " + id + " 不存在");
         }
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("evalId", report.getEvalId());
-        data.put("questionSet", report.getQuestionSet());
-        data.put("status", report.getStatus());
-        data.put("totalQuestions", report.getTotalQuestions());
-        data.put("totalScore", report.getTotalScore());
-        data.put("avgScore", report.getAvgScore());
-        data.put("grade", report.getGrade());
-        data.put("totalDurationMs", report.getTotalDurationMs());
-        data.put("startedAt", report.getStartedAt());
-        data.put("completedAt", report.getCompletedAt());
-
-        // 5维汇总均分
-        if (report.getDimensionAvgs() != null) {
-            data.put("dimensionAvgs", dimensionsToMap(report.getDimensionAvgs()));
-        }
-
-        if (report.getItems() != null) {
-            data.put("items", report.getItems().stream().map(this::itemToMap).collect(Collectors.toList()));
-        }
-
-        // 如果还在运行中，返回提示
-        if ("running".equals(report.getStatus())) {
-            data.put("hint", "评估仍在运行中，请稍后重新查询");
-        }
-
-        return ApiResponse.success(data);
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    //  私有工具方法
-    // ═══════════════════════════════════════════════════════════════
-
-    private Map<String, Object> itemToMap(EvalItemResult item) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("questionId", item.getQuestionId());
-        m.put("question", item.getQuestion());
-        m.put("category", item.getCategory());
-        m.put("score", item.getScore());
-        m.put("rawScore", Math.round(item.getRawScore() * 100.0) / 100.0);
-        m.put("agentAnswer", item.getAgentAnswer());
-        m.put("actualTool", item.getActualTool());
-        m.put("matchedKeywords", item.getMatchedKeywords());
-        m.put("judgeReason", item.getJudgeReason());
-        m.put("durationMs", item.getDurationMs());
-
-        // 5维评分明细
-        if (item.getDimensions() != null) {
-            m.put("dimensions", dimensionsToMap(item.getDimensions()));
-        }
-
-        return m;
-    }
-
-    private Map<String, Object> dimensionsToMap(DimensionScores dims) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("toolAccuracy", dims.getToolAccuracy());
-        m.put("keywordCoverage", dims.getKeywordCoverage());
-        m.put("answerQuality", dims.getAnswerQuality());
-        m.put("executionEfficiency", dims.getExecutionEfficiency());
-        m.put("hallucinationResist", dims.getHallucinationResist());
-        return m;
+        return ApiResponse.success(AgentEvalReportVO.of(report));
     }
 }

@@ -157,8 +157,11 @@ class WAgentForbiddenDependencyArchTest {
      * {@code ai.dto.NlqResultVO}／{@code ObjectQlText}。</p>
      * <p>2026-11-05 +3（272→275）＝ #147EC DI-2 Pipeline 面强类型化批：新增
      * {@code ai.dto.AipPipelineVO}／{@code AipPipelineSummaryVO}／{@code AipPipelineExecResultVO}。</p>
+     * <p>2026-11-05 +6（275→281）＝ #147EH DI-2 评估面强类型化批：新增
+     * {@code AgentEvalRunVO}／{@code AgentEvalDimensionsVO}／{@code AgentEvalItemVO}／
+     * {@code AgentEvalSummaryVO}／{@code AgentEvalListVO}／{@code AgentEvalReportVO}。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 275;
+    private static final int AI_SOURCE_FILE_FLOOR = 281;
 
     /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
      *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */
