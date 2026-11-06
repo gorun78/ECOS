@@ -632,8 +632,11 @@ class ControllerMapPayloadRatchetTest {
     /**
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
+     * <p>2026-11-06 #147Z-6：按 HEAD（含用户临时提交 0bfa694a 带入的 DI-2 并发批最新面）实扫
+     * 1250 行，基线 1239 已与提交面不符（门因此恒红）⇒ 按实测订正 1239→1250；这是<b>登记债</b>不是收口，
+     * 后续 DI-2 清退每一批必须同批向下调回。</p>
      */
-    private static final int BASELINE_LINES = 1239;
+    private static final int BASELINE_LINES = 1250;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;

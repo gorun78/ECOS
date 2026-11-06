@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.common.context;
+package com.chinacreator.gzcm.common.security.http;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -9,6 +9,11 @@ import jakarta.servlet.http.HttpServletRequest;
  * {@code ClearanceInterceptor} 写入、gateway 属主守卫读取），且两侧不得各自拼字面量——
  * 常量漂移会让守卫静默失效。客户端 {@code X-Org-Id} 头已在 {@code EcosTrustHeaderFilter}
  * 剥离，<b>本属性只接受服务端写入值</b>，任何从参数/头回填的写法都属越权面回潮。</p>
+ *
+ * <p><b>为什么落在 {@code security.http}</b>（#147Z-6）：本类是信任边界的载体（服务端解析值 +
+ * 客户端头已剥离），按 {@code ArchitectureGuardTest}「Controller 外禁依赖 servlet API、security
+ * 包除外」的分层口径，原 {@code common.context} 落位会被判违例；迁入 security 包是**改落位**
+ * 而非**放宽规则**。</p>
  *
  * @author ECOS Common #147G8
  */

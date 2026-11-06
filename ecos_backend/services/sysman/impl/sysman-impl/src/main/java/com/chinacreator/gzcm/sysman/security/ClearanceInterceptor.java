@@ -214,7 +214,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
         String orgId = getCurrentOrgId(userId);
         // §2.9.9 G8：把**服务端解析**的机构发布到请求属性，供 gateway 仓库属主守卫消费；
         // 客户端 X-Org-Id 已在网关剥离，此值不接受任何客户端输入（属性名单源见 ServerOrgAttribute）。
-        com.chinacreator.gzcm.common.context.ServerOrgAttribute.set(request, orgId);
+        com.chinacreator.gzcm.common.security.http.ServerOrgAttribute.set(request, orgId);
 
         com.chinacreator.gzcm.sysman.security.clearance.model.SubjectClearanceFact fact =
                 clearanceQueryService.resolveSubjectClearance(userId, tenantId, orgId);

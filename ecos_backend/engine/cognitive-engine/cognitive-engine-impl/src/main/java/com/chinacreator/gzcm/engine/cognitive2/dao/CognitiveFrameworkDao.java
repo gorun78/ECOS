@@ -74,7 +74,7 @@ public class CognitiveFrameworkDao extends JdbcTemplateDaoSupport {
                         + "steps_json, required_capabilities_json, validation_profile_ref, budget_policy_ref, "
                         + "stop_conditions_json, governance_json, contract_resolvable, content_json, content_hash, "
                         + "create_by, update_by) "
-                        + "VALUES (?,?,?,?,?,?,?,?::jsonb,?::jsonb,?,?,?::jsonb,?::jsonb,?,?,?::jsonb,?::jsonb,?,?::jsonb,?,?,?)",
+                        + "VALUES (?,?,?,?,?,?,?,CAST(? AS jsonb),CAST(? AS jsonb),?,?,CAST(? AS jsonb),CAST(? AS jsonb),?,?,CAST(? AS jsonb),CAST(? AS jsonb),?,CAST(? AS jsonb),?,?,?)",
                 java.util.UUID.randomUUID().toString(), d.getFrameworkId(), d.getVersion(), d.getName(),
                 d.getCategory(), d.getPurpose(), d.getStatus(),
                 json(Map.of("problemTypes", nullSafe(d.getProblemTypes()), "domains", nullSafe(d.getDomains()))),
