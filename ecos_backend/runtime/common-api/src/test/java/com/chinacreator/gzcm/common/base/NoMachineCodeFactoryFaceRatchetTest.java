@@ -698,6 +698,9 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * 枚举常量而非码值字面量，出口侧基线腿另立批次（本批不扩面生产文件）。</p>
      */
     private static final Map<String, List<String>> KB_LITERAL_HOLDERS = new TreeMap<>(Map.ofEntries(
+            // #147Z-6：ECOS-KB-010（入参校验失败归 KB 域码，commit 17433bdd 引入）按「新增族码先登记」
+            // 补入本表，并同步写入《从零实施版》§7.3.3 错误码表。
+            Map.entry("010", List.of(KB_ERROR_CODES_SOURCE)),
             Map.entry("011", List.of(KB_ERROR_CODES_SOURCE)),
             Map.entry("012", List.of(KB_ERROR_CODES_SOURCE)),
             Map.entry("020", List.of(KB_ERROR_CODES_SOURCE)),

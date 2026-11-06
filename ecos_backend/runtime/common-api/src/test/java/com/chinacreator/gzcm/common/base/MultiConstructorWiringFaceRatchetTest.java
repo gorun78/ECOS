@@ -194,7 +194,14 @@ class MultiConstructorWiringFaceRatchetTest {
             Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/"
                     + "com/chinacreator/gzcm/sysman/security/ClearanceInterceptor.java", 2),
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/"
-                    + "com/chinacreator/gzcm/workspace/forecast/ForecastRunOrchestrationService.java", 2)));
+                    + "com/chinacreator/gzcm/workspace/forecast/ForecastRunOrchestrationService.java", 2),
+            // #147Z-6（2026-11-06）：两枚均为「测试缝腿 + 生产腿带 @Autowired」良性档（逐枚实读确认），
+            // 并入面集钉名防迁：EventBusAuditPublisher（#147AQ 包级测试构造器）、
+            // ScenarioRunService（装配守卫测试缝，生产腿 FQ 形 @Autowired）。
+            Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/sysman/audit/EventBusAuditPublisher.java", 2),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/workspace/scenario/ScenarioRunService.java", 2)));
 
     // ── 1. 面集棘轮 ─────────────────────────────────
 

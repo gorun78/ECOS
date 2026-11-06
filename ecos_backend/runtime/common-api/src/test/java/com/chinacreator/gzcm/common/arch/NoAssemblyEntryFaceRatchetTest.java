@@ -185,8 +185,12 @@ class NoAssemblyEntryFaceRatchetTest {
      * 而替代实现判据原先先按 {@code implements} 过滤，配置类自己不 {@code implements} 该接口就被跳过；
      * 修法＝{@code @Bean} 腿独立判、不被 {@code implements} 门挡住。<b>两处偏差都朝「账面虚高」方向</b>：
      * 判据一松，只需下线的成员就被记成承流欠账，逼后来人去补一条本来就有人承的链。</p>
+     *
+     * <p><b>#147Z-6（2026-11-06）4→5</b>：runtime-core {@code AlertServiceImpl} 新进断链档
+     * （接口有裸消费者、无已装配替代实现；并发批新增告警服务带入）。按本门口径登记为
+     * 承流欠账（不是豁免），收口＝接装配入口或改显式不可用，修好同批下调本值。</p>
      */
-    private static final int BROKEN_CHAIN_BASELINE = 4;
+    private static final int BROKEN_CHAIN_BASELINE = 5;
 
     /** 断链档正见证：接口 {@code ISystemParamService} 被控制器裸引用，实现体却无装配入口。 */
     private static final String BROKEN_CHAIN_WITNESS =
