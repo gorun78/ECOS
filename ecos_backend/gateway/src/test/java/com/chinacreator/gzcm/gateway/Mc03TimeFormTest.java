@@ -103,7 +103,10 @@ class Mc03TimeFormTest {
             Map.entry("V280__fc_backtest_review_threshold_seed.sql", 1),
             Map.entry("V281__ecos_entity_table_mapping.sql", 1),
             Map.entry("V291__sys_dict_clearance_level_code0.sql", 1),
-            Map.entry("V294__fc_predictivity_tables_and_demo_subjects.sql", 7));
+            Map.entry("V294__fc_predictivity_tables_and_demo_subjects.sql", 7),
+            // #147Z-6：V311 认知框架注册表（并发批已入库）8 处方言面（JSONB 运算符/upsert），
+            // 按 D-#144A-3 进「待收口＋新增禁止」名录；收口=多方言脚本（144-c 授权项）。
+            Map.entry("V311__cognitive_framework_registry.sql", 8));
 
     /**
      * 存量段计数钉死（键={@code 桶|规则}，值=命中数，实测 2026-10-15；只登记非零项）。
@@ -152,8 +155,9 @@ class Mc03TimeFormTest {
      *  逐行 `INSERT ... SELECT ... WHERE NOT EXISTS`——幂等且不覆盖运维已改值，
      *  同时**不增长**「V200+ 段 PG 方言待清退」债务。
      *  2026-11-02 #147AE：V307（注册表 exclude_paths 播种，纯 UPDATE，无方言字面）落地
-     *  ⇒ 按实测订正 256→257（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 260;
+     *  ⇒ 按实测订正 256→257（四枚同批锚）。
+     *  2026-11-06 #147Z-6：V308~V315 共 8 枚入库；V311 带 8 处方言面进名录，V315 零方言 ⇒ 257→265。 */
+    private static final int SCRIPT_FLOOR = 265;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
     // 实测 V295 正文＋注释对 ::/ON CONFLICT/RETURNING/gen_random_uuid/JSON 运算符五类判据

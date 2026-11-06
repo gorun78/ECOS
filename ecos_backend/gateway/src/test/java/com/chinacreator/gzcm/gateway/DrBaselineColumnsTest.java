@@ -105,7 +105,11 @@ class DrBaselineColumnsTest {
             // 补列＝锚定与真身分叉）。七枚基线列全缺按 V293 同族入名录；与 V293 一样，#144-c 追加迁移
             // 需授权实跑才可收口，本批只登记不假装合规。
             "V295__ecos_audit_log_anchor.sql#public.ecos_audit_log"
-                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no");
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            // #147Z-6：V311 认知框架注册表（并发批已入库）建表时缺 domain/version_no 两枚 DR07/DR08 列，
+            // 按既有「已登记待收口」口径入名录（老脚本不改，收口=追加迁移补列，属授权迁移项）。
+            "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
+                    + "->domain,version_no");
 
     /**
      * 存量段计数钉死（键={@code 桶|列名}，值=缺该列的建表数，实测 2026-10-15 取证）。
@@ -150,8 +154,10 @@ class DrBaselineColumnsTest {
      *  `INSERT ... SELECT ... WHERE NOT EXISTS`）落地 ⇒ 按实测订正 255→256（四枚同批锚：
      *  本类 + Mc02 + Mc03 + MigrationVersionUniquenessTest）。
      *  2026-11-02 #147AE：V307（ecos_git_repo 六枚仓库播种 exclude_paths，纯 UPDATE 无 DDL）落地
-     *  ⇒ 按实测订正 256→257（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 260;
+     *  ⇒ 按实测订正 256→257（四枚同批锚）。
+     *  2026-11-06 #147Z-6：V308~V315 共 8 枚入库（V311 建表进待收口名录；V315 建 5 表补建 code 读端
+     *  schema 且基线列齐建，名录零贡献）⇒ 按实测订正 257→265（四枚同批锚）。 */
+    private static final int SCRIPT_FLOOR = 265;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
     // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，零建表，

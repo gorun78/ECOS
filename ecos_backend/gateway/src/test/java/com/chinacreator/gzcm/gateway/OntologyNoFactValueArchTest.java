@@ -118,6 +118,7 @@ class OntologyNoFactValueArchTest {
             "public.ecos_ontology_data",
             "public.ecos_ontology_domain",
             "public.ecos_ontology_entity",
+            "ecos_ontology.ecos_ontology_git_archive_pending",
             "public.ecos_ontology_git_archive_pending",
             "public.ecos_ontology_property",
             "public.ecos_ontology_proposals",

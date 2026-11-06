@@ -65,12 +65,25 @@ class DdlCodeSchemaAlignmentGateTest {
 
     private static final Pattern CREATE_TABLE =
             Pattern.compile("(?i)create\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)");
+    /** 单源内的 DROP（V315 起用于清退孤儿副本）：按脚本版本顺序与 CREATE 同序应用，判「跑完后的净落点」。 */
+    private static final Pattern DROP_TABLE =
+            Pattern.compile("(?i)drop\\s+table\\s+(?:if\\s+exists\\s+)?([A-Za-z_][A-Za-z0-9_]*)\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)");
     private static final Pattern QUALIFIED_LITERAL =
             Pattern.compile("\"([a-z_][a-z0-9_]*\\.[a-z_][a-z0-9_]*)\"");
+    private static final Pattern SCRIPT_VERSION = Pattern.compile("V(\\d+)(?:\\.(\\d+))?.*\\.sql");
 
-    /** 域内多 schema 的同名表：outbox 模式按域各建一张，属设计而非重复缺陷。 */
-    private static final Set<String> DOMAIN_SCOPED_TABLES = Set.of("outbox_event");
-    private static final int DOMAIN_SCOPED_COUNT = 11;
+    /**
+     * 允许多 schema 同名的表（其余一律判红）：{@code 表名 → 理由}。
+     * <p>口径是「单源跑完后的净落点」（同序应用 CREATE/DROP），已被 V315 清退的 public 副本不再计入。</p>
+     */
+    private static final Map<String, String> ALLOWED_DUPLICATES = Map.of(
+            "outbox_event", "域内 outbox 模式（V48 按 11 个业务域各建一张）",
+            "ecos_business_scenario",
+            "V123 认知域错放镜像（R-13 ① 只停写不迁移）与 V315 补建的 ecos_ai 读端并存，属登记在案的镜像而非重复缺陷");
+
+    private static final Map<String, Integer> EXPECTED_DUPLICATE_WIDTH = Map.of(
+            "outbox_event", 11,
+            "ecos_business_scenario", 2);
 
     /**
      * 声明式目录（非读端）：{@code legacyWriteSuspended} 里登记的是 IR03「只停写、不 DROP、不改名」的旧形态，
@@ -82,28 +95,14 @@ class DdlCodeSchemaAlignmentGateTest {
 
     /**
      * 存量分叉（只减不增）：{@code 代码所读 schema.表 → 登记理由与修法}。
-     * <p>逐条为 2026-11-05 实测（DDL 面 + live dev PG {@code information_schema} 双证），非推算。</p>
+     * <p><b>2026-11-06 #147Z-6 起清零</b>：原 5 条分叉由 V315 一次性收口（补建代码读端 schema 的 5 张表
+     * + 清退 public 孤儿副本，用户当日明确授权 DROP），此后本表应为空——任何新条目都意味着
+     * 「DDL 建 A、代码读 B」的重现，处置见类注释，禁加白名单。</p>
      */
     private static final Map<String, String> KNOWN_FORKS = knownForks();
 
     private static Map<String, String> knownForks() {
-        Map<String, String> m = new LinkedHashMap<>();
-        m.put("ecos_ontology.ecos_ontology_git_archive_pending",
-                "DD-4 主案：DDL 单源只建 public.（V170.2），runtime-task 硬编码 ecos_ontology.；"
-                        + "修法=增量迁移在 ecos_ontology 建表（public. 侧 DROP 属不可逆，须授权）");
-        m.put("ecos_control.ecos_runtime_audit_retry",
-                "控制域表按 ST07 目标 schema 读 ecos_control.，DDL 只建 public.（V244）；dev 两处并存；"
-                        + "修法=增量迁移补建 ecos_control. 侧");
-        m.put("ecos_control.ecos_runtime_event_dlq",
-                "DLQ 表读 ecos_control.，DDL 只建 public.（V243）；dev 两处都没有（live 缺表）；"
-                        + "修法=增量迁移补建 ecos_control. 侧");
-        m.put("ecos_control.ecos_security_asset",
-                "安全资产目录读 ecos_control.，DDL 只建 public.；dev 仅 ecos_control. 有表；"
-                        + "修法=增量迁移补建 ecos_control. 侧");
-        m.put("ecos_ai.ecos_business_scenario",
-                "场景只读 DAO 读 ecos_ai.（live 亦仅 ecos_ai.），DDL 单源却建在 ecos_cognitive.；"
-                        + "修法=增量迁移补建 ecos_ai. 侧（ecos_cognitive. 侧为停写镜像，不删除）");
-        return m;
+        return new LinkedHashMap<>();
     }
 
     @Test
@@ -136,15 +135,17 @@ class DdlCodeSchemaAlignmentGateTest {
     }
 
     @Test
-    @DisplayName("DDL 内多 schema 同名表只许是域内 outbox 模式")
-    void duplicatedTableNamesAreLimitedToDomainScopedOutbox() throws IOException {
+    @DisplayName("DDL 内多 schema 同名表只许在册的域内 outbox 与登记镜像")
+    void duplicatedTableNamesAreLimitedToRegisteredPatterns() throws IOException {
         AnalyzeResult r = analyzeRepo(repoRoot());
         Set<String> duplicated = new TreeSet<>(r.duplicatedTables);
-        assertEquals(new TreeSet<>(DOMAIN_SCOPED_TABLES), duplicated,
-                "DDL 单源出现了新的多 schema 同名表：" + duplicated + "（重复表会制造读写分叉；"
-                        + "确属域内模式请登记到 DOMAIN_SCOPED_TABLES 并写明理由）");
-        assertEquals(DOMAIN_SCOPED_COUNT, r.ddlSchemasByTable.get("outbox_event").size(),
-                "域内 outbox 覆盖 schema 数变了：" + r.ddlSchemasByTable.get("outbox_event"));
+        assertEquals(new TreeSet<>(ALLOWED_DUPLICATES.keySet()), duplicated,
+                "DDL 单源出现了新的多 schema 同名表（按跑完净落点计）：" + duplicated
+                        + "（重复表会制造读写分叉；确属设计请登记到 ALLOWED_DUPLICATES 并写明理由）");
+        for (Map.Entry<String, Integer> e : EXPECTED_DUPLICATE_WIDTH.entrySet()) {
+            assertEquals(e.getValue(), r.ddlSchemasByTable.get(e.getKey()).size(),
+                    e.getKey() + " 的 schema 覆盖数变了：" + r.ddlSchemasByTable.get(e.getKey()));
+        }
     }
 
     @Test
@@ -215,11 +216,31 @@ class DdlCodeSchemaAlignmentGateTest {
     private static AnalyzeResult analyze(Map<String, String> ddl, Map<String, String> sources,
                                          Set<String> nonReadSurfaces) {
         Map<String, Set<String>> byTable = new TreeMap<>();
-        for (String sql : ddl.values()) {
-            Matcher m = CREATE_TABLE.matcher(sql);
-            while (m.find()) {
-                byTable.computeIfAbsent(m.group(2).toLowerCase(Locale.ROOT), k -> new TreeSet<>())
-                        .add(m.group(1).toLowerCase(Locale.ROOT));
+        // 按脚本版本顺序同序应用 CREATE/DROP ⇒ 得到「单源跑完后的净落点」，而不是历史语句的简单并集
+        List<String> files = new ArrayList<>(ddl.keySet());
+        files.sort(DdlCodeSchemaAlignmentGateTest::compareScriptVersions);
+        for (String file : files) {
+            String sql = ddl.get(file);
+            List<Op> ops = new ArrayList<>();
+            Matcher c = CREATE_TABLE.matcher(sql);
+            while (c.find()) {
+                ops.add(new Op(c.start(), true, c.group(1).toLowerCase(Locale.ROOT), c.group(2).toLowerCase(Locale.ROOT)));
+            }
+            Matcher d = DROP_TABLE.matcher(sql);
+            while (d.find()) {
+                ops.add(new Op(d.start(), false, d.group(1).toLowerCase(Locale.ROOT), d.group(2).toLowerCase(Locale.ROOT)));
+            }
+            ops.sort((a, b) -> Integer.compare(a.pos, b.pos));
+            for (Op op : ops) {
+                Set<String> schemas = byTable.computeIfAbsent(op.table, k -> new TreeSet<>());
+                if (op.create) {
+                    schemas.add(op.schema);
+                } else {
+                    schemas.remove(op.schema);
+                    if (schemas.isEmpty()) {
+                        byTable.remove(op.table);
+                    }
+                }
             }
         }
         Set<String> forks = new TreeSet<>();
@@ -244,6 +265,25 @@ class DdlCodeSchemaAlignmentGateTest {
             }
         }
         return new AnalyzeResult(forks, duplicated, byTable, 0, 0);
+    }
+
+    private record Op(int pos, boolean create, String schema, String table) {
+    }
+
+    /** V 号排序：主版本数值优先，子版本（如 V170.2）按第二段数值。 */
+    private static int compareScriptVersions(String a, String b) {
+        Matcher ma = SCRIPT_VERSION.matcher(a);
+        Matcher mb = SCRIPT_VERSION.matcher(b);
+        if (!ma.matches() || !mb.matches()) {
+            return a.compareTo(b);
+        }
+        int c = Integer.compare(Integer.parseInt(ma.group(1)), Integer.parseInt(mb.group(1)));
+        if (c != 0) {
+            return c;
+        }
+        int na = ma.group(2) == null ? 0 : Integer.parseInt(ma.group(2));
+        int nb = mb.group(2) == null ? 0 : Integer.parseInt(mb.group(2));
+        return Integer.compare(na, nb);
     }
 
     private static String schema(String qualified) {

@@ -134,9 +134,12 @@ class MigrationVersionUniquenessTest {
      * 数据面；只播排除、不播纳入，纳入清单写错会让归档腿 FAILED）落地 ⇒ 按实测订正 306→307 / 下一号 307→308。
      * 2026-11-03：V311（认知框架注册表 ecos_cognitive.ecos_cognitive_framework + 首批四框架 DRAFT 种子）
      * 落地 ⇒ 按实测订正 310→311 / 下一号 311→312。
+     * 2026-11-06 #147Z-6：V312~V314（场景 run-mode 血缘 / kb 本体版本宽度 / kb 图谱可追溯回填）已入库，
+     * 且 V315（DD-4 DDL↔代码 schema 对齐：补建 5 处代码读端 schema 表 + 清退 public 孤儿副本）落地
+     * ⇒ 按实测订正 314→315 / 下一号 315→316。
      */
-    private static final int MAX_BASELINE_VERSION = 314;
-    private static final int NEXT_FREE_VERSION = 315;
+    private static final int MAX_BASELINE_VERSION = 315;
+    private static final int NEXT_FREE_VERSION = 316;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

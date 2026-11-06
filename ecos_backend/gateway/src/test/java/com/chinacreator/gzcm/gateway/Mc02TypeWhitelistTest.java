@@ -117,7 +117,23 @@ class Mc02TypeWhitelistTest {
             "V281__ecos_entity_table_mapping.sql#ecos_ontology.ecos_entity_table_mapping"
                     + ".materialized:BOOLEAN",
             "V285__td_runtime_task_persistence_create.sql#public.td_runtime_task_log.LOG_SEQ:BIGSERIAL",
-            "V295__ecos_audit_log_anchor.sql#public.ecos_audit_log.id:BIGSERIAL");
+            "V295__ecos_audit_log_anchor.sql#public.ecos_audit_log.id:BIGSERIAL",
+            // #147Z-6：V311 认知框架注册表（并发批已入库）六枚 *_json 列用了 JSONB，按 MC02
+            // 「新表禁 JSONB」判违例，登记待收口（收口=追加迁移改 TEXT，属授权项）。
+            "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
+                    + ".applicability_json:JSONB",
+            "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
+                    + ".content_json:JSONB",
+            "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
+                    + ".governance_json:JSONB",
+            "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
+                    + ".preconditions_json:JSONB",
+            "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
+                    + ".required_capabilities_json:JSONB",
+            "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
+                    + ".steps_json:JSONB",
+            "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
+                    + ".stop_conditions_json:JSONB");
 
     /** GOVERNED 段建表/列解析数下限（实测口径由本类首跑钉死，只增不减）。 */
     private static final int GOVERNED_TABLE_FLOOR = 60;
@@ -140,8 +156,10 @@ class Mc02TypeWhitelistTest {
      *  2026-11-02 #147AA：V306（sys_config 补 config_group=cache 四行种子）落地
      *  ⇒ 按实测订正 255→256（四枚同批锚）。本枚对类型白名单<b>零新增</b>：
      *  脚本只有 INSERT/SELECT 字面量与既有列引用，无 CREATE/ALTER 类型头。
-     *  2026-11-02 #147AE：V307（注册表 exclude_paths 播种，纯 UPDATE）落地 ⇒ 按实测订正 256→257。 */
-    private static final int SCRIPT_FLOOR = 260;
+     *  2026-11-02 #147AE：V307（注册表 exclude_paths 播种，纯 UPDATE）落地 ⇒ 按实测订正 256→257。
+     *  2026-11-06 #147Z-6：V308~V315 共 8 枚入库；V311 建表带 6 枚 JSONB 列进待收口名录，
+     *  V315 建 5 表（列型全在白名单内）零新增 ⇒ 按实测订正 257→265（四枚同批锚）。 */
+    private static final int SCRIPT_FLOOR = 265;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，
