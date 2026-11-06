@@ -89,12 +89,13 @@ public class UserController {
 	 */
 	@GetMapping("/me/permission-decisions")
 	public ApiResponse<Map<String, String>> myPermissionDecisions() {
+		// 401 承载必须在 try 之外抛出：包在 try 内会被兜底 catch 折成 internalError（分态被抹平）
+		var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+		String userId = auth == null ? null : auth.getName();
+		if (userId == null || userId.isBlank()) {
+			throw new UnauthorizedException("未登录或Token已过期");
+		}
 		try {
-			var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-			String userId = auth == null ? null : auth.getName();
-			if (userId == null || userId.isBlank()) {
-				throw new UnauthorizedException("未登录或Token已过期");
-			}
 			return ApiResponse.success(permissionCheckService.getUserEffectiveDecisions(userId));
 		} catch (Exception e) {
 			log.error("读取有效权限决策失败", e);
@@ -110,12 +111,13 @@ public class UserController {
 	 */
 	@GetMapping("/me/profile")
 	public ApiResponse<com.chinacreator.gzcm.sysman.iam.service.IUserService.UserBasicProfile> myProfile() {
+		// 同上：401 承载在 try 外，避免被兜底 catch 折成 500
+		var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+		String userId = auth == null ? null : auth.getName();
+		if (userId == null || userId.isBlank()) {
+			throw new UnauthorizedException("未登录或Token已过期");
+		}
 		try {
-			var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-			String userId = auth == null ? null : auth.getName();
-			if (userId == null || userId.isBlank()) {
-				throw new UnauthorizedException("未登录或Token已过期");
-			}
 			var profile = userService.getUserBasicProfile(userId);
 			return profile == null ? ApiResponse.notFound("用户不存在") : ApiResponse.success(profile);
 		} catch (Exception e) {

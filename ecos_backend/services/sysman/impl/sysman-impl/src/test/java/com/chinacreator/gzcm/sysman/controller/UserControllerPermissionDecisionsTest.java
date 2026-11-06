@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.sysman.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -42,13 +43,14 @@ class UserControllerPermissionDecisionsTest {
     }
 
     @Test
-    @DisplayName("未认证：401 分态，不查权限")
+    @DisplayName("未认证：抛 401 承载，不查权限")
     void unauthenticatedIs401() {
         IPermissionCheckService checker = mock(IPermissionCheckService.class);
-        ApiResponse<Map<String, String>> resp = controller(checker).myPermissionDecisions();
-
-        assertFalse(resp.isSuccess());
-        assertEquals(401, resp.getCode());
+        com.chinacreator.gzcm.common.exception.UnauthorizedException ex =
+                assertThrows(com.chinacreator.gzcm.common.exception.UnauthorizedException.class,
+                        () -> controller(checker).myPermissionDecisions());
+        assertEquals(401, ex.getHttpStatus());
+        assertEquals(401, ex.getErrorCode());
     }
 
     @Test

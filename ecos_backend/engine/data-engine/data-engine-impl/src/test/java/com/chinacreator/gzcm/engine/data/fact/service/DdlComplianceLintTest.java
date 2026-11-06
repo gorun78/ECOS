@@ -79,7 +79,10 @@ class DdlComplianceLintTest {
         // 属 db-migration-lint.ps1 头部声明的「人工审查」存量。豁免名单冻结于此——
         // 任何<b>新增</b>文件出现 DROP 即 FAIL（不许新增豁免面）。
         Set<String> dropExempt = Set.of(
-                "V126__drop_ecos_ontology_ghost_tables.sql");
+                "V126__drop_ecos_ontology_ghost_tables.sql",
+                // 2026-11-06 用户明确授权（DD-4 / #147Z-6）：清退 public. 侧孤儿副本，
+                // DROP 前已 pg_dump 备份且两侧行数实测为 0；属一次性裁决，不构成新增先例。
+                "V315__ddl_code_schema_alignment.sql");
         List<String> hits = new ArrayList<>();
         for (Path p : listMigrations()) {
             String name = p.getFileName().toString();
