@@ -84,19 +84,25 @@ public class KbEntityInstanceExtractionServiceDao extends JdbcTemplateDaoSupport
                 ontologyId, ontologyVersion, resourceId, sourcePk255);
     }
 
-    /** 本体快照 — 全量（每个本体最新一条生效快照）。 */
+    /**
+     * 本体快照 — 全量（每个本体最新一条生效快照）。
+     * <b>B28（2026-11-04）</b>：切 V179 权威表 {@code ecos_kb_ontology_snapshot}；
+     * 码集列 {@code entity_codes_json}（TEXT）以别名 {@code entity_codes} 保持上层契约不变。
+     */
     public List<Map<String, Object>> selectAllSnapshots() {
         return jdbcTemplate.queryForList(
-                "SELECT DISTINCT ON (ontology_id) ontology_id, version, entity_codes "
-                        + "FROM " + schema + ".kb_ontology_snapshot WHERE is_deleted = 0 "
-                        + "ORDER BY ontology_id, created_at DESC");
+                "SELECT DISTINCT ON (ontology_id) ontology_id, snap_version AS version, "
+                        + "entity_codes_json AS entity_codes "
+                        + "FROM " + schema + ".ecos_kb_ontology_snapshot WHERE is_deleted = 0 "
+                        + "ORDER BY ontology_id, create_time DESC");
     }
 
-    /** 本体快照 — 单本体最新一条生效快照。 */
+    /** 本体快照 — 单本体最新一条生效快照（同 {@link #selectAllSnapshots()} 切 V179）。 */
     public List<Map<String, Object>> selectLatestSnapshot(String ontologyId) {
         return jdbcTemplate.queryForList(
-                "SELECT ontology_id, version, entity_codes FROM " + schema + ".kb_ontology_snapshot "
-                        + "WHERE is_deleted = 0 AND ontology_id = ? ORDER BY created_at DESC LIMIT 1",
+                "SELECT ontology_id, snap_version AS version, entity_codes_json AS entity_codes "
+                        + "FROM " + schema + ".ecos_kb_ontology_snapshot "
+                        + "WHERE is_deleted = 0 AND ontology_id = ? ORDER BY create_time DESC LIMIT 1",
                 ontologyId);
     }
 

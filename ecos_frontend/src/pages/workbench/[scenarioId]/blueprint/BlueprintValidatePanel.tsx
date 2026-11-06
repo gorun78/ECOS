@@ -32,6 +32,8 @@ export default function BlueprintValidatePanel({ result, loading, error, onRun, 
     { key: 'missing_deps', rows: result?.details.missingRequiredDeps, label: t('workspace.bp.gate.missing_deps') },
     { key: 'unavail_caps', rows: result?.details.unavailableCapabilities, label: t('workspace.bp.gate.unavail_caps') },
     { key: 'failed_p0', rows: result?.details.failedP0Tests, label: t('workspace.bp.gate.failed_p0') },
+    { key: 'open_warnings', rows: result?.details.openWarnings, label: t('workspace.bp.gate.open_warnings') },
+    { key: 'open_suggestions', rows: result?.details.openSuggestions, label: t('workspace.bp.gate.open_suggestions') },
   ];
 
   return (

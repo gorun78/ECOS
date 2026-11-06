@@ -64,6 +64,14 @@ public final class CompletenessReport {
         return probeErrors;
     }
 
+    /**
+     * 是否存在阻断级问题（详细设计-场景工作台 §3.4/§4.2）：缺失必需边或孤岛绑定均阻断
+     * ACTIVE/正式发布；警告与建议不阻断。
+     */
+    public boolean isBlocking() {
+        return !missingEdges.isEmpty() || !islands.isEmpty();
+    }
+
     // ── 嵌套视图 ────────────────────────────────────────
 
     /** 必需边声明视图。 */
@@ -133,11 +141,27 @@ public final class CompletenessReport {
         private final String type;
         private final String labelKey;
         private final String reason;
+        private final String severity;
+        private final boolean blocking;
 
         public MissingEdgeView(String type, String labelKey, String reason) {
+            this(type, labelKey, reason, "BLOCKER", true);
+        }
+
+        public MissingEdgeView(String type, String labelKey, String reason, String severity, boolean blocking) {
             this.type = type;
             this.labelKey = labelKey;
             this.reason = reason;
+            this.severity = severity;
+            this.blocking = blocking;
+        }
+
+        public String getSeverity() {
+            return severity;
+        }
+
+        public boolean isBlocking() {
+            return blocking;
         }
 
         public String getType() {
@@ -159,12 +183,29 @@ public final class CompletenessReport {
         private final String name;
         private final String bindingType;
         private final String reason;
+        private final String severity;
+        private final boolean blocking;
 
         public IslandView(String bindingId, String name, String bindingType, String reason) {
+            this(bindingId, name, bindingType, reason, "BLOCKER", true);
+        }
+
+        public IslandView(String bindingId, String name, String bindingType, String reason,
+                          String severity, boolean blocking) {
             this.bindingId = bindingId;
             this.name = name;
             this.bindingType = bindingType;
             this.reason = reason;
+            this.severity = severity;
+            this.blocking = blocking;
+        }
+
+        public String getSeverity() {
+            return severity;
+        }
+
+        public boolean isBlocking() {
+            return blocking;
         }
 
         public String getBindingId() {

@@ -10,6 +10,7 @@ import { Icon } from '../../../../components/LucideIcon';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import type { ScenarioBlueprintVO } from '../../../../services/scenarioBlueprintClient';
+import GapSeveritySummary from './GapSeveritySummary';
 
 function firstStr(row: Record<string, unknown>, keys: string[]): string | null {
   for (const k of keys) {
@@ -110,6 +111,7 @@ export default function BlueprintDetail({ bp }: { bp: ScenarioBlueprintVO }) {
 
       {/* 缺口 */}
       <Section icon="AlertTriangle" title={`${t('workspace.bp.gaps_title')} (${gaps.length})`}>
+        <GapSeveritySummary scenarioId={bp.scenarioId} blueprintId={bp.id} />
         {gaps.length === 0 ? (
           <span className={`text-xs ${styles.cardTextMuted}`}>{dash}</span>
         ) : (

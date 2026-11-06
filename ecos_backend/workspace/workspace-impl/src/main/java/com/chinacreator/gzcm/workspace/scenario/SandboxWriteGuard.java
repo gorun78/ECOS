@@ -13,7 +13,10 @@ import java.util.Set;
 @Component
 public class SandboxWriteGuard {
 
+    /** 实测生产表名：运行表 = ecos_scenario_run（V125），画布布局 = ecos_scenario_sandbox_layout。 */
     private static final Set<String> SANDBOX_WHITELIST = Set.of(
+            "ecos_scenario_run",
+            "ecos_scenario_sandbox_layout",
             "ecos_scenario_execution",
             "ecos_scenario_canvas_layout");
 

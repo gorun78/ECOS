@@ -88,6 +88,14 @@ public class ScenarioBlueprintController {
         return ApiResponse.success(blueprintService.validate(blueprintId));
     }
 
+    /** GET {id}/gaps 缺口按严重级分类汇总（§6.5；severity 可选，未知值 400）。 */
+    @GetMapping("/{id}/gaps")
+    public ApiResponse<Map<String, Object>> gaps(@PathVariable("scenarioId") String scenarioId,
+                                                  @PathVariable("id") String blueprintId,
+                                                  @RequestParam(name = "severity", required = false) String severity) {
+        return ApiResponse.success(blueprintService.gaps(blueprintId, severity));
+    }
+
     /** GET {id}/diff 版本 diff（无 diff 表，§6.2 两版本 gap/依赖/content 结构化对比）。 */
     @GetMapping("/{id}/diff")
     public ApiResponse<Map<String, Object>> diff(@PathVariable("scenarioId") String scenarioId,

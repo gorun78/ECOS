@@ -20,12 +20,12 @@ public class EntityLinkerDao extends JdbcTemplateDaoSupport {
         this.schema = schema;
     }
 
-    /** 本体类型候选（kb_ontology_snapshot.entity_codes + ILIKE domain 过滤）。 */
+    /** 本体类型候选（V179 {@code ecos_kb_ontology_snapshot.entity_codes_json} + ILIKE domain 过滤）。 */
     public List<Map<String, Object>> queryOntologyTypes(String domain) {
         return jdbcTemplate.queryForList(
                 "SELECT s.ontology_id AS ontology_id, e AS entity_code " +
-                "FROM " + schema + ".kb_ontology_snapshot s, " +
-                "     jsonb_array_elements_text(s.entity_codes) AS e " +
+                "FROM " + schema + ".ecos_kb_ontology_snapshot s, " +
+                "     jsonb_array_elements_text(CAST(s.entity_codes_json AS jsonb)) AS e " +
                 "WHERE s.is_deleted = 0 AND e ILIKE ? " +
                 "ORDER BY s.ontology_id LIMIT 50",
                 "%" + domain + "%");

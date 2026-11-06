@@ -263,4 +263,36 @@ public final class CognitiveApiPaths {
      */
     public static final String REPLAY_REL = "/replay";
     public static final String REPLAY = COGNITIVE + REPLAY_REL;
+
+    // ── 详细设计-认知引擎 v1.0 §5/§6/§7 追加（2026-11-03，只追加本段，上方行零改写）──
+
+    /** Framework Registry（§5.1/§9.1）：定义/版本/注册/发布/启停/适用范围。 */
+    public static final String PARAM_FRAMEWORK_ID = "frameworkId";
+    public static final String PARAM_FRAMEWORK_VERSION = "version";
+    public static final String FRAMEWORKS_REL = "/frameworks";
+    public static final String FRAMEWORK_ITEM_REL =
+            FRAMEWORKS_REL + "/{" + PARAM_FRAMEWORK_ID + "}/{" + PARAM_FRAMEWORK_VERSION + "}";
+    public static final String FRAMEWORK_PUBLISH_REL = FRAMEWORK_ITEM_REL + "/publish";
+    public static final String FRAMEWORK_STATUS_REL = FRAMEWORK_ITEM_REL + "/status";
+    /** 策略选择（§6.2：硬约束过滤 → 确定性排序 → 计划 DAG）。 */
+    public static final String FRAMEWORK_SELECT_REL = FRAMEWORKS_REL + "/select";
+    /** 计划校验（§6.2 第四阶段：环/契约/能力/预算/权限）。 */
+    public static final String PLANS_VALIDATE_REL = "/plans/validate";
+
+    /** 认知方法目录（§1.1：方法与框架职责区分；只读字典 + 已发布框架 usedBy）。 */
+    public static final String PARAM_METHOD_ID = "methodId";
+    public static final String METHODS_REL = "/methods";
+    public static final String METHOD_ITEM_REL = METHODS_REL + "/{" + PARAM_METHOD_ID + "}";
+
+    /** 认知执行状态机（§7.2；记录为请求态，不新增执行表）。 */
+    public static final String PARAM_EXECUTION_ID = "executionId";
+    public static final String EXECUTIONS_REL = "/executions";
+    public static final String EXECUTION_ITEM_REL = EXECUTIONS_REL + "/{" + PARAM_EXECUTION_ID + "}";
+    public static final String EXECUTION_TRANSITIONS_REL = EXECUTION_ITEM_REL + "/transitions";
+
+    /** 绝对形态（文档/契约引用）。 */
+    public static final String FRAMEWORKS = COGNITIVE + FRAMEWORKS_REL;
+    public static final String FRAMEWORK_SELECT = COGNITIVE + FRAMEWORK_SELECT_REL;
+    public static final String PLANS_VALIDATE = COGNITIVE + PLANS_VALIDATE_REL;
+    public static final String EXECUTIONS = COGNITIVE + EXECUTIONS_REL;
 }

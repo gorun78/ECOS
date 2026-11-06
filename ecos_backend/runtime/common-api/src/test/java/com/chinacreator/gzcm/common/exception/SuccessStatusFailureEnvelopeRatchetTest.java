@@ -272,7 +272,10 @@ class SuccessStatusFailureEnvelopeRatchetTest {
     private static final int OWNER_HELPER_CEILING = 28;
     // #146ab：35→34，补账半＝#146x(49cfb4d6) 把 AgentProviderController 一枚纯信封赋值腿
     // 改写成 AiResponseSupport.classified(...) 属主工厂腿，出现点不再匹配本门判据
-    private static final int ENVELOPE_ONLY_CEILING = 34;
+    // 2026-11-03 认知框架注册/执行端点批：34→35，新增 CognitiveFrameworkController /
+    // CognitiveExecutionController 的 ApiResponse.success(...) 纯信封构造腿一枚（实测报文
+    // 「纯信封构造 35」，非算式推出）；错误面仍由 CognitiveErrorAdvice 单源承载，无裸回/折叠新增。
+    private static final int ENVELOPE_ONLY_CEILING = 35;
 
     /** 本批属主侧承载见证锚（文件 → 必须出现的形态片段）。缺任一即红＝「删腿」不算修好。 */
     private static final Map<String, List<String>> OWNER_SIDE_CARRIERS = Map.of(

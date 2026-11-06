@@ -25,26 +25,36 @@ public class KgMapperDao extends JdbcTemplateDaoSupport {
         this.schema = schema;
     }
 
+    /**
+     * 快照投影（V179 权威表 {@code ecos_kb_ontology_snapshot}）。
+     *
+     * <p>B28（2026-11-04）：原表名 {@code kb_ontology_snapshot} 在 live 库不存在
+     * （仅 {@code ecos_ontology} 侧有旧表），本体同步恒 DataAccessException；
+     * 今切 V179 表，码集列 {@code entity_codes_json/relationship_codes_json} 为 TEXT（DR04），
+     * 元素计数用标准 SQL {@code CAST(... AS jsonb)}。返回键 {@code version} 保持不变
+     * （对 {@code snap_version} 取别名，上层 OntologySnapshot 契约不变）。</p>
+     */
+    private String snapshotProjection() {
+        return "SELECT ontology_id, snap_version AS version, " +
+               "       jsonb_array_length(CAST(entity_codes_json AS jsonb)) AS entity_count, " +
+               "       jsonb_array_length(CAST(relationship_codes_json AS jsonb)) AS relationship_count " +
+               "FROM " + schema + ".ecos_kb_ontology_snapshot ";
+    }
+
     /** 全量范围：每个本体取最新一条生效快照。 */
     public List<Map<String, Object>> readSnapshotsAll() {
         return jdbcTemplate.queryForList(
-                "SELECT DISTINCT ON (ontology_id) ontology_id, version, " +
-                "       jsonb_array_length(entity_codes) AS entity_count, " +
-                "       jsonb_array_length(relationship_codes) AS relationship_count " +
-                "FROM " + schema + ".kb_ontology_snapshot " +
+                snapshotProjection() +
                 "WHERE is_deleted = 0 " +
-                "ORDER BY ontology_id, created_at DESC");
+                "ORDER BY ontology_id, create_time DESC");
     }
 
     /** 单本体：按 ontology_id 取最新一条生效快照。 */
     public List<Map<String, Object>> readSnapshotsSingle(String scope) {
         return jdbcTemplate.queryForList(
-                "SELECT ontology_id, version, " +
-                "       jsonb_array_length(entity_codes) AS entity_count, " +
-                "       jsonb_array_length(relationship_codes) AS relationship_count " +
-                "FROM " + schema + ".kb_ontology_snapshot " +
+                snapshotProjection() +
                 "WHERE is_deleted = 0 AND ontology_id = ? " +
-                "ORDER BY created_at DESC LIMIT 1",
+                "ORDER BY create_time DESC LIMIT 1",
                 scope);
     }
 

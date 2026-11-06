@@ -20,7 +20,12 @@ import java.util.UUID;
  * <p><b>#146h D-7 收口（2026-10-27·仅 sync log 腿）</b>：本文件中 {@code kg_sync_log} 写腿
  * 切至 V179 合规新表 {@code ecos_knowledge.ecos_kg_sync_log}（{@code VARCHAR(36)} 应用侧
  * UUID PK，{@code sync_op} / {@code error_message VARCHAR(200)} / {@code create_time}）。
- * 同文件 {@code kb_ontology_snapshot} 腿不在 D-7 面（dev 库面承接在位）。</p>
+ *
+ * <p><b>B28（2026-11-04）快照写腿切 V179</b>：原写 {@code ecos_knowledge.kb_ontology_snapshot}
+ * 在 live 库不存在（实表只有 {@code ecos_ontology.kb_ontology_snapshot}），本体发布事件恒失败；
+ * 今切 V179 权威表 {@code ecos_knowledge.ecos_kb_ontology_snapshot}
+ * （{@code id} UUID PK / {@code snap_version} / {@code entity_codes_json,relationship_codes_json} TEXT /
+ * {@code create_by} / {@code is_deleted}），唯一键 {@code (ontology_id, snap_version, is_deleted)}。</p>
  */
 @Repository
 public class KbOntologySnapshotDao extends JdbcTemplateDaoSupport {
@@ -51,27 +56,28 @@ public class KbOntologySnapshotDao extends JdbcTemplateDaoSupport {
     /** 旧版本软标为历史回滚基线（is_deleted=2）。 */
     public void softMarkPreviousVersion(String ontologyId, String versionId) {
         jdbcTemplate.update(
-                "UPDATE " + schema + ".kb_ontology_snapshot " +
-                "SET is_deleted = 2 WHERE ontology_id = ? AND version <> ? AND (is_deleted IS NULL OR is_deleted = 0)",
+                "UPDATE " + schema + ".ecos_kb_ontology_snapshot " +
+                "SET is_deleted = 2, update_time = NOW() " +
+                "WHERE ontology_id = ? AND snap_version <> ? AND is_deleted = 0",
                 ontologyId, versionId);
     }
 
-    /** 幂等 upsert（UNIQUE (ontology_id, version)）。 */
+    /** 幂等 upsert（UNIQUE (ontology_id, snap_version, is_deleted)，V179）。 */
     public void upsertSnapshot(String ontologyId, String versionId,
                                String entitiesJson, String relationshipsJson,
                                String schemaHash, String createdByName) {
         jdbcTemplate.update(
-                "INSERT INTO " + schema + ".kb_ontology_snapshot " +
-                "(ontology_id, version, entity_codes, relationship_codes, schema_hash, created_by, created_at) " +
-                "VALUES (?, ?, ?::jsonb, ?::jsonb, ?, ?, NOW()) " +
-                "ON CONFLICT (ontology_id, version) DO UPDATE SET " +
-                "  entity_codes = EXCLUDED.entity_codes, " +
-                "  relationship_codes = EXCLUDED.relationship_codes, " +
+                "INSERT INTO " + schema + ".ecos_kb_ontology_snapshot " +
+                "(id, ontology_id, snap_version, entity_codes_json, relationship_codes_json, " +
+                " schema_hash, create_by, is_deleted) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, 0) " +
+                "ON CONFLICT (ontology_id, snap_version, is_deleted) DO UPDATE SET " +
+                "  entity_codes_json = EXCLUDED.entity_codes_json, " +
+                "  relationship_codes_json = EXCLUDED.relationship_codes_json, " +
                 "  schema_hash = EXCLUDED.schema_hash, " +
-                "  created_by = EXCLUDED.created_by, " +
-                "  created_at = NOW(), " +
-                "  is_deleted = 0",
-                ontologyId, versionId, entitiesJson, relationshipsJson, schemaHash,
-                createdByName == null ? "system" : createdByName);
+                "  create_by = EXCLUDED.create_by, " +
+                "  update_time = NOW()",
+                UUID.randomUUID().toString(), ontologyId, versionId, entitiesJson, relationshipsJson,
+                schemaHash, createdByName == null ? "system" : createdByName);
     }
 }

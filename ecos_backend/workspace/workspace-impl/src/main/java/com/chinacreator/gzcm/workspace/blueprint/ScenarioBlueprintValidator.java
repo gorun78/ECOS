@@ -63,6 +63,11 @@ public class ScenarioBlueprintValidator {
             return new ValidationResult(true, List.of(), Map.of());
         }
 
+        /** 通过时仍携带非阻断明细（WARNING/SUGGESTION），不影响 passed。 */
+        public static ValidationResult passed(Map<String, Object> details) {
+            return new ValidationResult(true, List.of(), details == null ? Map.of() : details);
+        }
+
         public static ValidationResult failed(List<String> reasons, Map<String, Object> details) {
             return new ValidationResult(false, reasons, details);
         }
@@ -93,22 +98,53 @@ public class ScenarioBlueprintValidator {
         List<String> reasons = new ArrayList<>();
         Map<String, Object> details = new LinkedHashMap<>();
 
-        List<Map<String, Object>> openBlockers = checkBlockerGaps(content.gapsText, reasons);
-        details.put("openBlockerGaps", openBlockers);
+        try {
+            List<Map<String, Object>> openBlockers = checkBlockerGaps(content.gapsText, reasons);
+            details.put("openBlockerGaps", openBlockers);
+            // §6.6 只把 BLOCKER 作为阻断；WARNING/SUGGESTION 明示但不改 passed（禁静默丢弃）
+            details.put("openWarnings", openGapsBySeverity(content.gapsText, "WARNING"));
+            details.put("openSuggestions", openGapsBySeverity(content.gapsText, "SUGGESTION"));
 
-        List<Map<String, Object>> missingDeps = checkRequiredPublishedDeps(content.dependenciesText, reasons);
-        details.put("missingRequiredDeps", missingDeps);
+            List<Map<String, Object>> missingDeps = checkRequiredPublishedDeps(content.dependenciesText, reasons);
+            details.put("missingRequiredDeps", missingDeps);
 
-        List<Map<String, Object>> unavailCaps = checkRequiredCapabilities(content.capabilitiesText, reasons);
-        details.put("unavailableCapabilities", unavailCaps);
+            List<Map<String, Object>> unavailCaps = checkRequiredCapabilities(content.capabilitiesText, reasons);
+            details.put("unavailableCapabilities", unavailCaps);
 
-        List<Map<String, Object>> failedP0 = checkP0Tests(content.testsText, reasons);
-        details.put("failedP0Tests", failedP0);
+            List<Map<String, Object>> failedP0 = checkP0Tests(content.testsText, reasons);
+            details.put("failedP0Tests", failedP0);
+        } catch (BlueprintContentInvalidException e) {
+            // 历史蓝图的 gaps/dependencies 等可能仍是自由文本；GET {id}/validate 契约是
+            // 只读 200 + passed=false + 明细，不得因无法解析就 400（更不得判为通过）。
+            reasons.add("蓝图结构化字段无法解析，按 fail-closed 判为未通过: " + e.getMessage());
+            details.put("invalidContent", e.getMessage());
+        }
 
         if (reasons.isEmpty()) {
-            return ValidationResult.passed();
+            return ValidationResult.passed(details);
         }
         return ValidationResult.failed(reasons, details);
+    }
+
+    /** 指定严重级的未关闭 Gap（RESOLVED/ACCEPTED_RISK 视为关闭）；不参与阻断判定。 */
+    private List<Map<String, Object>> openGapsBySeverity(String gapsJson, String severity) {
+        List<Map<String, Object>> open = new ArrayList<>();
+        for (JsonNode gap : arrayNodes(gapsJson, "gaps")) {
+            if (!severity.equalsIgnoreCase(text(gap, "severity"))) {
+                continue;
+            }
+            String status = text(gap, "status");
+            if (status != null && GAP_CLOSED_STATES.contains(status.toUpperCase())) {
+                continue;
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("gapId", text(gap, "gapId"));
+            item.put("category", text(gap, "category"));
+            item.put("status", status == null ? "OPEN" : status);
+            item.put("description", text(gap, "description"));
+            open.add(item);
+        }
+        return open;
     }
 
     // ─────────────── 门槛 1：BLOCKER Gap 全关 ───────────────

@@ -34,13 +34,22 @@ public class ScenarioRunService {
     private final ObjectMapper objectMapper;
     private final DcchengClient dcchengClient;
     private final ScenarioService scenarioService;
+    private final SandboxWriteGuard sandboxWriteGuard;
 
     public ScenarioRunService(WorkspaceDataDao dao, ObjectMapper objectMapper,
                               DcchengClient dcchengClient, ScenarioService scenarioService) {
+        this(dao, objectMapper, dcchengClient, scenarioService, new SandboxWriteGuard());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ScenarioRunService(WorkspaceDataDao dao, ObjectMapper objectMapper,
+                              DcchengClient dcchengClient, ScenarioService scenarioService,
+                              SandboxWriteGuard sandboxWriteGuard) {
         this.dao = dao;
         this.objectMapper = objectMapper;
         this.dcchengClient = dcchengClient;
         this.scenarioService = scenarioService;
+        this.sandboxWriteGuard = sandboxWriteGuard == null ? new SandboxWriteGuard() : sandboxWriteGuard;
     }
 
     /**
@@ -52,6 +61,20 @@ public class ScenarioRunService {
      */
     @Transactional
     public Map<String, Object> run(String scenarioId, Map<String, Object> param) {
+        return run(scenarioId, param,
+                new ScenarioRunRequestValidator.RunCommand(scenarioId, RunMode.FORMAL, null));
+    }
+
+    /**
+     * 带 runMode/baseline 的运行入口（详细设计-场景工作台 §5）：SANDBOX 不写正式场景指标；
+     * 产物落 run_mode=SANDBOX 与 sandbox_lineage=SANDBOX；FORMAL 引用 SANDBOX 基线由
+     * {@link ScenarioRunRequestValidator} 在入口拒绝。
+     */
+    @Transactional
+    public Map<String, Object> run(String scenarioId, Map<String, Object> param,
+                                   ScenarioRunRequestValidator.RunCommand command) {
+        RunMode runMode = command == null || command.getRunMode() == null
+                ? RunMode.FORMAL : command.getRunMode();
         // 校验场景存在
         try {
             scenarioService.get(scenarioId);
@@ -153,18 +176,21 @@ public class ScenarioRunService {
         }
 
         String status = degraded ? "SUCCEEDED_DEGRADED" : "SUCCEEDED";
+        sandboxWriteGuard.assertAllowed(runMode, "ecos_scenario_run");
         dao.insertRun(
             runId, scenarioId, String.join(",", runTypes), status, metric,
             deviation == 0 ? null : BigDecimal.valueOf(deviation),
             toJson(diagnosis), toJson(forecast), toJson(simulation), toJson(strategy),
-            degraded, operator);
+            degraded, operator, runMode.name(),
+            command == null ? null : command.getBaselineRunId(),
+            runMode == RunMode.SANDBOX ? "SANDBOX" : "NONE");
 
-        // 回写场景指标
-        if (actualSafety != null || !metricsMerge.isEmpty()) {
+        // 回写场景指标（SANDBOX 禁写正式场景事实，详细设计 §5.1 铁律 4）
+        if (runMode != RunMode.SANDBOX && (actualSafety != null || !metricsMerge.isEmpty())) {
             scenarioService.updateMetrics(scenarioId, actualSafety, metricsMerge);
         }
-        log.info("场景运行完成 runId={} scenario={} status={} runTypes={} degraded={}",
-                runId, scenarioId, status, runTypes, degraded);
+        log.info("场景运行完成 runId={} scenario={} status={} runMode={} runTypes={} degraded={}",
+                runId, scenarioId, status, runMode, runTypes, degraded);
 
         Map<String, Object> resp = new LinkedHashMap<>();
         resp.put("runId", runId);
@@ -175,7 +201,12 @@ public class ScenarioRunService {
         resp.put("forecast", forecast);
         resp.put("simulation", simulation);
         resp.put("strategy", strategy);
-        resp.put("metricsWritten", actualSafety != null ? actualSafety : metricsMerge.isEmpty() ? null : "merged");
+        resp.put("runMode", runMode.name());
+        resp.put("sandboxLineage", runMode == RunMode.SANDBOX ? "SANDBOX" : "NONE");
+        resp.put("sourceRunId", command == null ? null : command.getBaselineRunId());
+        resp.put("metricsWritten", runMode == RunMode.SANDBOX
+                ? null
+                : (actualSafety != null ? actualSafety : metricsMerge.isEmpty() ? null : "merged"));
         return resp;
     }
 

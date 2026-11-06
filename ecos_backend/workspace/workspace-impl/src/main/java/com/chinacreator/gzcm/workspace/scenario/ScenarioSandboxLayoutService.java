@@ -27,13 +27,17 @@ import java.util.Map;
 public class ScenarioSandboxLayoutService {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioSandboxLayoutService.class);
+    private static final String LAYOUT_TABLE = "ecos_scenario_sandbox_layout";
 
     private final WorkspaceDataDao dao;
     private final ObjectMapper objectMapper;
+    private final SandboxWriteGuard sandboxWriteGuard;
 
-    public ScenarioSandboxLayoutService(WorkspaceDataDao dao, ObjectMapper objectMapper) {
+    public ScenarioSandboxLayoutService(WorkspaceDataDao dao, ObjectMapper objectMapper,
+                                        SandboxWriteGuard sandboxWriteGuard) {
         this.dao = dao;
         this.objectMapper = objectMapper;
+        this.sandboxWriteGuard = sandboxWriteGuard;
     }
 
     /**
@@ -77,6 +81,8 @@ public class ScenarioSandboxLayoutService {
         if (dto == null) {
             throw new BusinessException(400, "SBX-400: 保存体不可为空");
         }
+        // 画布写入口统一过白名单断言（P1-7）：SANDBOX 仅允许布局表；未知 runMode 拒绝。
+        sandboxWriteGuard.assertAllowed(RunMode.parseOrDefault(dto.getRunMode()), LAYOUT_TABLE);
         String operator = currentOperator();
         int expected = dto.getExpectedVersion() != null ? dto.getExpectedVersion() : 0;
 

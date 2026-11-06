@@ -136,4 +136,21 @@ public class ArchitectureTest {
             .resideInAnyPackage("com.chinacreator.gzcm.engine.data..", "com.chinacreator.gzcm.engine.ontology..", "com.chinacreator.gzcm.engine.ai..", "com.chinacreator.gzcm.engine.security..");
         rule.check(classes);
     }
+
+    // ── 调度器/线程池守护（验收清单 §3：禁私有调度器；长任务唯一通道 runtime-task） ──
+
+    @Test
+    void shouldNotCreatePrivateSchedulerOrThreadPool() {
+        ArchRule rule = noClasses().that()
+            .resideInAPackage("com.chinacreator.gzcm.engine.cognitive2..")
+            .should().dependOnClassesThat()
+            .haveFullyQualifiedName("java.util.concurrent.ScheduledExecutorService")
+            .orShould().dependOnClassesThat()
+            .haveFullyQualifiedName("java.util.concurrent.Executors")
+            .orShould().dependOnClassesThat()
+            .haveFullyQualifiedName("java.util.concurrent.ThreadPoolExecutor")
+            .orShould().dependOnClassesThat()
+            .haveFullyQualifiedName("java.util.Timer");
+        rule.check(classes);
+    }
 }

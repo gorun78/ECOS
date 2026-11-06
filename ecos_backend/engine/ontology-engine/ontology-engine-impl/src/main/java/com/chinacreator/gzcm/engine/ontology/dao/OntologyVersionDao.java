@@ -17,9 +17,23 @@ import org.springframework.stereotype.Repository;
  * {@code regexp_replace ... ::bigint} 语法，属 W83/W77 范围外存量，非 proposal 链路）。
  * 方法名保留 {@code findByOntology} / {@code findById} / {@code findPreviousVersion}
  * 等（HistoryNotInDbTest 依赖）。</p>
+ *
+ * <p>B28（2026-11-04）账实订正（live 42703 复证：发布版本 500）：
+ * <ul>
+ *   <li>时间戳列名断裂——原读写 {@code created_at}，live 实列 {@code create_time}
+ *       （V122 §2.6 六基线列），建行与排序全部失败；</li>
+ *   <li>快照列——V170.1 起新写落 {@code snapshot_json}(TEXT)，旧 {@code snapshot} 停写；
+ *       原 INSERT 仍写 {@code snapshot ?::jsonb}，与 live TEXT 列/列名双重不符；</li>
+ *   <li>列投影改显式列名（含 {@code COALESCE(snapshot_json, snapshot)}），兼容停写前存量行。</li>
+ * </ul>
  */
 @Repository
 public class OntologyVersionDao extends JdbcTemplateDaoSupport {
+
+    /** 显式列投影：兼容 V170.1 双列过渡（存量行只有 snapshot，新写行只有 snapshot_json）。 */
+    private static final String COLUMNS =
+            "id, ontology_id, version_no, status, COALESCE(snapshot_json, snapshot) AS snapshot, "
+            + "change_log, publisher, published_at, create_time, git_ref";
 
     private final RowMapper<OntologyVersion> ROW_MAPPER = (rs, rn) -> {
         OntologyVersion v = new OntologyVersion();
@@ -31,7 +45,7 @@ public class OntologyVersionDao extends JdbcTemplateDaoSupport {
         v.setChangeLog(rs.getString("change_log"));
         v.setPublisher(rs.getString("publisher"));
         v.setPublishedAt(ts(rs.getTimestamp("published_at")));
-        v.setCreatedAt(ts(rs.getTimestamp("created_at")));
+        v.setCreatedAt(ts(rs.getTimestamp("create_time")));
         // #147D：补 git_ref 读腿。V170.1 起 setGitRef 一直在写该列，但行映射从未读回——
         // 「写了却读不到」使回滚计划（§2.9.6②／DF-3 需按 git ref 检出）无 ref 可取，
         // 也让 UI 无从区分"已归档"与"待归档"。列由 setGitRef 的同一 UPDATE 语句证实存在。
@@ -45,34 +59,34 @@ public class OntologyVersionDao extends JdbcTemplateDaoSupport {
 
     public List<OntologyVersion> findByOntology(String ontologyId) {
         return jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? ORDER BY created_at DESC",
+            "SELECT " + COLUMNS + " FROM ecos_ontology_version WHERE ontology_id = ? ORDER BY create_time DESC",
             ROW_MAPPER, ontologyId);
     }
 
     public Optional<OntologyVersion> findById(String id) {
         List<OntologyVersion> list = jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_version WHERE id = ?", ROW_MAPPER, id);
+            "SELECT " + COLUMNS + " FROM ecos_ontology_version WHERE id = ?", ROW_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     public Optional<OntologyVersion> findByOntologyAndVersion(String ontologyId, String versionNo) {
         List<OntologyVersion> list = jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? AND version_no = ?",
+            "SELECT " + COLUMNS + " FROM ecos_ontology_version WHERE ontology_id = ? AND version_no = ?",
             ROW_MAPPER, ontologyId, versionNo);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     public Optional<OntologyVersion> findLatestPublished(String ontologyId) {
         List<OntologyVersion> list = jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? AND status = 'Published' ORDER BY created_at DESC LIMIT 1",
+            "SELECT " + COLUMNS + " FROM ecos_ontology_version WHERE ontology_id = ? AND status = 'Published' ORDER BY create_time DESC LIMIT 1",
             ROW_MAPPER, ontologyId);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     public int insert(OntologyVersion version) {
         return jdbcTemplate.update("""
-            INSERT INTO ecos_ontology_version (id, ontology_id, version_no, status, snapshot, change_log, publisher, published_at, created_at)
-            VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, NOW())
+            INSERT INTO ecos_ontology_version (id, ontology_id, version_no, status, snapshot_json, change_log, publisher, published_at, create_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
             """, version.getId(), version.getOntologyId(), version.getVersionNo(),
             version.getStatus(), version.getSnapshot(), version.getChangeLog(),
             version.getPublisher(), version.getPublishedAt() != null ? Timestamp.valueOf(version.getPublishedAt()) : null);
@@ -99,7 +113,8 @@ public class OntologyVersionDao extends JdbcTemplateDaoSupport {
     }
 
     public List<OntologyVersion> findAll() {
-        return jdbcTemplate.query("SELECT * FROM ecos_ontology_version ORDER BY created_at DESC", ROW_MAPPER);
+        return jdbcTemplate.query(
+            "SELECT " + COLUMNS + " FROM ecos_ontology_version ORDER BY create_time DESC", ROW_MAPPER);
     }
 
     public String nextId() {
@@ -111,7 +126,7 @@ public class OntologyVersionDao extends JdbcTemplateDaoSupport {
 
     public Optional<OntologyVersion> findPreviousVersion(String ontologyId, LocalDateTime beforeTime) {
         List<OntologyVersion> list = jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_version WHERE ontology_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT 1",
+            "SELECT " + COLUMNS + " FROM ecos_ontology_version WHERE ontology_id = ? AND create_time < ? ORDER BY create_time DESC LIMIT 1",
             ROW_MAPPER, ontologyId, beforeTime != null ? Timestamp.valueOf(beforeTime) : null);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }

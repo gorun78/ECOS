@@ -42,6 +42,11 @@ public class ScenarioBlueprintService {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioBlueprintService.class);
 
+    /** 缺口严重级词表（§6.5）：服务端分类，前端禁自算。 */
+    private static final Set<String> GAP_SEVERITIES = Set.of("BLOCKER", "WARNING", "SUGGESTION");
+    /** 缺口已关闭状态（与校验器同口径，§6.6 门槛 1）。 */
+    private static final Set<String> GAP_CLOSED_STATES = Set.of("RESOLVED", "ACCEPTED_RISK");
+
     private final ScenarioBlueprintDao dao;
     private final ScenarioBlueprintStateMachine stateMachine;
     private final ScenarioBlueprintValidator validator;
@@ -224,6 +229,75 @@ public class ScenarioBlueprintService {
         data.put("reasons", result.getReasons());
         data.put("details", result.getDetails());
         return data;
+    }
+
+    /** GET {id}/gaps：按严重级汇总缺口（§6.5；severity 可选过滤，非法值 400 不静默降级）。 */
+    public Map<String, Object> gaps(String blueprintId, String severity) {
+        ScenarioBlueprint bp = requireById(blueprintId);
+        String filter = severity == null || severity.isBlank() ? null : severity.trim().toUpperCase();
+        if (filter != null && !GAP_SEVERITIES.contains(filter)) {
+            throw new BlueprintQueryInvalidException("severity", severity);
+        }
+
+        int blocker = 0;
+        int warning = 0;
+        int suggestion = 0;
+        int unknown = 0;
+        int openBlockers = 0;
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> gap : bp.getGaps()) {
+            String level = classifyGapSeverity(gap);
+            if ("BLOCKER".equals(level)) {
+                blocker++;
+            } else if ("WARNING".equals(level)) {
+                warning++;
+            } else if ("SUGGESTION".equals(level)) {
+                suggestion++;
+            } else {
+                unknown++;
+            }
+            boolean blocking = "BLOCKER".equals(level) && !isGapClosed(gap.get("status"));
+            if (blocking) {
+                openBlockers++;
+            }
+            if (filter == null || filter.equals(level)) {
+                Map<String, Object> item = new LinkedHashMap<>(gap);
+                item.put("severity", level);
+                item.put("blocking", blocking);
+                items.add(item);
+            }
+        }
+
+        Map<String, Object> counts = new LinkedHashMap<>();
+        counts.put("BLOCKER", blocker);
+        counts.put("WARNING", warning);
+        counts.put("SUGGESTION", suggestion);
+        counts.put("UNKNOWN", unknown);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("blueprintId", bp.getId());
+        out.put("scenarioId", bp.getScenarioId());
+        out.put("version", bp.getVersion());
+        out.put("status", bp.getStatus());
+        out.put("severityFilter", filter);
+        out.put("counts", counts);
+        out.put("openBlockers", openBlockers);
+        out.put("blocking", openBlockers > 0);
+        out.put("gaps", items);
+        return out;
+    }
+
+    private static String classifyGapSeverity(Map<String, Object> gap) {
+        Object raw = gap == null ? null : gap.get("severity");
+        if (raw == null) {
+            return "UNKNOWN";
+        }
+        String value = String.valueOf(raw).trim().toUpperCase();
+        return GAP_SEVERITIES.contains(value) ? value : "UNKNOWN";
+    }
+
+    private static boolean isGapClosed(Object status) {
+        return status != null && GAP_CLOSED_STATES.contains(String.valueOf(status).trim().toUpperCase());
     }
 
     /** GET {id}/diff：两版本 gap/依赖结构化对比（无 diff 表，§6.2 content diff）。 */

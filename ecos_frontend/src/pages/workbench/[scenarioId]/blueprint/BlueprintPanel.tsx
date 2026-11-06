@@ -43,6 +43,8 @@ import BlueprintDetail from './BlueprintDetail';
 import BlueprintValidatePanel from './BlueprintValidatePanel';
 import CapabilityPanel from './CapabilityPanel';
 import ContextBuildPanel from './ContextBuildPanel';
+import FrameworkPanel from './FrameworkPanel';
+import CompletenessPanel from './CompletenessPanel';
 import WizardShell, { type WizardStep } from './WizardShell';
 
 interface Props {
@@ -488,6 +490,18 @@ function buildWizardSteps(ctx: {
   return [
     { key: 'goal', icon: 'Target', content: goalStep },
     { key: 'context', icon: 'Layers', content: <ContextBuildPanel scenarioId={scenarioId} blueprint={selected} /> },
+    { key: 'completeness', icon: 'ShieldCheck', content: <CompletenessPanel scenarioId={scenarioId} /> },
+    {
+      key: 'framework',
+      icon: 'Wrench',
+      content: (
+        <FrameworkPanel
+          scenarioId={scenarioId}
+          blueprintId={selected.id}
+          blueprintVersion={selected.version}
+        />
+      ),
+    },
     {
       key: 'model',
       icon: 'Wrench',

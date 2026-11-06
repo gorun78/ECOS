@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -93,5 +94,27 @@ class CompletenessReportTest {
         assertNotNull(r.getMissingEdges());
         assertEquals(Collections.singletonList("kb_engine_timeout"),
                 Collections.singletonList(r.getProbeErrors().get(0)));
+    }
+
+    @Test
+    @DisplayName("阻断级问题可区分：缺必需边/孤岛=BLOCKER 阻断，纯 OK 不阻断（§3.4/§4.2）")
+    void blockingSeverityIsClassified() {
+        CompletenessReport ok = new CompletenessReport("s-8", 1.0d, CompletenessReport.Verdict.OK);
+        assertFalse(ok.isBlocking());
+
+        CompletenessReport partial = new CompletenessReport("s-9", 0.5d, CompletenessReport.Verdict.PARTIAL);
+        CompletenessReport.MissingEdgeView missing = new CompletenessReport.MissingEdgeView(
+                "mapping", "workspace.completeness.missing.mapping", "no_contract_verified");
+        partial.getMissingEdges().add(missing);
+        assertEquals("BLOCKER", missing.getSeverity());
+        assertTrue(missing.isBlocking());
+        assertTrue(partial.isBlocking());
+
+        CompletenessReport islands = new CompletenessReport("s-10", 1.0d, CompletenessReport.Verdict.OK);
+        CompletenessReport.IslandView island = new CompletenessReport.IslandView(
+                "b-2", "孤立知识库", "KNOWLEDGE_BASE", "no_edge_to_target");
+        islands.getIslands().add(island);
+        assertEquals("BLOCKER", island.getSeverity());
+        assertTrue(islands.isBlocking());
     }
 }

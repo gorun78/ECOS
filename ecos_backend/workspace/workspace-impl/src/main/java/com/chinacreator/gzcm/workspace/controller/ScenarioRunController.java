@@ -51,7 +51,7 @@ public class ScenarioRunController {
         ScenarioRunRequestValidator.RunCommand command = requestValidator.validate(id, param);
         log.info("发起场景运行 scenario={} runMode={} baselineRunId={} params={}",
                 command.getScenarioId(), command.getRunMode(), command.getBaselineRunId(), param);
-        return ApiResponse.success(scenarioRunService.run(id, param));
+        return ApiResponse.success(scenarioRunService.run(id, param, command));
     }
 
     /** 场景运行历史（倒序）。F07-18：经 security-engine RLS/CLS 裁决后方可返回。 */

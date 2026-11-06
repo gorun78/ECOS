@@ -191,6 +191,10 @@ export interface BlueprintSavePayload {
 /** validate 四道门槛明细（ScenarioBlueprintValidator.ValidationResult）。 */
 export interface BlueprintValidateDetails {
   openBlockerGaps?: Array<Record<string, unknown>>;
+  /** 未关闭 WARNING：明示但不阻断（passed 仅由 BLOCKER 决定）。 */
+  openWarnings?: Array<Record<string, unknown>>;
+  /** 未关闭 SUGGESTION：明示但不阻断。 */
+  openSuggestions?: Array<Record<string, unknown>>;
   missingRequiredDeps?: Array<Record<string, unknown>>;
   unavailableCapabilities?: Array<Record<string, unknown>>;
   failedP0Tests?: Array<Record<string, unknown>>;
@@ -477,4 +481,46 @@ export async function diffBlueprint(
   const url = `${blueprintActionUrl(scenarioId, blueprintId, '/diff')}${qs ? `?${qs}` : ''}`;
   const data = await callBlueprint(url);
   return (data ?? {}) as BlueprintDiffResult;
+}
+
+/** 缺口严重级汇总（GET {id}/gaps 服务端分类；前端只展示不自算）。 */
+export interface BlueprintGapSummary {
+  blueprintId: string;
+  scenarioId: string;
+  version: number;
+  status: string;
+  severityFilter: string | null;
+  counts: { BLOCKER: number; WARNING: number; SUGGESTION: number; UNKNOWN: number };
+  openBlockers: number;
+  blocking: boolean;
+  gaps: Array<Record<string, unknown>>;
+}
+
+/** GET {id}/gaps 缺口按严重级分类汇总（severity 可选，非法值后端 400）。 */
+export async function getBlueprintGaps(
+  scenarioId: string,
+  blueprintId: string,
+  severity?: 'BLOCKER' | 'WARNING' | 'SUGGESTION',
+): Promise<BlueprintGapSummary> {
+  const qs = severity ? `?severity=${encodeURIComponent(severity)}` : '';
+  const data = (await callBlueprint(`${blueprintActionUrl(scenarioId, blueprintId, '/gaps')}${qs}`)) as Record<string, unknown>;
+  const o = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+  const c = (o.counts && typeof o.counts === 'object' ? o.counts : {}) as Record<string, unknown>;
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  return {
+    blueprintId: typeof o.blueprintId === 'string' ? o.blueprintId : '',
+    scenarioId: typeof o.scenarioId === 'string' ? o.scenarioId : '',
+    version: num(o.version),
+    status: typeof o.status === 'string' ? o.status : '',
+    severityFilter: typeof o.severityFilter === 'string' ? o.severityFilter : null,
+    counts: {
+      BLOCKER: num(c.BLOCKER),
+      WARNING: num(c.WARNING),
+      SUGGESTION: num(c.SUGGESTION),
+      UNKNOWN: num(c.UNKNOWN),
+    },
+    openBlockers: num(o.openBlockers),
+    blocking: o.blocking === true,
+    gaps: asArray<Record<string, unknown>>(o.gaps),
+  };
 }

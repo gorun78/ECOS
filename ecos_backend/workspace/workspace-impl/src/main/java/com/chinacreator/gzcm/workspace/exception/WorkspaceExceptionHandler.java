@@ -98,6 +98,17 @@ public class WorkspaceExceptionHandler {
         return build(400, "BAD_REQUEST", "请求体不可解析或缺少必填参数", Map.of());
     }
 
+    /**
+     * 资源不存在 → 404。common 的 {@link com.chinacreator.gzcm.common.exception.NotFoundException}
+     * 不在 WorkspaceDomainException 继承链上，漏映射会被兜底成 500（引用不存在资源的异常场景必须可辨）。
+     */
+    @ExceptionHandler(com.chinacreator.gzcm.common.exception.NotFoundException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleNotFound(
+            com.chinacreator.gzcm.common.exception.NotFoundException ex) {
+        log.warn("资源不存在 traceId={} message={}", EcosTraceContext.currentTraceId(), ex.getMessage());
+        return build(404, "NOT_FOUND", ex.getMessage(), Map.of());
+    }
+
     /** 安全引擎/下游 HTTP 层故障 → 500 固定文案，原文不入体（X-41）。 */
     @ExceptionHandler(HttpStatusCodeException.class)
     public ResponseEntity<ApiResponse<Map<String, Object>>> handleDownstream(HttpStatusCodeException ex) {

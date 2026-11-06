@@ -17,6 +17,9 @@ public class SandboxSaveDTO {
     /** 乐观锁：客户端当前持有的版本号（0 = 首次保存） */
     private Integer expectedVersion;
 
+    /** 运行模式（可选；缺省 FORMAL，用于写入口白名单断言）。 */
+    private String runMode;
+
     public Object getNodes() { return nodes; }
     public void setNodes(Object nodes) { this.nodes = nodes; }
     public Object getEdges() { return edges; }
@@ -25,4 +28,6 @@ public class SandboxSaveDTO {
     public void setViewport(Object viewport) { this.viewport = viewport; }
     public Integer getExpectedVersion() { return expectedVersion; }
     public void setExpectedVersion(Integer expectedVersion) { this.expectedVersion = expectedVersion; }
+    public String getRunMode() { return runMode; }
+    public void setRunMode(String runMode) { this.runMode = runMode; }
 }

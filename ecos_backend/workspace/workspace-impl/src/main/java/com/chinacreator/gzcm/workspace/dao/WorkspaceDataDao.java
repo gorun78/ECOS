@@ -430,24 +430,45 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
 
     // ═══════════════ 场景运行（ecos_scenario_run） ═══════════════
 
+    /** 旧签名（FORMAL 缺省）保留，避免破坏既有调用方；新写入走带 lineage 的重载。 */
     public int insertRun(String runId, String scenarioId, String runType, String status, String metric,
                          Object deviation, String diagnosisJson, String forecastJson,
                          String simulationJson, String strategyJson, boolean degraded, String operator) {
+        return insertRun(runId, scenarioId, runType, status, metric, deviation,
+                diagnosisJson, forecastJson, simulationJson, strategyJson, degraded, operator,
+                "FORMAL", null, "NONE");
+    }
+
+    public int insertRun(String runId, String scenarioId, String runType, String status, String metric,
+                         Object deviation, String diagnosisJson, String forecastJson,
+                         String simulationJson, String strategyJson, boolean degraded, String operator,
+                         String runMode, String sourceRunId, String sandboxLineage) {
         return jdbcTemplate.update(
             "INSERT INTO ecos_scenario_run " +
             "(id, scenario_id, run_type, status, metric, deviation, " +
-            " diagnosis_result, forecast_result, simulation_result, strategy_result, degraded, create_by, update_by) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?)",
+            " diagnosis_result, forecast_result, simulation_result, strategy_result, degraded, " +
+            " run_mode, source_run_id, sandbox_lineage, create_by, update_by) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?, ?)",
             runId, scenarioId, runType, status, metric, deviation,
-            diagnosisJson, forecastJson, simulationJson, strategyJson, degraded, operator, operator);
+            diagnosisJson, forecastJson, simulationJson, strategyJson, degraded,
+            runMode, sourceRunId, sandboxLineage, operator, operator);
     }
 
     public List<Map<String, Object>> listRunHistory(String scenarioId, int limit) {
         return jdbcTemplate.queryForList(
             "SELECT id, scenario_id, run_type, status, metric, deviation, degraded, " +
+            "       run_mode, source_run_id, sandbox_lineage, " +
             "       diagnosis_result, forecast_result, simulation_result, strategy_result, create_time " +
             "FROM ecos_scenario_run WHERE scenario_id = ? AND is_deleted = 0 ORDER BY create_time DESC LIMIT ?",
             scenarioId, limit);
+    }
+
+    /** 运行模式解析（沙盘基线守卫唯一 IO 点）；无记录返回 null（诚实缺省，不伪造 FORMAL）。 */
+    public String findRunMode(String runId) {
+        List<String> rows = jdbcTemplate.queryForList(
+            "SELECT run_mode FROM ecos_scenario_run WHERE id = ? AND is_deleted = 0",
+            String.class, runId);
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     // ═══════════════ 沙盘布局（ecos_scenario_sandbox_layout） ═══════════════
