@@ -101,8 +101,8 @@ class CacheConfigSingleSourceGateTest {
     private static Map<String, String> legacyFaces() {
         Map<String, String> m = new LinkedHashMap<>();
         // —— 配置字典播种：引擎自建缓存 TTL（live dev PG 实测 4 行 active，见 DoD DC-3 回写）——
-        m.put("B|ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/controller/OntologyConfigController.java|ontology.cache.ttl_seconds",
-                "DC-3 违例存量：本体引擎自建缓存 TTL 字典键。清退=删键并改读底座 default_ttl_seconds。");
+        // —— 配置字典播种：ontology 引擎自建缓存 TTL（无读取方、无前端消费面，已按
+        //    #147EW 清退；白名单同步 −1）——
         m.put("B|ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/controller/DataEngineConfigController.java|dw.cache.ttl_seconds",
                 "DC-3 违例存量：数据引擎自建缓存 TTL。清退同上。");
         m.put("B|ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/controller/DataEngineConfigController.java|dw.lineage.cache_ttl_minutes",

@@ -48,7 +48,6 @@ public class OntologyConfigController {
         {"ontology.graph.neo4j.uri", "bolt://localhost:7687", "ontology-engine", "string", "Neo4j连接URI"},
         {"ontology.graph.neo4j.user", "neo4j", "ontology-engine", "string", "Neo4j用户名"},
         {"ontology.graph.neo4j.password", "neo4j123", "ontology-engine", "password", "Neo4j密码"},
-        {"ontology.cache.ttl_seconds", "300", "ontology-engine", "int", "缓存TTL秒数"},
         {"ontology.version.max_versions", "10", "ontology-engine", "int", "最大版本数"},
         {"ontology.version.auto_version", "true", "ontology-engine", "bool", "自动版本化"},
         {"ontology.version.require_approval", "true", "ontology-engine", "bool", "版本发布需审批"},
