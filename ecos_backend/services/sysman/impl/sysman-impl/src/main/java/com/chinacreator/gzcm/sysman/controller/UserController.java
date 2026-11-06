@@ -30,6 +30,7 @@ package com.chinacreator.gzcm.sysman.controller;
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.common.exception.UnauthorizedException;
 import com.chinacreator.gzcm.sysman.dto.UserBatchSaveDTO;
 import com.chinacreator.gzcm.sysman.dto.UserSaveDTO;
 import com.chinacreator.gzcm.sysman.iam.entity.UserAccount;
@@ -92,7 +93,7 @@ public class UserController {
 			var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
 			String userId = auth == null ? null : auth.getName();
 			if (userId == null || userId.isBlank()) {
-				return ApiResponse.unauthorized("未登录或Token已过期");
+				throw new UnauthorizedException("未登录或Token已过期");
 			}
 			return ApiResponse.success(permissionCheckService.getUserEffectiveDecisions(userId));
 		} catch (Exception e) {
@@ -113,7 +114,7 @@ public class UserController {
 			var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
 			String userId = auth == null ? null : auth.getName();
 			if (userId == null || userId.isBlank()) {
-				return ApiResponse.unauthorized("未登录或Token已过期");
+				throw new UnauthorizedException("未登录或Token已过期");
 			}
 			var profile = userService.getUserBasicProfile(userId);
 			return profile == null ? ApiResponse.notFound("用户不存在") : ApiResponse.success(profile);
