@@ -241,7 +241,21 @@ class DependencyUnreadyIllegalStateRatchetTest {
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
                     + "gzcm/workspace/blueprint/ScenarioBlueprintService.java", 1),
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/workspace/forecast/ForecastAuditPackService.java", 1));
+                    + "gzcm/workspace/forecast/ForecastAuditPackService.java", 1),
+            // 2026-11-06 #147Z-7：按 HEAD 实测补登 5 枚 ENV_ALGO 持有者（并发批新增的 JVM 算法/环境
+            // 故障腿：AI 控制器 1、认知框架注册 2、Git 读写与备份 2）。ENV_ALGO 面进出必须点名，
+            // 收口方向＝接显式不可用载体或确认属环境故障保留 500。
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ai/controller/AIPAgentController.java", 1),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/cognitive2/service/ModelRegistryService.java", 1),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/cognitive2/service/framework/"
+                    + "CognitiveFrameworkRegistryService.java", 1),
+            Map.entry("ecos_backend/runtime/runtime-access/src/main/java/com/chinacreator/"
+                    + "gzcm/runtime/access/git/GitServiceImpl.java", 1),
+            Map.entry("ecos_backend/runtime/runtime-access/src/main/java/com/chinacreator/"
+                    + "gzcm/runtime/access/git/backup/GitRepoBackupService.java", 1));
 
     /**
      * 四面读数与总站点数的对账常量（#142/B4-3e-38 探测实扫，禁算式推出）。
@@ -308,10 +322,10 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 同批重设：总站点 139 → <b>140</b>、OTHER 面 105 → <b>106</b>，
      * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（16／10／8）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 146;
+    private static final int TOTAL_SITE_BASELINE = 154;
     private static final int DEPENDENCY_FACE_BASELINE = 16;
-    private static final int ENV_ALGO_FACE_BASELINE = 10;
-    private static final int OTHER_FACE_BASELINE = 112;
+    private static final int ENV_ALGO_FACE_BASELINE = 15;
+    private static final int OTHER_FACE_BASELINE = 115;
     private static final int UNREADABLE_FACE_BASELINE = 8;
 
     /**
@@ -321,8 +335,11 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * <p>实扫 9 枚（10 枚 ENV_ALGO 腿里只有 {@code WAgentHashSupport} 的
      * 「JVM 缺 SHA-256 算法（不符合 Java 17 基线）」不带依赖词）＝<b>绝大多数</b>环境故障腿
      * 都写着「不可用」，这正是"按消息一刀切换 503"会把 JVM 故障说成下游未就绪的原因。</p>
+     *
+     * <p><b>2026-11-06 #147Z-7：9→14</b>——ENV_ALGO 面 10→15 后，新增 5 枚持有者的腿全部同时命中
+     * 「环境故障／依赖未就绪」两词表（文案写着 unavailable），交叠数按实测同步；判据仍按算法词优先。</p>
      */
-    private static final int BOTH_PATTERN_OVERLAP_BASELINE = 9;
+    private static final int BOTH_PATTERN_OVERLAP_BASELINE = 14;
 
     /**
      * 判据<b>读不出消息</b>的腿（参数表里无字符串字面量，消息来自变量／i18n 键）。

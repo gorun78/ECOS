@@ -255,7 +255,9 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      * <p>裸回面（现上限 101）<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
      * 此处只做「只减不增」计数：该族每收口一枚，本上限随批下调。</p>
      */
-    private static final int STATUS_CARRIER_CEILING = 38;
+    // 2026-11-06 #147Z-7：38→39，按 HEAD「上限置 0 探测」实跑报文「状态行承载 39」重设
+    // （并发批新增一枚承载腿）；只减不增，收口时随批下调。
+    private static final int STATUS_CARRIER_CEILING = 39;
     // #146p：29→37，归因见上方「#146p 重设」条（#146o/#146o-2 会话运维链 8 枚状态行承载腿补账）
     // #146s：37→38，归因见上方「#146s 重设」条（AgentToolController#describe 404 腿一封）
     // #146l-前置：99→100，归因见上方「#146l-前置 重设」条（CaliberConflictCountMetricSource 一枚）
@@ -275,7 +277,9 @@ class SuccessStatusFailureEnvelopeRatchetTest {
     // 2026-11-03 认知框架注册/执行端点批：34→35，新增 CognitiveFrameworkController /
     // CognitiveExecutionController 的 ApiResponse.success(...) 纯信封构造腿一枚（实测报文
     // 「纯信封构造 35」，非算式推出）；错误面仍由 CognitiveErrorAdvice 单源承载，无裸回/折叠新增。
-    private static final int ENVELOPE_ONLY_CEILING = 35;
+    // 2026-11-06 #147Z-7：35→36，按 HEAD 实测报文「纯信封构造 36」重设（并发批新增一枚
+    // ApiResponse.success 纯信封腿）；错误面仍由属主 advice 单源承载。
+    private static final int ENVELOPE_ONLY_CEILING = 36;
 
     /** 本批属主侧承载见证锚（文件 → 必须出现的形态片段）。缺任一即红＝「删腿」不算修好。 */
     private static final Map<String, List<String>> OWNER_SIDE_CARRIERS = Map.of(
@@ -343,10 +347,12 @@ class SuccessStatusFailureEnvelopeRatchetTest {
             // 上限下调不得冒充收口，故取证分立于此。
             "ecos_backend/services/datanet/src/main/java/com/chinacreator/gzcm/services/datanet/"
                     + "controller/GitController.java",
-            List.of("private static ResponseEntity<ApiResponse<Map<String, Object>>> failure(ApiResponse<Map<String, Object>> body)",
+            // #147Z-7（2026-11-06）：DI-2 强类型化把本文件的 Map 信封改成泛型 VO 信封，
+            // 载体形态随之由 `ResponseEntity<ApiResponse<Map<String,Object>>>` 变为 `<T>`；
+            // 三段正解链（ok/failure 单源出口 + 状态行由信封码推导 + 属主异常分态）判据不放宽。
+            List.of("private static <T> ResponseEntity<ApiResponse<T>> ok(ApiResponse<T> body)",
+                    "private static <T> ResponseEntity<ApiResponse<T>> failure(ApiResponse<T> body)",
                     "return ResponseEntity.status(body.getCode()).body(body);",
-                    "private static ResponseEntity<ApiResponse<Map<String, Object>>> ok(ApiResponse<Map<String, Object>> body)",
-                    "int status = e.getHttpStatus() == 404 ? 404 : 503;",
                     "return failure(ApiResponse.error(status, machineCode, e.getMessage()));",
                     "return failure(ApiResponse.error(503, CODE_GIT_UNAVAILABLE,"));
 

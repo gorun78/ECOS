@@ -175,20 +175,30 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * （{@code sites=944, files=152}，分枚 332/12/24/270/306），非由旧值做算术推出；
      * 该枚的可换参数重试语义（400）与机读码面由新增门
      * {@code GitControllerStatusLineTest} 逐枚钉住。</p>
+     *
+     * <p><b>2026-11-06 #147Z-7 按 HEAD 实测重设 944→946（分枚 332/12/23/271/308）</b>：
+     * 差额来自 DI-2 并发批把 Map 信封改强类型 VO 时新增的三类出口（forbidden −1 / notFound +1 /
+     * internalError +2）；同期 #147Z-7 把 UserController 两枚自读面拒绝腿改抛 401 载体，
+     * unauthorized 由 14 回落到 12。这是<b>登记面</b>不是收口——后续这些出口改走带码重载时，
+     * 必须同批把本基线与分枚值一起下调（合计恒等于 {@link #BASELINE_SITES}）。</p>
      */
-    private static final int BASELINE_SITES = 944;
+    private static final int BASELINE_SITES = 946;
     private static final int BASELINE_FILES = 152;
 
     /** 分枚基线：只减不增，且合计必须等于 {@link #BASELINE_SITES}（防「拆细了但总数对不上」）。 */
     private static final Map<String, Integer> BASELINE_BY_FACTORY = new TreeMap<>(Map.of(
             "badRequest", 332,
             "unauthorized", 12,
-            "forbidden", 24,
-            "notFound", 270,
-            "internalError", 306));
+            "forbidden", 23,
+            "notFound", 271,
+            "internalError", 308));
 
-    /** gateway 入口面已带码的六枚腿（锚点，不得回退）。 */
-    private static final int ENTRY_LEGS_CODED = 6;
+    /**
+     * gateway 入口面已带码的腿（锚点，不得回退）。
+     * <p>2026-11-06 #147Z-7：6→8——属主 handler 新增两类异常映射腿（同批实扫 8 枚：badRequest×5/
+     * unauthorized×1/forbidden×2，均带 {@code ECOS_SYS_*} 机读码）。本条只增不减，少一枚即红。</p>
+     */
+    private static final int ENTRY_LEGS_CODED = 8;
 
     /** {@code ECOS-SYS-*} 族码字面量（带引号的串），单源只允许 {@link #SYSTEM_ERROR_CODE_SOURCE} 承载。 */
     private static final Pattern SYS_FAMILY_LITERAL = Pattern.compile("\"ECOS-SYS-\\d+\"");
