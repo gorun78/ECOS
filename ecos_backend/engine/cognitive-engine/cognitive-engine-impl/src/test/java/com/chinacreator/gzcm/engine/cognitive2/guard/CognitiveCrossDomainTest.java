@@ -36,6 +36,15 @@ class CognitiveCrossDomainTest {
     /** REQ-COG-07 模型资产唯一权威载体（schema 限定形态，V261 / ST07）。 */
     private static final String MODEL_ASSET_TABLE = "ecos_cognitive.ecos_cognitive_model";
 
+    /**
+     * B42/P1-19 第二处受控例外（非放宽）：场景 Mind 注册门面按设计-05 F05-02/W116 必须写
+     * V187 {@code ecos_cognitive_mind} + V188 {@code ecos_cognitive_scenario_mind}（本域自有表）。
+     * 收紧为「DML 语句的紧随片段只能引用 MindAssetDao 的表名常量 MIND_TABLE / SCEN_MIND_TABLE」——
+     * 写任何其它表或裸字面量表名 ⇒ 违例照旧 FAIL。
+     */
+    private static final java.util.Set<String> MIND_WRITE_TABLE_CONSTANTS =
+            java.util.Set.of("MIND_TABLE", "SCEN_MIND_TABLE");
+
     @Test
     @DisplayName("契约面零 DML：认知不写任何表（更不写他域表）")
     void cognitiveWritesNoOtherDomainTables() throws IOException {
@@ -57,6 +66,20 @@ class CognitiveCrossDomainTest {
                             if (!MODEL_ASSET_TABLE.equalsIgnoreCase(table)) {
                                 offenders.add(p.getFileName() + ":" + CogScope.lineOf(src, t.start())
                                         + " :: 模型资产面写了非权威表 " + table);
+                            }
+                        }
+                        return;
+                    }
+                    if ("MindAssetDao.java".equals(p.getFileName().toString())) {
+                        // 受控例外：DML 紧随片段必须引用两张 Mind 表常量（本域自有载体）
+                        var mm = DML.matcher(src);
+                        while (mm.find()) {
+                            int end = Math.min(src.length(), mm.end() + 160);
+                            String tail = src.substring(mm.end(), end);
+                            boolean allowedTarget = MIND_WRITE_TABLE_CONSTANTS.stream().anyMatch(tail::contains);
+                            if (!allowedTarget) {
+                                offenders.add(p.getFileName() + ":" + CogScope.lineOf(src, mm.start())
+                                        + " :: Mind 写面引用了非 Mind 表常量");
                             }
                         }
                         return;

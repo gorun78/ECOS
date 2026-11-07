@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.workspace.scenario.BindingNode;
 import com.chinacreator.gzcm.workspace.scenario.CompletenessDataLoader;
 import com.chinacreator.gzcm.workspace.scenario.CompletenessReport;
+import com.chinacreator.gzcm.workspace.scenario.DcchengClient;
 import com.chinacreator.gzcm.workspace.scenario.LinkEdge;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioCompletenessService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindService;
@@ -40,13 +41,17 @@ public class ScenarioPreValidateController {
     private final ScenarioSandboxLayoutService sandboxLayoutService;
     private final CompletenessDataLoader loader;
     private final ScenarioCompletenessService completenessService;
+    /** B40：认知 E1 读客户端（场景 Mind 权威源）；不可用时回退 legacy 读面。 */
+    private final DcchengClient cognitionClient;
 
     public ScenarioPreValidateController(
             ScenarioMindService mindService,
             ScenarioSandboxLayoutService sandboxLayoutService,
             CompletenessDataLoader loader,
-            ScenarioCompletenessService completenessService) {
+            ScenarioCompletenessService completenessService,
+            DcchengClient cognitionClient) {
         this.mindService = mindService;
+        this.cognitionClient = cognitionClient;
         this.sandboxLayoutService = sandboxLayoutService;
         this.loader = loader;
         this.completenessService = completenessService;
@@ -61,12 +66,43 @@ public class ScenarioPreValidateController {
         return ApiResponse.success(checks);
     }
 
+    /**
+     * 心智检查（B40/P1-16 订正）：以认知域场景-Mind 绑定为权威源（V188 + E1 detect）；
+     * legacy ecos_scenario_mind 仅作读门缺席时兜底（该表按 F05-02/W116 已停写）。
+     */
     private PreValidateCheckVO checkMind(String scenarioId) {
+        try {
+            int count = countMinds(cognitionClient.detectScenarioMinds(scenarioId));
+            return new PreValidateCheckVO("mind", count > 0,
+                    count > 0 ? "active_mind present (source=cognitive, count=" + count + ")"
+                              : "no cognitive mind bound to scenario (E1 detect empty)");
+        } catch (Exception e) {
+            log.warn("认知 E1 detect 不可用，回退 legacy 读面: scenario={} err={}", scenarioId, e.getMessage());
+        }
         ScenarioMindVO active = mindService.getActiveMind(scenarioId);
         boolean pass = active != null;
         return new PreValidateCheckVO("mind", pass,
-                pass ? "active_mind present (id=" + active.getId() + ")"
+                pass ? "active_mind present (legacy id=" + active.getId() + ")"
                      : "no active mind for scenario");
+    }
+
+    /** E1 detect 返回形态兼容：List 直接计数；Map 取常见容器键再计数（未知形态按 0）。 */
+    private static int countMinds(Object data) {
+        if (data instanceof List<?> list) {
+            return list.size();
+        }
+        if (data instanceof Map<?, ?> map) {
+            for (String key : List.of("minds", "items", "data", "records")) {
+                Object nested = map.get(key);
+                if (nested instanceof List<?> list) {
+                    return list.size();
+                }
+                if (nested instanceof Map<?, ?> inner && inner.get("minds") instanceof List<?> list) {
+                    return list.size();
+                }
+            }
+        }
+        return 0;
     }
 
     private PreValidateCheckVO checkSandboxCoverage(String scenarioId) {

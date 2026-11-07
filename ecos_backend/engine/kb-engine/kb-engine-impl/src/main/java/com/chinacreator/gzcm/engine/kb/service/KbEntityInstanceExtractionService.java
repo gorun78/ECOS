@@ -134,7 +134,11 @@ public class KbEntityInstanceExtractionService {
         if (endpointResolver == null) {
             throw crossEngineUnavailable("datanet 服务寻址失败（ServiceEndpointResolver bean 不可用）");
         }
-        return endpointResolver.resolve("datanet", ServiceEndpointResolver.RouteMode.MONOLITH)
+        // B33/P1-12：尊重 route-manifest 的 datanet 切流事实（route=service ⇒ :18082 直连）。
+        // 原硬传 MONOLITH ⇒ 绕过切流自环 gateway :8080，而 gateway 对匿名出站一律 403
+        // （抽取 job 属 @Async 线程，无请求上下文可中继凭据）⇒ 同步恒 ECOS-DATA-041。
+        // resolver 对未切流 owner 自动回落 monolith 端口，此改动对未切流环境无行为变化。
+        return endpointResolver.resolve("datanet", ServiceEndpointResolver.RouteMode.SERVICE)
                 .orElseThrow(() -> crossEngineUnavailable(
                         "datanet 服务寻址失败（route-manifest 缺 datanet 条目）"));
     }

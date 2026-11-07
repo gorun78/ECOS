@@ -96,6 +96,46 @@ public class ScenarioMindsController {
         return ApiResponse.success();
     }
 
+    // ═══════════════ B44/P1-20：认知域 Mind 引用面（只增端点，既有 Long 面零改动）═══════════════
+
+    /**
+     * 按认知 Mind 引用切换激活位（当前支持 {@code active:true|false}）。
+     * 0 行受影响 ⇒ 404（目标不存在或未绑定），禁伪装成功。
+     * <p>DI-2：请求体改强类型 record（键面与旧 Map 的 {@code active} 一致；
+     * 缺省/空体沿用旧语义「非显式 false 即激活」）。</p>
+     */
+    @PatchMapping("/{id}/minds/ref/{mindRef}")
+    public ApiResponse<ScenarioMindVO> updateByRef(@PathVariable("id") String id,
+                                                   @PathVariable("mindRef") String mindRef,
+                                                   @RequestBody(required = false) MindActiveRequest patch) {
+        boolean active = patch == null || !Boolean.FALSE.equals(patch.active());
+        int rows = mindService.setActiveByRef(id, mindRef, active);
+        if (rows == 0) {
+            throw new NotFoundException("MIND-404: mindRef 不存在或未绑定: " + mindRef);
+        }
+        ScenarioMindVO vo = new ScenarioMindVO();
+        vo.setScenarioId(id);
+        vo.setMindRef(mindRef);
+        vo.setActiveMind(active ? 1 : 0);
+        return ApiResponse.success(vo);
+    }
+
+    /** 激活位切换请求体（DI-2 强类型；未知键按旧 Map 行为忽略）。 */
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    public record MindActiveRequest(Boolean active) {
+    }
+
+    /** 按认知 Mind 引用解绑（0 行受影响 ⇒ 404，如实失败）。 */
+    @DeleteMapping("/{id}/minds/ref/{mindRef}")
+    public ApiResponse<Void> deleteByRef(@PathVariable("id") String id,
+                                         @PathVariable("mindRef") String mindRef) {
+        int rows = mindService.unbindByRef(id, mindRef);
+        if (rows == 0) {
+            throw new NotFoundException("MIND-404: 场景未绑定该 Mind: " + mindRef);
+        }
+        return ApiResponse.success();
+    }
+
     // ═══════════════ 兼容端点（v1.x /mind-model）═══════════════
 
     /** 兼容：获取 base mind。 */

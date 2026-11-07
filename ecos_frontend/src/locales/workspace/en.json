@@ -51,7 +51,7 @@
   "workspace.l2.not_found_hint": "It may have been archived or you lack access.",
   "workspace.l2.error": "Failed to load scenario: {msg}",
   "workspace.l2.offline": "Offline mode: showing last synced snapshot.",
-  "workspace.l2.empty": "No data or cognition bound yet.",
+  "workspace.l2.empty": "No operation evaluation records yet for this scenario.",
   "workspace.l2.no_permission": "You do not have permission to view this scenario.",
   "workspace.l2.stat.title": "Key Metrics",
   "workspace.l2.stat.safety": "Safety Index",
@@ -78,6 +78,8 @@
   "workspace.wiz.progress": "Step {cur}/{total}",
   "workspace.wiz.step.goal": "Goal & state",
   "workspace.wiz.step.context": "Context build",
+  "workspace.wiz.step.completeness": "Completeness",
+  "workspace.wiz.step.framework": "Framework selection",
   "workspace.wiz.step.model": "Logic model & capabilities",
   "workspace.wiz.step.validate": "Release gate",
   "workspace.wiz.step.release": "Release & feedback",
@@ -363,5 +365,10 @@
   "workspace.completeness.single_source": "Computed by the backend single algorithm; UI renders only",
   "workspace.completeness.missing_edges": "Missing required edges",
   "workspace.completeness.islands": "Island bindings",
-  "workspace.completeness.probe_errors": "Contract probe errors"
+  "workspace.completeness.probe_errors": "Contract probe errors",
+  "workspace.completeness.missing.mapping": "Datasource → ontology entity (mapping)",
+  "workspace.completeness.missing.extraction": "Ontology entity → knowledge asset (extraction)",
+  "workspace.completeness.missing.cognition": "Knowledge asset → AI agent (cognition)",
+  "workspace.completeness.missing.expose": "AI agent → external interface (expose)",
+  "workspace.completeness.missing.govern": "Security policy → AI agent (govern)"
 }

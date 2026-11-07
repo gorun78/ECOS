@@ -88,7 +88,7 @@ class BusinessExceptionStatusParityRatchetTest {
     /** 扫描面阈值守卫：2026-10-22 实测 ecos_backend main 面 .java 文件 2339 枚。 */
     private static final int MIN_SCANNED_MAIN_FILES = 2000;
 
-    /** 基线：双参 400 形态逐文件处数（合计 105 处／18 文件；100→101 系 #146l-前置补账 ModelRegistryService 4→5；101→105 系 #146be 前置补账 #146ay 325bf6ee 于两文件新增 4 枚双参 400 腿，该批未落账本门）。 */
+    /** 基线：双参 400 形态逐文件处数（合计 106 处／18 文件；100→101 系 #146l-前置补账 ModelRegistryService 4→5；101→105 系 #146be 前置补账 #146ay 325bf6ee 于两文件新增 4 枚双参 400 腿，该批未落账本门）。 */
     private static final Map<String, Integer> BASELINE_TWO_ARG_400 = baseline(
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/ForecastServiceImpl.java", 4,
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/CognitiveEvidenceService.java", 7,
@@ -105,11 +105,11 @@ class BusinessExceptionStatusParityRatchetTest {
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioRunService.java", 3,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioSandboxLayoutService.java", 3,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioService.java", 12,
-            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioMindService.java", 3,
+            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioMindService.java", 4, // 2026-11-07 P0 批次：3→4（在途 upsertMind 新增 scenarioId 必填 400 腿，重测后同批登记）
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioBindingLinkService.java", 7,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/forecast/ForecastRunRequestValidator.java", 3);
 
-    /** 基线：三参同号形态逐文件处数（合计 24 处／14 文件；23＝本批迁移集，+1 系 #146ag-0 ragQueryStrict 严格供数腿）。 */
+    /** 基线：三参同号形态逐文件处数（合计 23 处／14 文件；23＝本批迁移集，+1 系 #146ag-0 ragQueryStrict 严格供数腿）。 */
     private static final Map<String, Integer> BASELINE_THREE_ARG = baseline(
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/controller/CognitiveConfigController.java", 1,
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/mental/BeliefReplayService.java", 1,
@@ -123,7 +123,7 @@ class BusinessExceptionStatusParityRatchetTest {
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ScenarioCognitiveController.java", 1,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioSandboxLayoutService.java", 4,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioService.java", 1,
-            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioMindService.java", 3,
+            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioMindService.java", 2, // 2026-11-07 P0 批次：3→2（在途 upsertMind 改写后三参同号腿减一，重测后同批登记）
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/config/WorkspaceRestClientConfig.java", 1);
 
     /**

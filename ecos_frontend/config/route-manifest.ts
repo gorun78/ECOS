@@ -186,7 +186,8 @@ export function buildViteDevProxyTable(
       // （要求 X-ECOS-USER/X-ECOS-TENANT，由 gateway 认证后注入）的引擎，
       // dev vite 直连绕开 gateway 时必须补注同款信任头，否则 :18084/:18090 一律
       // 403 ECOS-AUTH-010（2026-10-11 live 实证：workspace 场景面 L1/L2 全 403）。
-      if (entry.engine === "ai" || entry.engine === "workspace") {
+      // B32：sysman 起已按同口径启用 header-auth（P1-15 修复），security 引擎直连面补注同款。
+      if (entry.engine === "ai" || entry.engine === "workspace" || entry.engine === "security") {
         item.headers = { ...AIMING_DEV_TRUST_HEADERS };
       }
       table[entry.prefix] = item;

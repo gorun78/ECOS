@@ -116,7 +116,7 @@ export default function CompletenessPanel({ scenarioId }: Props) {
           <div className={`font-bold ${styles.cardText}`}>{t('workspace.completeness.missing_edges')}</div>
           {report.missingEdges.map((e) => (
             <div key={`${e.type}-${e.labelKey}`} className={styles.cardTextMuted}>
-              [{e.severity ?? 'BLOCKER'}] [{e.type}] {e.labelKey} · {e.reason}
+              [{e.severity ?? 'BLOCKER'}] [{e.type}] {t(e.labelKey)} · {e.reason}
             </div>
           ))}
         </div>

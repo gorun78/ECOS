@@ -1,11 +1,13 @@
 package com.chinacreator.gzcm.workspace.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
 import com.chinacreator.gzcm.workspace.scenario.AvailableItemVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -102,13 +104,26 @@ public class ScenarioOptionsController {
     // ═══════════════ 私有辅助 ═══════════════
 
     /**
+     * B32：跨服务 GET 统一携带调用方凭证（单源 {@link CallerCredentialSource}）。
+     * 此前一律 {@code HttpEntity.EMPTY}＝裸调——sysman 切直连（:18081 启用 header-auth）后
+     * 缺信任头即 403，属 D-B4-61「六腿中继收口」的漏网腿。无请求上下文时不发明主语
+     * （fail-closed 语义不变）。
+     */
+    private static HttpEntity<Void> credentialedEntity() {
+        HttpHeaders headers = new HttpHeaders();
+        CallerCredentialSource.applyTo(headers);
+        return new HttpEntity<>(headers);
+    }
+
+    /**
      * 通用跨服务 GET 调用 → 解析 ApiResponse.data → 映射为 List<AvailableItemVO>。
      * 服务不可达返 503。path 为相对 Bean rootUri（base-url 单源=route-manifest，F07-17）的路径。
      */
     private ApiResponse<?> callRemote(RestTemplate restTemplate, String path, String serviceName,
                                       String idField, String nameField) {
         try {
-            ResponseEntity<Map> resp = restTemplate.exchange(path, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
+            ResponseEntity<Map> resp = restTemplate.exchange(path, HttpMethod.GET,
+                    credentialedEntity(), Map.class);
             Map<String, Object> body = resp.getBody();
             if (body == null) {
                 return unavailable(serviceName, "empty response");
@@ -144,7 +159,8 @@ public class ScenarioOptionsController {
             path += "?domain=" + domain;
         }
         try {
-            ResponseEntity<Map> resp = buszhiRest.exchange(path, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
+            ResponseEntity<Map> resp = buszhiRest.exchange(path, HttpMethod.GET,
+                    credentialedEntity(), Map.class);
             Map<String, Object> body = resp.getBody();
             if (body == null) {
                 return unavailable("buszhi", "empty response");
@@ -164,7 +180,7 @@ public class ScenarioOptionsController {
                         try {
                             ResponseEntity<Map> entResp = buszhiRest.exchange(
                                 "/ecos/ontologies/" + oid + "/entities",
-                                HttpMethod.GET, HttpEntity.EMPTY, Map.class);
+                                HttpMethod.GET, credentialedEntity(), Map.class);
                             Map<String, Object> entBody = entResp.getBody();
                             if (entBody == null) continue;
                             Object entData = entBody.get("data");

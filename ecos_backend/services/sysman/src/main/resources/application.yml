@@ -44,7 +44,6 @@ mybatis:
   mapper-locations: classpath*:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    cache-enabled: true
     lazy-loading-enabled: false
 
 # PMO-49 D1: 收窄 MyBatis 类型别名扫包到 sysman 域
@@ -53,8 +52,14 @@ mybatis:
 ecos:
   mybatis:
     type-aliases-package: com.chinacreator.gzcm.sysman.security
-  header-auth:
-    enabled: false
+  # B32（#142/B4-3e-21 信任链补腿）：sysman 宿主此前从未注册 HeaderAuthInterceptor
+  # （旧条目误置 ecos.header-auth——auto-config 读不到的死键，等同常关），
+  # ServiceContext 恒空 ⇒ /api/v1/security/decision 对无 subject 请求恒 403 ECOS-AUTH-010
+  # （场景运行历史列裁剪被 DENY 置空的根因）。按 aiming/workspace 同口径启用：
+  # 缺 X-ECOS-USER/X-ECOS-TENANT → 403 ECOS-AUTH-010（fail-closed 内网契约；ADR-7 端口仅内网）。
+  security:
+    header-auth:
+      enabled: true
 
 # 认证配置 (PMO-74 H9-T5c 更正: gateway 侧 auth.whitelist 块已删除, "同款"前提不成立;
 # 本 auth.enabled 全仓无存活 Java 消费方 —— H9-T5b 实测, 是否删除待 T5e 裁决)

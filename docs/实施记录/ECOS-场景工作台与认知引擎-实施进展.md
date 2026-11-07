@@ -248,9 +248,152 @@
 - 新暴露的下游前置（**未解，不得计为通过**）：实例抽取 job `tg-obj-1793776670109` 落 `FAILED`，`ECOS-DATA-041: DW 层资源端点不可用: http://localhost:8080/api/v1/engine/data/layers/CURATED (403 …)`。同端点带 admin Token 直连为 **200**（资源清单正常），即 kb 引擎内部 REST 客户端未携带凭据、被既有 fail-closed 拦下。修法涉及服务间凭据（服务账号/Token 透传/mTLS），属安全面决策，未擅自放宽。
 - 另一处观测缺口（登记，不修）：`GET /knowledge/sync/status` 的 `lastSyncTime` 恒为 `null`（成功同步不写 `ecos_kg_sync_log` 成功行，仅失败落行）。
 
+### B30 前端实跑复验（浏览器点验 4 个缺陷，3 修 1 登记）
+- 环境：`start-frontend.ps1` → vite :3000（BFF）/ `#/workbench/sc_ent2_group_month`，admin 登录后逐 Tab 点验；服务侧 gateway:8080 + aiming:18084 + workspace:18090 在线。
+- **D1 向导步骤 Tab 显原始 key**：`workspace.wiz.step.completeness` / `.framework` 缺词条（后端/前端新增第 3、4 步时未同步 locale）。修：`locales/workspace/{zh-CN,en}.json` 补键（完整度 / 框架选型）。
+- **D2 完整度面板显原始 key**：`CompletenessPanel` 直接渲染后端下发的 `labelKey` 而未过 `t()`，且 5 类缺失边词条缺失。修：改 `t(e.labelKey)` + 补 `workspace.completeness.missing.{mapping,extraction,cognition,expose,govern}` 双语；live 复验显示「本体实体 → 知识资产（抽取）」「知识资产 → AI Agent（认知）」。
+- **D3 框架选择恒 403（传输层丢 Authorization）**：页面 `POST /api/v1/cognitive/frameworks/select` 恒 403，而同一 payload 直连网关 200。根因 `httpClient` 的 `fetch(url, { headers, ...options })` 调用序——调用方一传 `options.headers` 就整体覆盖默认头，`Authorization` 被冲掉。修：新增 `mergeHeaders()`，三条传输腿（`apiFetch`/`apiFetchData`/`doFetch`）统一合并默认头与调用方头。
+- **D4 修 D3 后的 500（重复 Content-Type）**：朴素合并同时下发 `Content-Type` 与 `content-type`，aiming 侧拼成 `application/json, application/json` → `HttpMediaTypeNotSupportedException` → `ECOS-COG-504`（aiming 日志实证）。修：`mergeHeaders` 经 `Headers` 归一化后再下发，单一 content-type。
+- 新增回归门 `src/services/__tests__/httpClient.headers.spec.ts`（4 例）：调用方带头时仍带 Bearer、content-type 不重复、apiFetch/doFetch 自定义头与 Authorization 并存；**变异探针**：撤掉 apiFetchData 的合并后该用例转红（1 failed / 3 passed），恢复后 4/4 绿。
+- 实跑：`npm run lint`（tsc --noEmit）零错；`vitest run src/services/__tests__` under Node 22 → **25 文件 / 347 测试全过**；`i18n-coverage` + workbench 用例 → **3 文件 / 35 测试全过**。
+- live 复验：框架选型点「执行策略选择」→ 页面渲染「选择结果：NEEDS_INPUT_OR_HUMAN」+ 排除原因 `MISSING_INPUT:goal_statement_present` + 未校准声明（不再 403/500）。
+- **D5 认知摘要空态文案与事实不符**：场景已绑 6 类资产，但「认知摘要」显示「该场景暂未绑定任何数据或认知」——该空态实际由 `operationEval`（经营评估）无记录触发，与绑定无关。修：`workspace.l2.empty` 改为「该场景暂无经营评估记录。」（en 同步）；live 复验渲染新文案。
+- **登记未修（非本批缺陷面）**：① `GET /api/v1/workspace/scenarios/{id}/actions` → `503 COGNITIVE_UNAVAILABLE`，reason=「decision 底座网关未装配」（`DecisionGateway` 无实现 Bean，卷07 声明的接缝；UI 已按 503 显示横幅 + traceId，未掩成 200）；② aiming 侧 `ClearanceInterceptor` 超管旁路审计发布 WARN：`ObjectProvider<Object>` 候选歧义（`No qualifying bean of type Object … more than one primary`），属既有装配面缺陷，按「不阻断旁路」降级。
+
+### B31 场景运行首次实跑 + 服务间裁决链根因定位（2026-11-06）
+- 实跑：`POST /api/v1/workspace/scenarios/sc_ent2_group_month/runs`（`runTypes=[DIAGNOSE]`，metric=毛利率，deviation=3.5）→ **200**；`ecos_ai.ecos_scenario_run` 落 1 行 `run_e810c6a7-804 / FORMAL / SUCCEEDED_DEGRADED / degraded=true`；响应体 `diagnosis.message=诊断失败: 认知引擎暂不可用`。
+- 下游归因（同一根因，三处实例）：
+  1. workspace → cognitive（gateway monolith 通道）`POST /cognitive/diagnose` → **403**（DcchengClient 无凭证中继，`post()` 不加 Authorization/信任头，workspace 日志实证 `dccheng 调用失败 /cognitive/diagnose: 403`）；
+  2. workspace → security `POST /api/v1/security/decision` → **403 `无用户上下文（ECOS-AUTH-010）`**，`filterColumns` 按 DENY 置空 ⇒ `GET .../runs` 返回 `200 []`（库里 1 行不可见，UI「运行历史」空）；
+  3. kb → DW `GET /api/v1/engine/data/layers/CURATED` → 403（P1-12 既有）。
+- 第 2 条的精确归因（已用三组探针证伪其他假设）：
+  - 直连 sysman:18081 `/security/decision`（Bearer + 四信任头 + 正确 `assetRef` 体）→ 同为 010 ⇒ **不是**中继丢头（`WorkspaceSecurityEngineClient` 已用 `CallerCredentialSource` 逐字中继，jar 内类字节码已核）；
+  - 体加 `subject:{subjectId:"u-admin"}` → **200** 并返回真实裁决束（RLS `(1=1)` / columns allow / OPA `EVALUATED_DENY`）⇒ 端点本身可用；
+  - 根因 = `DecisionController` 的主体取 `ServiceContext.current()`，而 `ServiceContext` 只由 `HeaderAuthInterceptor` 填充；**sysman 宿主从未注册该拦截器**（全仓 grep：仅 workspace 宿主注册，sysman 只有 `ClearanceMvcConfig`），gateway 侧又对全部外部请求剥离 X-ECOS-\* ⇒ 两态寻址两条路都拿不到主体。
+- 修复属安全信任链设计决策（C.2：service 侧按设计应由 `HeaderAuthInterceptor` 从真实 HTTP 头重建上下文，但注册该拦截器会对该宿主全部路径强制要求信任头，需 PM/架构定注册范围），本任务**未擅自改安全链**；已登记 P1-15。
+
+### B32 安全裁决信任链修复（P1-15，方案①落地：sysman 宿主装 HeaderAuthInterceptor）
+- **腿 1 — sysman 启用信任头拦截器**：`services/sysman/application.yml` 的死键 `ecos.header-auth.enabled=false`（auto-config 读不到）改为正键 `ecos.security.header-auth.enabled=true`（与 aiming/workspace 同口径，common-api `HeaderAuthAutoConfiguration` 单源装配）。`ServiceContext` 自此在 sysman 宿主可被填充。
+- **腿 2+3 — MapperScan 双重误注册修复**（途中挖出的宿主级既有缺陷）：
+  - 现象：腿 1 后 `/decision` 仍 503 `ECOS-SEC-501 主体域真值源不可用`，日志 `Invalid bound statement: OrganizationDao.getUserOrganizationAffiliations`；另证 `GET /system/organizations/all` 恒 `code=-1 查询机构列表失败`（sysman 宿主机构读面整体从未工作过）。
+  - 根因一：sysman 启动类 `@MapperScan("com.chinacreator.gzcm.sysman.**.dao")`——sysman 域 dao 包全量核查为「纯接口 + Impl(ISystemDatabaseAccess/iBATIS sqlMap)」形态（顶层无 class、无 mapper 目录），误注册 mapper 代理后按参数名优先命中代理而非 `@Repository` Impl。
+  - 根因二（gateway 不中招的原因）：runtime-core `MyBatisConfig` 内含 `MapperScannerConfigurer(basePackage="com.chinacreator.gzcm.**.dao")` 全仓通配；gateway 在 `GatewayApplication` 显式 ASSIGNABLE_TYPE 排除该类，sysman 未排除。
+  - 修复：删除 sysman 启动类 MapperScan 的 `sysman.**.dao`/`sysman.**.mapper` 死条目 + 同 gateway 口径排除 `MyBatisConfig`（SqlSessionFactory/事务交 mybatis-spring-boot-starter 自动装配）。
+- **腿 4 — workspace→sysman 直连**：gateway 的 `EcosTrustHeaderFilter` 剥离 X-ECOS-\* ⇒ workspace→gateway→decision 恒 010。本机 dev 以逃生口 `ECOS_WS_SYSMAN_BASE=http://localhost:18081` 注入（yml 默认空走 route-manifest，不违「端口字面量禁止入库」门禁）；正解=sysman 切流（manifest route=service），切流后逃生口清空。配套：`ScenarioOptionsController` 全部跨服务 GET 补 `CallerCredentialSource.applyTo` 凭据中继（原 `HttpEntity.EMPTY` 裸调，属 D-B4-61 六腿收口漏网腿）。
+- 前端配套：`config/route-manifest.ts` dev 直连 :18081 的 security 族补注信任头（与 ai/workspace 同款）。
+- **门禁**：新增 `SysmanHeaderAuthConfigTest`（3 例，变异探针：enabled=false 转红）+ `SysmanMapperScanContractTest`（3 例，变异探针：回 HEAD 版本 2 例转红）；sysman 模块 `7/7` 绿；workspace-impl `391/0/3` 绿（端口字面量门禁触发后已改逃生口方案）；前端 tsc 零错 + e6Placements/i18n `2 文件 16 + 1 文件 4` 全绿。
+- **live 验证（2026-11-06）**：
+  - `POST :18081/security/decision`（Bearer+信任头+assetRef 体）→ **200**，返回真实裁决束（`rls.whereClause=(1=1)`、columns allow、OPA `EVALUATED_DENY`）；无信任头 → 403（fail-closed 生效）。
+  - `GET :18081/system/organizations/all` → **200 + 机构列表**（修复前 code=-1）。
+  - `GET :18090/.../runs` → **200 + run 行完整可见**（修复前 200 空数组）。
+  - `GET :18090/.../available/interfaces` → 200 有数据（凭据中继生效）；`available/security` → 200 空列表（sysman 侧真实数据为空；对照 gateway 宿主同端点为 `code=-1 bad SQL grammar`——gateway 嵌套 sysman-impl 亦为 9 月旧制品，佐证切流方向）。
+  - 浏览器（登录后场景页）：「运行历史」表格渲染 `2026-11-06T07:05 / DIAGNOSE / 毛利率 (3.5%) / SUCCEEDED_DEGRADED`。
+- **未解残余（登记 P1-12/P1-15 余项）**：①workspace→cognitive（gateway monolith 通道）仍 403（DcchengClient 无凭据中继，P1-12）；②kb/ai/ontology 三个 security 客户端仍裸调（本期未改）；③sysman 切流登记与 gateway 嵌套旧 sysman-impl 刷新待部署批。
+
+### B33 workspace→cognitive 凭据中继（P1-12 的 workspace 腿收口，2026-11-06）
+- 修复：`DcchengClient` 两条出站腿（`post`/`postJson`）补 `CallerCredentialSource.applyTo` 中继（原 `HttpEntity` 裸调 ⇒ gateway 按匿名 403 ⇒ 场景运行四类全降级）。
+- 新增契约门 `DcchengClientCredentialRelayTest`（4 例）：中继逐字断言（Bearer+四信任头）、postJson 同款、无上下文不发明主语、类内无第二套取头实现（`getHeader(` 零命中 + applyTo 恰 2 次）。**变异探针**：注释掉 post 腿中继 → 1 红；恢复 → 4/4 绿。
+- 全量：workspace-impl `Tests run: 395, Failures: 0, Skipped: 3` / `BUILD SUCCESS`（+4 用例）。
+- live 复验（重启 workspace 后）：
+  - `POST .../runs`（DIAGNOSE，毛利率 2.1%）→ `run_30eff59a-8f7 / SUCCEEDED / degraded=false`，返回**真实因果诊断**（rootCause「地缘政治/供需失衡 引发大宗商品市场波动」+ 因果链 + 认知层诚实降级说明「KG 未覆盖该指标，已切换规则兜底」——非传输层 403）；
+  - `POST .../runs`（FORECAST）→ `SUCCEEDED / degraded=false`，返回**确定性基线预测**（baseline-linear：水平 90.4164 / 斜率 -2.8841 / 残差 std=14.1292 / horizon=3，含预测点与上下界）——正式口径走确定性预测服务的验收红线在此腿成立。
+- 至此 P1-12 三实例中 workspace→cognitive 与 workspace→security（B32）两腿已收口；**余 kb→DW CURATED**（kb 引擎侧，未动）。
+
+### B34 知识抽取链路打通 + 契约探测 XML 化假零修复（EXTRACTION 边 present，覆盖率 33%→66.7%）
+- **腿 1 — kb 共享 RestTemplate 凭据中继**：`KbEngineRestConfig#restTemplate`（@Primary，被 kb 抽取 / ontology SecurityEngineClient / ai AiSecurityEngineClient 裸注入共用）挂 `CallerCredentialRelayInterceptor`：当前请求带头则逐字中继、无上下文不加头（fail-closed 语义不变）。新增 `CallerCredentialRelayInterceptorTest`（4 例）。
+- **腿 2 — kb→DW 寻址遵守切流登记**：`KbEntityInstanceExtractionService#datanetBaseUrl` 由硬传 `RouteMode.MONOLITH`（绕过 manifest datanet route=service 自环 gateway）改为 `SERVICE`；resolver 对未切流 owner 自动回落，行为兼容。
+  - live：`POST /knowledge/sync/object/ont_entmgmt` → job `tg-obj-1793961671536` **SUCCEEDED**（此前两代恒 `ECOS-DATA-041 (403)`）；`ecos_kg_sync_log` 落 `SUCCESS / node_count=0`；`/knowledge/sync/status` 的 `ALL.lastSyncTime=2026-11-06 18:41:18` 首次非空。
+- **腿 3 — 契约探测 Accept 协商（最隐蔽的一处）**：EXTRACTION 边仍 missing，现场取证链：
+  - `EdgeContractProbe` 诊断行输出 `contractCount=0` 但 `lastVerifiedAt=18:41` 有值（快照有值却计数为 0）；
+  - 逐步探针：raw 应答 `{"syncedCount":28}`（数字）但 workspace 侧反序列化为 **`java.lang.String`**；
+  - 终因：`HttpContractProbeFacade#requestData` 未设 `Accept`（`*/*`）⇒ gateway 内容协商用 **XML converter** 应答（`contentType=application/xml`）⇒ `Jackson2Xml` 读回 `Map` 时数字全变 String ⇒ `asLong=0` ⇒ `ContractSnapshot.contractCount` **假 0**。
+  - 修复：出站钉 `Accept: application/json`。新增用例 `extractionRequestPinsAcceptJson`（断言出站头 + `contractCount=56` + verified）；**变异探针**：删 setAccept → 1 红。
+- 实跑：kb 模块 `364/0/2`；workspace-impl 全量 **`396/0/3`**（+1 用例 + 中继 4 例）。
+- **live 终验**：`GET /workspace/scenarios/sc_ent2_group_month/completeness` → `coverage=0.6667`、`present: MAPPING count=4 | EXTRACTION count=56`、`missing: COGNITION`。EXTRACTION 边首次 present。
+- 残余：COGNITION 仍无契约载体（`HttpContractProbeFacade` 显式抛「智能体注册表未持有知识库引用（需求侧缺口）」）——需新增智能体→知识库引用载体（ADR/设计决策），本批未擅自加字段。
+
+### B35 COGNITION 契约载体落位（完整度 66.7% → 100%）
+- 载体选择（不新增表/列/API）：既有 `ecos_ai.ecos_agent_registry.metadata` JSONB 扩展位新增 `knowledgeBases` 数组，元素取知识库**业务键**（与 `ecos_scenario_binding_link` 的 `ent2_doc_profit_caliber` 同源）。迁移 `V316__agent_registry_knowledge_carrier.sql`（幂等 `jsonb_set`，仅当键缺失时写入；dev 库实跑 `UPDATE 1`，复核 `["ent2_doc_profit_caliber"]`）；同步更新种子 `entmgmt_demo_seed_v2_w6_ai_scenario.sql`。
+- 探针实现：`HttpContractProbeFacade` 新增 `probeCognition()` —— 读 aiming 既有只读面 `GET /api/v1/agent-mesh/agents`，解析各智能体 `metadata.knowledgeBases` 引用数求和、时间取引用者 max(updatedAt, createdAt)；不可解析/缺失按 0（不伪造）。原「无载体直接抛错」分支撤销。
+- 门禁：`HttpContractProbeFacadeTest` 新增 2 例（有引用 count=2 verified；无引用 count=0 不 verified），全类 15/15；workspace-impl 全量 **397/0/3**；`MigrationVersionUniquenessTest` 5/5（V315 已被并发批次占用 `ddl_code_schema_alignment`，本迁移顺延 **V316**，门禁基线 316/317）。
+- **live 终验**：`GET /workspace/scenarios/sc_ent2_group_month/completeness` → **`coverage=1.0`、`verdict=OK`**，`present: MAPPING count=4 | EXTRACTION count=56 | COGNITION count=1`，`missing=[]`、`probeErrors=[]`。
+- 语义边界：本次仅表达「智能体声明消费哪些知识库」这一条配置事实，不含任何业务结果；载体字段落在既有 metadata 扩展位，属增量数据配置而非新增数据模型。
+
+### B36 正式口径读面 RLS 策略补位（calibers 403 → 200）
+- 根因：`GET /workspace/calibers` 恒 `403 PERMISSION_DENIED / reason=RLS_NO_POLICY_MATCHED`——`ecos_control.ecos_rls_policy` 无 `table_name='caliber_definition'` 命中行（安全引擎 fail-closed 行为正确，缺策略数据）。
+- 处置：新增 `V317__caliber_definition_rls_demo_policy.sql`（幂等 INSERT，仅当 `(policy_name,table_name)` 不存在）——与既有 `ent2-demo-read-role` / `rls-finance-all` 同形，`role_id='role_admin'`、`predicate_template='1=1'`，不绑具体 user、不放宽其它实体；dev 库实跑 `INSERT 0 1`。
+- live：`GET /workspace/calibers` → **200**，返回真实口径行（`accrual_revenue_amount` 权责发生制验收确认额 / AMOUNT / CNY / ownerRole=finance_analyst …）。
+- 门禁：`MigrationVersionUniquenessTest` 顺延 **317/318**，5/5 绿。
+
+### B37 场景装配与发布闭环（沙盘覆盖 6/6、SANDBOX 运行、蓝图 RELEASED）
+- **沙盘装配**：`POST /workspace/scenarios/{id}/sandbox/layout`（`expectedVersion=0`，`runMode=FORMAL`）写入 React Flow 布局——hub + 6 个 `type=resource` 节点，`data.category` 覆盖 DATASOURCE / ONTOLOGY_ENTITY / KNOWLEDGE_ARTICLE / AGENT_PROFILE / SECURITY_POLICY / INTERFACE_REF（refId 全部取自场景已绑定业务键）。live `pre-validate` → `sandbox_coverage: pass=true（all 6 categories present）`。
+- **运行面四类全通**（live，全部 `SUCCEEDED`）：DIAGNOSE（真实因果诊断）、FORECAST（baseline-linear 确定性预测）、SIMULATE（扰动 +5%，返回 COMPLETED 仿真结果）、STRATEGY（策略产出）；**SANDBOX** 运行 → `run_540cbb12-ae9 / run_mode=SANDBOX / sandbox_lineage=SANDBOX`（与 FORMAL 行分离，正式指标未被写）。
+- **蓝图发布**：旧版 v1 `gaps` 为自由文本、validate fail-closed 不可发布；按 §6.2 以**真实 live 证据**重建 v2 草稿（`7d7ea2bb-1567-441c-80f0-2ed740c4f38d`）：
+  - 依赖 `ONTOLOGY/ont_entmgmt@1.0.1 status=PUBLISHED`；capabilities 无 required；tests 3 条 P0 均带当日实证（calibers 200 / FORECAST baseline / completeness OK）；
+  - `GET validate` → **passed=true、reasons=[]**；
+  - 状态机推进 `DRAFT→DISCOVERING→GAP_ANALYSIS→BLUEPRINT_READY→VALIDATING→READY_FOR_APPROVAL`；
+  - `POST approve {approvalRef:"APR-2026-1107-E2E-CALIBER"}` → **APPROVED**；`POST release` → **201 RELEASED**；
+  - 复核：`status=RELEASED`、`artifactDigest=90dbefad715297e0…`、`approvalRef=APR-2026-1107-E2E-CALIBER`；`contextDigest=null`（Context Pack 摘要未建，登记为余项）。
+- 运行记录终态：`ecos_ai.ecos_scenario_run` 目标场景 **6 行**（FORMAL SUCCEEDED×4 / FORMAL SUCCEEDED_DEGRADED×1 / SANDBOX SUCCEEDED×1）。
+
+### B38 Context 源读取器凭据中继 + 上下文装配余量定位（contextDigest 未完成）
+- 修复：`cognitiveRestTemplate`（Context 五源读取器共享）挂 `CognitiveCallerCredentialRelayInterceptor`（薄适配器，判据仍单源 `CallerCredentialSource`；无上下文不加头、不覆盖显式头）。新增 4 例契约测试（3 语义腿 + 装配断言）。
+- 说明：曾尝试把拦截器下沉 runtime-core 共享，但 runtime-core 无 spring-web 依赖，不为一个适配器改模块依赖，故按引擎各留薄适配器（kb 侧同名类保持）。实跑：cognitive 4/4、kb 4/4；双模块 `install` BUILD SUCCESS；gateway 重建重启。
+- **结论：中继是必要前置但不足以打通**。live 复核三源仍 `UNAVAILABLE`，逐源定位出**上游数据面缺陷**（均非本任务代码）：
+  1. `DATA_ASSET`：读取器调 `GET /api/v1/datanet/assets/{id}`；真实资产行在 `ecos_data.ecos_data_asset`（`asset_entmgmt_attribution` 等 4 行）但端点恒 `code=404 ASSET-010`；另 `GET /api/v1/datanet/assets` 列表恒 **409「conversion to Integer from int8」**。
+  2. `KNOWLEDGE`：读取器调 `GET /api/v1/knowledge/articles/{id}`；库内文章存在（`a99a05ab…` 权责发生制产值确认办法 PUBLISHED），但列表端点 `GET /knowledge/articles` 恒 **500**。
+  3. `COGNITIVE`：读取器走 `CognitiveAssetLifecycleService.resolve(id)`，需认知资产 id（belief/hypothesis/mind/model），与场景绑定的 AI_AGENT id 非同空间。
+- 因此**未把 degraded 空包 digest 写入蓝图**（`contextDigest` 保持 null），避免伪造追溯证据。余量登记 P1-17。
+
+### B39 P1-17 闭环：Context Pack 真实组装 + 蓝图 v3 发布（contextDigest 在位）
+- **上游数据面缺陷修复**（均属卷02/卷04 代码，本任务范围内最小修）：
+  1. `AssetDao` 两处 `COUNT(*)`（int8）读成 `Integer.class` → 资产详情恒 404、列表恒 409；改按 `Long` 取再降位（`countRegisteredAssets` + `confirmedFieldCount` 助手），新增契约门 `AssetRowMapperInt8ContractTest`（2 例）。
+  2. `DataAssetVO` 未透出版本 → DATA_ASSET 源缺 SUP-CTX-01 三要素；**只增** `versionNo` 字段并在两条资产 SELECT/RMapper 携带；认知侧 `DataEngineContextSourceReader` 版本键表补 `versionNo/version_no`。
+- **安全裁剪器生产实现**（P1-9 收口）：新增 `SecurityEngineContextTrimmer`——主体取本请求已认证 `SecurityContextHolder`（不读自报字段），调 `POST /api/v1/security/decision`（`assetRef.table + columns:["*"] + purpose=ai + subject.subjectId`），读数<strong>只经单源 `RlsExecutionContract.read`</strong>（四道不变量），仅 `ALLOW_ALL` 放行、非平凡谓词/拒绝/不可用一律 DENY。首版手抄键面与 fail-open 形态被既有 `RlsExecutionContractGateTest` 拦下（13 例），改单源后通过。
+- **RLS 演示读策略**：新增 `V318__context_source_rls_read_policies.sql`（`ecos_data.ecos_data_asset` / `ecos_knowledge.knowledge_article`，仅 `role_admin`、`1=1`，幂等），dev 库实跑 `INSERT 0 2`；门禁基线 318/319。
+- **live**：`POST /api/v1/cognitive/context/build`（DATA_ASSET + KNOWLEDGE 为必需源，版本取源侧真值）→ **200**、`ready=true`、`contextDigest=sha256:8a1857ac…`，两源 `accessResult=OK`。
+- **蓝图 v3**：以真实 P0 证据（calibers 200 / 基线预测 / 完整度 OK / context pack digest）重建 → `validate passed=true` → 状态机 5 步 → `approve(APR-2026-1107-CTX-E2E)` → **`release 201 / RELEASED`**；复核 `artifactDigest=b2e0c0e3…`、**`contextDigest=sha256:8a1857ac…`**（摘要链闭合）。
+- 门禁：cognitive `564+` 全绿（新增 trimmer 7 例、context 41 例）、workspace `397/0/3`、data-engine 资产 14 例、迁移门 5/5。
+
+### B40 P1-16 闭环：场景 Mind 以认知域为权威源（pre-validate 三项全 PASS）
+- 语义订正：`pre-validate.mind` 原读 legacy `ecos_scenario_mind`（按 F05-02/W116 停写、0 行）；改由 `DcchengClient#detectScenarioMinds` 直连认知 **E1 detect**（`GET /business/scenarios/{id}/cognition/detect`，带 `CallerCredentialSource` 中继），按返回 Mind 数判定；legacy 仅在 E1 不可用时兜底。
+- 载体种子：`V319__scenario_cognitive_mind_seed.sql`（幂等）——`ecos_cognitive_mind` 建 `mind_ent2_month`（`mind_key=mind_entmgmt_monthly`、`capability_mask=["DIAGNOSE","FORECAST","SIMULATE","STRATEGY"]`、`is_active=1`）并绑定 `sc_ent2_group_month` 为 PRIMARY；dev 库实跑 2×`INSERT 0 1`；门禁基线 319/320。
+- live：`GET .../cognition/detect` → 200 返回该 Mind；`POST .../pre-validate` → **`mind=true | sandbox_coverage=true | bindings_reachability=true`**（mind 明细 `source=cognitive, count=1`）。
+- 门禁：workspace 全量 `397/0/3`；`DcchengClientCredentialRelayTest` 三出站腿断言同步（2→3，中继仍单源）。
+
+### B41 预测-实际-偏差关联：端点实跑 + 缺口定位（按设计拒绝伪造，非缺陷）
+- **实跑**：`POST /api/v1/cognitive/outcomes/evaluate`（结构合法请求：scenarioId/blueprintId+v3/runId/forecastRunId、`actualRef` 三要素、`metricRefs=[M_PROFIT]`、窗口 2026-11、逐指标 `metricCalculations`（deterministic=true 双引用）、七项门禁声明齐、幂等键）→ **200**、`evaluationId=5740e7c8…`、**`status=NEEDS_RECONCILE`**；`metrics[0]`：`predicted/actual/absoluteError=null`、`applicable=false`、`notApplicableReason="value seam absent"`；`diagnoses[0].verdict=INCONCLUSIVE`（无治理假设/信念关联）；`warnings` 含 deterministic 相关提示。
+- **缺口定位（数据/服务面，非代码缺陷）**：
+  1. `OutcomeMetricValueReader`（确定性计算产物只读接缝）**全仓无实现**——接口 javadoc 明确「本仓当前无业务侧计算服务实现 ⇒ 无 bean ⇒ 指标标不适用 + NEEDS_RECONCILE，禁 200 返回内置/伪造数值」；
+  2. `ecos_dw.ecos_application_forecast_run` **0 行**（无确定性预测产物可引用）；
+  3. 无实际值指标存储表（`%actual%`/`%biz_metric%` 均 0 命中）；数据引擎亦无「指标值」计算端点。
+- 结论：该 E2E 项**能力在位且 fail-loud 正确**（零伪造），但**业务可执行性**依赖「确定性业务计算服务」（落 `ecos_dw`，属业务域/卷02 交付物）。认知侧不得自算（铁律 §0.6/ADR-14 + 红线 6），故不在此层补算。已登记 P1-18。
+
+### B42 P1-19 闭环：场景 Mind 权威写面（认知域 V187+V188）
+- 新增 `MindAssetDao` 写腿（`findMindByKey` / `upsertMind`（唯一键 `(mind_key,mind_version,is_deleted)`）/ `upsertScenarioBinding`（`(scenario_id,mind_id,is_deleted)`）/ `softDeleteBinding`）+ `MindRegistrationService`（注册/解绑，幂等、事务、缺必填 400）。
+- 端点（认知域唯一写入口，路径池常量驱动）：`POST /api/v1/cognitive/minds`（注册/更新场景 Mind 并绑定，`capabilityMask`/`closedLoopBounds`/`bindingRole`/`priority`/`active`）、`DELETE /api/v1/cognitive/minds/{mindId}?scenarioId=`（逻辑解绑，回 `unboundRows`）。
+- **门禁两处受控扩展（非放宽）**：①`CognitiveCrossDomainTest` 对 `MindAssetDao` 增第二例外——DML 紧随片段只能引用 `MIND_TABLE`/`SCEN_MIND_TABLE`（写其它表仍 FAIL）；②`MindUpdateGateTest` 路径池 6→**8**（计入注册 POST 与解绑 DELETE，并补 `DeleteMapping` 解析）。
+- **live**（gateway 重建重启）：`POST /cognitive/minds`（`mind_benchmark`）→ 200 `mindId=e1c23934…`；`GET .../cognition/detect` → **2 个 Mind**；`DELETE /cognitive/minds/{id}?scenarioId=…` → `unboundRows=1`；detect 回落 **1 个**（临时数据已清，无残留绑定）。
+- 门禁：cognitive 全量 **`575/0/0`**（含新增 `MindRegistrationServiceTest` 4 例）。
+- **残余（登记 P1-20）**：workspace `POST/PATCH /workspace/scenarios/{id}/minds*` 仍 501——其 `ScenarioMindVO.id` 为 `Long`，与认知 Mind 的 32 位 UUID 主键不可无损映射；改为代理需变更既有出参类型（违「API 只增不改」），属契约决策。当前产品写路径 = 认知域端点（设计指定的注册门面）。
+
+### B43 P1-18 余量收窄：实际结果读面存在，缺业务聚合口径
+- 复检：`GET /api/v1/datanet/facts/action-outcomes?forecastRunId=|actionId=`（data-engine 只读，V279 表）已存在，行含 `factType/period/actualImpact/forecastRunId`；预测侧确定性产物亦已有（`POST /cognitive/forecast-runs/compute` + `GET .../{id}/results`）。
+- 仍缺：**「行动结果 → 指标实际值」的业务聚合口径**（多 action 同一指标/期间如何汇总、未匹配行如何处置）与真实行动结果数据（`ecos_dw.ecos_application_action_outcome` 0 行）。该口径属业务域定义，认知侧不得自造（数值主权/§0.6/ADR-14），故 `OutcomeMetricValueReader` 保持未装配（fail-loud 已实跑验证）。
+- 结论：P1-18 由「无数据」收敛为「**缺业务聚合契约 + 真实结果数据**」，需业务域（卷02/卷09）给出指标聚合定义后接 bean 即自动接通（接口语义原样支持）。
+
+### B44 P1-20 闭环：workspace Mind 写代理改为认知域引用面（只增端点，既有 Long 面不动）
+- `ScenarioMindVO` 只增 `mindRef`（String，认知 Mind 的 32 位 UUID）；既有 `id: Long` 语义不变（认知承载行为 null）。
+- `DcchengClient` 增 `registerMind`（POST /cognitive/minds）/ `unbindMind`（DELETE）/ `setMindActive`（PUT …/active），三条腿均带 `CallerCredentialSource` 中继（出站腿自检 3→5）。
+- `ScenarioMindService.upsertMind` 由 501 改为代理认知注册门面：`mindKey = mind_<scenarioId>_<label>`、`capabilityMask` 取 `cognitiveEndpoints` 中 `enabled!=false` 的键（缺配置=空掩码，不臆造），返回 VO 带 `mindRef`；新增 `unbindByRef` / `setActiveByRef`。
+- 新端点（只增）：`PATCH /workspace/scenarios/{id}/minds/ref/{mindRef}`（激活位）、`DELETE /workspace/scenarios/{id}/minds/ref/{mindRef}`（解绑）；0 行 ⇒ 404 如实失败。既有 `PATCH/DELETE /{id}/minds/{mindId}(Long)` 保持原语义（legacy 停写 501）。
+- 认知侧配套：`MindAssetDao.setMindActive` + `MindRegistrationService.setActive` + `PUT /api/v1/cognitive/minds/{id}/active`；路径池门禁 8→**9**。
+- **live**：workspace `POST .../minds` → 200（`mindRef=e6f28adc…`，`active=0`）；`PATCH ref {active:true}` → detect **2**；`{active:false}` → detect 1；`DELETE ref` → `200` 且 detect 回落 1（临时行已清理，仅存种子 Mind 1 条）。
+- 门禁：cognitive `575/0/0`、workspace `397/0/3`。
+
 ## 3. 未执行 / 未验证（不得当作完成）
 - **数据库迁移已实跑（B22/B27/B29 订正）**：V311/V312/V313/V314 均已对 `ecos-postgres/sys_man` 执行并复核（表/种子/列/索引/溯源列）；单源目录 `V*.sql` 现扫 **264** 个，MAX=V314、NEXT=**V315**。本节原「仅落文件、未执行」表述作废。
-- **未启动全栈 E2E**：2026-11-04 live 已覆盖 gateway:8080 + 5 service（18081/18082/18083/18084/18086）+ workspace:18090；**前端未起、Playwright 未跑**。年度经营预测 E2E 仍阻塞于 P0-2 的契约/数据缺口（非鉴权、非服务在线）。
+- **年度经营预测 E2E 未完成**：2026-11-06 已起前端 vite:3000 并做浏览器点验（见 B30，7 个 Tab 的可达面 + 框架选择 live 成功）；**Playwright 工程未跑**，10 项业务验证仍阻塞于 P0-2 的契约/数据缺口与非鉴权因素。
 - **全量 common-api 门禁未全绿**：存在与本任务无关的存量失败（`SecurityDenialHttpStatusRatchetTest`→UserController、`ArchitectureGuardTest`→ServerOrgAttribute、`NoMachineCodeFactoryFaceRatchetTest` 计数漂移），以及用户工作树中 `RuntimeCacheManager` 未提交改动导致 `runtime-core` 从头编译失败；本任务未修改这些文件。
 - **前端全量 `npm test`**：本机默认 Node 下 jsdom 依赖 `ERR_REQUIRE_ESM`，与既有环境约束一致；本次改用 `--environment=node` 跑受影响的静态/服务测试，未宣称 jsdom 全量绿。
 
@@ -266,6 +409,12 @@
 - `engine/ontology-engine/.../dao/OntologyVersionDao.java`（账实订正：created_at→create_time、snapshot→snapshot_json、显式列投影）
 - 测试 `engine/ontology-engine/.../dao/OntologyVersionContractDaoTest.java`（新，6 例）
 - `engine/kb-engine/.../dao/{KbOntologySnapshotDao,KgMapperDao,KbEntityInstanceExtractionServiceDao,EntityLinkerDao}.java`（快照腿切 V179 `ecos_kb_ontology_snapshot`）
+
+**前端（B30 实跑修复）**
+- `src/services/httpClient.ts`（`mergeHeaders`：Authorization 不被调用方 headers 冲掉 + content-type 去重）
+- `src/pages/workbench/[scenarioId]/blueprint/CompletenessPanel.tsx`（`labelKey` 过 `t()`）
+- `src/locales/workspace/{zh-CN,en}.json`（向导步骤 2 键 + 缺失边 5 键 ×2 语）
+- 测试 `src/services/__tests__/httpClient.headers.spec.ts`（新，4 例，含变异探针）
 
 **认知后端（api/impl）**
 - `CognitiveApiPaths.java`（追加端点常量）

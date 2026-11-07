@@ -61,6 +61,13 @@ public class DataAssetVO {
     /** 命中字段总数（来自字段级敏感度表） */
     private Integer confirmedFieldCount;
 
+    /**
+     * 资产版本号（B39/P1-17：来自 {@code ecos_data_asset.version_no}，只增暴露）。
+     * 供 Context Builder 三要素（ID/版本/时点）取证——原 VO 未透出版本，
+     * DATA_ASSET 源读取器按 SUP-CTX-01 判「引用不完整」。
+     */
+    private String versionNo;
+
     /** 近源层（layer: SOURCE/RAW/CURATED/SEMANTIC/APPLICATION） */
     private String layer;
 

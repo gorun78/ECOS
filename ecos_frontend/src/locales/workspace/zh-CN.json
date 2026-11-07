@@ -51,7 +51,7 @@
   "workspace.l2.not_found_hint": "场景可能已被归档或你没有访问权限。",
   "workspace.l2.error": "场景详情加载失败：{msg}",
   "workspace.l2.offline": "离线模式：展示上次同步的快照。",
-  "workspace.l2.empty": "该场景暂未绑定任何数据或认知。",
+  "workspace.l2.empty": "该场景暂无经营评估记录。",
   "workspace.l2.no_permission": "你没有权限查看该场景。",
   "workspace.l2.stat.title": "关键指标",
   "workspace.l2.stat.safety": "安全指标",
@@ -78,6 +78,8 @@
   "workspace.wiz.progress": "步骤 {cur}/{total}",
   "workspace.wiz.step.goal": "目标与状态",
   "workspace.wiz.step.context": "上下文构建",
+  "workspace.wiz.step.completeness": "完整度",
+  "workspace.wiz.step.framework": "框架选型",
   "workspace.wiz.step.model": "逻辑模型与能力",
   "workspace.wiz.step.validate": "发布门槛",
   "workspace.wiz.step.release": "发布与回流",
@@ -363,5 +365,10 @@
   "workspace.completeness.single_source": "完整度由后端唯一算法计算，前端只展示",
   "workspace.completeness.missing_edges": "缺失必需边",
   "workspace.completeness.islands": "孤岛绑定",
-  "workspace.completeness.probe_errors": "契约探测错误"
+  "workspace.completeness.probe_errors": "契约探测错误",
+  "workspace.completeness.missing.mapping": "数据源 → 本体实体（映射）",
+  "workspace.completeness.missing.extraction": "本体实体 → 知识资产（抽取）",
+  "workspace.completeness.missing.cognition": "知识资产 → AI Agent（认知）",
+  "workspace.completeness.missing.expose": "AI Agent → 对外接口（出口）",
+  "workspace.completeness.missing.govern": "安全策略 → AI Agent（治理）"
 }

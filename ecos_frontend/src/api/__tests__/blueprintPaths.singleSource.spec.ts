@@ -54,13 +54,18 @@ describe('场景蓝图面 — 路径/传输单源', () => {
       if (HARDCODE_API.test(code)) offenders.push(`${rel}: 硬编码 API/蓝图/能力/上下文路径`);
       if (DIRECT_FETCH.test(code)) offenders.push(`${rel}: 直接 fetch`);
       // 能力面面板经 capabilityClient；上下文盘点面板经 cognitiveClient（并 import 蓝图类型）；
-      // 其余蓝图面经 scenarioBlueprintClient。三者都是路径/auth 单源出口。
+      // 框架选择面板经 cognitiveFrameworkClient；完整度面板经 scenarioCompletenessClient；
+      // 其余蓝图面经 scenarioBlueprintClient。全部都是路径/auth 单源出口。
       const requiredImports =
         base === 'CapabilityPanel.tsx'
           ? ['capabilityClient']
           : base === 'ContextBuildPanel.tsx'
             ? ['cognitiveClient', 'scenarioBlueprintClient']
-            : ['scenarioBlueprintClient'];
+            : base === 'FrameworkPanel.tsx'
+              ? ['cognitiveFrameworkClient']
+              : base === 'CompletenessPanel.tsx'
+                ? ['scenarioCompletenessClient']
+                : ['scenarioBlueprintClient'];
       for (const dep of requiredImports) {
         if (!new RegExp(dep).test(code)) offenders.push(`${rel}: 未 import ${dep}`);
       }

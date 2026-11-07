@@ -97,7 +97,7 @@ public class AssetDao extends JdbcTemplateDaoSupport {
             "SELECT a.asset_id, a.resource_id, r.resource_name, r.resource_type, r.datasource_id, " +
             "  a.asset_name, a.business_desc, a.owner, a.owner_org, a.data_grain, " +
             "  c.category_id, c.name AS category_name, " +
-            "  a.sensitivity_level, l.level_name, a.category_status, " +
+            "  a.sensitivity_level, l.level_name, a.category_status, a.version_no, " +
             "  a.last_tagged_by, a.last_tagged_at, a.domain, " +
             "  r.description, r.field_count, r.record_count, r.layer, r.zone, r.last_sync_time, " +
             "  (SELECT COUNT(*) FROM ecos_data.ecos_data_asset_field af " +
@@ -112,10 +112,11 @@ public class AssetDao extends JdbcTemplateDaoSupport {
             assetId);
     }
 
-    /** listAssets — 登记资产数统计 */
+    /** listAssets — 登记资产数统计（COUNT(*) 返回 int8，按 Long 取再降位，禁 Integer.class 直读）。 */
     public Integer countRegisteredAssets() {
-        return jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM ecos_data.ecos_data_asset WHERE is_deleted = 0", Integer.class);
+        Long count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM ecos_data.ecos_data_asset WHERE is_deleted = 0", Long.class);
+        return count == null ? 0 : count.intValue();
     }
 
     /** listAssets — 已登记资产列表（动态 SQL） */
@@ -125,7 +126,7 @@ public class AssetDao extends JdbcTemplateDaoSupport {
             "a.asset_id, a.resource_id, r.resource_name, r.resource_type, r.datasource_id, " +
             "  a.asset_name, a.business_desc, a.owner, a.owner_org, a.data_grain, " +
             "  c.category_id, c.name AS category_name, " +
-            "  a.sensitivity_level, l.level_name, a.category_status, " +
+            "  a.sensitivity_level, l.level_name, a.category_status, a.version_no, " +
             "  a.last_tagged_by, a.last_tagged_at, a.domain, " +
             "  r.description, r.field_count, r.record_count, r.layer, r.zone, r.last_sync_time, " +
             "  (SELECT COUNT(*) FROM ecos_data.ecos_data_asset_field af " +
@@ -376,10 +377,22 @@ public class AssetDao extends JdbcTemplateDaoSupport {
                 vo.setZone(rs.getString("zone"));
                 java.sql.Timestamp lastSync = rs.getTimestamp("last_sync_time");
                 if (lastSync != null) vo.setLastSyncTime(lastSync.toLocalDateTime());
-                vo.setConfirmedFieldCount(rs.getObject("confirmed_field_count", Integer.class));
+                vo.setConfirmedFieldCount(confirmedFieldCount(rs));
+                vo.setVersionNo(rs.getString("version_no"));
                 return vo;
             }
         };
+    }
+
+    /**
+     * confirmed_field_count 子查询是 {@code COUNT(*)} ⇒ JDBC 返回 int8；
+     * 直接 {@code getObject(..., Integer.class)} 会抛
+     * 「conversion to class java.lang.Integer from int8 not supported」（资产详情 404 / 列表 409 的根因）。
+     * 按 Long 取再降位（计数列不承载大数语义）。
+     */
+    private static Integer confirmedFieldCount(ResultSet rs) throws SQLException {
+        Long value = rs.getObject("confirmed_field_count", Long.class);
+        return value == null ? 0 : value.intValue();
     }
 
     /** 字段行映射器 */

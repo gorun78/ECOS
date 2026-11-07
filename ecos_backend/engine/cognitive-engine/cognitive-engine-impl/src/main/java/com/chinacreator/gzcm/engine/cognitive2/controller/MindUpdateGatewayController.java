@@ -4,7 +4,9 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.cognitive.api.CognitiveApiPaths;
 import com.chinacreator.gzcm.engine.cognitive.api.mind.MindUpdateVO;
 import com.chinacreator.gzcm.engine.cognitive2.service.mind.MindAggregateService;
+import com.chinacreator.gzcm.engine.cognitive2.service.mind.MindRegistrationService;
 import lombok.Data;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,9 +49,74 @@ import java.util.Map;
 public class MindUpdateGatewayController {
 
     private final MindAggregateService service;
+    /** B42/P1-19：V187/V188 唯一写入口（注册/绑定）。 */
+    private final MindRegistrationService registrationService;
 
-    public MindUpdateGatewayController(MindAggregateService service) {
+    public MindUpdateGatewayController(MindAggregateService service,
+                                       MindRegistrationService registrationService) {
         this.service = service;
+        this.registrationService = registrationService;
+    }
+
+    /**
+     * 注册/更新场景 Mind 并建立绑定（B42/P1-19；V187 + V188 唯一写面）。
+     * 幂等：同 {@code mindKey} 更新既有 Mind；同 (scenarioId, mindId) 更新绑定。
+     */
+    @PostMapping(CognitiveApiPaths.MINDS_REL)
+    public ApiResponse<MindRegisterResult> registerMind(@RequestBody MindRegisterRequest request) {
+        if (request == null) {
+            throw new MindNullBody();
+        }
+        var reg = registrationService.register(
+                request.scenarioId(), request.mindKey(), request.name(), request.description(),
+                request.capabilityMask(), request.closedLoopBounds(), request.bindingRole(),
+                request.priority(), request.active(), request.operator());
+        return ApiResponse.success(new MindRegisterResult(
+                str(reg.get("mindId")), str(reg.get("mindKey")), str(reg.get("name")),
+                str(reg.get("scenarioId")), Boolean.TRUE.equals(reg.get("isActive")),
+                str(reg.get("mindVersion"))));
+    }
+
+    /** 解除场景↔Mind 绑定（逻辑删除；返 rows，0 行如实回 0，禁伪装成功语义）。 */
+    @DeleteMapping(CognitiveApiPaths.MINDS_REL + "/{" + CognitiveApiPaths.PARAM_MIND_ID + "}")
+    public ApiResponse<MindUnbindResult> unbindMind(
+            @PathVariable(CognitiveApiPaths.PARAM_MIND_ID) String mindId,
+            @RequestParam("scenarioId") String scenarioId) {
+        int rows = registrationService.unbind(scenarioId, mindId);
+        return ApiResponse.success(new MindUnbindResult(scenarioId, mindId, rows));
+    }
+
+    /** 切换 Mind 激活位（B44/P1-20；0 行 = 目标不存在，如实回 0）。 */
+    @PutMapping(CognitiveApiPaths.MINDS_REL + "/{" + CognitiveApiPaths.PARAM_MIND_ID + "}/active")
+    public ApiResponse<MindActiveResult> setActive(
+            @PathVariable(CognitiveApiPaths.PARAM_MIND_ID) String mindId,
+            @RequestParam("active") boolean active,
+            @RequestParam(value = "operator", required = false) String operator) {
+        int rows = registrationService.setActive(mindId, active, operator);
+        return ApiResponse.success(new MindActiveResult(mindId, active, rows));
+    }
+
+    /** 注册/解绑/激活回执（DI-2 强类型；键面与原 Map 逐字一致）。 */
+    public record MindRegisterResult(String mindId, String mindKey, String name,
+                                     String scenarioId, Boolean isActive, String mindVersion) {
+    }
+
+    public record MindUnbindResult(String scenarioId, String mindId, int unboundRows) {
+    }
+
+    public record MindActiveResult(String mindId, boolean active, int updatedRows) {
+    }
+
+    private static String str(Object v) {
+        return v == null ? null : String.valueOf(v);
+    }
+
+    /** 注册入参（record：Jackson 原生支持，禁 Map 透传丢字段）。 */
+    public record MindRegisterRequest(String scenarioId, String mindKey, String name, String description,
+                                      java.util.List<String> capabilityMask,
+                                      java.util.List<String> closedLoopBounds,
+                                      String bindingRole, Integer priority, Boolean active,
+                                      String operator) {
     }
 
     /** Mind 列表（#/decision/mind 列表态；三轴按 r4ColumnsProvisioned 可空回显）。 */
@@ -57,6 +124,16 @@ public class MindUpdateGatewayController {
     public ApiResponse<Map<String, Object>> listMinds(
             @RequestParam(value = "limit", required = false) Integer limit) {
         return ApiResponse.success(service.mindList(limit));
+    }
+
+    /**
+     * 场景绑定 Mind 读面（P0-2；workspace 心智列表/mind-model 的唯一读源）。
+     * 读 = V188 绑定 JOIN V187 Mind，含未激活；无行返回空表（不伪造）。
+     */
+    @GetMapping(CognitiveApiPaths.MINDS_REL + "/by-scenario/{scenarioId}")
+    public ApiResponse<List<com.chinacreator.gzcm.engine.cognitive.api.mind.ScenarioMindBindingVO>>
+            scenarioMinds(@PathVariable("scenarioId") String scenarioId) {
+        return ApiResponse.success(registrationService.listForScenario(scenarioId));
     }
 
     /** Mind 详情（六段投影；V292 未迁移的三轴/版本字段显式 null，禁假值。 */

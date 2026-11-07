@@ -102,7 +102,7 @@ const CANONICAL = 'services/httpClient.ts';
  * 全量 run 实走面值 686→**691**，只增；五枚均经 `KNOWLEDGE_BASE`/服务层取址，
  * 代码面零 `/api` 字面量与零 `${API_BASE}` 派生。
  */
-const PROD_FILES = 691;
+const PROD_FILES = 696; // 2026-11-07 P0 批次：蓝图/心智新增面入库后按实跑读数重设（原 691）
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [

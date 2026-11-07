@@ -79,14 +79,12 @@ public class DataEngineConfigController {
         DEFAULTS.put("dw.lineage.enabled",             "true");
         DEFAULTS.put("dw.lineage.parser",              "sql");
         DEFAULTS.put("dw.lineage.max_depth",           "10");
-        DEFAULTS.put("dw.lineage.cache_ttl_minutes",   "30");
         DEFAULTS.put("dw.lineage.neo4j_enabled",       "false");
         // 数据引擎自身
         DEFAULTS.put("dw.sync.batch_size",             "5000");
         DEFAULTS.put("dw.sync.max_retries",            "3");
         DEFAULTS.put("dw.query.max_rows",              "10000");
         DEFAULTS.put("dw.query.timeout",               "30");
-        DEFAULTS.put("dw.cache.ttl_seconds",           "300");
         DEFAULTS.put("dw.engine.auto_start",           "true");
         // Pipeline 2.0 新增
         DEFAULTS.put("dw.pipeline.log_storage",        "db");

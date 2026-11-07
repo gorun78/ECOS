@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.engine.cognitive.api.mind.MindUpdateVO;
 import com.chinacreator.gzcm.engine.cognitive2.controller.MindUpdateGatewayController;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -156,7 +157,8 @@ class MindUpdateGateTest {
             String[] paths = valueOf(meth, GetMapping.class);
             String[] posts = valueOf(meth, PostMapping.class);
             String[] puts = valueOf(meth, PutMapping.class);
-            for (String p : Stream.of(paths, posts, puts).flatMap(Arrays::stream).toList()) {
+            String[] deletes = valueOf(meth, DeleteMapping.class);
+            for (String p : Stream.of(paths, posts, puts, deletes).flatMap(Arrays::stream).toList()) {
                 mapped++;
                 assertFalse(p.contains("/api/"),
                         "方法级映射出现绝对 /api/ 字面（须走 REL 常量）：" + p);
@@ -168,8 +170,9 @@ class MindUpdateGateTest {
                 }
             }
         }
-        assertEquals(6, mapped,
-                "Minds 端点族应为 6 枚（列表 GET + mind 详情 GET + 提交 POST + 候选列表 GET + 回读 GET + 终态 PUT）");
+        assertEquals(10, mapped,
+                "Minds 端点族应为 10 枚（B42 增注册 POST + 解绑 DELETE；B44 增激活 PUT /minds/{id}/active："
+                        + "原 6 + 新 3；P0-2 增场景绑定读面 GET /minds/by-scenario/{id}：+1）");
     }
 
     @Test
@@ -208,6 +211,7 @@ class MindUpdateGateTest {
         if (a instanceof GetMapping g) return g.value();
         if (a instanceof PostMapping p) return p.value();
         if (a instanceof PutMapping p) return p.value();
+        if (a instanceof DeleteMapping d) return d.value();
         return new String[0];
     }
 

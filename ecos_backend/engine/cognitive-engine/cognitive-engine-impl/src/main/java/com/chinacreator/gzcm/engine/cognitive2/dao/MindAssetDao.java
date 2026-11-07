@@ -73,6 +73,23 @@ public class MindAssetDao extends JdbcTemplateDaoSupport {
     }
 
     /**
+     * P0-2 读面：场景下全部绑定 Mind（含未激活；激活优先、绑定优先级次之）。
+     * 全显式列、两侧 {@code is_deleted=0} 恒带；无行返回空表（空 ≠ 故障）。
+     */
+    public List<Map<String, Object>> listMindsForScenario(String scenarioId) {
+        String sql =
+                "SELECT m.id AS mind_id, m.mind_key, m.name AS mind_name, m.description, " +
+                "       m.capability_mask_json, m.closed_loop_bounds_json, m.is_active, " +
+                "       sm.binding_role, sm.priority, m.create_time, m.update_time " +
+                "  FROM " + MIND_TABLE + " m " +
+                "  JOIN " + SCEN_MIND_TABLE + " sm ON sm.mind_id = m.id " +
+                " WHERE sm.scenario_id = ? AND sm.is_deleted = 0 AND m.is_deleted = 0 " +
+                " ORDER BY m.is_active DESC, sm.priority ASC, m.name ASC";
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, scenarioId);
+        return rows == null ? new ArrayList<>() : rows;
+    }
+
+    /**
      * {@code GET /api/v1/cognitive/minds} 读面（无场景归属心智构建列表）：
      * 列 id / mind_key / name / description / is_active；
      * 全显式列、{@code is_deleted=0} 恒带、ORDER BY (id ASC) 兜底；
@@ -192,5 +209,82 @@ public class MindAssetDao extends JdbcTemplateDaoSupport {
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
+    }
+
+    // ═══════════════ B42/P1-19：Mind 注册写面（V187/V188 权威载体） ═══════════════
+
+    /** 按 mind_key 查当前版本 Mind（未命中 → null，不抛）。 */
+    public Map<String, Object> findMindByKey(String mindKey) {
+        try {
+            return jdbcTemplate.queryForMap(
+                    "SELECT " + MIND_COLUMNS + " FROM " + MIND_TABLE +
+                    " WHERE mind_key = ? AND is_deleted = 0 ORDER BY create_time DESC LIMIT 1",
+                    mindKey);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 幂等 upsert Mind（唯一键 {@code (mind_key, mind_version, is_deleted)}）；
+     * 冲突时更新名称/描述/能力掩码/闭环边界/域与激活位，不改主键与版本号。
+     */
+    public int upsertMind(String id, String mindKey, String name, String description,
+                          String capabilityMaskJson, String closedLoopBoundsJson,
+                          String status, int isActive, String mindVersion,
+                          String domain, String operator) {
+        // 方言中立（SqlDialectDerivationTest）：先 UPDATE、0 行再 INSERT，禁 ON CONFLICT。
+        int rows = jdbcTemplate.update(
+                "UPDATE " + MIND_TABLE +
+                " SET name = ?, description = ?, capability_mask_json = ?, closed_loop_bounds_json = ?," +
+                "     status = ?, is_active = ?, domain = ?, update_by = ?, update_time = CURRENT_TIMESTAMP" +
+                " WHERE mind_key = ? AND mind_version = ? AND is_deleted = 0",
+                name, description == null ? "" : description, capabilityMaskJson, closedLoopBoundsJson,
+                status, isActive, domain, operator, mindKey, mindVersion);
+        if (rows > 0) {
+            return rows;
+        }
+        return jdbcTemplate.update(
+                "INSERT INTO " + MIND_TABLE +
+                " (id, mind_key, name, description, capability_mask_json, closed_loop_bounds_json," +
+                "  status, is_active, mind_version, domain, version_no, create_by, update_time)" +
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '1', ?, CURRENT_TIMESTAMP)",
+                id, mindKey, name, description == null ? "" : description,
+                capabilityMaskJson, closedLoopBoundsJson, status, isActive, mindVersion, domain, operator);
+    }
+
+    /** 场景↔Mind 绑定幂等 upsert（唯一键 {@code (scenario_id, mind_id, is_deleted)}）。 */
+    public int upsertScenarioBinding(String id, String scenarioId, String mindId,
+                                     String bindingRole, int priority, String domain, String operator) {
+        // 方言中立：同 upsertMind（UPDATE → 0 行 INSERT），禁 ON CONFLICT。
+        int rows = jdbcTemplate.update(
+                "UPDATE " + SCEN_MIND_TABLE +
+                " SET binding_role = ?, priority = ?, update_by = ?, update_time = CURRENT_TIMESTAMP" +
+                " WHERE scenario_id = ? AND mind_id = ? AND is_deleted = 0",
+                bindingRole, priority, operator, scenarioId, mindId);
+        if (rows > 0) {
+            return rows;
+        }
+        return jdbcTemplate.update(
+                "INSERT INTO " + SCEN_MIND_TABLE +
+                " (id, scenario_id, mind_id, binding_role, priority, domain, version_no, create_by)" +
+                " VALUES (?, ?, ?, ?, ?, ?, '1', ?)",
+                id, scenarioId, mindId, bindingRole, priority, domain, operator);
+    }
+
+    /** 逻辑删除场景↔Mind 绑定（返受影响行数）。 */
+    public int softDeleteBinding(String scenarioId, String mindId) {
+        return jdbcTemplate.update(
+                "UPDATE " + SCEN_MIND_TABLE + " SET is_deleted = 1, update_time = CURRENT_TIMESTAMP" +
+                " WHERE scenario_id = ? AND mind_id = ? AND is_deleted = 0",
+                scenarioId, mindId);
+    }
+
+    /** 切换 Mind 激活位（B44/P1-20；0 行 = 目标不存在，如实回 0）。 */
+    public int setMindActive(String mindId, int isActive, String operator) {
+        return jdbcTemplate.update(
+                "UPDATE " + MIND_TABLE + " SET is_active = ?, update_by = ?, update_time = CURRENT_TIMESTAMP" +
+                " WHERE id = ? AND is_deleted = 0",
+                isActive, operator, mindId);
     }
 }

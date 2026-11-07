@@ -218,7 +218,6 @@ export function buildItemMeta(edition: EcosEdition = 'standard'): Record<string,
   put('dw.lineage.enabled', bool(true));
   put('dw.lineage.parser', enumOf('sql', ['sql', 'spark', 'dbt']));
   put('dw.lineage.max_depth', int(10));
-  put('dw.lineage.cache_ttl_minutes', int(30));
   put('dw.lineage.neo4j_enabled', bool(false));
 
   // ── DW 层 · 查询 ──
@@ -226,7 +225,6 @@ export function buildItemMeta(edition: EcosEdition = 'standard'): Record<string,
   put('dw.query.timeout', int(30));
 
   // ── DW 层 · 缓存 ──
-  put('dw.cache.ttl_seconds', int(300));
 
   // ── DW 层 · 数据目录 ──
   put('dw.catalog.search_limit', int(500));

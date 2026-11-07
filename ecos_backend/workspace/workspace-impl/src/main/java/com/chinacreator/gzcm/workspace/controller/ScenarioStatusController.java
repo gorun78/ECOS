@@ -8,8 +8,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 /**
  * 场景状态迁移端点（卷07 F07-07 N12，真实 409 依赖 F07-13 advice）。
  * <pre>PATCH /api/v1/workspace/scenarios/{id}/status  body:{status}</pre>
@@ -25,15 +23,16 @@ public class ScenarioStatusController {
         this.transitionService = transitionService;
     }
 
+    /** 状态迁移请求体（DI-2 强类型：键面 = 旧 Map 的 {@code status}，未知键按旧行为忽略）。 */
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    public record ScenarioStatusRequest(String status) {
+    }
+
     @PatchMapping("/{id}/status")
     public ApiResponse<ScenarioStatusTransitionService.TransitionResult> transition(
             @PathVariable("id") String scenarioId,
-            @RequestBody Map<String, Object> body) {
-        String target = body == null ? null : str(body.get("status"));
+            @RequestBody(required = false) ScenarioStatusRequest body) {
+        String target = body == null ? null : body.status();
         return ApiResponse.success(transitionService.transition(scenarioId, target));
-    }
-
-    private String str(Object v) {
-        return v == null ? null : String.valueOf(v);
     }
 }

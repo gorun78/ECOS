@@ -636,7 +636,7 @@ class ControllerMapPayloadRatchetTest {
      * 1250 行，基线 1239 已与提交面不符（门因此恒红）⇒ 按实测订正 1239→1250；这是<b>登记债</b>不是收口，
      * 后续 DI-2 清退每一批必须同批向下调回。</p>
      */
-    private static final int BASELINE_LINES = 1250;
+    private static final int BASELINE_LINES = 1249;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;

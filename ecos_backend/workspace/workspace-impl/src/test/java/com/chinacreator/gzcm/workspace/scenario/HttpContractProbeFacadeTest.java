@@ -20,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,20 +33,23 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 /**
  * D-W8-1 收口验证：必需边契约探测的生产实现。
  *
- * <p>钉住四件事：① 探测源真的被消费（MAPPING 走 ontology api 门面、EXTRACTION 走 kb api 门面，
- * 零直读 schema）；② 计数与最近校验时间来自应答真值，不是硬编码；
- * ③ COGNITION 边无载体时必须抛错而非返回 0（否则"数据模型缺列"会被冒充成"演示数据缺行"）；
+ * <p>钉住四件事：① 探测源真的被消费（MAPPING 走 ontology api 门面、EXTRACTION 走 kb api 门面、
+ * COGNITION 走 aiming agent-mesh 门面，零直读 schema）；② 计数与最近校验时间来自应答真值，不是硬编码；
+ * ③ COGNITION 只按智能体 metadata.knowledgeBases 的真实引用计数，无引用时不得伪造 verified
+ * （B35：载体缺失时曾直接抛错，现载体落在既有 metadata 扩展位）；
  * ④ 出站凭证中继（缺它则引擎侧默认 DENY，把 plumbing 缺口读成契约不存在 = D-W8-3 同源教训）。</p>
  */
 class HttpContractProbeFacadeTest {
 
     private static final String MAPPING_URL = "http://svc.test/api/v1/ontology/entity-mappings";
     private static final String EXTRACTION_URL = "http://svc.test/api/v1/knowledge/sync/status";
+    private static final String COGNITION_URL = "http://svc.test/api/v1/agent-mesh/agents";
 
     private final RestTemplate ontologyRest = template();
     private final RestTemplate knowledgeRest = template();
+    private final RestTemplate aimingRest = template();
     private final HttpContractProbeFacade facade =
-            new HttpContractProbeFacade(ontologyRest, knowledgeRest);
+            new HttpContractProbeFacade(ontologyRest, knowledgeRest, aimingRest);
 
     @AfterEach
     void clearRequestContext() {
@@ -136,14 +140,45 @@ class HttpContractProbeFacadeTest {
         assertFalse(snapshot.isVerified(), "从未执行过导入 ⇒ missing，禁按定义面存在判 present");
     }
 
-    // ═══════════════ COGNITION：无载体必须暴露，不得静默 0 ═══════════════
+    // ═══════════════ COGNITION：载体=智能体 metadata.knowledgeBases（B35） ═══════════════
 
     @Test
-    void cognitionHasNoContractCarrierAndThrows() {
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
-                facade.fetch(edge(EdgeType.COGNITION, BindingType.KNOWLEDGE_BASE, BindingType.AI_AGENT)));
-        assertTrue(ex.getMessage().contains("无契约载体"),
-                "原因必须是「载体缺失」而非「探测故障」: " + ex.getMessage());
+    void cognitionCountsKnowledgeBaseRefsFromAgentMetadata() {
+        MockRestServiceServer server = MockRestServiceServer.bindTo(aimingRest).build();
+        server.expect(requestTo(COGNITION_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"code":0,"message":"ok","data":[
+                          {"id":"ag_1","metadata":"{\\"domain\\":\\"entmgmt\\",\\"knowledgeBases\\":[\\"kb_a\\",\\"kb_b\\"]}",
+                           "createdAt":"2026-11-01T10:00:00","updatedAt":"2026-11-06T09:00:00"},
+                          {"id":"ag_2","metadata":"{\\"domain\\":\\"entmgmt\\"}",
+                           "createdAt":"2026-11-01T10:00:00","updatedAt":"2026-11-07T09:00:00"}
+                        ]}""", MediaType.APPLICATION_JSON));
+
+        ContractSnapshot snapshot = facade.fetch(
+                edge(EdgeType.COGNITION, BindingType.KNOWLEDGE_BASE, BindingType.AI_AGENT));
+
+        server.verify();
+        assertEquals(2L, snapshot.getContractCount(), "只统计声明了 knowledgeBases 的引用数");
+        assertNotNull(snapshot.getLastVerifiedAt());
+        assertTrue(snapshot.isVerified());
+    }
+
+    @Test
+    void cognitionWithoutAnyKnowledgeBaseRefIsNotVerified() {
+        MockRestServiceServer server = MockRestServiceServer.bindTo(aimingRest).build();
+        server.expect(requestTo(COGNITION_URL))
+                .andRespond(withSuccess("""
+                        {"code":0,"message":"ok","data":[
+                          {"id":"ag_1","metadata":"{\\"domain\\":\\"entmgmt\\"}","updatedAt":"2026-11-06T09:00:00"}
+                        ]}""", MediaType.APPLICATION_JSON));
+
+        ContractSnapshot snapshot = facade.fetch(
+                edge(EdgeType.COGNITION, BindingType.KNOWLEDGE_BASE, BindingType.AI_AGENT));
+
+        server.verify();
+        assertEquals(0L, snapshot.getContractCount());
+        assertFalse(snapshot.isVerified(), "没有任何智能体声明知识库引用 ⇒ 契约不成立（不得伪造）");
     }
 
     @Test
@@ -247,15 +282,39 @@ class HttpContractProbeFacadeTest {
         ObjectProvider<ContractProbeFacade> provider = Mockito.mock(ObjectProvider.class);
         Mockito.when(provider.getIfAvailable()).thenReturn(facade);
         ProbeResult result = new EdgeContractProbe(provider).probe(
-                edge(EdgeType.COGNITION, BindingType.KNOWLEDGE_BASE, BindingType.AI_AGENT),
+                edge(EdgeType.GOVERN, BindingType.SECURITY_POLICY, BindingType.AI_AGENT),
                 true, true, true);
         assertFalse(result.isPresent());
-        assertTrue(result.getProbeError() != null && result.getProbeError().contains("无契约载体"),
+        assertTrue(result.getProbeError() != null && result.getProbeError().contains("非必需边"),
                 "missing 必须带原因，前端才能区分「契约未通过」与「载体缺失」");
     }
 
     private static Instant localInstant(String isoLocal) {
         return java.time.LocalDateTime.parse(isoLocal, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                 .atZone(ZoneId.systemDefault()).toInstant();
+    }
+
+    // ═══════════════ B33：JSON 协商（防 XML 化把数字读成 String ⇒ contractCount=0） ═══════════════
+
+    @Test
+    void extractionRequestPinsAcceptJson() {
+        MockRestServiceServer server = MockRestServiceServer.bindTo(knowledgeRest).build();
+        server.expect(requestTo(EXTRACTION_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE))
+                .andRespond(withSuccess("""
+                        {"code":0,"message":"ok","data":{"objectTypes":[
+                          {"type":"entmgmt","syncedCount":28,"totalCount":28,"lastSyncTime":null},
+                          {"type":"ALL","syncedCount":28,"totalCount":28,
+                           "lastSyncTime":"2026-11-06 18:41:18.333207"}
+                        ],"overallStatus":"ready"}}""", MediaType.APPLICATION_JSON));
+
+        ContractSnapshot snapshot = facade.fetch(
+                edge(EdgeType.EXTRACTION, BindingType.OBJECT_TYPE, BindingType.KNOWLEDGE_BASE));
+
+        server.verify();
+        assertEquals(56L, snapshot.getContractCount(), "出站必须钉 Accept=JSON，否则 XML 化后数字变 String 归零");
+        assertNotNull(snapshot.getLastVerifiedAt());
+        assertTrue(snapshot.isVerified(), "syncedCount>0 且 lastSyncTime 非空 ⇒ 契约通过");
     }
 }

@@ -83,7 +83,7 @@ VALUES
   '{"domain":"entmgmt","tier":"engine","tools":["ent2_kb_doc_search","ent2_graph_query"],"bind_documents":12}'::jsonb, NOW(), NOW()),
  ('ag_ent2_cognitive', '经营认知智能体', 'cognition-analysis',
   '["假设检验","证据消解","指标计算","预测回测"]'::jsonb, 'ACTIVE', '/api/v1/cognitive/beliefs',
-  '{"domain":"entmgmt","tier":"engine","tools":["ent2_belief_list","ent2_forecast_submit"],"bind_metrics":12}'::jsonb, NOW(), NOW()),
+  '{"domain":"entmgmt","tier":"engine","tools":["ent2_belief_list","ent2_forecast_submit"],"bind_metrics":12,"knowledgeBases":["ent2_doc_profit_caliber"]}'::jsonb, NOW(), NOW()),
  ('ag_ent2_wagent', '场景编排智能体（W Agent）', 'wagent-orchestration',
   '["目标理解","缺口分析","计划编排","步骤执行","人工闸门"]'::jsonb, 'ACTIVE', '/api/v1/wagent/goals',
   '{"domain":"entmgmt","tier":"scene","blueprint_states":["DRAFT","DISCOVERING","GAP_ANALYSIS","BLUEPRINT_READY"],"contracts":"V266 core + 本批 4"}'::jsonb, NOW(), NOW()),
@@ -309,14 +309,11 @@ SELECT 'bp_ent2_'||s.id, 'default', s.department, s.id, 1, 'BLUEPRINT_READY',
        s.business_goal,
        '达成所需：六类绑定齐备 + 必需三边连通 + 蓝图评审通过后方可 RELEASED',
        '{"bindingTypes":["DATASET","OBJECT_TYPE","KNOWLEDGE_BASE","AI_AGENT","SECURITY_POLICY","INTERFACE"],"requiredEdges":["MAPPING","EXTRACTION","COGNITION"]}'::text,
-       '域1 治理层资产 / 域2 本体对象与口径 / 域3 知识文档 / 域0 ABAC 策略 / 域2 接口登记',
-       (SELECT string_agg(a.name, ' → ' ORDER BY x.ord)
-          FROM (VALUES (1,'ag_ent2_data'),(2,'ag_ent2_ontology'),(3,'ag_ent2_knowledge'),
-                       (4,'ag_ent2_cognitive'),(5,'ag_ent2_wagent'),(6,'ag_ent2_security')) x(ord, aid)
-          JOIN ecos_ai.ecos_agent_registry a ON a.id = x.aid),
-       '缺口：builtin 智能体 status 小写不可见（D-W6-1）；护栏策略表缺（D-W6-3）',
-       '风险：跨板块隔离依赖 ABAC 生效；OPA 无策略时 fail-closed 拒绝执行',
-       '验收：六类绑定 6/6、必需三边 3/3、孤岛绑定 0、悬挂 0',
+       '[{"type":"ONTOLOGY","id":"ont_entmgmt","required":false,"versionConstraint":"1.0.1","status":"PUBLISHED"}]',
+       '[]',
+       '[{"gapId":"D-W6-1","category":"PLATFORM","severity":"WARNING","status":"OPEN","description":"builtin 智能体 status 小写不可见"},{"gapId":"D-W6-3","category":"PLATFORM","severity":"WARNING","status":"OPEN","description":"护栏策略表缺"}]',
+       '[]',
+       '[]',
        '{"pipeline":["read_entmgmt_ledger","run_entmgmt_dq_gate","read_entmgmt_ontology_objects","ent2_metric_caliber_check","ent2_kb_doc_search","ent2_graph_query","ent2_forecast_submit"],"agents":["ag_ent2_data","ag_ent2_ontology","ag_ent2_knowledge","ag_ent2_cognitive","ag_ent2_wagent","ag_ent2_security"],"humanGateBeforeCommit":true}'::text,
        1, 'entmgmt', '1', 'seed-entmgmt', 'seed-entmgmt', 0
   FROM ecos_ai.ecos_business_scenario s

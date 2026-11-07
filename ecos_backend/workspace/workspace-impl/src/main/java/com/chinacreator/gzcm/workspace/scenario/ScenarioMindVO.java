@@ -35,6 +35,12 @@ public class ScenarioMindVO {
     /** 更新时间 */
     private String updateTime;
 
+    /**
+     * 认知域 Mind 业务引用（B44/P1-20，只增字段）：{@code ecos_cognitive.ecos_cognitive_mind.id}
+     * （32 位 UUID）。legacy 行为 null；认知承载行为 UUID 字符串。既有 {@code id}(Long) 语义不变。
+     */
+    private String mindRef;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getScenarioId() { return scenarioId; }
@@ -57,6 +63,8 @@ public class ScenarioMindVO {
     public void setInitialConfidence(Double initialConfidence) { this.initialConfidence = initialConfidence; }
     public String getCreateTime() { return createTime; }
     public void setCreateTime(String createTime) { this.createTime = createTime; }
+    public String getMindRef() { return mindRef; }
+    public void setMindRef(String mindRef) { this.mindRef = mindRef; }
     public String getUpdateTime() { return updateTime; }
     public void setUpdateTime(String updateTime) { this.updateTime = updateTime; }
 

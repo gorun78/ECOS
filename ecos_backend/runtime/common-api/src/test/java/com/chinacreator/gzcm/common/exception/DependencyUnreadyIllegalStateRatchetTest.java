@@ -217,7 +217,11 @@ class DependencyUnreadyIllegalStateRatchetTest {
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java", 1),
             // #146l-前置补账：#142/B4-3e-86（D-B4-103 收口批）新增 hasRoleCode 腿 1 枚未随批落账本门
-            Map.entry(SYS_SECURITY_PROFILE_QUERY_DAO, 1));
+            Map.entry(SYS_SECURITY_PROFILE_QUERY_DAO, 1),
+            // 2026-11-07 P0 批次：上下文安全裁剪器（在途 C 批新增）1 枚依赖未就绪腿，
+            // 重测后同批登记（渲染 500 → 四档残差/欠账 +1，见 CARRIER_BASELINE 同名行）。
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/service/context/SecurityEngineContextTrimmer.java", 1));
 
     /**
      * ENV_ALGO 面基线（故意保持 500 的豁免面，登记制、必须点名）：
@@ -322,8 +326,8 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 同批重设：总站点 139 → <b>140</b>、OTHER 面 105 → <b>106</b>，
      * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（16／10／8）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 154;
-    private static final int DEPENDENCY_FACE_BASELINE = 16;
+    private static final int TOTAL_SITE_BASELINE = 155;
+    private static final int DEPENDENCY_FACE_BASELINE = 17;
     private static final int ENV_ALGO_FACE_BASELINE = 15;
     private static final int OTHER_FACE_BASELINE = 115;
     private static final int UNREADABLE_FACE_BASELINE = 8;
@@ -1016,7 +1020,12 @@ class DependencyUnreadyIllegalStateRatchetTest {
             // 按现行 judge 判据落四档残差（渲染读数＝网关入口兜底 500），挂账登记在
             // 欠账面 0→1。该腿属主侧收口（SysmanErrorAdvice 补 ISE 503 承载或
             // 端点 catch 腿）归 sysman 独立批，本门只做账面登记不代行裁决。
-            Map.entry(SYS_SECURITY_PROFILE_QUERY_DAO, ENTRY_FALLBACK_LABEL));
+            Map.entry(SYS_SECURITY_PROFILE_QUERY_DAO, ENTRY_FALLBACK_LABEL),
+            // 2026-11-07 P0 批次：上下文安全裁剪器（在途 C 批）落四档残差（渲染入口兜底 500），
+            // 同批登记；其收口归 C 批（给出安全域 503 载体或端点 catch 腿）后本行随批退出。
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/service/context/SecurityEngineContextTrimmer.java",
+                    ENTRY_FALLBACK_LABEL));
 
     /**
      * 承载者实际渲染的状态行（键＝advice 文件名；锚点逐条钉在
@@ -1062,7 +1071,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * #146l-前置 按门规显式登记；此前 3e-61 四档化后一度归零＝未归类报警位，
      * 新落一枚进来必须先判它是二档还是三档，不能像 D-B4-72 那样靠默认值蒙过去）。
      */
-    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 1;
+    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 2;
 
     /**
      * <b>真欠账面</b>＝四档残差（落入口兜底 500）＋承载者实际渲染的不是「不可用族」状态行的腿。
@@ -1082,7 +1091,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 渲染 500（非 502/503/504 不可用族），按本门口径继续挂账。收口归 sysman 独立批
      * 后本值随批下调回 0，禁以「register 了所以不算欠账」替代修码。</p>
      */
-    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 1;
+    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 2;
 
     // ── #142/B4-3e-45：承流归属第三档（无 HTTP 承流面）与其可重跑证据 ────────────
 
@@ -1174,7 +1183,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * HTTP 通路在位）＝可 HTTP 承流的属主欠账，收口排「SysmanErrorAdvice 补 ISE 503
      * 承载」这一档，归 sysman 独立批；收口后本值随批回 0。
      */
-    private static final int HTTP_REACHABLE_OWNER_SIDE_DEBT_BASELINE = 1;
+    private static final int HTTP_REACHABLE_OWNER_SIDE_DEBT_BASELINE = 2;
 
     /**
      * 死面持有者文件里必须出现的<b>停写标记</b>原文（#142/B4-3e-48 对 D-B4-77 的通路侧裁决＝
@@ -1902,7 +1911,10 @@ class DependencyUnreadyIllegalStateRatchetTest {
         // #146l-前置：四档残差锚 空面 → Map.of(SYS_SECURITY_PROFILE_QUERY_DAO, 1)
         //（#142/B4-3e-86 hasRoleCode 腿显式登记；摘腿必须同批把本锚回复空面，见方法 javadoc）
         assertPinnedBidirectionally("四档 入口兜底残差", residual,
-                Map.of(SYS_SECURITY_PROFILE_QUERY_DAO, 1));
+                Map.of(SYS_SECURITY_PROFILE_QUERY_DAO, 1,
+                        "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                                + "com/chinacreator/gzcm/engine/cognitive2/service/context/"
+                                + "SecurityEngineContextTrimmer.java", 1));
 
         List<String> drift = new ArrayList<>();
         accountFor(drift, "三档腿数合计", NO_HTTP_CARRIER_LEGS_TOTAL_BASELINE, sum(noCarrier),

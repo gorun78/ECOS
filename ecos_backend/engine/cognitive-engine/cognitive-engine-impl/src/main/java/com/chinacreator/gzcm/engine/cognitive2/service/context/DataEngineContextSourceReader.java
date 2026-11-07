@@ -72,7 +72,7 @@ public class DataEngineContextSourceReader implements ContextSourceReader {
                     "DATA_ASSET 源缺 sourceId（禁全量扫描资产目录，§5.4-2）");
         }
         JsonNode data = fetchAssetDetail(ref.getSourceId());
-        String version = firstText(data, "version", "assetVersion", "asset_version",
+        String version = firstText(data, "version", "versionNo", "version_no", "assetVersion", "asset_version",
                 "dataVersion", "data_version", "schemaVersion", "schema_version");
         if (version == null) {
             throw new ContextReadException(SOURCE_TYPE_DATA_ASSET, ref.getSourceId(),

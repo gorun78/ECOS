@@ -79,11 +79,15 @@ class DdlCodeSchemaAlignmentGateTest {
     private static final Map<String, String> ALLOWED_DUPLICATES = Map.of(
             "outbox_event", "域内 outbox 模式（V48 按 11 个业务域各建一张）",
             "ecos_business_scenario",
-            "V123 认知域错放镜像（R-13 ① 只停写不迁移）与 V315 补建的 ecos_ai 读端并存，属登记在案的镜像而非重复缺陷");
+            "V123 认知域错放镜像（R-13 ① 只停写不迁移）与 V315 补建的 ecos_ai 读端并存，属登记在案的镜像而非重复缺陷",
+            "ecos_ontology_entity",
+            "2026-11-07 DD-4 延伸：canonical 读端在 ecos_ontology（V322 单源补建），public 侧为 V3/V122 历史建表"
+                    + "（只停写、不 DROP）；public 孤儿清退属授权项，清退后本行同步删除");
 
     private static final Map<String, Integer> EXPECTED_DUPLICATE_WIDTH = Map.of(
             "outbox_event", 11,
-            "ecos_business_scenario", 2);
+            "ecos_business_scenario", 2,
+            "ecos_ontology_entity", 2);
 
     /**
      * 声明式目录（非读端）：{@code legacyWriteSuspended} 里登记的是 IR03「只停写、不 DROP、不改名」的旧形态，

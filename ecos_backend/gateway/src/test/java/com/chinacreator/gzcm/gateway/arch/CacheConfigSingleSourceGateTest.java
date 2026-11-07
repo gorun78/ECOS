@@ -63,8 +63,12 @@ class CacheConfigSingleSourceGateTest {
     /** 合法配置键形态：点分或下划线，无空格。 */
     private static final Pattern KEY_SHAPE = Pattern.compile("[A-Za-z0-9_.\\-]+");
 
-    /** 资源面命中下限（防扫描根漂移把门变成空转）。#147EU 清退 ontology-defaults 后 HEAD 实测 = 8。 */
-    private static final int MIN_RESOURCE_HITS = 8;
+    /**
+     * 资源面真实归口外键下限。2026-11-07 D-2 清退批后 = <b>0</b>（8 枚 MyBatis 开关已删除）：
+     * 「A 面为空」就是目标态，防空转由 {@code ontology-defaults.yml} 仍在扫描面的断言
+     * 与 {@code mutationProvesTheGateCanGoRed} 的合成夹具承担，禁用「必须 ≥N 命中」来维持门槛。
+     */
+    private static final int MIN_RESOURCE_HITS = 0;
     /** main java 文件扫描下限。#147Z-2 HEAD 实测 = 2483 枚。 */
     private static final int MIN_MAIN_JAVA_FILES = 2000;
     /** 底座属主去重命中数（只减不增）。#147Z-2 HEAD 实测 = 9。 */
@@ -100,37 +104,16 @@ class CacheConfigSingleSourceGateTest {
 
     private static Map<String, String> legacyFaces() {
         Map<String, String> m = new LinkedHashMap<>();
-        // —— 配置字典播种：引擎自建缓存 TTL（live dev PG 实测 4 行 active，见 DoD DC-3 回写）——
-        // —— 配置字典播种：ontology 引擎自建缓存 TTL（无读取方、无前端消费面，已按
-        //    #147EW 清退；白名单同步 −1）——
-        m.put("B|ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/controller/DataEngineConfigController.java|dw.cache.ttl_seconds",
-                "DC-3 违例存量：数据引擎自建缓存 TTL。清退同上。");
-        m.put("B|ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/controller/DataEngineConfigController.java|dw.lineage.cache_ttl_minutes",
-                "DC-3 违例存量：血缘缓存 TTL。清退同上。");
-        m.put("B|ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/config/service/impl/SysConfigService.java|dw.cache.ttl_seconds",
-                "DC-3 违例存量：sysman 字典种子里的同一键（与上两条同族）。清退=随引擎侧一并删行。");
-        m.put("B|ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/config/service/impl/SysConfigService.java|dw.lineage.cache_ttl_minutes",
-                "DC-3 违例存量：同上。");
-        // —— 自建缓存直读环境变量/系统属性：已清退（DC-3 #147EP 删除 security 两个
-        //    内存缓存的 System property/环境变量 TTL 自读，改由装配方注入；该链未承流，
-        //    无运行时消费方受影响，白名单同步 −4）——
-        // —— ontology-defaults.yml 的 cache.ttl_seconds：已清退（DC-3 #147EU）。该文件
-        //    全仓无 spring.config.import / @PropertySource / 属主绑定，键本身零读取方；
-        //    删除后引擎缓存 TTL 不存在第二来源，白名单同步 −1、资源面下限 9 → 8）——
-        // —— 幻影键：已清退（DC-3 #147EM 删除网关 `profile.cache-enabled/cache-ttl-minutes`，
-        //    全仓无 profile 前缀绑定、属主默认值在 LLMGatewayProperties(llm.*)，删后白名单同步 −2）——
-        // —— ORM 二级缓存开关：框架自身开关，不属 R8 知识缓存底座作用域，但必须同值同批 ——
-        m.put("A|ecos_backend/gateway/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
-        m.put("A|ecos_backend/services/aiming/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
-        m.put("A|ecos_backend/services/buszhi/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
-        m.put("A|ecos_backend/services/datanet/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
-        m.put("A|ecos_backend/services/dccheng/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
-        m.put("A|ecos_backend/services/sysman/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
-        m.put("A|ecos_backend/services/sysman/impl/sysman-boot/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
-        m.put("A|ecos_backend/workspace/workspace-service/src/main/resources/application.yml|mybatis.configuration.cache-enabled|true", MYBATIS_REASON);
-        // —— DDL 播种面：自建缓存键（config_key 值）——
+        // —— 2026-11-07 D-2 清退批：原 17 条中的 12 条真实归口外键已清零 ——
+        //   B 面 4 条（dw.cache.ttl_seconds / dw.lineage.cache_ttl_minutes 在
+        //   DataEngineConfigController DEFAULTS、SysConfigService 字典种子、前端面板三处全删）；
+        //   A 面 8 条（各 application.yml 的 mybatis.configuration.cache-enabled —— MyBatis 默认即 true，
+        //   删除为行为零变化，且仓内 0 个 mapper 声明 <cache/>）。
+        //   余下 5 条不是「归口外配置键」：1 条历史迁移里的键字面（V13，不可改写历史）
+        //   + 4 条 sys_config 种子行 id（形态撞判据、语义是主键）；当前均零读取方。
+        // —— DDL 播种面：历史迁移中的键字面（当前零读取方；迁移不可改写，删行须授权）——
         m.put("C|docs/50-db_script/02-flyway-migration/gateway/V13__ecos_sys_config.sql|cache_ttl_seconds",
-                "DC-3 违例存量：g1-data-foundation 组的自建缓存 TTL 种子（live 实测 1 行 active）。清退=停写后删行。");
+                "历史迁移键字面（g1-data-foundation 组，live 1 行；当前零读取方）。迁移不可改写；删行须授权。");
         m.put("C|docs/50-db_script/02-flyway-migration/gateway/V13__ecos_sys_config.sql|cfg-g1-cache-ttl",
                 SEED_ID_REASON);
         // —— DDL 播种面：底座键（属主=V306，由 baseCacheKeysOnDdlFaceLiveOnlyInSeedScript 单独钉）——
@@ -217,9 +200,9 @@ class CacheConfigSingleSourceGateTest {
         Faces faces = scan(repoRoot());
         assertTrue(faces.mainJavaFiles >= MIN_MAIN_JAVA_FILES,
                 "main 源扫描面退化：" + faces.mainJavaFiles + " < 下限 " + MIN_MAIN_JAVA_FILES + "（扫描根漂了？）");
-        assertTrue(faces.resourceHits() >= MIN_RESOURCE_HITS,
-                "资源面命中退化：" + faces.resourceHits() + " < 下限 " + MIN_RESOURCE_HITS
-                        + "（若确已清退，同批下调白名单与本下限）");
+        assertEquals(MIN_RESOURCE_HITS, faces.resourceHits(),
+                "资源面出现归口外缓存键（D-2 清退批后应为 0）：" + faces.resourceHits()
+                        + "；新键必须改经 SysConfigCacheSettingsSource + RuntimeCacheManager 读取");
         assertTrue(faces.resourceFiles.contains("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/resources/ontology-defaults.yml"),
                 "资源面盲区复发：ontology-defaults.yml 不在扫描面内——原判据只扫 application*.yml 正是因此漏掉自建缓存键");
     }
@@ -388,11 +371,24 @@ class CacheConfigSingleSourceGateTest {
             if (!rel.endsWith(".sql")) {
                 continue;
             }
-            Matcher m = Pattern.compile("'([^'\\n]{2,90})'").matcher(Files.readString(p, StandardCharsets.UTF_8));
-            while (m.find()) {
-                String lit = m.group(1);
-                if (isCacheConfigKey(lit)) {
-                    f.hits.add(new Hit("C", rel, lit, ""));
+            // 剥行注释并按语句切分：DELETE 是清退动作、不是配置供给面（V321 清退批实证）；
+            // 不剥注释会把说明文字里的键计入，制造误红。
+            String sql = Files.readString(p, StandardCharsets.UTF_8).lines()
+                    .map(line -> {
+                        int at = line.indexOf("--");
+                        return at >= 0 ? line.substring(0, at) : line;
+                    })
+                    .reduce("", (a, b) -> a + "\n" + b);
+            for (String stmt : sql.split(";")) {
+                if (stmt.trim().toUpperCase(java.util.Locale.ROOT).startsWith("DELETE")) {
+                    continue;
+                }
+                Matcher m = Pattern.compile("'([^'\\n]{2,90})'").matcher(stmt);
+                while (m.find()) {
+                    String lit = m.group(1);
+                    if (isCacheConfigKey(lit)) {
+                        f.hits.add(new Hit("C", rel, lit, ""));
+                    }
                 }
             }
         }

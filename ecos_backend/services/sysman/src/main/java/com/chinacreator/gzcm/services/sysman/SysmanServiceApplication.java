@@ -58,12 +58,21 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 原 sysman-boot 启动器 — 它有独立 Application + @ComponentScan, 与本 service 双启动冲突
         // 用正则 exclude 避免直接引用 (隔离 monorepo 依赖域, 不依赖 sysman-boot artifact)
         @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.chinacreator\\.gzcm\\.sysman\\.boot\\..*"),
+        // B32 装订订正（P1-15 修复腿 3，与 gateway 同口径）：runtime-core 的 MyBatisConfig 内含
+        // MapperScannerConfigurer(basePackage = "com.chinacreator.gzcm.**.dao") 全仓通配，
+        // 会把 sysman 域的 ISystemDatabaseAccess 纯接口（OrganizationDao/UserDao/...）误注册成
+        // mapper 代理（Invalid bound statement 家族根因）。gateway 同口径显式排除本类，
+        // SqlSessionFactory/事务交由 mybatis-spring-boot-starter 自动装配——本 service 照抄。
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes =
+                com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class)
 })
 @MapperScan({
-        // sysman dao 包 (iac/iam, config, security, abac, kvstore, touch) — 实际 DAO 用 `.dao` 子包,
-        // 不是 `.mapper`; 通配 `**` 后缀兜底 (monolith gateway 里 gateway-impl 也是用 `**` 后缀)
-        "com.chinacreator.gzcm.sysman.**.dao",
-        "com.chinacreator.gzcm.sysman.**.mapper",
+        // B32 装订订正（P1-15 修复腿 2）：删除 "com.chinacreator.gzcm.sysman.**.dao" 扫描。
+        // sysman 域 dao 包下全部是「纯接口 + Impl(ISystemDatabaseAccess/iBATIS sqlMap)」形态
+        // （全量核查：顶层无 class、无任何 mapper 目录；gateway 同口径只扫 .mapper）。
+        // 误注册 mapper 代理后，注入按参数名优先命中代理（如 organizationDao）而非
+        // @Repository 的 OrganizationDaoImpl ⇒ 一调用即 MyBatis "Invalid bound statement"
+        // （实证：/decision 主体域解析 503、GET /system/organizations/all code=-1）。
         // security-engine dao (DATA_SECURITY_POLICY / RLS / ABAC 服务落在 security.engine 里,
         // 铁律 §0.3 声明由 sysman service 管理命中)
         "com.chinacreator.gzcm.engine.security.**.dao",

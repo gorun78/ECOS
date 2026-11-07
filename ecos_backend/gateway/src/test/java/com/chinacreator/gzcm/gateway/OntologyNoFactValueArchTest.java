@@ -119,6 +119,9 @@ class OntologyNoFactValueArchTest {
             "public.ecos_ontology_domain",
             "public.ecos_ontology_entity",
             "ecos_ontology.ecos_ontology_git_archive_pending",
+            // 2026-11-07 DD-4 延伸：V322 在单源补建本体实体表（此前只在 public 侧/单源外），
+            // 读端 SecurityEngineContextTrimmer 自本批起显式引用该 schema 限定表 ⇒ 登记入清单。
+            "ecos_ontology.ecos_ontology_entity",
             "public.ecos_ontology_git_archive_pending",
             "public.ecos_ontology_property",
             "public.ecos_ontology_proposals",

@@ -329,6 +329,22 @@ export function encodeQueryString(path: string): string {
 }
 
 /**
+ * 合并默认头与调用方头（B30）：调用方显式头优先，但**不得整体覆盖**默认头，
+ * 否则 `options.headers` 一传就把 Authorization 冲掉（POST → 匿名 → 403 的实证根因）。
+ */
+function mergeHeaders(base: Record<string, string>, extra?: HeadersInit): Record<string, string> {
+  if (!extra) return base;
+  // 经 Headers 归一化，避免 `Content-Type` 与 `content-type` 同时下发（重复头）
+  const merged = new Headers(base);
+  new Headers(extra).forEach((v, k) => merged.set(k, v));
+  const out: Record<string, string> = {};
+  merged.forEach((v, k) => {
+    out[k] = v;
+  });
+  return out;
+}
+
+/**
  * Standard apiFetch – returns full JSON.
  * Prefixes path with /api and encodes query parameters for Tomcat UTF-8.
  */
@@ -339,7 +355,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   if (token) headers['Authorization'] = `Bearer ${token}`;
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${finalPath}`, { headers, ...options });
+    res = await fetch(`${API_BASE}${finalPath}`, { ...options, headers: mergeHeaders(headers, options?.headers) });
   } catch (e) {
     markNetworkDown();
     await notifyNetworkDown(e);
@@ -369,7 +385,7 @@ export async function apiFetchData<T>(url: string, options?: RequestInit): Promi
   if (token) headers['Authorization'] = `Bearer ${token}`;
   let res: Response;
   try {
-    res = await fetch(url, { headers, ...options });
+    res = await fetch(url, { ...options, headers: mergeHeaders(headers, options?.headers) });
   } catch (e) {
     markNetworkDown();
     await notifyNetworkDown(e);
@@ -405,7 +421,7 @@ export async function doFetch(url: string, opts: RequestInit = {}): Promise<any>
   if (token) headers['Authorization'] = `Bearer ${token}`;
   let r: Response;
   try {
-    r = await fetch(url, { headers, ...opts });
+    r = await fetch(url, { ...opts, headers: mergeHeaders(headers, opts.headers) });
   } catch (e) {
     markNetworkDown();
     await notifyNetworkDown(e);

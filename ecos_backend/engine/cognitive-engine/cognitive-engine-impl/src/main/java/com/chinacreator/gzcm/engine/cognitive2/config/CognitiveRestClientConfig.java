@@ -5,6 +5,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 认知引擎共享 REST 客户端配置（F05-15 / X-35 收口）。
  *
@@ -40,6 +43,11 @@ public class CognitiveRestClientConfig {
         // 防 XML 响应解析（与收口前 EngineCapabilityRegistryImpl 行为兼容）
         restTemplate.getMessageConverters().removeIf(c ->
                 c instanceof org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter);
+        // B38/P1-12：出站中继调用方凭证（Context 源读取器等裸调客户端 → gateway 匿名 403
+        // 是「源不可用」的直接成因）。无请求上下文时不加头，保持属主 fail-closed。
+        List<org.springframework.http.client.ClientHttpRequestInterceptor> interceptors = new ArrayList<>();
+        interceptors.add(new CognitiveCallerCredentialRelayInterceptor());
+        restTemplate.setInterceptors(interceptors);
         return restTemplate;
     }
 }

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.scenario;
 
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -7,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -32,6 +34,114 @@ public class DcchengClient {
 
     public DcchengClient(@Qualifier("workspaceCognitiveInvokeRest") RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
+    }
+
+    /**
+     * 场景认知 E1 读取（B40/P1-16）：{@code GET {base}/business/scenarios/{id}/cognition/detect}。
+     * 返回 {@code data} 原值（通常为 List&lt;Map&gt;；形态不符返回空表，不伪造）。
+     */
+    public Object detectScenarioMinds(String scenarioId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        CallerCredentialSource.applyTo(headers);
+        try {
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    "/business/scenarios/" + scenarioId + "/cognition/detect",
+                    org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> body = resp.getBody();
+            if (body == null) {
+                throw new CognitiveEngineUnavailableException("cognitive detect 应答为空体");
+            }
+            Object code = body.get("code");
+            if (code instanceof Number n && n.intValue() != 0) {
+                throw new CognitiveEngineUnavailableException("cognitive detect 业务错误 code=" + n);
+            }
+            return body.get("data");
+        } catch (CognitiveEngineUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CognitiveEngineUnavailableException("cognitive detect 不可用: " + e.getMessage(), e);
+        }
+    }
+
+    /** B44/P1-20：认知域 Mind 注册（{@code POST {base}/cognitive/minds}，V187+V188 权威写面）。 */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> registerMind(Map<String, Object> payload) {
+        return post("/cognitive/minds", payload);
+    }
+
+    /**
+     * P0-2 读面：场景绑定 Mind 列表（{@code GET {base}/cognitive/scenarios/{id}/minds}）。
+     * 返回 {@code data} 原值（数组）；空数组 = 真实无绑定（不伪造），形状异常/通道故障 = 503 载体。
+     */
+    @SuppressWarnings("unchecked")
+    public java.util.List<Map<String, Object>> listScenarioMinds(String scenarioId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        CallerCredentialSource.applyTo(headers);
+        try {
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    "/cognitive/minds/by-scenario/" + encode(scenarioId),
+                    org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> body = resp.getBody();
+            if (body == null) {
+                throw new CognitiveEngineUnavailableException("cognitive minds 应答为空体");
+            }
+            Object code = body.get("code");
+            if (code instanceof Number n && n.intValue() != 0) {
+                throw new CognitiveEngineUnavailableException("cognitive minds 业务错误 code=" + n);
+            }
+            Object data = body.get("data");
+            if (data == null) {
+                return java.util.List.of();
+            }
+            if (!(data instanceof java.util.List)) {
+                throw new CognitiveEngineUnavailableException("cognitive minds 应答形状异常: data 非数组");
+            }
+            return (java.util.List<Map<String, Object>>) data;
+        } catch (CognitiveEngineUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CognitiveEngineUnavailableException("cognitive minds 不可用: " + e.getMessage(), e);
+        }
+    }
+
+    /** B44/P1-20：认知域 Mind 解绑（{@code DELETE {base}/cognitive/minds/{id}?scenarioId=}）。 */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> unbindMind(String mindRef, String scenarioId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        CallerCredentialSource.applyTo(headers);
+        try {
+            String path = "/cognitive/minds/" + mindRef + "?scenarioId=" + encode(scenarioId);
+            ResponseEntity<Map> resp = restTemplate.exchange(path,
+                    org.springframework.http.HttpMethod.DELETE, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> body = resp.getBody();
+            return body == null ? Map.of() : (Map<String, Object>) body.get("data");
+        } catch (Exception e) {
+            throw new CognitiveEngineUnavailableException("cognitive mind 解绑不可用: " + e.getMessage(), e);
+        }
+    }
+
+    /** B44/P1-20：切换认知 Mind 激活位（{@code PUT {base}/cognitive/minds/{id}/active}）。 */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> setMindActive(String mindRef, boolean active) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        CallerCredentialSource.applyTo(headers);
+        try {
+            String path = "/cognitive/minds/" + mindRef + "/active?active=" + active + "&operator=workspace";
+            ResponseEntity<Map> resp = restTemplate.exchange(path,
+                    org.springframework.http.HttpMethod.PUT, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> body = resp.getBody();
+            return body == null ? Map.of() : (Map<String, Object>) body.get("data");
+        } catch (Exception e) {
+            throw new CognitiveEngineUnavailableException("cognitive mind 激活切换不可用: " + e.getMessage(), e);
+        }
+    }
+
+    private static String encode(String raw) {
+        return java.net.URLEncoder.encode(raw == null ? "" : raw, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /** 因果诊断 POST {base}/cognitive/diagnose */
@@ -83,6 +193,9 @@ public class DcchengClient {
             // 显式 JSON Accept — 缺省时 String.class 目标会让 RestTemplate 发 text/plain, */*，
             // 网关侧按 Accept 选 converter 时编缀 XML 系 converter（实证：返回 <ApiResponse> 伪 XML 文本）
             headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+            // B32/P1-12：中继调用方凭证（Authorization + 四信任头，单源 CallerCredentialSource）。
+            // 原裸调 ⇒ gateway 侧按匿名拒绝 403 ⇒ 场景运行 DIAGNOSE/FORECAST 恒降级。
+            CallerCredentialSource.applyTo(headers);
             String body = RAW_JSON.writeValueAsString(payload);
             String resp = restTemplate.postForObject(path,
                     new HttpEntity<>(body, headers), String.class);
@@ -112,6 +225,8 @@ public class DcchengClient {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+            // B32/P1-12：同 postJson —— 中继调用方凭证，禁裸调匿名（fail-closed 会全数 403）。
+            CallerCredentialSource.applyTo(headers);
             @SuppressWarnings("unchecked")
             Map<String, Object> resp = restTemplate.postForObject(path,
                     new HttpEntity<>(payload, headers), Map.class);

@@ -1,12 +1,15 @@
 package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.workspace.security.CallerCredentialRelay;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -34,10 +37,11 @@ import java.util.Map;
  *       计数取 data 数组长度，最近校验时间取 max(updatedAt, createdAt)；</li>
  *   <li>EXTRACTION（OBJECT_TYPE→KNOWLEDGE_BASE）= {@code GET /knowledge/sync/status}，
  *       计数取各 objectType 的 syncedCount 之和，时间取 max(lastSyncTime)；</li>
- *   <li>COGNITION（KNOWLEDGE_BASE→AI_AGENT）= <b>无契约载体</b>：智能体注册表
- *       （{@code ecos_ai.ecos_agent_registry}）只有 capability/metadata，全仓零处持有知识库引用，
- *       故本实现显式抛错而不是返回 0，让缺失原因以 probeError 面暴露（登记于二期规划册），
- *       禁止把"数据模型缺列"冒充成"演示数据缺行"。</li>
+ *   <li>COGNITION（KNOWLEDGE_BASE→AI_AGENT）= {@code GET /agent-mesh/agents}（aiming 既有只读面），
+ *       载体 = 智能体 {@code metadata.knowledgeBases} 业务键数组（V315 落位；
+ *       与 {@code ecos_scenario_binding_link} 的知识库业务键同源），
+ *       计数取全部智能体的知识库引用总数，时间取引用者的 max(updatedAt, createdAt)。
+ *       无引用时如实返回 0（不伪造 verified）；此前"零载体"的抛错形态已随载体落位撤销。</li>
  * </ul></p>
  *
  * <p>失败语义：探测异常一律上抛，由 {@link EdgeContractProbe} 降级为 missing，本类不外溢到端点。</p>
@@ -49,14 +53,21 @@ public class HttpContractProbeFacade implements ContractProbeFacade {
 
     private static final String MAPPING_PATH = "/ontology/entity-mappings";
     private static final String EXTRACTION_PATH = "/knowledge/sync/status";
+    /** B35：智能体注册表（aiming AgentMeshController）——COGNITION 边的契约载体读面。 */
+    private static final String COGNITION_PATH = "/agent-mesh/agents";
+    /** metadata JSON 文本解析（与 Web 层 converter 隔离，只读小对象）。 */
+    private static final ObjectMapper META_MAPPER = new ObjectMapper();
 
     private final RestTemplate ontologyRest;
     private final RestTemplate knowledgeRest;
+    private final RestTemplate aimingRest;
 
     public HttpContractProbeFacade(@Qualifier("workspaceBuszhiRest") RestTemplate ontologyRest,
-                                   @Qualifier("workspaceDcchengRest") RestTemplate knowledgeRest) {
+                                   @Qualifier("workspaceDcchengRest") RestTemplate knowledgeRest,
+                                   @Qualifier("workspaceAimingRest") RestTemplate aimingRest) {
         this.ontologyRest = ontologyRest;
         this.knowledgeRest = knowledgeRest;
+        this.aimingRest = aimingRest;
     }
 
     @Override
@@ -67,8 +78,7 @@ public class HttpContractProbeFacade implements ContractProbeFacade {
         return switch (edge.getType()) {
             case MAPPING -> probeMapping();
             case EXTRACTION -> probeExtraction();
-            case COGNITION -> throw new IllegalStateException(
-                    "COGNITION 边无契约载体：智能体注册表未持有知识库引用（需求侧缺口，非探测故障）");
+            case COGNITION -> probeCognition();
             case GOVERN, EXPOSE -> throw new IllegalStateException(
                     "非必需边不参与契约探测: " + edge.getType());
         };
@@ -104,12 +114,61 @@ public class HttpContractProbeFacade implements ContractProbeFacade {
         return new ContractSnapshot(total, latest);
     }
 
+    /**
+     * COGNITION 边（KNOWLEDGE_BASE→AI_AGENT）契约载体（B35）。
+     *
+     * <p>载体 = 智能体注册表 {@code ecos_ai.ecos_agent_registry.metadata.knowledgeBases}
+     * （业务键数组，与 {@code ecos_scenario_binding_link} 的知识库业务键同源）。
+     * 判据 = 全表智能体声明的知识库引用总数 &gt; 0 且最近更新时间非空。
+     * 读面走 aiming {@code GET /api/v1/agent-mesh/agents}（既有只读端点，不新增 API）。</p>
+     */
+    private ContractSnapshot probeCognition() {
+        List<?> rows = requestList(COGNITION_PATH, aimingRest, "aiming");
+        long total = 0L;
+        Instant latest = null;
+        for (Object row : rows) {
+            if (!(row instanceof Map<?, ?> m)) {
+                continue;
+            }
+            int refs = knowledgeBaseRefs(m.get("metadata"));
+            if (refs <= 0) {
+                continue;
+            }
+            total += refs;
+            latest = maxInstant(latest, maxInstant(
+                    parseTimestamp(m.get("updatedAt")), parseTimestamp(m.get("createdAt"))));
+        }
+        return new ContractSnapshot(total, latest);
+    }
+
+    /** 解析 agent metadata JSON 里的 knowledgeBases 数组长度；不可解析/缺失按 0（不伪造引用）。 */
+    private int knowledgeBaseRefs(Object metadataRaw) {
+        if (metadataRaw == null) {
+            return 0;
+        }
+        try {
+            JsonNode root = metadataRaw instanceof String text
+                    ? META_MAPPER.readTree(text)
+                    : META_MAPPER.valueToTree(metadataRaw);
+            JsonNode arrays = root == null ? null : root.path("knowledgeBases");
+            return arrays != null && arrays.isArray() ? arrays.size() : 0;
+        } catch (Exception e) {
+            log.warn("智能体 metadata 解析失败，按无知识库引用处置: {}", e.getMessage());
+            return 0;
+        }
+    }
+
     // ═══════════════ 私有辅助 ═══════════════
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private Object requestData(String path, RestTemplate rest, String serviceName) {
         HttpHeaders headers = new HttpHeaders();
         CallerCredentialRelay.applyTo(headers);
+        // B33 订正：Accept 缺省 * / * 时 gateway 侧 XML converter 优先把应答编成 XML
+        // （rest.exchange Map.class 经 Jackson2Xml 读回，数字全变 String ⇒ asLong=0 ⇒
+        // 契约快照 contractCount 恒 0，实证见 contentType=application/xml 现场日志）。
+        // 钉死 JSON 协商（与 DcchengClient#postJson 同族教训）。
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
         ResponseEntity<Map> resp = rest.exchange(path, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
         Map<String, Object> body = resp.getBody();
         if (body == null) {

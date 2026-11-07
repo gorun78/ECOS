@@ -49,6 +49,12 @@ public class EdgeContractProbe {
             return ProbeResult.missingWithError(e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
         }
         if (snapshot == null || !snapshot.isVerified()) {
+            // 契约未通过的可取证现场：contractCount=0 或 lastVerifiedAt=null 都落日志面，
+            // 便于区分「确实没同步」与「探测链路把字段读丢了」（B33 实证：XML 协商把数字读成
+            // String ⇒ asLong=0 ⇒ contractCount 假 0，靠本行 contractCount=0 + 有 lastVerifiedAt 定位）。
+            log.info("契约快照未通过: edge={} contractCount={} lastVerifiedAt={}",
+                    edge, snapshot == null ? "null" : snapshot.getContractCount(),
+                    snapshot == null ? "null" : snapshot.getLastVerifiedAt());
             return ProbeResult.missing();
         }
         return ProbeResult.present(snapshot.getContractCount(), snapshot.getLastVerifiedAt());

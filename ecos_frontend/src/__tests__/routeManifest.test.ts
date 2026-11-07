@@ -122,7 +122,12 @@ describe("bff › route manifest single source (W194/C176)", () => {
       "X-ECOS-TENANT": "default",
     });
     expect(table["/api/v1/cognitive"]?.headers).toBeDefined();
-    expect(table["/api/v1/security"]?.headers).toBeUndefined();
+    // 2026-11-07：sysman/security 直连面同口径启用 header-auth（B32/P1-15），
+    // 故 security 前缀与 aiming 一样注入信任头；原「headers 为 undefined」的断言已过期。
+    expect(table["/api/v1/security"]?.headers).toEqual({
+      "X-ECOS-USER": "admin",
+      "X-ECOS-TENANT": "default",
+    });
     // gateway 兜底（含替换 catch-all 的更具体前缀）一律保留 Authorization 透传 configure
     expect(typeof table["/api"]?.configure).toBe("function");
     for (const prefix of GATEWAY_HOSTED_KNOWLEDGE_KEYS) {

@@ -48,7 +48,6 @@ mybatis:
   mapper-locations: classpath*:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    cache-enabled: true
     lazy-loading-enabled: false
 
 # PMO-49 D1: 收窄 MyBatis 类型别名扫包到 engine.kb + cognitive2 域
