@@ -19,19 +19,17 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * 本体版本历史 Git 读面（DS-4 本体域第一批；2026-11-08）。
+ * 本体版本事件读面（DS-4 本体域第一/二层；2026-11-08）。
  *
- * <p><b>真源</b>：已发布版本的内容与提交元数据直接从 {@code ontology-model} 仓库读取——
- * 提交消息 {@code Publish ontology <ontologyId> <versionNo>} 是版本事件的权威记录，
- * 内容在 {@code ontologies/<ontologyId>/<versionNo>.json}。不再依赖
- * {@code ecos_ontology_version.git_ref} 索引才能读历史（DB 只保留草稿/在工作态）。</p>
+ * <p><b>事件源</b>（{@code ontology-model} 仓库，全部是普通 Git 提交）：</p>
+ * <ul>
+ *   <li>{@code Publish ontology <id> <ver>} → 内容 {@code ontologies/<id>/<ver>.json}，状态 Published；</li>
+ *   <li>{@code Draft ontology <id> <ver>} → 内容 {@code ontologies/<id>/drafts/<ver>.json}，状态 Draft；</li>
+ *   <li>{@code Deprecate ontology <id> <ver>} → 无内容，状态事件（覆盖为 Deprecated）。</li>
+ * </ul>
  *
- * <p><b>诚实语义</b>：仓库未注册/不可读、匹配提交的归档文件缺失 ⇒ 显式异常，
- * 禁返回空历史（"读不到" ≠ "没有版本"）。历史条数受 {@link GitService#MAX_COMMIT_LOG_LIMIT}
- * 约束，超出部分需分页（本轮上限登记为已知边界）。</p>
- *
- * <p><b>id 方案</b>：{@code git-<commitId>}（40 位 sha 前缀为 {@code git-}）。与旧库内
- * {@code ver5001} 型 id 并存：草稿仍走库，已发布版本走 Git；详情端点按前缀分派。</p>
+ * <p>同一版本多次事件取最新一条；Deprecate 晚于内容事件时状态为 Deprecated。
+ * 仓库未注册、匹配提交缺文件 ⇒ 显式异常（禁空历史假绿）。</p>
  */
 @Component
 public class OntologyGitHistoryReader {
@@ -40,8 +38,10 @@ public class OntologyGitHistoryReader {
 
     static final String REPOSITORY_ID = "ontology-model";
     static final String COMMIT_PREFIX = "Publish ontology ";
-    static final String PATH_PREFIX = "ontologies/";
+    static final String DRAFT_PREFIX = "Draft ontology ";
+    static final String DEPRECATE_PREFIX = "Deprecate ontology ";
     static final String ID_PREFIX = "git-";
+    static final String CANONICAL_DIR = "ontologies/";
 
     private final GitService gitService;
     private final GitRepositoryService repositoryService;
@@ -51,32 +51,56 @@ public class OntologyGitHistoryReader {
         this.repositoryService = repositoryService;
     }
 
-    /** 已发布版本（新→旧，按版本号去重取最新提交）。 */
-    public List<OntologyVersion> listPublished(String ontologyId) {
+    /** 当前全部版本（已发布 + 草稿），按提交时间新→旧；含 Deprecate 覆盖后的状态。 */
+    public List<OntologyVersion> listAll(String ontologyId) {
         GitRepository repo = requireRepository();
-        String prefix = ontologyId == null || ontologyId.isBlank()
-                ? COMMIT_PREFIX : COMMIT_PREFIX + ontologyId + " ";
         Map<String, OntologyVersion> byVersion = new LinkedHashMap<>();
+        Map<String, Boolean> deprecated = new LinkedHashMap<>();
         for (GitCommitView c : commits(repo)) {
-            String msg = c.getMessage() == null ? "" : c.getMessage().trim();
-            if (!msg.startsWith(prefix)) {
+            String msg = subject(c);
+            Event e = parse(msg);
+            if (e == null) {
                 continue;
             }
-            String rest = msg.substring(COMMIT_PREFIX.length()).trim();
-            int at = rest.lastIndexOf(' ');
-            if (at <= 0 || at == rest.length() - 1) {
-                log.warn("Git 提交消息无法解析版本（跳过但留痕）: commit={} msg={}", c.getCommitId(), msg);
+            if (ontologyId != null && !ontologyId.isBlank() && !ontologyId.equals(e.ontologyId)) {
                 continue;
             }
-            String oid = rest.substring(0, at).trim();
-            String versionNo = rest.substring(at + 1).trim();
-            if (ontologyId != null && !ontologyId.isBlank() && !ontologyId.equals(oid)) {
+            if (DEPRECATE_PREFIX.equals(e.prefix)) {
+                deprecated.put(e.ontologyId + "@" + e.versionNo, true);
                 continue;
             }
-            OntologyVersion v = toVersion(repo, c, oid, versionNo);
-            byVersion.putIfAbsent(versionNo, v);
+            String key = e.ontologyId + "@" + e.versionNo;
+            if (byVersion.containsKey(e.versionNo) && ontologyId != null && !ontologyId.isBlank()) {
+                // 同版本已有更新提交（提交按新→旧遍历），状态与内容均以更新者为准
+                continue;
+            }
+            if (byVersion.containsKey(key)) {
+                continue;
+            }
+            OntologyVersion v = toVersion(repo, c, e);
+            byVersion.put(ontologyId == null || ontologyId.isBlank() ? key : e.versionNo, v);
         }
-        return new ArrayList<>(byVersion.values());
+        List<OntologyVersion> out = new ArrayList<>(byVersion.values());
+        for (OntologyVersion v : out) {
+            if (deprecated.containsKey(v.getOntologyId() + "@" + v.getVersionNo())) {
+                v.setStatus("Deprecated");
+            }
+        }
+        return out;
+    }
+
+    /** 已发布版本（不含草稿/弃用过滤；弃用状态保留在 status 上）。 */
+    public List<OntologyVersion> listPublished(String ontologyId) {
+        return listAll(ontologyId).stream()
+                .filter(v -> !"Draft".equals(v.getStatus()))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    /** 草稿版本（未被发布/弃用覆盖的最新内容事件为 Draft）。 */
+    public List<OntologyVersion> listDrafts(String ontologyId) {
+        return listAll(ontologyId).stream()
+                .filter(v -> "Draft".equals(v.getStatus()))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     /** 按 {@code git-<sha>} 取单版本；非该前缀返回 empty（交由库内草稿读面）。 */
@@ -93,37 +117,60 @@ public class OntologyGitHistoryReader {
             if (!sha.equals(c.getCommitId())) {
                 continue;
             }
-            String msg = c.getMessage() == null ? "" : c.getMessage().trim();
-            if (!msg.startsWith(COMMIT_PREFIX)) {
+            Event e = parse(subject(c));
+            if (e == null || DEPRECATE_PREFIX.equals(e.prefix)) {
                 return Optional.empty();
             }
-            String rest = msg.substring(COMMIT_PREFIX.length()).trim();
-            int at = rest.lastIndexOf(' ');
-            if (at <= 0) {
-                throw new IllegalStateException("Git 提交消息无法解析版本: " + msg);
-            }
-            return Optional.of(toVersion(repo, c,
-                    rest.substring(0, at).trim(), rest.substring(at + 1).trim()));
+            OntologyVersion v = toVersion(repo, c, e);
+            return Optional.of(v);
         }
         return Optional.empty();
     }
 
-    /** 按本体 + 版本号取已发布版本（内容读自该提交）。 */
-    public Optional<OntologyVersion> findPublished(String ontologyId, String versionNo) {
-        return listPublished(ontologyId).stream()
+    /** 按本体 + 版本号取最新内容事件（Draft 或 Published）。 */
+    public Optional<OntologyVersion> findVersion(String ontologyId, String versionNo) {
+        return listAll(ontologyId).stream()
                 .filter(v -> versionNo != null && versionNo.equals(v.getVersionNo()))
                 .findFirst();
     }
 
-    private OntologyVersion toVersion(GitRepository repo, GitCommitView c,
-                                      String ontologyId, String versionNo) {
-        String path = PATH_PREFIX + ontologyId + "/" + versionNo + ".json";
+    // ── 事件解析 ─────────────────────────────────────────
+
+    private record Event(String prefix, String ontologyId, String versionNo) {
+    }
+
+    private static Event parse(String msg) {
+        String prefix;
+        if (msg.startsWith(COMMIT_PREFIX)) {
+            prefix = COMMIT_PREFIX;
+        } else if (msg.startsWith(DRAFT_PREFIX)) {
+            prefix = DRAFT_PREFIX;
+        } else if (msg.startsWith(DEPRECATE_PREFIX)) {
+            prefix = DEPRECATE_PREFIX;
+        } else {
+            return null;
+        }
+        String rest = msg.substring(prefix.length()).trim();
+        int at = rest.lastIndexOf(' ');
+        if (at <= 0 || at == rest.length() - 1) {
+            return null;
+        }
+        return new Event(prefix, rest.substring(0, at).trim(), rest.substring(at + 1).trim());
+    }
+
+    private static String subject(GitCommitView c) {
+        return c.getMessage() == null ? "" : c.getMessage().trim();
+    }
+
+    private OntologyVersion toVersion(GitRepository repo, GitCommitView c, Event e) {
+        boolean draft = DRAFT_PREFIX.equals(e.prefix);
+        String path = CANONICAL_DIR + e.ontologyId + (draft ? "/drafts/" : "/") + e.versionNo + ".json";
         Optional<String> content;
         try {
             content = gitService.readFileAtRef(repo, c.getCommitId(), path);
-        } catch (GitService.GitException e) {
-            throw new IllegalStateException("Git 历史内容读取失败: " + path + "@" + shortSha(c.getCommitId())
-                    + " - " + e.getMessage(), e);
+        } catch (GitService.GitException ex) {
+            throw new IllegalStateException("Git 历史内容读取失败: " + path + "@"
+                    + shortSha(c.getCommitId()) + " - " + ex.getMessage(), ex);
         }
         if (content == null || content.isEmpty()) {
             throw new IllegalStateException("Git 提交存在但归档文件缺失: " + path + "@"
@@ -131,9 +178,9 @@ public class OntologyGitHistoryReader {
         }
         OntologyVersion v = new OntologyVersion();
         v.setId(ID_PREFIX + c.getCommitId());
-        v.setOntologyId(ontologyId);
-        v.setVersionNo(versionNo);
-        v.setStatus("Published");
+        v.setOntologyId(e.ontologyId);
+        v.setVersionNo(e.versionNo);
+        v.setStatus(draft ? "Draft" : "Published");
         v.setSnapshot(content.get());
         v.setChangeLog(c.getMessage());
         v.setPublisher(c.getAuthorName());

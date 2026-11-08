@@ -152,6 +152,11 @@ public class OntologyVersionService {
     /** 资产类型（仓内目录/标签前缀），与 repositoryId 语义不同，保持 {@code ontology}。 */
     private static final String GIT_ASSET_TYPE = "ontology";
 
+    // ── DS-4 本体域第二层：草稿/状态事件（Git 提交即事件，库内零写）──
+    private static final String GIT_DRAFT_MSG = "Draft ontology ";
+    private static final String GIT_DEPRECATE_MSG = "Deprecate ontology ";
+    private static final String GIT_STATUS_DEPRECATED = "{\"status\":\"Deprecated\"}";
+
     /**
      * 发布成功后委托 runtime Git 归档真实链路（H4-T4 / VG-2），并升级为 F03-15 可补偿语义（W83/C66）。
      *
@@ -196,7 +201,10 @@ public class OntologyVersionService {
             if (r != null && OntologyGitArchiveResult.STATUS_COMMITTED.equals(r.getStatus())) {
                 String ref = r.getCommitId() != null ? r.getCommitId() : r.getTag();
                 if (ref != null && !ref.isBlank()) {
-                    versionRepository.setGitRef(ver.getId(), ref);
+                    // Git 事件化版本（id=git-<sha>）不在库内，跳过 DB 回填（DS-4 第二层）。
+                    if (!isGitVersionId(ver.getId())) {
+                        versionRepository.setGitRef(ver.getId(), ref);
+                    }
                     return new GitLegRecord(LegOutcome.SUCCEEDED, ref, null, "已提交并回填 git_ref");
                 }
                 // COMMITTED 却无 ref：回执无可指向实物＝伪成功，按不成套记（§2.9.6①）
@@ -440,7 +448,7 @@ public class OntologyVersionService {
     public List<Map<String, Object>> listVersions(String ontologyId) {
         List<Map<String, Object>> out = new java.util.ArrayList<>();
         java.util.Set<String> archived = new java.util.LinkedHashSet<>();
-        for (OntologyVersion git : gitPublished(ontologyId)) {
+        for (OntologyVersion git : gitAll(ontologyId)) {
             archived.add(git.getVersionNo());
             out.add(toIndexMap(git));
         }
@@ -460,7 +468,7 @@ public class OntologyVersionService {
     public List<OntologyVersionVO> listVersionsVO(String ontologyId) {
         List<OntologyVersionVO> out = new java.util.ArrayList<>();
         java.util.Set<String> archived = new java.util.LinkedHashSet<>();
-        for (OntologyVersion git : gitPublished(ontologyId)) {
+        for (OntologyVersion git : gitAll(ontologyId)) {
             archived.add(git.getVersionNo());
             out.add(toIndexVO(git));
         }
@@ -521,6 +529,12 @@ public class OntologyVersionService {
      * 创建新版本 Draft：从当前 ontology 生成完整快照
      */
     public Map<String, Object> createVersion(String ontologyId, Map<String, Object> body) {
+        if (gitEventsAvailable()) {
+            OntologyVersion ver = createDraftInGit(ontologyId,
+                    String.valueOf(body.getOrDefault("changeLog", "")),
+                    String.valueOf(body.getOrDefault("publisher", "")));
+            return toMap(ver);
+        }
         // 1. 计算新版本号
         String nextVersion = computeNextVersion(ontologyId);
         // 2. 生成 snapshot
@@ -543,6 +557,12 @@ public class OntologyVersionService {
      * 强类型 VO 版（T16-2）；DTO 承载 changeLog / publisher（均可选）。
      */
     public OntologyVersionVO createVersionVO(String ontologyId, OntologyVersionSaveDTO dto) {
+        if (gitEventsAvailable()) {
+            OntologyVersion ver = createDraftInGit(ontologyId,
+                    dto.getChangeLog() != null ? dto.getChangeLog() : "",
+                    dto.getPublisher() != null ? dto.getPublisher() : "");
+            return toVO(ver);
+        }
         String nextVersion = computeNextVersion(ontologyId);
         String snapshot = generateSnapshot(ontologyId);
         OntologyVersion ver = new OntologyVersion();
@@ -565,6 +585,10 @@ public class OntologyVersionService {
      * 事件双发，驱动 kb 侧 KG 同步（buszhi 金·I → dccheng 水·K）。
      */
     public Map<String, Object> publishVersion(String ontologyId, String versionId) {
+        if (gitEventsAvailable() && isGitVersionId(versionId)) {
+            GitPublishResult r = publishGitVersion(ontologyId, versionId);
+            return attachPublishState(toMap(r.version()), r.recording());
+        }
         OntologyVersion ver = versionRepository.findById(versionId)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
         if ("Published".equals(ver.getStatus())) {
@@ -583,6 +607,10 @@ public class OntologyVersionService {
      * 强类型 VO 版（T16-2）；语义与旧版一致（Illustrated，含 PMO-50 T4 发布事件双发）。
      */
     public OntologyVersionVO publishVersionVO(String ontologyId, String versionId) {
+        if (gitEventsAvailable() && isGitVersionId(versionId)) {
+            GitPublishResult r = publishGitVersion(ontologyId, versionId);
+            return attachPublishState(toVO(r.version()), r.recording());
+        }
         OntologyVersion ver = versionRepository.findById(versionId)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
         if ("Published".equals(ver.getStatus())) {
@@ -693,6 +721,10 @@ public class OntologyVersionService {
      * 把内容来源切到 git ref 属 #147E，本批只做计划与状态面。</p>
      */
     public Map<String, Object> rollback(String ontologyId, String versionId) {
+        if (gitEventsAvailable() && isGitVersionId(versionId)) {
+            RollbackGitResult r = rollbackGitVersion(ontologyId, versionId);
+            return attachPublishState(toMap(r.version()), r.recording());
+        }
         OntologyVersion ver = versionRepository.findById(versionId)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
         versionRepository.updateStatus(versionId, "Deprecated");
@@ -708,6 +740,10 @@ public class OntologyVersionService {
      * 强类型 VO 版（T16-2）。
      */
     public OntologyVersionVO rollbackVO(String ontologyId, String versionId) {
+        if (gitEventsAvailable() && isGitVersionId(versionId)) {
+            RollbackGitResult r = rollbackGitVersion(ontologyId, versionId);
+            return attachPublishState(toVO(r.version()), r.recording());
+        }
         OntologyVersion ver = versionRepository.findById(versionId)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
         versionRepository.updateStatus(versionId, "Deprecated");
@@ -790,6 +826,9 @@ public class OntologyVersionService {
      * 废弃版本
      */
     public Map<String, Object> deprecate(String ontologyId, String versionId) {
+        if (gitEventsAvailable() && isGitVersionId(versionId)) {
+            return toMap(deprecateGitVersion(ontologyId, versionId));
+        }
         versionRepository.updateStatus(versionId, "Deprecated");
         return versionRepository.findById(versionId).map(this::toMap).orElse(null);
     }
@@ -798,6 +837,9 @@ public class OntologyVersionService {
      * 强类型 VO 版（T16-2）。
      */
     public OntologyVersionVO deprecateVO(String ontologyId, String versionId) {
+        if (gitEventsAvailable() && isGitVersionId(versionId)) {
+            return toVO(deprecateGitVersion(ontologyId, versionId));
+        }
         versionRepository.updateStatus(versionId, "Deprecated");
         return versionRepository.findById(versionId).map(this::toVO).orElse(null);
     }
@@ -897,7 +939,7 @@ public class OntologyVersionService {
     public List<Map<String, Object>> listAllVersions() {
         List<Map<String, Object>> out = new java.util.ArrayList<>();
         java.util.Set<String> archived = new java.util.LinkedHashSet<>();
-        for (OntologyVersion git : gitPublished(null)) {
+        for (OntologyVersion git : gitAll(null)) {
             archived.add(git.getOntologyId() + "@" + git.getVersionNo());
             out.add(toIndexMap(git));
         }
@@ -916,7 +958,7 @@ public class OntologyVersionService {
     public List<OntologyVersionVO> listAllVersionsVO() {
         List<OntologyVersionVO> out = new java.util.ArrayList<>();
         java.util.Set<String> archived = new java.util.LinkedHashSet<>();
-        for (OntologyVersion git : gitPublished(null)) {
+        for (OntologyVersion git : gitAll(null)) {
             archived.add(git.getOntologyId() + "@" + git.getVersionNo());
             out.add(toIndexVO(git));
         }
@@ -1226,8 +1268,11 @@ public class OntologyVersionService {
      * @return 下一个版本号，如 {@code 1.0.1}；无历史版本时返回 {@code 1.0.0}
      */
     private String computeNextVersion(String ontologyId) {
-        return versionRepository.findByOntology(ontologyId).stream()
-            .map(OntologyVersion::getVersionNo)
+        List<String> versionNos = gitEventsAvailable()
+                ? gitAll(ontologyId).stream().map(OntologyVersion::getVersionNo).collect(Collectors.toList())
+                : versionRepository.findByOntology(ontologyId).stream()
+                        .map(OntologyVersion::getVersionNo).collect(Collectors.toList());
+        return versionNos.stream()
             .filter(no -> no != null && no.matches("\\d+\\.\\d+\\.\\d+"))
             .max(Comparator.comparingLong(this::versionWeight))
             .map(no -> {
@@ -1320,5 +1365,168 @@ public class OntologyVersionService {
         vo.setPublishedAt(v.getPublishedAt() != null ? v.getPublishedAt().toString() : null);
         vo.setCreatedAt(v.getCreatedAt() != null ? v.getCreatedAt().toString() : null);
         return vo;
+    }
+
+    // ═══════════ DS-4 本体域第二层：草稿/状态事件（Git 即真源） ═══════════
+
+    /** Git 事件化是否可用：归档通道 + 历史读面同时装配（单测直构时为空 ⇒ 走库内旧路径）。 */
+    private boolean gitEventsAvailable() {
+        return gitService.isPresent() && gitHistoryReader().isPresent();
+    }
+
+    private List<OntologyVersion> gitAll(String ontologyId) {
+        return gitHistoryReader().map(r -> r.listAll(ontologyId)).orElse(List.of());
+    }
+
+    /** 创建 Draft = 写 {@code ontologies/<id>/drafts/<ver>.json} 并提交；失败显式抛错。 */
+    private OntologyVersion createDraftInGit(String ontologyId, String changeLog, String publisher) {
+        String nextVersion = computeNextVersion(ontologyId);
+        String snapshot = generateSnapshot(ontologyId);
+        String actor = publisher == null || publisher.isBlank() ? "system" : publisher;
+        String path = "ontologies/" + ontologyId + "/drafts/" + nextVersion + ".json";
+        OntologyGitArchiveResult r = gitService.get().archiveRelative(GIT_REPO_ONTOLOGY, path,
+                snapshot, GIT_DRAFT_MSG + ontologyId + " " + nextVersion, actor);
+        if (r == null || !OntologyGitArchiveResult.STATUS_COMMITTED.equals(r.getStatus())
+                || r.getCommitId() == null || r.getCommitId().isBlank()) {
+            throw new IllegalStateException("ONT-007: Git 草稿写入失败: "
+                    + (r == null ? "null" : r.getStatus() + "/" + r.getReason()));
+        }
+        OntologyVersion ver = new OntologyVersion();
+        ver.setId(OntologyGitHistoryReader.ID_PREFIX + r.getCommitId());
+        ver.setOntologyId(ontologyId);
+        ver.setVersionNo(nextVersion);
+        ver.setStatus("Draft");
+        ver.setSnapshot(snapshot);
+        ver.setChangeLog(changeLog == null ? "" : changeLog);
+        ver.setPublisher(actor);
+        ver.setGitRef(r.getCommitId());
+        ver.setCreatedAt(java.time.LocalDateTime.now());
+        log.info("Version created in Git: {} v{} for ontology {}", ver.getId(), nextVersion, ontologyId);
+        return ver;
+    }
+
+    /** 发布 Git 草稿：写 canonical 提交；DB 腿记 NOT_APPLICABLE（Git 事件即应用）。 */
+    private GitPublishResult publishGitVersion(String ontologyId, String versionId) {
+        OntologyVersion ver = gitVersionById(versionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "ONT-001: Version '" + versionId + "' not found"));
+        if ("Published".equals(ver.getStatus())) {
+            throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
+        }
+        fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
+        GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
+        AuditLegRecord auditLeg = auditPublish(ver, gitLeg, 1);
+        PublishRecording recording = recordGitOnlyState(ver, gitLeg, auditLeg);
+        OntologyVersion published = new OntologyVersion();
+        published.setId(OntologyGitHistoryReader.ID_PREFIX
+                + (gitLeg.gitRef() == null ? "unknown" : gitLeg.gitRef()));
+        published.setOntologyId(ver.getOntologyId());
+        published.setVersionNo(ver.getVersionNo());
+        published.setStatus("Published");
+        published.setSnapshot(ver.getSnapshot());
+        published.setChangeLog(ver.getChangeLog());
+        published.setPublisher(ver.getPublisher());
+        published.setGitRef(gitLeg.gitRef());
+        published.setPublishedAt(java.time.LocalDateTime.now());
+        published.setCreatedAt(ver.getCreatedAt());
+        return new GitPublishResult(published, recording);
+    }
+
+    /** 弃用 = 写状态文件提交；读面据 Deprecate 事件覆盖状态。 */
+    private OntologyVersion deprecateGitVersion(String ontologyId, String versionId) {
+        OntologyVersion ver = gitVersionById(versionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "ONT-001: Version '" + versionId + "' not found"));
+        String actor = ver.getPublisher() == null || ver.getPublisher().isBlank()
+                ? "system" : ver.getPublisher();
+        String path = "ontologies/" + ver.getOntologyId() + "/status/" + ver.getVersionNo() + ".json";
+        OntologyGitArchiveResult r = gitService.get().archiveRelative(GIT_REPO_ONTOLOGY, path,
+                GIT_STATUS_DEPRECATED,
+                GIT_DEPRECATE_MSG + ver.getOntologyId() + " " + ver.getVersionNo(), actor);
+        if (r == null || !OntologyGitArchiveResult.STATUS_COMMITTED.equals(r.getStatus())) {
+            throw new IllegalStateException("ONT-008: Git 弃用状态写入失败: "
+                    + (r == null ? "null" : r.getReason()));
+        }
+        ver.setStatus("Deprecated");
+        return ver;
+    }
+
+    /** 回滚 = 目标状态事件 + 新 Draft 提交（内容取自该 Git 提交）。 */
+    private RollbackGitResult rollbackGitVersion(String ontologyId, String versionId) {
+        OntologyVersion ver = gitVersionById(versionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "ONT-001: Version '" + versionId + "' not found"));
+        String actor = ver.getPublisher() == null || ver.getPublisher().isBlank()
+                ? "system" : ver.getPublisher();
+        String statusPath = "ontologies/" + ver.getOntologyId() + "/status/"
+                + ver.getVersionNo() + ".json";
+        gitService.get().archiveRelative(GIT_REPO_ONTOLOGY, statusPath, GIT_STATUS_DEPRECATED,
+                GIT_DEPRECATE_MSG + ver.getOntologyId() + " " + ver.getVersionNo(), actor);
+        String nextVersion = computeNextVersion(ontologyId) + "-rollback";
+        String draftPath = "ontologies/" + ver.getOntologyId() + "/drafts/" + nextVersion + ".json";
+        OntologyGitArchiveResult r = gitService.get().archiveRelative(GIT_REPO_ONTOLOGY, draftPath,
+                ver.getSnapshot(), GIT_DRAFT_MSG + ver.getOntologyId() + " " + nextVersion, actor);
+        if (r == null || !OntologyGitArchiveResult.STATUS_COMMITTED.equals(r.getStatus())
+                || r.getCommitId() == null) {
+            throw new IllegalStateException("ONT-009: Git 回滚草稿写入失败: "
+                    + (r == null ? "null" : r.getReason()));
+        }
+        OntologyVersion rollback = new OntologyVersion();
+        rollback.setId(OntologyGitHistoryReader.ID_PREFIX + r.getCommitId());
+        rollback.setOntologyId(ver.getOntologyId());
+        rollback.setVersionNo(nextVersion);
+        rollback.setStatus("Draft");
+        rollback.setSnapshot(ver.getSnapshot());
+        rollback.setChangeLog("Rollback from v" + ver.getVersionNo() + "（content from git ref）");
+        rollback.setPublisher(ver.getPublisher());
+        rollback.setGitRef(r.getCommitId());
+        rollback.setCreatedAt(java.time.LocalDateTime.now());
+        RollbackPlan plan = rollbackPlanFor(ver);
+        return new RollbackGitResult(rollback,
+                rollbackRecording(plan, ver,
+                        new RollbackContent(ver.getSnapshot(), true,
+                                "内容取自 git 提交 " + ver.getGitRef())));
+    }
+
+    /** Git-only 发布态：DB 腿显式 NOT_APPLICABLE，其余与三腿记录同口径。 */
+    private PublishRecording recordGitOnlyState(OntologyVersion ver, GitLegRecord gitLeg,
+                                                AuditLegRecord auditLeg) {
+        DualWriteOutcome dual = DualWriteOutcome
+                .builder(gitLeg.outcome(), LegOutcome.NOT_APPLICABLE, auditLeg.outcome())
+                .gitRef(gitLeg.gitRef())
+                .versionRef(ver.getVersionNo())
+                .task(gitLeg.taskId(), DualWriteOutcome.KIND_COMPENSATION_QUEUE)
+                .reason("Git 事件化：DB 腿 NOT_APPLICABLE；审计腿：" + auditLeg.reason()
+                        + "；" + gitLeg.reason())
+                .securityCritical(false)
+                .build();
+        PublishState state = PublishStateMachine.deriveState(dual);
+        StringBuilder why = new StringBuilder(dual.legSummary());
+        if (dual.reason() != null) {
+            why.append(" | ").append(dual.reason());
+        }
+        if (state == PublishState.APPLIED) {
+            PublishStateMachine.assertTransition(state, PublishState.VERIFYING);
+            state = PublishState.VERIFYING;
+            ReconciliationInput input = ReconciliationInput.builder()
+                    .outcome(dual)
+                    .versionRefMatched(null)
+                    .dependencyMatched(null)
+                    .build();
+            PublishReconciler.Result verdict = PublishReconciler.reconcile(input);
+            state = PublishStateMachine.stateAfterVerification(state, verdict.verdict());
+            why.append(" | 对账=").append(verdict.verdict())
+                    .append('(').append(verdict.reason()).append(')');
+            if (verdict.verdict() != ReconciliationVerdict.CONSISTENT) {
+                why.append(" | 禁报完全成功");
+            }
+        }
+        return new PublishRecording(state.name(), why.toString());
+    }
+
+    private record GitPublishResult(OntologyVersion version, PublishRecording recording) {
+    }
+
+    private record RollbackGitResult(OntologyVersion version, PublishRecording recording) {
     }
 }
