@@ -157,7 +157,7 @@ class DrBaselineColumnsTest {
      *  ⇒ 按实测订正 256→257（四枚同批锚）。
      *  2026-11-06 #147Z-6：V308~V315 共 8 枚入库（V311 建表进待收口名录；V315 建 5 表补建 code 读端
      *  schema 且基线列齐建，名录零贡献）⇒ 按实测订正 257→265（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 272;
+    private static final int SCRIPT_FLOOR = 273;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
     // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，零建表，

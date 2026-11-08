@@ -160,7 +160,7 @@ class Mc03TimeFormTest {
      *  2026-11-02 #147AE：V307（注册表 exclude_paths 播种，纯 UPDATE，无方言字面）落地
      *  ⇒ 按实测订正 256→257（四枚同批锚）。
      *  2026-11-06 #147Z-6：V308~V315 共 8 枚入库；V311 带 8 处方言面进名录，V315 零方言 ⇒ 257→265。 */
-    private static final int SCRIPT_FLOOR = 272;
+    private static final int SCRIPT_FLOOR = 273;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
     // 实测 V295 正文＋注释对 ::/ON CONFLICT/RETURNING/gen_random_uuid/JSON 运算符五类判据

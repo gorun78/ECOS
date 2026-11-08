@@ -446,13 +446,16 @@ public class OntologyVersionService {
     private synchronized String nextId() { return versionRepository.nextId(); }
 
     public List<Map<String, Object>> listVersions(String ontologyId) {
+        if (gitEventsAvailable()) {
+            return gitAll(ontologyId).stream().map(this::toIndexMap).collect(Collectors.toList());
+        }
         List<Map<String, Object>> out = new java.util.ArrayList<>();
         java.util.Set<String> archived = new java.util.LinkedHashSet<>();
         for (OntologyVersion git : gitAll(ontologyId)) {
             archived.add(git.getVersionNo());
             out.add(toIndexMap(git));
         }
-        // 库内只补「未归档」的行（草稿/在工作态）；已发布版本内容与元数据以 Git 为准。
+        // 库内回退面（仅 Git 通道未装配时；DS-4 后生产不再进入）
         versionRepository.findByOntology(ontologyId).stream()
                 .filter(v -> !archived.contains(v.getVersionNo()))
                 .map(this::toIndexMap)
@@ -466,6 +469,9 @@ public class OntologyVersionService {
      * <p>#147T：本门面按分态裁决输出<b>版本索引视图</b>（不内联快照），见 {@link #toIndexVO}。
      */
     public List<OntologyVersionVO> listVersionsVO(String ontologyId) {
+        if (gitEventsAvailable()) {
+            return gitAll(ontologyId).stream().map(this::toIndexVO).collect(Collectors.toList());
+        }
         List<OntologyVersionVO> out = new java.util.ArrayList<>();
         java.util.Set<String> archived = new java.util.LinkedHashSet<>();
         for (OntologyVersion git : gitAll(ontologyId)) {
@@ -896,17 +902,15 @@ public class OntologyVersionService {
      * Diff 两个版本
      */
     public Map<String, Object> diff(String ontologyId, String v1, String v2) {
-        OntologyVersion ver1 = versionRepository.findById(v1)
-            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + v1 + "' not found"));
-        OntologyVersion ver2 = versionRepository.findById(v2)
-            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + v2 + "' not found"));
+        OntologyVersion ver1 = resolveVersionById(v1);
+        OntologyVersion ver2 = resolveVersionById(v2);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("version1", ver1.getVersionNo());
         result.put("version2", ver2.getVersionNo());
         // 每侧只解析一次：#147R 前两侧各调 2 次读，diff 端点会打 4 趟 Git 对象库。
-        result.put("snapshot1", safeParseJson(resolveSnapshot(ver1).content()));
-        result.put("snapshot2", safeParseJson(resolveSnapshot(ver2).content()));
+        result.put("snapshot1", safeParseJson(snapshotFor(ver1).content()));
+        result.put("snapshot2", safeParseJson(snapshotFor(ver2).content()));
         return result;
     }
 
@@ -917,12 +921,10 @@ public class OntologyVersionService {
      * 与既有 Map 行为（{@code diff} 端点输出）等价。
      */
     public OntologyVersionVO diffVO(String ontologyId, String v1, String v2) {
-        OntologyVersion ver1 = versionRepository.findById(v1)
-            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + v1 + "' not found"));
-        OntologyVersion ver2 = versionRepository.findById(v2)
-            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + v2 + "' not found"));
-        SnapshotResolution r1 = resolveSnapshot(ver1);
-        SnapshotResolution r2 = resolveSnapshot(ver2);
+        OntologyVersion ver1 = resolveVersionById(v1);
+        OntologyVersion ver2 = resolveVersionById(v2);
+        SnapshotResolution r1 = snapshotFor(ver1);
+        SnapshotResolution r2 = snapshotFor(ver2);
         OntologyVersionVO vo = new OntologyVersionVO();
         vo.setVersion1(ver1.getVersionNo());
         vo.setVersion2(ver2.getVersionNo());
@@ -937,6 +939,9 @@ public class OntologyVersionService {
      * 列出所有版本（跨全部 ontology）
      */
     public List<Map<String, Object>> listAllVersions() {
+        if (gitEventsAvailable()) {
+            return gitAll(null).stream().map(this::toIndexMap).collect(Collectors.toList());
+        }
         List<Map<String, Object>> out = new java.util.ArrayList<>();
         java.util.Set<String> archived = new java.util.LinkedHashSet<>();
         for (OntologyVersion git : gitAll(null)) {
@@ -956,6 +961,9 @@ public class OntologyVersionService {
      * 是「列表面逐行读 Git」成本裁决的主要对象。
      */
     public List<OntologyVersionVO> listAllVersionsVO() {
+        if (gitEventsAvailable()) {
+            return gitAll(null).stream().map(this::toIndexVO).collect(Collectors.toList());
+        }
         List<OntologyVersionVO> out = new java.util.ArrayList<>();
         java.util.Set<String> archived = new java.util.LinkedHashSet<>();
         for (OntologyVersion git : gitAll(null)) {
@@ -1047,22 +1055,22 @@ public class OntologyVersionService {
      * @return 发布时间倒序的归档历史行（不含 snapshot）
      */
     public List<OntologyGitHistoryVO> gitHistoryVO(String ontologyId) {
-        // DS-4 本体域：已发布历史以 Git 提交为准；库内仅用于覆盖「当前状态」（弃用等写面尚未迁 Git）。
-        List<OntologyVersion> source = gitHistoryReader()
-                .map(r -> r.listPublished(ontologyId))
-                .orElseGet(() -> {
-                    List<OntologyVersion> db = (ontologyId == null || ontologyId.isBlank())
-                            ? versionRepository.findAll() : versionRepository.findByOntology(ontologyId);
-                    return db.stream()
-                            .filter(v -> "Published".equals(v.getStatus()))
-                            .filter(v -> v.getGitRef() != null && !v.getGitRef().isBlank())
-                            .collect(Collectors.toList());
-                });
+        // DS-4 本体域：历史与状态均以 Git 事件为准；仅当读面未装配时才回退库内。
+        Optional<OntologyGitHistoryReader> reader = gitHistoryReader();
+        List<OntologyVersion> source;
         Map<String, String> statusByKey = new java.util.HashMap<>();
-        List<OntologyVersion> dbRows = (ontologyId == null || ontologyId.isBlank())
-                ? versionRepository.findAll() : versionRepository.findByOntology(ontologyId);
-        for (OntologyVersion v : dbRows) {
-            statusByKey.put(v.getOntologyId() + "@" + v.getVersionNo(), v.getStatus());
+        if (reader.isPresent()) {
+            source = reader.get().listPublished(ontologyId);
+        } else {
+            List<OntologyVersion> db = (ontologyId == null || ontologyId.isBlank())
+                    ? versionRepository.findAll() : versionRepository.findByOntology(ontologyId);
+            for (OntologyVersion v : db) {
+                statusByKey.put(v.getOntologyId() + "@" + v.getVersionNo(), v.getStatus());
+            }
+            source = db.stream()
+                    .filter(v -> "Published".equals(v.getStatus()))
+                    .filter(v -> v.getGitRef() != null && !v.getGitRef().isBlank())
+                    .collect(Collectors.toList());
         }
         return source.stream()
             .sorted((a, b) -> {
@@ -1107,22 +1115,49 @@ public class OntologyVersionService {
         return id != null && id.startsWith(OntologyGitHistoryReader.ID_PREFIX);
     }
 
+    /** 按 id 解析版本：Git 版本优先（事件读面），否则库内（草稿回退/旧行）。 */
+    private OntologyVersion resolveVersionById(String id) {
+        if (isGitVersionId(id)) {
+            return gitVersionById(id).orElseThrow(() -> new IllegalArgumentException(
+                    "ONT-001: Version '" + id + "' not found"));
+        }
+        return versionRepository.findById(id).orElseThrow(() -> new IllegalArgumentException(
+                "ONT-001: Version '" + id + "' not found"));
+    }
+
+    /** Git 事件版本的内容已在读面按提交/路径取回，直接用；库内版本走既有来源解析。 */
+    private SnapshotResolution snapshotFor(OntologyVersion ver) {
+        if (ver != null && isGitVersionId(ver.getId())) {
+            return new SnapshotResolution(ver.getSnapshot(), VersionContentSource.GIT, null);
+        }
+        return resolveSnapshot(ver);
+    }
+
+    /** 前一版本：Git 版本按提交时间在同本体事件流里取最近更早者；库内版本沿用库查询。 */
+    private Optional<OntologyVersion> previousOf(OntologyVersion current) {
+        if (current != null && isGitVersionId(current.getId()) && gitEventsAvailable()) {
+            return gitAll(current.getOntologyId()).stream()
+                    .filter(v -> v.getCreatedAt() != null && current.getCreatedAt() != null
+                            && v.getCreatedAt().isBefore(current.getCreatedAt()))
+                    .max(Comparator.comparing(OntologyVersion::getCreatedAt));
+        }
+        return versionRepository.findPreviousVersion(current.getOntologyId(), current.getCreatedAt());
+    }
+
     /**
      * 与前一版本 diff（按创建时间排序，取当前版本的前一个）
      */
     public Map<String, Object> diffWithPrevious(String versionId) {
-        OntologyVersion current = versionRepository.findById(versionId)
-            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
-        Optional<OntologyVersion> previous = versionRepository.findPreviousVersion(
-            current.getOntologyId(), current.getCreatedAt());
+        OntologyVersion current = resolveVersionById(versionId);
+        Optional<OntologyVersion> previous = previousOf(current);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("currentVersion", current.getVersionNo());
-        result.put("currentSnapshot", safeParseJson(current.getSnapshot()));
+        result.put("currentSnapshot", safeParseJson(snapshotFor(current).content()));
         if (previous.isPresent()) {
             OntologyVersion prev = previous.get();
             result.put("previousVersion", prev.getVersionNo());
-            result.put("previousSnapshot", safeParseJson(prev.getSnapshot()));
+            result.put("previousSnapshot", safeParseJson(snapshotFor(prev).content()));
         } else {
             result.put("previousVersion", null);
             result.put("previousSnapshot", null);
@@ -1137,18 +1172,16 @@ public class OntologyVersionService {
      * （VO {@code NON_NULL} 省略，与既有 Map put null 前端 undefined 行为一致）。
      */
     public OntologyVersionPreviousDiffVO diffWithPreviousVO(String versionId) {
-        OntologyVersion current = versionRepository.findById(versionId)
-            .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
-        Optional<OntologyVersion> previous = versionRepository.findPreviousVersion(
-            current.getOntologyId(), current.getCreatedAt());
+        OntologyVersion current = resolveVersionById(versionId);
+        Optional<OntologyVersion> previous = previousOf(current);
 
         OntologyVersionPreviousDiffVO vo = new OntologyVersionPreviousDiffVO();
         vo.setCurrentVersion(current.getVersionNo());
-        vo.setCurrentSnapshot(safeParseJson(current.getSnapshot()));
+        vo.setCurrentSnapshot(safeParseJson(snapshotFor(current).content()));
         if (previous.isPresent()) {
             OntologyVersion prev = previous.get();
             vo.setPreviousVersion(prev.getVersionNo());
-            vo.setPreviousSnapshot(safeParseJson(prev.getSnapshot()));
+            vo.setPreviousSnapshot(safeParseJson(snapshotFor(prev).content()));
         }
         return vo;
     }
@@ -1157,6 +1190,13 @@ public class OntologyVersionService {
      * 按 ID 发布版本（不依赖 ontologyId）
      */
     public Map<String, Object> publishVersionById(String versionId) {
+        if (gitEventsAvailable() && isGitVersionId(versionId)) {
+            OntologyVersion gitVer = gitVersionById(versionId)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "ONT-001: Version '" + versionId + "' not found"));
+            GitPublishResult r = publishGitVersion(gitVer.getOntologyId(), versionId);
+            return attachPublishState(toMap(r.version()), r.recording());
+        }
         OntologyVersion ver = versionRepository.findById(versionId)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
         if ("Published".equals(ver.getStatus())) {
@@ -1175,6 +1215,13 @@ public class OntologyVersionService {
      * 强类型 VO 版（T16-5，简化端点 publish）；语义与旧 {@link #publishVersionById(String)} 一致。
      */
     public OntologyVersionVO publishVersionVOById(String versionId) {
+        if (gitEventsAvailable() && isGitVersionId(versionId)) {
+            OntologyVersion gitVer = gitVersionById(versionId)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "ONT-001: Version '" + versionId + "' not found"));
+            GitPublishResult r = publishGitVersion(gitVer.getOntologyId(), versionId);
+            return attachPublishState(toVO(r.version()), r.recording());
+        }
         OntologyVersion ver = versionRepository.findById(versionId)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
         if ("Published".equals(ver.getStatus())) {
