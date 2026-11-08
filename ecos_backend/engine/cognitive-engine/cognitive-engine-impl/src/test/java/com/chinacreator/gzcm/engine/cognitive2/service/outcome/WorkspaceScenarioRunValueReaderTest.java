@@ -125,6 +125,9 @@ class WorkspaceScenarioRunValueReaderTest {
     void pointValueParsesJsonStringAndFlatValue() {
         assertEquals(new BigDecimal("2.5"), WorkspaceScenarioRunValueReader.firstPointValue(
                 "{\"points\":{\"points\":[{\"value\":\"2.5\"}]}}"));
+        assertEquals(new BigDecimal("4"), WorkspaceScenarioRunValueReader.firstPointValue(
+                Map.of("type", "jsonb", "value", "{\"points\":{\"points\":[{\"value\":4}]}}")),
+                "PGobject 序列化形态 {type,value} 必须先解包");
         assertEquals(new BigDecimal("3"), WorkspaceScenarioRunValueReader.firstPointValue(
                 Map.of("value", 3)));
         assertNull(WorkspaceScenarioRunValueReader.firstPointValue("not-json"));

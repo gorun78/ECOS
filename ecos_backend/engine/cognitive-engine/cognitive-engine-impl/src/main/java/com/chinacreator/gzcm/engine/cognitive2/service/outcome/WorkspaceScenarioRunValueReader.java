@@ -87,6 +87,11 @@ public class WorkspaceScenarioRunValueReader implements OutcomeMetricValueReader
         }
         BigDecimal predicted = firstPointValue(run.get("forecast_result"));
         if (predicted == null) {
+            Object raw = run.get("forecast_result");
+            String sample = raw == null ? "null" : String.valueOf(raw);
+            log.warn("结果评估数值接缝：运行 {} 的 forecast_result 无法解析 class={} sample={}",
+                    run.get("id"), raw == null ? "null" : raw.getClass().getSimpleName(),
+                    sample.substring(0, Math.min(240, sample.length())));
             return new ResolvedValue(metricRef, null, null, text(run.get("id")),
                     Map.of(), "forecast result has no point value (run produced no deterministic number)");
         }
@@ -172,6 +177,11 @@ public class WorkspaceScenarioRunValueReader implements OutcomeMetricValueReader
         }
         if (!(node instanceof Map<?, ?> map)) {
             return null;
+        }
+        // workspace 运行历史经 JDBC 返回 PGobject，Jackson 序列化为 {type:"jsonb", value:"<json>"}；
+        // 先解包再取点值（2026-11-08 活体实证）。
+        if ("jsonb".equals(String.valueOf(map.get("type"))) && map.get("value") instanceof String rawJson) {
+            return firstPointValue(rawJson);
         }
         Object points = map.get("points");
         if (points instanceof Map<?, ?> pm) {

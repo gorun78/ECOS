@@ -117,6 +117,65 @@ class WorkspaceRouteCarrierGateTest {
     }
 
     @Test
+    void forwardReinjectsAuthenticatedIdentityHeaders() throws Exception {
+        java.util.List<HttpHeaders> captured = new java.util.ArrayList<>();
+        RestTemplate fake = new RestTemplate() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <T> ResponseEntity<T> exchange(URI url, HttpMethod method,
+                                                  HttpEntity<?> requestEntity, Class<T> responseType) {
+                captured.add(requestEntity.getHeaders());
+                return (ResponseEntity<T>) ResponseEntity.ok(new byte[0]);
+            }
+        };
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        "u-admin", null,
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "ROLE_SUPER_ADMIN"))));
+        com.chinacreator.gzcm.common.context.TenantContextHolder.setTenantId("tenant-a");
+        try {
+            WorkspaceForwardController controller =
+                    new WorkspaceForwardController(fake, "http://127.0.0.1:18090");
+            controller.forward(new MockHttpServletRequest("GET", "/api/v1/workspace/scenarios"),
+                    new MockHttpServletResponse());
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+            com.chinacreator.gzcm.common.context.TenantContextHolder.clear();
+        }
+
+        HttpHeaders headers = captured.get(0);
+        assertEquals("u-admin", headers.getFirst("X-ECOS-USER"),
+                "转发必须重注入已认证用户（EcosTrustHeaderFilter 已剥离客户端值）");
+        assertEquals("tenant-a", headers.getFirst("X-ECOS-TENANT"));
+        assertEquals("ROLE_SUPER_ADMIN", headers.getFirst("X-ECOS-ROLE"));
+    }
+
+    @Test
+    void upstreamErrorStatusIsPassedThroughNotCollapsedTo503() throws Exception {
+        RestTemplate fake = new RestTemplate() {
+            @Override
+            @SuppressWarnings("unchecked")
+            public <T> ResponseEntity<T> exchange(URI url, HttpMethod method,
+                                                  HttpEntity<?> requestEntity, Class<T> responseType) {
+                throw org.springframework.web.client.HttpClientErrorException.create(
+                        org.springframework.http.HttpStatus.METHOD_NOT_ALLOWED, "Method Not Allowed",
+                        HttpHeaders.EMPTY, "{\"code\":405}".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        java.nio.charset.StandardCharsets.UTF_8);
+            }
+        };
+        WorkspaceForwardController controller =
+                new WorkspaceForwardController(fake, "http://127.0.0.1:18090");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        controller.forward(new MockHttpServletRequest("POST", "/api/v1/workspace/scenarios/x/pre-validate"),
+                response);
+
+        assertEquals(405, response.getStatus(), "上游 4xx 必须原样透传，禁折叠成 503");
+        assertTrue(response.getContentAsString().contains("405"));
+    }
+
+    @Test
     void upstreamFailureIs503WithMachineCode() throws Exception {
         RestTemplate fake = new RestTemplate() {
             @Override
