@@ -10,6 +10,9 @@ import { ApiResponse, call, creds, loginAsAdmin } from '../helpers/ecos';
  *      `SECURITY_ENGINE_UNAVAILABLE`，按 `pipeline-ABAC-semantic-note.md` 既有口径**判失败**（不放宽为
  *      "DENY 即通过"），因为 fail-closed 只是兜底，策略缺位本身是要暴露的环境/实现缺口。
  *   3. 凭据只从 env 读取（见 .env.example），用例内不写死账号口令。
+ *   4. 数据前置：OUTPUT_OBJECT 落表 `e2e_target` 须存在（dev 一次性）：
+ *      `CREATE TABLE IF NOT EXISTS ecos_dw.e2e_target (one integer);`
+ *   5. 终态词表含 runtime-task 的 `SUCCEEDED`（与 COMPLETED/SUCCESS 同族）。
  */
 
 // 节点类型全集 = 前端基础 5 + PMO-36 新增 4 + 数据采集/近源读取/文档解析 3（B6-1/B6-2 + 近源库）
@@ -24,7 +27,7 @@ const EXPECTED_NODE_TYPES = [
 // 前端画布必须可用的基础 5 类（禁用即属实现缺口）
 const ALWAYS_ENABLED_TYPES = ['SOURCE_JDBC', 'SOURCE_CSV', 'SOURCE_REST', 'TRANSFORM_SQL', 'OUTPUT_OBJECT'];
 
-const TERMINAL_STATUSES = ['COMPLETED', 'SUCCESS', 'FAILED', 'CANCELLED', 'WRONG', 'DONE'];
+const TERMINAL_STATUSES = ['COMPLETED', 'SUCCEEDED', 'SUCCESS', 'FAILED', 'CANCELLED', 'WRONG', 'DONE'];
 
 function smokeDefinition() {
   return {
@@ -140,7 +143,8 @@ test('C–H 管道定义生命周期（创建→详情→执行→轮询→列�
   await test.step('H 归档后 GET /definitions/{id}/executions → 不可见', async () => {
     const { json } = await call(request, 'GET', `/api/v1/pipeline/definitions/${definitionId}/executions?page=1&pageSize=10`, { token });
     const hidden = json?.code === 404 || json?.success === false || !json?.data;
-    expect(hidden, `归档定义仍可见: ${JSON.stringify(json?.data).slice(0, 120)}`).toBe(true);
+    const shown = JSON.stringify(json?.data ?? null).slice(0, 120);
+    expect(hidden, `归档定义仍可见: ${shown}`).toBe(true);
   });
 });
 

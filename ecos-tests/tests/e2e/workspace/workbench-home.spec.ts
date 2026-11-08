@@ -9,7 +9,7 @@ import { expectNoErrorBoundary, injectAuth, loginAsAdmin, watchPageHealth } from
  */
 
 test.describe('workbench L1 — 我的场景', () => {
-  test.skip('六态：加载→数据态卡片网格渲染', async ({ page, request, context }) => {
+  test('六态：加载→数据态卡片网格渲染', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     watchPageHealth(page);
@@ -19,7 +19,7 @@ test.describe('workbench L1 — 我的场景', () => {
     await expectNoErrorBoundary(page);
   });
 
-  test.skip('首屏不出现技术概念 Mind / Goal Tree / Causal', async ({ page, request, context }) => {
+  test('首屏不出现技术概念 Mind / Goal Tree / Causal', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     await page.goto('/#/workbench');
@@ -28,7 +28,7 @@ test.describe('workbench L1 — 我的场景', () => {
     }
   });
 
-  test.skip('高级视图默认折叠，可展开', async ({ page, request, context }) => {
+  test('高级视图默认折叠，可展开', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     await page.goto('/#/workbench');
@@ -38,11 +38,13 @@ test.describe('workbench L1 — 我的场景', () => {
     await expect(page.getByRole('link', { name: /technical|技术/i })).toBeVisible();
   });
 
-  test.skip('离线态：navigator.onLine=false 时展示 banner，不静默 200', async ({ page, context, request }) => {
+  test('离线态：navigator.onLine=false 时展示 banner，不静默 200', async ({ page, context, request }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
-    await page.context().setOffline(true);
     await page.goto('/#/workbench');
-    await expect(page.getByText(/Offline|离线/i)).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    // 先加载、再断网：离线期间不做页面级导航（否则 ERR_INTERNET_DISCONNECTED）
+    await context.setOffline(true);
+    await expect(page.getByText(/Offline|离线/i).first()).toBeVisible({ timeout: 30_000 });
   });
 });

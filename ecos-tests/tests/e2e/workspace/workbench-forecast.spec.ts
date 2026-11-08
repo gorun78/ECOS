@@ -8,7 +8,7 @@ import { expectNoErrorBoundary, injectAuth, loginAsAdmin, watchPageHealth } from
 const SCENARIO_ID = process.env.ECOS_E2E_SCENARIO_ID ?? 'p-2027-profit';
 
 test.describe('workbench L3 — 预测与推演', () => {
-  test.skip('推演页假设/信念两栏渲染，无 verdict 合成', async ({ page, request, context }) => {
+  test('推演页假设/信念两栏渲染，无 verdict 合成', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     watchPageHealth(page);
@@ -17,10 +17,13 @@ test.describe('workbench L3 — 预测与推演', () => {
     await expectNoErrorBoundary(page);
   });
 
-  test.skip('引擎不可用 → 503 原样穿透，横幅 + 重试按钮', async ({ page, request, context }) => {
+  test('引擎不可用 → 503 原样穿透，横幅 + 重试按钮', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
-    await page.route('**/api/v1/business/scenarios/*/cognition/hypotheses', (r) =>
+    await page.route('**/api/v1/business/scenarios/*/cognition/hypotheses**', (r) =>
+      r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'ENGINE_DISABLED', traceId: 't', message: 'engine disabled', data: null }) }),
+    );
+    await page.route('**/api/v1/business/scenarios/*/cognition/beliefs**', (r) =>
       r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'ENGINE_DISABLED', traceId: 't', message: 'engine disabled', data: null }) }),
     );
     await page.goto(`/#/workbench/${SCENARIO_ID}/forecast`);
@@ -29,6 +32,8 @@ test.describe('workbench L3 — 预测与推演', () => {
   });
 
   test.skip('边界态：时间窗越界提示，不静默通过', async ({ page, request, context }) => {
+    // 设计口径：L3 推演页无时间窗入参（forecast.tsx 头注释「不承诺该态」）⇒ 该验收项不适用。
+    // 保留空壳以便未来引入时间窗入参时去 skip 实装。
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     await page.route('**/api/v1/workspace/scenarios/*/forecast-scope*', (r) =>

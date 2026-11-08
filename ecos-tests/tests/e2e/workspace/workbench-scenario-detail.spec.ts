@@ -8,7 +8,7 @@ import { expectNoErrorBoundary, injectAuth, loginAsAdmin, watchPageHealth } from
 const SCENARIO_ID = process.env.ECOS_E2E_SCENARIO_ID ?? 'p-2027-profit';
 
 test.describe('workbench L2 — 场景详情', () => {
-  test.skip('关键指标卡 + 认知摘要 + 最近动作三段渲染', async ({ page, request, context }) => {
+  test('关键指标卡 + 认知摘要 + 最近动作三段渲染', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     watchPageHealth(page);
@@ -17,14 +17,14 @@ test.describe('workbench L2 — 场景详情', () => {
     await expectNoErrorBoundary(page);
   });
 
-  test.skip('未找到（404）：无效 scenarioId → 显示空态而非崩溃', async ({ page, request, context }) => {
+  test('未找到（404）：无效 scenarioId → 显示空态而非崩溃', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     await page.goto('/#/workbench/does-not-exist');
     await expect(page.getByText(/not found|未找到/i)).toBeVisible();
   });
 
-  test.skip('认知摘要 503 → 只渲染横幅 + traceId，绝不合成 verdict', async ({ page, request, context }) => {
+  test('认知摘要 503 → 只渲染横幅 + traceId，绝不合成 verdict', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     await page.route('**/api/v1/business/scenarios/*/cognition/operation-eval', (r) =>

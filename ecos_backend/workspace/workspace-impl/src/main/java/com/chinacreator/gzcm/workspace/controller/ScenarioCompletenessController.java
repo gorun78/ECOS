@@ -28,15 +28,19 @@ public class ScenarioCompletenessController {
     private final ScenarioCompletenessService completenessService;
     private final WorkspaceSecurityAudit audit;
     private final ScenarioReadGuard readGuard;
+    /** 场景存在性前置（未知场景 404，禁以空绑定伪装 EMPTY 200）。 */
+    private final com.chinacreator.gzcm.workspace.scenario.ScenarioService scenarioService;
 
     public ScenarioCompletenessController(CompletenessDataLoader loader,
                                           ScenarioCompletenessService completenessService,
                                           WorkspaceSecurityAudit audit,
-                                          ScenarioReadGuard readGuard) {
+                                          ScenarioReadGuard readGuard,
+                                          com.chinacreator.gzcm.workspace.scenario.ScenarioService scenarioService) {
         this.loader = loader;
         this.completenessService = completenessService;
         this.audit = audit;
         this.readGuard = readGuard;
+        this.scenarioService = scenarioService;
     }
 
     @GetMapping("/{id}/completeness")
@@ -44,6 +48,8 @@ public class ScenarioCompletenessController {
                                                         @RequestParam(name = "refresh", required = false, defaultValue = "false") boolean refresh) {
         // F07-18：拓扑/完整度属敏感读，先过 RLS fail-DENY 咽喉（security 不可用 → 403，禁 200 数据）
         readGuard.assertReadable("scenario_completeness");
+        // 未知场景 404（get 内抛 NotFoundException），禁把“场景不存在”渲染成 EMPTY 200
+        scenarioService.get(scenarioId);
         List<BindingNode> bindings = loader.bindingsOf(scenarioId);
         List<LinkEdge> links = loader.linksOf(scenarioId);
         CompletenessReport report = refresh
