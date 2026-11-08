@@ -78,6 +78,13 @@ public class OntologyVersionService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private org.springframework.beans.factory.ObjectProvider<com.chinacreator.gzcm.engine.ontology.audit.PublishAuditReconciler> auditReconcilerProvider;
 
+    /**
+     * DS-4 本体域第一批：已发布版本的 Git 历史读面（2026-11-08）。
+     * 可选装配——缺席（单测直构/未接 Git）时回退库内读面，不伪造 Git 结果。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<OntologyGitHistoryReader> gitHistoryReaderProvider;
+
     /** 旧 5 参构造保留（Wave31 单测直接 new；Git 归档 + 补偿均默认关闭）。 */
     public OntologyVersionService(OntologyVersionRepository versionRepository,
                                    OntologyRepository ontologyRepository,
@@ -431,8 +438,18 @@ public class OntologyVersionService {
     private synchronized String nextId() { return versionRepository.nextId(); }
 
     public List<Map<String, Object>> listVersions(String ontologyId) {
-        return versionRepository.findByOntology(ontologyId).stream()
-            .map(this::toIndexMap).collect(Collectors.toList());
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        java.util.Set<String> archived = new java.util.LinkedHashSet<>();
+        for (OntologyVersion git : gitPublished(ontologyId)) {
+            archived.add(git.getVersionNo());
+            out.add(toIndexMap(git));
+        }
+        // 库内只补「未归档」的行（草稿/在工作态）；已发布版本内容与元数据以 Git 为准。
+        versionRepository.findByOntology(ontologyId).stream()
+                .filter(v -> !archived.contains(v.getVersionNo()))
+                .map(this::toIndexMap)
+                .forEach(out::add);
+        return out;
     }
 
     /**
@@ -441,11 +458,23 @@ public class OntologyVersionService {
      * <p>#147T：本门面按分态裁决输出<b>版本索引视图</b>（不内联快照），见 {@link #toIndexVO}。
      */
     public List<OntologyVersionVO> listVersionsVO(String ontologyId) {
-        return versionRepository.findByOntology(ontologyId).stream()
-            .map(this::toIndexVO).collect(Collectors.toList());
+        List<OntologyVersionVO> out = new java.util.ArrayList<>();
+        java.util.Set<String> archived = new java.util.LinkedHashSet<>();
+        for (OntologyVersion git : gitPublished(ontologyId)) {
+            archived.add(git.getVersionNo());
+            out.add(toIndexVO(git));
+        }
+        versionRepository.findByOntology(ontologyId).stream()
+                .filter(v -> !archived.contains(v.getVersionNo()))
+                .map(this::toIndexVO)
+                .forEach(out::add);
+        return out;
     }
 
     public Map<String, Object> getVersion(String ontologyId, String versionId) {
+        if (isGitVersionId(versionId)) {
+            return gitVersionById(versionId).map(this::toMap).orElse(null);
+        }
         return versionRepository.findById(versionId)
             .map(ver -> withResolvedSnapshot(toMap(ver), ver)).orElse(null);
     }
@@ -454,6 +483,9 @@ public class OntologyVersionService {
      * 强类型 VO 版（T16-2）；不存在返回 null。
      */
     public OntologyVersionVO getVersionVO(String ontologyId, String versionId) {
+        if (isGitVersionId(versionId)) {
+            return gitVersionById(versionId).map(this::toVO).map(this::withAuditReconciliation).orElse(null);
+        }
         return versionRepository.findById(versionId)
             .map(ver -> withResolvedSnapshot(toVO(ver), ver))
             .map(this::withAuditReconciliation)
@@ -863,8 +895,17 @@ public class OntologyVersionService {
      * 列出所有版本（跨全部 ontology）
      */
     public List<Map<String, Object>> listAllVersions() {
-        return versionRepository.findAll().stream()
-            .map(this::toIndexMap).collect(Collectors.toList());
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        java.util.Set<String> archived = new java.util.LinkedHashSet<>();
+        for (OntologyVersion git : gitPublished(null)) {
+            archived.add(git.getOntologyId() + "@" + git.getVersionNo());
+            out.add(toIndexMap(git));
+        }
+        versionRepository.findAll().stream()
+                .filter(v -> !archived.contains(v.getOntologyId() + "@" + v.getVersionNo()))
+                .map(this::toIndexMap)
+                .forEach(out::add);
+        return out;
     }
 
     /**
@@ -873,14 +914,26 @@ public class OntologyVersionService {
      * 是「列表面逐行读 Git」成本裁决的主要对象。
      */
     public List<OntologyVersionVO> listAllVersionsVO() {
-        return versionRepository.findAll().stream()
-            .map(this::toIndexVO).collect(Collectors.toList());
+        List<OntologyVersionVO> out = new java.util.ArrayList<>();
+        java.util.Set<String> archived = new java.util.LinkedHashSet<>();
+        for (OntologyVersion git : gitPublished(null)) {
+            archived.add(git.getOntologyId() + "@" + git.getVersionNo());
+            out.add(toIndexVO(git));
+        }
+        versionRepository.findAll().stream()
+                .filter(v -> !archived.contains(v.getOntologyId() + "@" + v.getVersionNo()))
+                .map(this::toIndexVO)
+                .forEach(out::add);
+        return out;
     }
 
     /**
      * 按 ID 获取版本（不依赖 ontologyId）
      */
     public Map<String, Object> getVersionById(String id) {
+        if (isGitVersionId(id)) {
+            return gitVersionById(id).map(this::toMap).orElse(null);
+        }
         return versionRepository.findById(id)
             .map(ver -> withResolvedSnapshot(toMap(ver), ver)).orElse(null);
     }
@@ -889,6 +942,9 @@ public class OntologyVersionService {
      * 强类型 VO 版（T16-5，简化端点 get）；不存在返回 null。
      */
     public OntologyVersionVO getVersionVOById(String id) {
+        if (isGitVersionId(id)) {
+            return gitVersionById(id).map(this::toVO).map(this::withAuditReconciliation).orElse(null);
+        }
         return versionRepository.findById(id)
             .map(ver -> withResolvedSnapshot(toVO(ver), ver))
             .map(this::withAuditReconciliation)
@@ -949,12 +1005,24 @@ public class OntologyVersionService {
      * @return 发布时间倒序的归档历史行（不含 snapshot）
      */
     public List<OntologyGitHistoryVO> gitHistoryVO(String ontologyId) {
-        List<OntologyVersion> source = (ontologyId == null || ontologyId.isBlank())
-            ? versionRepository.findAll()
-            : versionRepository.findByOntology(ontologyId);
+        // DS-4 本体域：已发布历史以 Git 提交为准；库内仅用于覆盖「当前状态」（弃用等写面尚未迁 Git）。
+        List<OntologyVersion> source = gitHistoryReader()
+                .map(r -> r.listPublished(ontologyId))
+                .orElseGet(() -> {
+                    List<OntologyVersion> db = (ontologyId == null || ontologyId.isBlank())
+                            ? versionRepository.findAll() : versionRepository.findByOntology(ontologyId);
+                    return db.stream()
+                            .filter(v -> "Published".equals(v.getStatus()))
+                            .filter(v -> v.getGitRef() != null && !v.getGitRef().isBlank())
+                            .collect(Collectors.toList());
+                });
+        Map<String, String> statusByKey = new java.util.HashMap<>();
+        List<OntologyVersion> dbRows = (ontologyId == null || ontologyId.isBlank())
+                ? versionRepository.findAll() : versionRepository.findByOntology(ontologyId);
+        for (OntologyVersion v : dbRows) {
+            statusByKey.put(v.getOntologyId() + "@" + v.getVersionNo(), v.getStatus());
+        }
         return source.stream()
-            .filter(v -> "Published".equals(v.getStatus()))
-            .filter(v -> v.getGitRef() != null && !v.getGitRef().isBlank())
             .sorted((a, b) -> {
                 if (b.getPublishedAt() == null) return -1;
                 if (a.getPublishedAt() == null) return 1;
@@ -965,7 +1033,8 @@ public class OntologyVersionService {
                 vo.setId(v.getId());
                 vo.setOntologyId(v.getOntologyId());
                 vo.setVersionNo(v.getVersionNo());
-                vo.setStatus(v.getStatus());
+                String status = statusByKey.get(v.getOntologyId() + "@" + v.getVersionNo());
+                vo.setStatus(status != null ? status : v.getStatus());
                 vo.setGitRef(v.getGitRef());
                 vo.setPublisher(v.getPublisher());
                 vo.setPublishedAt(v.getPublishedAt() != null ? v.getPublishedAt().toString() : null);
@@ -973,6 +1042,27 @@ public class OntologyVersionService {
                 return vo;
             })
             .collect(Collectors.toList());
+    }
+
+    // ── DS-4 本体域 Git 读面辅助（2026-11-08）───────────────────────────
+
+    private java.util.Optional<OntologyGitHistoryReader> gitHistoryReader() {
+        return gitHistoryReaderProvider == null
+                ? java.util.Optional.empty()
+                : java.util.Optional.ofNullable(gitHistoryReaderProvider.getIfAvailable());
+    }
+
+    /** 已发布版本（Git 真源）；读面未装配时返回空，由调用方回退库内读面（不伪造）。 */
+    private List<OntologyVersion> gitPublished(String ontologyId) {
+        return gitHistoryReader().map(r -> r.listPublished(ontologyId)).orElse(List.of());
+    }
+
+    private java.util.Optional<OntologyVersion> gitVersionById(String id) {
+        return gitHistoryReader().flatMap(r -> r.findById(id));
+    }
+
+    private static boolean isGitVersionId(String id) {
+        return id != null && id.startsWith(OntologyGitHistoryReader.ID_PREFIX);
     }
 
     /**
