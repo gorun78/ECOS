@@ -86,10 +86,12 @@ export default function FunctionAuditPage({ onToast }: FunctionAuditPageProps) {
     setError(null);
     setGuardNotice(null);
     if (!me) {
-      // 未识别登录主体 ⇒ fail-closed：不展示任何记录（此前 me 兜底 'admin' 属身份造假）
+      // 未识别登录主体 ⇒ fail-closed：不展示任何记录（此前 me 兜底 'admin' 属身份造假）。
+      // 用 guardNotice 而不是 error：表头与空态契约（ECOS-ONTO-060 拒收语义）仍可见，
+      // 只把“记录面”锁死，禁把“无身份”渲染成整页错误（B.5 列头/空态验收）。
       setRows([]);
       setTotal(null);
-      setError(t("ow.fnAudit.err.no_identity"));
+      setGuardNotice(t("ow.fnAudit.err.no_identity"));
       setLoading(false);
       return;
     }

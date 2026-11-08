@@ -76,6 +76,9 @@ export async function injectAuth(ctx: BrowserContext, token: string): Promise<vo
  */
 export interface PageHealthOptions {
   expectDegraded?: readonly RegExp[];
+  /** 已声明的降级面在页面上产生的 console.error（如客户端把 503 记 logger.error）——
+   * 必须逐条显式声明，禁止整页豁免；网络面仍由 expectDegraded 逐 URL 剔除。 */
+  expectConsoleErrors?: readonly RegExp[];
 }
 
 export function watchPageHealth(page: Page, opts: PageHealthOptions = {}): void {
@@ -94,19 +97,28 @@ export function watchPageHealth(page: Page, opts: PageHealthOptions = {}): void 
       badResponses.push({ url: res.url(), status: res.status() });
     }
   });
-  health.set(page, { errors, badResponses, expectDegraded: opts.expectDegraded ?? [] });
+  health.set(page, {
+    errors,
+    badResponses,
+    expectDegraded: opts.expectDegraded ?? [],
+    expectConsoleErrors: opts.expectConsoleErrors ?? [],
+  });
 }
 
 const health = new WeakMap<Page, {
   errors: string[];
   badResponses: { url: string; status: number }[];
   expectDegraded: readonly RegExp[];
+  expectConsoleErrors: readonly RegExp[];
 }>();
 
 export function expectHealthyPage(page: Page): void {
   const seen = health.get(page);
   if (!seen) throw new Error('用例未调用 watchPageHealth(page)');
-  const fatal = seen.errors.filter((e) => !/favicon|ResizeObserver loop|DevTools/i.test(e));
+  const fatal = seen.errors.filter(
+    (e) => !/favicon|ResizeObserver loop|DevTools/i.test(e)
+      && !seen.expectConsoleErrors.some((p) => p.test(e)),
+  );
   expect(fatal, `console error: ${fatal.slice(0, 3).join(' | ')}`).toHaveLength(0);
   const unexpected = seen.badResponses.filter(
     (r) => !seen.expectDegraded.some((p) => p.test(r.url)),
@@ -116,10 +128,17 @@ export function expectHealthyPage(page: Page): void {
 
 /** 页面文本里出现错误边界 = 渲染失败 */
 export async function expectNoErrorBoundary(page: Page): Promise<void> {
+  // domcontentloaded 后 SPA 首帧可能尚未挂载（RequireAuth/懒加载）：先等正文出现再判空，
+  // 否则会把「还在渲染」误判成「页面空白」。
+  await expect
+    .poll(() => page.evaluate(() => (document.body.innerText || '').length), {
+      message: '页面空白（可能卡在 RequireAuth loading）',
+      timeout: 15_000,
+    })
+    .toBeGreaterThan(0);
   const text = await page.evaluate(() => document.body.innerText || '');
   expect(
     /Something went wrong|Unexpected Application Error|应用发生错误|useTheme must be used within/i.test(text),
     '页面落入 ErrorBoundary'
   ).toBeFalsy();
-  expect(text.length, '页面空白（可能卡在 RequireAuth loading）').toBeGreaterThan(0);
 }

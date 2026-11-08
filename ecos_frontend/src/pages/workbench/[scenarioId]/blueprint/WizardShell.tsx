@@ -32,6 +32,8 @@ interface Props {
   steps: WizardStep[];
   /** 当前蓝图状态（raw 字符串，单源 client 解析）；呈现层据此给推荐步视觉默认值。 */
   status?: string;
+  /** 权威目标陈述（服务端行字段）；只读展示，便于创建草稿后回显服务端值。 */
+  goalStatement?: string | null;
 }
 
 /** 状态 tone → 推荐步骤（0 基）的视觉映射：仅呈现层默认值，非迁移规则。 */
@@ -50,7 +52,7 @@ function recommendedStepOf(status: string | undefined): number {
   }
 }
 
-export default function WizardShell({ steps, status }: Props) {
+export default function WizardShell({ steps, status, goalStatement }: Props) {
   const { styles } = useTheme();
   const { t } = useLanguage();
   const recommended = recommendedStepOf(status);
@@ -84,6 +86,9 @@ export default function WizardShell({ steps, status }: Props) {
           {t('workspace.wiz.progress', { cur: cur + 1, total: steps.length })}
         </span>
       </div>
+      {goalStatement ? (
+        <p className={`text-xs ${styles.cardText} leading-relaxed`}>{goalStatement}</p>
+      ) : null}
 
       {/* 步骤条（呈现层导览，非状态机） */}
       <ol className="flex items-stretch gap-1 overflow-x-auto pb-1" role="tablist" aria-label={t('workspace.wiz.title')}>

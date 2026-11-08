@@ -17,8 +17,16 @@ const SCENARIO_WITH_BP = process.env.ECOS_E2E_SCENARIO_ID ?? 'sc001';
  * 经 watchPageHealth 的 expectDegraded 逐 URL 声明剔除「意外」计数（helpers/ecos.ts），
  * 页面侧由 T4 另行断言横幅真实呈现 —— 不是整页豁免，也不是伪造健康。
  */
+const RECENT_ACTIONS_DEGRADED = [
+  /workbench-recent-actions/,
+  /认知引擎暂不可用/,
+];
+
 const COGNITION_DEGRADED = [
   /\/api\/v1\/business\/scenarios\/[^/]+\/cognition\/(detect|operation-eval|hypotheses|beliefs)(\?|$)/,
+  // 场景动作记录同样依赖认知编排（诊断/预测/模拟/策略）；引擎不可用时按设计 503，
+  // 页面须展示「动作记录加载失败」横幅（快照已断言），不属意外 4xx/5xx。
+  /\/api\/v1\/workspace\/scenarios\/[^/]+\/actions(\?|$)/,
 ];
 
 test.describe('议题1 — 知识工作台·认知资产只读引用面', () => {
@@ -73,7 +81,7 @@ test.describe('议题3 — 场景工作台 Blueprint 中心面', () => {
   test('L2 蓝图面板：真实版本列表（v+状态）渲染，无合成', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
-    watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED });
+    watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED, expectConsoleErrors: RECENT_ACTIONS_DEGRADED });
     await page.goto(`/#/workbench/${SCENARIO_WITH_BP}`);
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     // 权威副题（workspace.bp.subtitle）
@@ -91,7 +99,7 @@ test.describe('议题3 — 场景工作台 Blueprint 中心面', () => {
   test('新建蓝图草稿：goal 输入 → 服务端 v 递增真实回显', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
-    watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED });
+    watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED, expectConsoleErrors: RECENT_ACTIONS_DEGRADED });
     await page.goto(`/#/workbench/${SCENARIO_WITH_BP}`);
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     const createBtn = page.getByRole('button', { name: /新建蓝图草稿/ });
@@ -110,7 +118,7 @@ test.describe('议题3 — 场景工作台 Blueprint 中心面', () => {
   test('能力盘：GET /api/v1/ai/capabilities 真实目录渲染（200 十三项基线，§3.12 修正）', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
-    watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED });
+    watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED, expectConsoleErrors: RECENT_ACTIONS_DEGRADED });
     await page.goto(`/#/workbench/${SCENARIO_WITH_BP}`);
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     // 能力目录区（workspace.cap.title）——只读快照 + ★ 声明标记
@@ -126,8 +134,8 @@ test.describe('议题3 — 场景工作台 Blueprint 中心面', () => {
   test('空态：无蓝图场景（sc002）显示如实空态引导，不合成版本', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
-    watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED });
-    await page.goto('/#/workbench/sc002');
+    watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED, expectConsoleErrors: RECENT_ACTIONS_DEGRADED });
+    await page.goto(`/#/workbench/${process.env.ECOS_E2E_EMPTY_SCENARIO_ID ?? 'sc002'}`);
     // 运行面降级的如实呈现：cognition 503 → L2 认知卡片显示 unavailable 横幅，禁占位假数据
     await expect(page.getByText(/认知引擎暂不可用|该场景暂未绑定任何数据或认知/).first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });

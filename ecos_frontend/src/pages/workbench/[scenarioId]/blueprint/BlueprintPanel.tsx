@@ -218,8 +218,12 @@ export default function BlueprintPanel({ scenarioId }: Props) {
       setGoal('');
       setCriteria('');
       setNote('');
-      setVersions((prev) => (prev.some((v) => v.id === created.id) ? prev : [...prev, created]));
-      setSelectedId(created.id);
+      // 以服务端列表为权威：创建后重取一次，确保详情读到的版本行含 goalStatement 等字段
+      //（只 append 本地响应会在字段形状/并发刷新时造成“已创建但详情空白”）。
+      const list = await listBlueprints(scenarioId);
+      setVersions(list);
+      const fresh = list.find((v) => v.id === created.id) ?? created;
+      setSelectedId(fresh.id);
       setPhase('ready');
     } catch (e) {
       logger.error('blueprint-create', e);
@@ -367,6 +371,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
 
           <WizardShell
             status={selected.status}
+            goalStatement={selected.goalStatement}
             steps={buildWizardSteps({
               scenarioId,
               selected,

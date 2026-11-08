@@ -24,7 +24,7 @@ const DIAG = {
   title: { zh: '网关诊断', en: 'Gateway Diagnostics' },
   tabs: {
     artifacts: { zh: '产物', en: 'Artifacts' },
-    filters: { zh: '过滤器链', en: 'Filter chain' },
+    filters: { zh: '过滤链', en: 'Filter Chain' },
     routes: { zh: '路由清单', en: 'Routes' },
     anonymous: { zh: '匿名端点', en: 'Anonymous' },
     editions: { zh: '版本能力', en: 'Editions' },

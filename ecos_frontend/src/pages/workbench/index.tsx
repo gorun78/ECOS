@@ -8,7 +8,7 @@
  * 离线（加载失败且 navigator.onLine=false 时横幅）。
  * 颜色全部走 useTheme 语义 token，文案全部走 t('workspace.*')。</p>
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -53,7 +53,7 @@ export default function WorkbenchHome() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -68,11 +68,39 @@ export default function WorkbenchHome() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
+
+  // 浏览器离线/恢复事件：离线立即呈现横幅并尝试一次真实加载（失败如实入 error），
+  // 恢复在线后自动重载。此前只在首挂载 load 里判 offline，用户停留在页面时断网不显示。
+  useEffect(() => {
+    const onOffline = () => {
+      setOffline(true);
+      void load();
+    };
+    const onOnline = () => {
+      setOffline(false);
+      void load();
+    };
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    // 兜底轮询：部分内嵌/仿真环境不派发 offline 事件，按 navigator.onLine 翻转检测。
+    let wasOnline = navigator.onLine;
+    const timer = window.setInterval(() => {
+      const now = navigator.onLine;
+      if (wasOnline && !now) onOffline();
+      else if (!wasOnline && now) onOnline();
+      wasOnline = now;
+    }, 2000);
+    return () => {
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+      window.clearInterval(timer);
+    };
+  }, [load]);
 
   // 快捷入口真实目标（2026-10-14 裁决订正）：
   // - 「新建场景」：L1 直接弹新建模态（原型 v2.0：模板 chips 预填 + 真实

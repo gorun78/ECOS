@@ -97,7 +97,7 @@ ecos:
     # workspace→gateway→decision 恒「无用户上下文 010」；直连后经 CallerCredentialSource 中继的
     # 信任头可被 sysman 侧 HeaderAuthInterceptor（B32 已启用）还原为 ServiceContext。
     # sysman 切流（manifest route=service）是正解，切流后本逃生口清空即可。
-    sysman: ${ECOS_WS_SYSMAN_BASE:}
+    sysman: ${ECOS_WS_SYSMAN_BASE:http://127.0.0.1:18081}
 
 management:
   endpoints:

@@ -54,6 +54,11 @@ ecos:
       enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   cognitive:
     scan-interval: 10m
+  # DS-4/P1（2026-11-08）：workspace→security 的 ABAC 裁决必须直连 sysman。
+  # 经网关时 EcosTrustHeaderFilter 会剥离 X-ECOS-*（安全设计），security 端无用户上下文
+  # ⇒ ECOS-AUTH-010；直连内网端口由 CallerCredentialSource 中继原样信任头。
+  endpoints:
+    sysman: ${ECOS_ENDPOINT_SYSMAN:http://127.0.0.1:18081}
 
 # MyBatis Configuration
 mybatis:

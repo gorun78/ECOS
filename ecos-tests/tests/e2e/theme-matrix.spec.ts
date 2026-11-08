@@ -1,5 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { expectNoErrorBoundary, injectAuth, loginAsAdmin, watchPageHealth } from '../helpers/ecos';
+
+/**
+ * 主题 TOKEN 字面量集合（唯一合法色源 = ThemeContext 的四套预设）。
+ * 结构容器挂的是 `styles.*` 语义 token —— 其类名本身是色板字面量，属主题定义而非组件硬编码；
+ * 本集合从 ThemeContext 源码实读，组件若硬编码一个主题里不存在的色板类仍会被判红。
+ */
+const THEME_TOKEN_CLASSES = new Set(
+  readFileSync(resolve(__dirname, '../../../ecos_frontend/src/components/ThemeContext.tsx'), 'utf8')
+    .match(/(?:bg|text|border|ring|from|to|via|fill|stroke|shadow|divide|outline)-[a-z]+-\d{2,3}(?:\/\d+)?/g) ?? [],
+);
 
 /**
  * 详设-08 §2.4 / W210（C192）主题基线矩阵 — 冻结用例名 `fourThemesSixTabsNoRawColor`。
@@ -49,7 +61,9 @@ async function setTheme(page: Page, theme: string): Promise<void> {
 
 /** 结构性裸色抽样：色板字面类（含 hover:/focus: 变体前缀）或内联十六进制色。 */
 async function collectRawColorOffenders(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
+  const allowed = [...THEME_TOKEN_CLASSES];
+  return page.evaluate((allowList: string[]) => {
+    const allow = new Set(allowList);
     const paletteRe =
       /(?:bg|text|border|ring|from|to|via|fill|stroke|shadow|divide|outline)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}/;
     const hexRe = /#[0-9a-fA-F]{3,8}/;
@@ -57,13 +71,13 @@ async function collectRawColorOffenders(page: Page): Promise<string[]> {
     for (const el of Array.from(document.querySelectorAll('nav, aside, header'))) {
       const cls = el.getAttribute('class') || '';
       for (const token of cls.split(/\s+/)) {
-        if (paletteRe.test(token)) offenders.push(`${el.tagName}.${token}`);
+        if (paletteRe.test(token) && !allow.has(token)) offenders.push(`${el.tagName}.${token}`);
       }
       const style = el.getAttribute('style') || '';
       if (hexRe.test(style)) offenders.push(`${el.tagName}[style*="#"]`);
     }
     return offenders;
-  });
+  }, allowed);
 }
 
 test.describe('W210/C192 主题矩阵（R-55②/R-49 口径）', () => {

@@ -102,12 +102,7 @@ test.describe('六态行为面 — 权限/未找到/引擎降级/离线', () => 
     await page.waitForLoadState('networkidle');
     // 先真实加载一次，再切离线并做 SPA 内部路由重挂载（离线时禁止任何页面级 reload/导航）
     await context.setOffline(true);
-    await page.evaluate(() => {
-      window.location.hash = '#/';
-    });
-    await page.evaluate(() => {
-      window.location.hash = '#/workbench';
-    });
+    // 停留在页面切网：页面按 offline 事件/轮询检测（2026-11-08 修复），无需 reload 或 hash 重挂载。
     await expect(page.getByText(/当前处于离线模式/).first()).toBeVisible({ timeout: 30_000 });
     // 离线 ≠ 错误遮掩：失败原因如实呈现（workspace.l1.refresh_failed），且有重试入口
     await expect(page.getByText(/场景列表加载失败/).first()).toBeVisible();
