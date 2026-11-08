@@ -45,4 +45,14 @@ public interface OntologyGitService {
      */
     OntologyGitReadResult readVersionAtRef(String repositoryId, String assetType,
                                            String assetId, String versionNo, String ref);
+
+    /**
+     * 按仓库内相对路径写文件并提交（DS-4 本体域第二层：草稿/状态事件）。
+     *
+     * <p>路径必须位于 {@code ontologies/} 下且不含 {@code ..}；仓库仅由服务端
+     * {@code repositoryId} 定位。返回真实 commitId；写入/提交失败返回
+     * {@code not_available} + reason（禁伪成功）。</p>
+     */
+    OntologyGitArchiveResult archiveRelative(String repositoryId, String relativePath,
+                                             String content, String commitMessage, String authorName);
 }

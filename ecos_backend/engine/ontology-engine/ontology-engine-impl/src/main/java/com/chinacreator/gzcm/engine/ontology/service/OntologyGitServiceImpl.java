@@ -162,8 +162,67 @@ public class OntologyGitServiceImpl implements OntologyGitService {
         return result;
     }
 
-    // ═══════════════ #147E：read-at-ref 取证腿 ═══════════════
+    @Override
+    public OntologyGitArchiveResult archiveRelative(String repositoryId, String relativePath,
+                                                    String content, String commitMessage,
+                                                    String authorName) {
+        OntologyGitArchiveResult result = new OntologyGitArchiveResult();
+        result.setTimestamp(System.currentTimeMillis());
+        result.setRepositoryId(repositoryId);
+        String repoId = trimToNull(repositoryId);
+        String path = trimToNull(relativePath);
+        if (repoId == null) {
+            return notAvailable(result, "缺少 repositoryId：仓库仅由服务端注册表定位");
+        }
+        if (path == null || !path.startsWith("ontologies/") || path.contains("..") || path.startsWith("/")) {
+            return notAvailable(result, "非法相对路径（必须位于 ontologies/ 下且不含 ..）: " + relativePath);
+        }
+        if (content == null || content.isBlank()) {
+            return notAvailable(result, "缺少已序列化内容，拒绝写入空文件");
+        }
+        GitRepository repository;
+        try {
+            repository = gitRepositoryService.getRepositoryById(repoId);
+        } catch (GitRepositoryService.GitRepositoryException e) {
+            return notAvailable(result, "仓库未在 runtime 注册表注册: repositoryId=" + repoId);
+        }
+        if (repository == null || isBlank(repository.getLocalPath())) {
+            return notAvailable(result, "仓库定位失败或缺少 localPath: repositoryId=" + repoId);
+        }
+        if (!repository.isEnabled()) {
+            return notAvailable(result, "仓库已禁用: repositoryId=" + repoId);
+        }
+        try {
+            Path base = Paths.get(repository.getLocalPath(), "ontologies").normalize();
+            Path file = Paths.get(repository.getLocalPath(), path).normalize();
+            if (!file.startsWith(base)) {
+                return notAvailable(result, "路径越出 ontologies 目录，已拒绝: " + path);
+            }
+            if (file.getParent() != null) {
+                Files.createDirectories(file.getParent());
+            }
+            Files.writeString(file, content, StandardCharsets.UTF_8);
+            gitService.commitAllChanges(repository,
+                    orDefault(trimToNull(commitMessage), "Archive " + path),
+                    orDefault(trimToNull(authorName), DEFAULT_AUTHOR_NAME), DEFAULT_AUTHOR_EMAIL);
+            String commitId = gitService.getCurrentCommitId(repository);
+            if (isBlank(commitId)) {
+                return notAvailable(result, "提交号为空，拒绝伪成功");
+            }
+            result.setStatus(STATUS_COMMITTED);
+            result.setCommitId(commitId);
+            log.info("Git 相对路径归档成功 repositoryId={} path={} commitId={}", repoId, path, commitId);
+            return result;
+        } catch (IOException e) {
+            log.error("Git 相对路径写入失败 repositoryId={} path={}", repoId, path, e);
+            return notAvailable(result, "写入工作树失败: " + e.getMessage());
+        } catch (GitService.GitException e) {
+            log.error("Git 相对路径提交失败 repositoryId={} path={}", repoId, path, e);
+            return notAvailable(result, "Git 提交失败: " + e.getMessage());
+        }
+    }
 
+    // ═══════════════ #147E：read-at-ref 取证腿 ═══════════════
     @Override
     public OntologyGitReadResult readVersionAtRef(String repositoryId, String assetType,
                                                   String assetId, String versionNo, String ref) {
