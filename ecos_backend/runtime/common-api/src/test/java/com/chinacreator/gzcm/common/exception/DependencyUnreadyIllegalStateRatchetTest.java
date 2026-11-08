@@ -326,10 +326,14 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 同批重设：总站点 139 → <b>140</b>、OTHER 面 105 → <b>106</b>，
      * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（16／10／8）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 155;
+    // 2026-11-08 DS-4：Git 历史/归档读面新增 IllegalStateException 腿 12 枚
+    // （OntologyGitHistoryReader 3、DesignAssetArchiver.listCommits 3、对象版本端口 4、
+    //  其余 2 为归档事件路径），语义=Git 通道不可用（非依赖未就绪）⇒ 落 OTHER 面。
+    // 按门规「重测后同批改」：总站点 155→167、OTHER 115→127。
+    private static final int TOTAL_SITE_BASELINE = 167;
     private static final int DEPENDENCY_FACE_BASELINE = 17;
     private static final int ENV_ALGO_FACE_BASELINE = 15;
-    private static final int OTHER_FACE_BASELINE = 115;
+    private static final int OTHER_FACE_BASELINE = 127;
     private static final int UNREADABLE_FACE_BASELINE = 8;
 
     /**

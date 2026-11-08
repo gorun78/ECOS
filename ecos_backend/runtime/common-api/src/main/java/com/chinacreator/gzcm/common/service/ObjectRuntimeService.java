@@ -41,9 +41,17 @@ public class ObjectRuntimeService {
     private final ObjectRuntimeDao dao;
     private final ApplicationEventPublisher eventPublisher;
 
+    /** DS-4 对象版本 Git 端口（上层实现）；缺席时走库内回退（测试/未接 Git 进程）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<ObjectVersionArchivePort> versionArchiveProvider;
+
     public ObjectRuntimeService(ObjectRuntimeDao dao, ApplicationEventPublisher eventPublisher) {
         this.dao = dao;
         this.eventPublisher = eventPublisher;
+    }
+
+    private ObjectVersionArchivePort versionArchive() {
+        return versionArchiveProvider == null ? null : versionArchiveProvider.getIfAvailable();
     }
 
     private String nextId() { return "ort-" + ID_SEQ.incrementAndGet(); }
@@ -109,8 +117,21 @@ public class ObjectRuntimeService {
      */
     public void createVersion(String objectId, String entityCode, Map<String, Object> snapshot,
                                String changeSummary, String createdBy) {
-        String id = "ver-" + ID_SEQ.incrementAndGet();
         try {
+            ObjectVersionArchivePort port = versionArchive();
+            if (port != null) {
+                // DS-4：Git 可用时提交即版本，零库写。
+                int newVer = port.maxVersion(objectId) + 1;
+                java.util.Optional<String> commit = port.archive(objectId, entityCode, newVer,
+                        toJsonString(snapshot), changeSummary, createdBy);
+                if (commit.isEmpty()) {
+                    log.warn("对象版本 Git 归档失败（无库内兜底）: {}/{} v{}", entityCode, objectId, newVer);
+                    return;
+                }
+                log.debug("Version {} created in git for {}/{}, v{}", commit.get(), entityCode, objectId, newVer);
+                return;
+            }
+            String id = "ver-" + ID_SEQ.incrementAndGet();
             // 获取当前最大版本号
             Long maxVer = dao.queryMaxVersion(objectId);
             int newVer = (maxVer != null ? maxVer.intValue() : 0) + 1;
@@ -127,6 +148,12 @@ public class ObjectRuntimeService {
      */
     public List<Map<String, Object>> getVersions(String entityCode, String objectId) {
         try {
+            ObjectVersionArchivePort port = versionArchive();
+            if (port != null) {
+                return port.list(objectId).stream()
+                        .map(r -> toVersionRow(r, false))
+                        .collect(java.util.stream.Collectors.toList());
+            }
             return dao.queryVersions(objectId);
         } catch (Exception e) {
             log.warn("Failed to query versions for {}/{}: {}", entityCode, objectId, e.getMessage());
@@ -139,12 +166,33 @@ public class ObjectRuntimeService {
      */
     public Map<String, Object> getVersion(String entityCode, String objectId, int versionNo) {
         try {
+            ObjectVersionArchivePort port = versionArchive();
+            if (port != null) {
+                return port.get(objectId, versionNo).map(r -> toVersionRow(r, true)).orElse(null);
+            }
             List<Map<String, Object>> rows = dao.queryVersion(objectId, versionNo);
             return rows.isEmpty() ? null : rows.get(0);
         } catch (Exception e) {
             log.warn("Failed to get version {} for {}/{}: {}", versionNo, entityCode, objectId, e.getMessage());
             return null;
         }
+    }
+
+    /** 端口记录 → 与库内查询同键的行（键集只增不改，前端契约不漂）。 */
+    private static Map<String, Object> toVersionRow(ObjectVersionArchivePort.ObjectVersionRecord r,
+                                                    boolean withSnapshot) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("id", r.id());
+        m.put("object_id", r.objectId());
+        m.put("entity_code", r.entityCode());
+        m.put("version_no", r.versionNo());
+        if (withSnapshot) {
+            m.put("snapshot", r.snapshot());
+        }
+        m.put("change_summary", r.changeSummary());
+        m.put("created_by", r.createdBy());
+        m.put("created_at", r.createdAt());
+        return m;
     }
 
     // ═══════════════ Relationship ═══════════════════

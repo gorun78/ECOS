@@ -138,8 +138,8 @@ class MigrationVersionUniquenessTest {
      * 且 V315（DD-4 DDL↔代码 schema 对齐：补建 5 处代码读端 schema 表 + 清退 public 孤儿副本）落地
      * ⇒ 按实测订正 314→315 / 下一号 315→316。
      */
-    private static final int MAX_BASELINE_VERSION = 324;
-    private static final int NEXT_FREE_VERSION = 325;
+    private static final int MAX_BASELINE_VERSION = 325;
+    private static final int NEXT_FREE_VERSION = 326;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
