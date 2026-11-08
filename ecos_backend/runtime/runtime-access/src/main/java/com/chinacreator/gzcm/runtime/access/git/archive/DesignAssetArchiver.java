@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.runtime.access.git.archive;
 
 import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
+import com.chinacreator.gzcm.runtime.access.git.entity.GitCommitView;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
 import com.chinacreator.gzcm.runtime.access.git.publish.PublishFreezeGuard;
 import org.slf4j.Logger;
@@ -152,9 +153,38 @@ public class DesignAssetArchiver {
         return ArchiveOutcome.archived(commitId, tag);
     }
 
+    /**
+     * 列出仓库提交历史（DS-4 规则版本域：从提交事件重建版本历史）。
+     *
+     * <p>仓库仅由服务端 {@code repositoryId} 定位；仓库未注册/不可读 ⇒ 显式
+     * {@link IllegalStateException}（禁返回空历史冒充「没有版本」）。</p>
+     */
+    public java.util.List<GitCommitView> listCommits(String repositoryId, int limit) {
+        String repoId = trimToNull(repositoryId);
+        if (repoId == null) {
+            throw new IllegalStateException("缺少 repositoryId，拒绝枚举提交历史");
+        }
+        GitRepository repository;
+        try {
+            repository = repositoryService.getRepositoryById(repoId);
+        } catch (GitRepositoryService.GitRepositoryException e) {
+            throw new IllegalStateException("仓库未注册: " + repoId + " - " + e.getMessage(), e);
+        }
+        if (repository == null || repository.getLocalPath() == null || repository.getLocalPath().isBlank()) {
+            throw new IllegalStateException("仓库未解析 localPath: " + repoId);
+        }
+        try {
+            int lim = limit <= 0 ? GitService.DEFAULT_COMMIT_LOG_LIMIT
+                    : Math.min(limit, GitService.MAX_COMMIT_LOG_LIMIT);
+            java.util.List<GitCommitView> rows = gitService.listCommits(repository, 0, lim);
+            return rows == null ? java.util.List.of() : rows;
+        } catch (GitService.GitException e) {
+            throw new IllegalStateException("Git 提交历史读取失败: " + e.getMessage(), e);
+        }
+    }
+
     /** 按 ref 读回资产内容（对账/回滚取证；路径不存在返回空）。 */
-    public Optional<String> readAtRef(String repositoryId, String assetType, String assetId,
-                                      String versionNo, String ref) {
+    public Optional<String> readAtRef(String repositoryId, String assetType, String assetId,                                      String versionNo, String ref) {
         String repoId = trimToNull(repositoryId);
         String type = trimToNull(assetType);
         String id = trimToNull(assetId);

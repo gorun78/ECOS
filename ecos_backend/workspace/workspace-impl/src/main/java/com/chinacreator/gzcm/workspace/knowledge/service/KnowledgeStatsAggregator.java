@@ -38,7 +38,8 @@ public class KnowledgeStatsAggregator {
                     "COALESCE((SELECT MAX(created_at) FROM kb_ontology_snapshot), TIMESTAMP '1970-01-01 00:00:00+08')," +
                     "COALESCE((SELECT MAX(updated_at) FROM kb_cognitive_pipeline), TIMESTAMP '1970-01-01 00:00:00+08')," +
                     "COALESCE((SELECT MAX(parse_at) FROM kb_lineage_event), TIMESTAMP '1970-01-01 00:00:00+08')," +
-                    "COALESCE((SELECT MAX(TO_TIMESTAMP(changed_at / 1000.0)) FROM sys_rule_version), TIMESTAMP '1970-01-01 00:00:00+08')," +
+                    // DS-4（2026-11-08）：规则版本已迁 Git 并 DROP sys_rule_version，库内无此腿；
+                    // 最近变更时间由 sys_compliance_rule.updated_at 承接（规则本体每次更新都会刷新）。
                     "COALESCE((SELECT MAX(TO_TIMESTAMP(updated_at / 1000.0)) FROM sys_compliance_rule), TIMESTAMP '1970-01-01 00:00:00+08')" +
                     ")";
 
@@ -60,7 +61,9 @@ public class KnowledgeStatsAggregator {
         vo.setEmbeddingCount(count("SELECT COUNT(*) FROM ecos_knowledge.knowledge_embedding"));
         vo.setComplianceRuleCount(count("SELECT COUNT(*) FROM sys_compliance_rule"));
         vo.setActiveComplianceRuleCount(count("SELECT COUNT(*) FROM sys_compliance_rule WHERE status = 'ACTIVE'"));
-        vo.setRuleVersionCount(count("SELECT COUNT(*) FROM sys_rule_version"));
+        // DS-4：规则版本历史已迁 Git（sys_rule_version 已 DROP），库内计数不可得 ⇒ null（未知），
+        // 禁以 0 冒充「没有版本」；需要精确值时由 kb 版本端点按 Git 提交计数。
+        vo.setRuleVersionCount(null);
         vo.setOntologySnapshotCount(count("SELECT COUNT(*) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
         vo.setOntologyVersionCount(count(
                 "SELECT COUNT(DISTINCT ontology_id) FROM kb_ontology_snapshot WHERE is_deleted = 0"));

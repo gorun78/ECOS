@@ -3,8 +3,10 @@ package com.chinacreator.gzcm.engine.kb.service;
 import com.chinacreator.gzcm.engine.kb.dao.ComplianceRuleDao;
 import com.chinacreator.gzcm.engine.kb.dto.RuleContentSource;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
+import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
 import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
+import com.chinacreator.gzcm.runtime.access.git.entity.GitCommitView;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -79,9 +81,23 @@ public class ComplianceRuleVersionService {
      * </ul>
      */
     public ArchiveOutcome snapshotVersion(ComplianceRule existing, String approvedBy, long now, int newVersion) {
-        String versionId = UUID.randomUUID().toString();
         String json = toJson(existing);
         int archivedVersion = existing.getVersion();
+        // DS-4 规则版本域：Git 可用时「提交即版本」，零库写（sys_rule_version 已可停写/清退）。
+        if (availableArchiver() != null) {
+            ArchiveOutcome outcome = archive(existing, json, archivedVersion, approvedBy);
+            if (outcome.isArchived()) {
+                log.info("kb 规则版本已归档（Git 事件化，零库写）ruleId={} version={} git_ref={}",
+                        existing.getId(), archivedVersion, outcome.commitId());
+                auditRuleVersionPublish(existing, archivedVersion, outcome.commitId(), approvedBy, json);
+            } else if (outcome.status() != ArchiveOutcome.Status.NOT_AVAILABLE) {
+                log.warn("kb 规则版本未归档（Git 事件化，无库内兜底）ruleId={} version={} status={} reason={}",
+                        existing.getId(), archivedVersion, outcome.status(), outcome.reason());
+            }
+            return outcome;
+        }
+        // —— 库内回退面（仅归档器未装配时；DS-4 后生产不再进入）——
+        String versionId = UUID.randomUUID().toString();
         complianceRuleDao.insertVersion(
             versionId,
             existing.getId(),
@@ -136,6 +152,10 @@ public class ComplianceRuleVersionService {
      * 门面只增键不改既有键，{@code snapshot} 语义保持「返回原文、不解析」。</p>
      */
     public List<Map<String, Object>> getVersions(String ruleId) {
+        DesignAssetArchiver archiver = availableArchiver();
+        if (archiver != null) {
+            return getVersionsFromGit(ruleId, archiver);
+        }
         List<Map<String, Object>> rows = complianceRuleDao.getVersions(ruleId);
         if (rows == null || rows.isEmpty()) {
             return rows == null ? List.of() : rows;
@@ -144,6 +164,59 @@ public class ComplianceRuleVersionService {
             applyContentSource(row, ruleId);
         }
         return rows;
+    }
+
+    /**
+     * 从 Git 提交事件重建版本历史（DS-4 规则版本域）：
+     * 提交信息 {@code Snapshot compliance rule <ruleId> v<version>}，内容 {@code rules/<id>/<ver>.json}。
+     * 同一版本多次提交取最新；按版本号倒序（与旧 DAO 排序一致）。
+     */
+    private List<Map<String, Object>> getVersionsFromGit(String ruleId, DesignAssetArchiver archiver) {
+        String prefix = "Snapshot compliance rule " + ruleId + " v";
+        Map<String, Map<String, Object>> byVersion = new java.util.LinkedHashMap<>();
+        List<GitCommitView> commits = archiver.listCommits(GIT_REPO_KB, GitService.MAX_COMMIT_LOG_LIMIT);
+        for (GitCommitView c : commits) {
+            String msg = c.getMessage() == null ? "" : c.getMessage().trim();
+            if (!msg.startsWith(prefix)) {
+                continue;
+            }
+            String verText = msg.substring(prefix.length()).trim();
+            int version;
+            try {
+                version = Integer.parseInt(verText);
+            } catch (NumberFormatException e) {
+                log.warn("kb 规则版本提交信息版本号不可解析（跳过但留痕）ruleId={} commit={} msg={}",
+                        ruleId, c.getCommitId(), msg);
+                continue;
+            }
+            String key = String.valueOf(version);
+            if (byVersion.containsKey(key)) {
+                continue;
+            }
+            Optional<String> content = archiver.readAtRef(
+                    GIT_REPO_KB, GIT_ASSET_TYPE_RULES, ruleId, key, c.getCommitId());
+            Map<String, Object> row = new java.util.LinkedHashMap<>();
+            row.put("id", "git-" + c.getCommitId());
+            row.put("rule_id", ruleId);
+            row.put(KEY_VERSION_NUMBER, version);
+            row.put(KEY_SNAPSHOT, content.orElse(null));
+            row.put("changed_by", c.getAuthorName());
+            row.put("changed_at", c.getCommittedAt() == null ? null : c.getCommittedAt().getTime());
+            row.put("change_note", msg);
+            row.put(KEY_GIT_REF, c.getCommitId());
+            if (content.isPresent()) {
+                row.put(KEY_CONTENT_SOURCE, RuleContentSource.GIT.name());
+            } else {
+                row.put(KEY_CONTENT_SOURCE, RuleContentSource.DB_FALLBACK.name());
+                row.put(KEY_CONTENT_REASON, "归档提交存在但按 ref 读回为空（path=" + GIT_ASSET_TYPE_RULES
+                        + "/" + ruleId + "/" + key + ".json, ref=" + c.getCommitId() + "）");
+            }
+            byVersion.put(key, row);
+        }
+        return byVersion.values().stream()
+                .sorted((a, b) -> Integer.compare(
+                        (Integer) b.get(KEY_VERSION_NUMBER), (Integer) a.get(KEY_VERSION_NUMBER)))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     /** 单行内容来源判定与内容置换（谓词单源，禁在别处复制）。 */
