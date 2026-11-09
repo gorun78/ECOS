@@ -86,3 +86,4 @@
 |:--|:--|:--|
 | v1.0 | 2026-09-29 | 首版（Proposed）。实测确立"仓内 0 个机器可读契约文件（`docs/**/*.yaml\|yml` 为空）"，据此把附件 D-11「契约同源」重述为**平台级前置件 P-5**，并把 CLI 载体锁定为 `tools/ecos-cli/`（栈与是否本期建设交用户裁）。 |
 | v1.1 | 2026-09-29 | 随需求检视报告 §十四 批量批准：裁决 **Proposed → Accepted**（R-38 载体按推荐项 = `tools/ecos-cli/`；R-50 推荐项 ① ⇒ 前置件 **P-5** 成立并计入落地任务）。**P-5 未闭环前 CLI 不得开工**这一约束不变；§14.4 明确 CLI 代码实现需逐项再授权。 |
+| v1.2 | 2026-11-09 | 用户裁决 D1~D4 后开工并交付首个只读 MVP：① 技术栈定 **B 档 Java 独立 jar**（`tools/ecos-cli/pom.xml` 不在 ecos_backend reactor，双计数门禁不受影响）；② 契约按 REQ-PLT-26 原文位迁至 `docs/10-架构/api-contracts/openapi/`（3 份，84 paths / 87 ops），并修复原文件 1 处 YAML 语法错误（`:404`）；③ P-5 门禁建成 `CliContractParityTest`（4 法，实跑 4/4，3 次变异探针均红）+ `cli-l3-approval.spec.ts`（4 passed）；④ 首批命令 `doctor` / `cognition models list` / `capabilities list` 落地，输出六字段五值、凭据不回显；⑤ 门禁顺带发现 D-CLI-1（AI 能力双前缀，3 条契约降 partial）与 D-CLI-2（认知健康端点被网关排除，doctor 改靶 `listCognitiveModels`）。登记册：`docs/40-实现/CLI-MVP落地登记-2026-11-09.md`。写命令与 L3 审批链路仍未建设。 |

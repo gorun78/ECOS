@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
@@ -39,13 +38,16 @@ import java.util.Map;
  *
  * <p>路径常量单源 {@link AiCapabilityApiPaths}，禁散落字面量；{@code {id}} 走
  * {@link AiCapabilityId} 词表，未知能力 404（§13.1：禁造空成功）。</p>
+ *
+ * <p><b>路径注册形态（D-CLI-1 修复，2026-11-09）</b>：{@link AiCapabilityApiPaths} 中的方法级常量
+ * <b>已是含 {@code /api/v1/ai} 的全路径</b>，因此本类<b>不得</b>再加类级 {@code @RequestMapping}
+ * 前缀——否则两者叠加会注册成 {@code /api/v1/ai/api/v1/ai/...}（活体实测单前缀 404、双前缀 200）。
+ * 回归由 {@code AiCapabilityControllerPathContractTest} 与 gateway {@code CliContractParityTest} 双重守护。</p>
  */
 @RestController
-@RequestMapping(AiCapabilityApiPaths.BASE_PREFIX)
 public class AiCapabilityController {
 
     private static final Logger log = LoggerFactory.getLogger(AiCapabilityController.class);
-    private static final String PATH_CAPABILITIES = "/capabilities";
 
     private final CapabilityReadService readService;
     private final ModelCapabilityExecutor executor;
@@ -56,7 +58,7 @@ public class AiCapabilityController {
     }
 
     /** §13 #1 getCapabilities：查询可用能力与契约版本（只读）。 */
-    @GetMapping(PATH_CAPABILITIES)
+    @GetMapping(AiCapabilityApiPaths.CAPABILITIES_COLLECTION)
     public ApiResponse<List<CapabilityReadVO>> getCapabilities() {
         return ApiResponse.success(readService.listCapabilities())
                 .withTraceId(AiTraceSupport.currentTraceId());
