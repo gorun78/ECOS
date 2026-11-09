@@ -1,0 +1,5 @@
+# 构建产物不入库（与 ecos_backend/.gitignore 同口径）
+target/
+*.class
+*.jar
+!.gitkeep

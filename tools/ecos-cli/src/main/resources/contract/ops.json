@@ -1,0 +1,683 @@
+{
+  "contractVersion" : "1.0.0",
+  "contracts" : [
+    {
+      "file" : "platform-v1.yaml",
+      "sha256" : "8cd847e639fd3ef6f86cf34b27d443b6850cb5a696f525607b2f538d3abf5a30",
+      "paths" : 4,
+      "operations" : 4
+    },
+    {
+      "file" : "supplementary-cognitive-ai-v1.yaml",
+      "sha256" : "e3d063865f4a971df8d7ac84ee7a0f343232622421e6163c6f649e17d4bbc9f9",
+      "paths" : 54,
+      "operations" : 57
+    },
+    {
+      "file" : "wagent-v1.yaml",
+      "sha256" : "0d8a70bcfdd9e4bba78510941537fd4909abaf04650680b04d01b796099d654b",
+      "paths" : 26,
+      "operations" : 26
+    }
+  ],
+  "operations" : [
+    {
+      "operationId" : "getGatewayHealth",
+      "method" : "GET",
+      "path" : "/actuator/health",
+      "status" : "framework",
+      "contract" : "platform-v1.yaml"
+    },
+    {
+      "operationId" : "getMonitorHealth",
+      "method" : "GET",
+      "path" : "/api/monitor/health",
+      "status" : "implemented",
+      "contract" : "platform-v1.yaml"
+    },
+    {
+      "operationId" : "listCapabilities",
+      "method" : "GET",
+      "path" : "/api/v1/ai/capabilities",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "getCapabilityTaskStatus",
+      "method" : "GET",
+      "path" : "/api/v1/ai/capabilities/tasks/{taskId}/status",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "executeCapability",
+      "method" : "POST",
+      "path" : "/api/v1/ai/capabilities/{id}/execute",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "submitCapabilityTask",
+      "method" : "POST",
+      "path" : "/api/v1/ai/capabilities/{id}/tasks",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "listScenarioBlueprints",
+      "method" : "GET",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "createScenarioBlueprint",
+      "method" : "POST",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "getScenarioBlueprint",
+      "method" : "GET",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "approveScenarioBlueprint",
+      "method" : "POST",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}/approve",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "diffScenarioBlueprint",
+      "method" : "GET",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}/diff",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "enterApprovalScenarioBlueprint",
+      "method" : "POST",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}/enter-approval",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "releaseScenarioBlueprint",
+      "method" : "POST",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}/release",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "reviseScenarioBlueprint",
+      "method" : "POST",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}/revise",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "transitionScenarioBlueprint",
+      "method" : "POST",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}/transition",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "transitionScenarioBlueprintTo",
+      "method" : "POST",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}/transition/{target}",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "validateScenarioBlueprint",
+      "method" : "GET",
+      "path" : "/api/v1/business/scenarios/{scenarioId}/blueprints/{id}/validate",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "listCognitiveAssetCatalog",
+      "method" : "GET",
+      "path" : "/api/v1/cognitive/assets/catalog",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "proposeCognitiveAssetChange",
+      "method" : "POST",
+      "path" : "/api/v1/cognitive/assets/{assetId}/proposals",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "resolveCognitiveAsset",
+      "method" : "GET",
+      "path" : "/api/v1/cognitive/assets/{assetId}/resolve",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "transitionCognitiveAsset",
+      "method" : "POST",
+      "path" : "/api/v1/cognitive/assets/{assetId}/transitions",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "buildContextPack",
+      "method" : "POST",
+      "path" : "/api/v1/cognitive/context/build",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "getCognitiveHealth",
+      "method" : "GET",
+      "path" : "/api/v1/cognitive/health",
+      "status" : "partial",
+      "contract" : "platform-v1.yaml"
+    },
+    {
+      "operationId" : "listCognitiveModels",
+      "method" : "GET",
+      "path" : "/api/v1/cognitive/models",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "listOutcomesByScenario",
+      "method" : "GET",
+      "path" : "/api/v1/cognitive/outcomes",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "listOutcomesByRun",
+      "method" : "GET",
+      "path" : "/api/v1/cognitive/outcomes/by-run/{runId}",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "evaluateOutcome",
+      "method" : "POST",
+      "path" : "/api/v1/cognitive/outcomes/evaluate",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "getOutcomeEvaluation",
+      "method" : "GET",
+      "path" : "/api/v1/cognitive/outcomes/{evaluationId}",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "backtestOutcome",
+      "method" : "GET",
+      "path" : "/api/v1/cognitive/outcomes/{evaluationId}/backtest",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "createOutcomeReviewTask",
+      "method" : "POST",
+      "path" : "/api/v1/cognitive/outcomes/{evaluationId}/review-tasks",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "listDataGovernanceCandidates",
+      "method" : "GET",
+      "path" : "/api/v1/data/governance/candidates",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "createDataGovernanceCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "getDataGovernanceCandidate",
+      "method" : "GET",
+      "path" : "/api/v1/data/governance/candidates/{candidateId}",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "approveDataGovernanceCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates/{candidateId}/approve",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "applyDataGovernanceCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates/{id}/apply",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "conflictDataGovernanceCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates/{id}/conflict",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "expireDataGovernanceCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates/{id}/expire",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "needEvidenceDataGovernanceCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates/{id}/need-evidence",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "rejectDataGovernanceCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates/{id}/reject",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "submitDataGovernanceCandidateToApproval",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates/{id}/submit-to-approval",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "validateDataGovernanceCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/candidates/{id}/validate",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "dqPreviewDataGovernanceCandidate",
+      "method" : "GET",
+      "path" : "/api/v1/data/governance/dq-preview/{id}",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "suggestDqRules",
+      "method" : "GET",
+      "path" : "/api/v1/data/governance/dq-rule-suggest",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "suggestFieldMapping",
+      "method" : "GET",
+      "path" : "/api/v1/data/governance/field-mapping-suggest",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "suggestFieldSemantic",
+      "method" : "GET",
+      "path" : "/api/v1/data/governance/field-semantic-suggest",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "runDataProfile",
+      "method" : "POST",
+      "path" : "/api/v1/data/governance/profile",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "listOntologyCandidates",
+      "method" : "GET",
+      "path" : "/api/v1/ontology/candidates",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "createOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "gapAnalyzeOntology",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/gap-analyze",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "getOntologyCandidate",
+      "method" : "GET",
+      "path" : "/api/v1/ontology/candidates/{candidateId}",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "validateOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{candidateId}/validate",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "applyOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/apply",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "approveOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/approve",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "markOntologyCandidateChecked",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/checked",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "conflictOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/conflict",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "diffPreviewOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/diff-preview",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "expireOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/expire",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "needEvidenceOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/need-evidence",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "rejectOntologyCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/reject",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "submitOntologyCandidateToProposal",
+      "method" : "POST",
+      "path" : "/api/v1/ontology/candidates/{id}/submit-proposal",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "getCurrentUserProfile",
+      "method" : "GET",
+      "path" : "/api/v1/system/users/me/profile",
+      "status" : "implemented",
+      "contract" : "platform-v1.yaml"
+    },
+    {
+      "operationId" : "draftAction",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/actions",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "commitAction",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/actions/{actionId}/commit",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "listCandidates",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/candidates",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "getCandidate",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/candidates/{candidateId}",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "reviewCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/candidates/{candidateId}/approve",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "publishCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/candidates/{candidateId}/publish",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "listClaims",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/claims/{runId}",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "recordDecision",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/decisions",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "traceEvidence",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/evidence",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "setKillSwitch",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/flags/kill-switch",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "createGoal",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/goals",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "reviseGoal",
+      "method" : "PATCH",
+      "path" : "/api/v1/wagent/goals/{goalId}",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "createQuestion",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/questions",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "getQuestion",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/questions/{questionId}",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "getReadiness",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/readiness",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "refillReadiness",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/readiness/{questionId}/refill",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "startRun",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/runs",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "getRun",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/runs/{runId}",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "approveRunGate",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/runs/{runId}/approval",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "cancelRun",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/runs/{runId}/cancel",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "streamRunEvents",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/runs/{runId}/events",
+      "status" : "partial",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "submitRunInput",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/runs/{runId}/input",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "getRunProgressCapability",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/runs/{runId}/progress-capability",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "searchTools",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/tools",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "describeTool",
+      "method" : "GET",
+      "path" : "/api/v1/wagent/tools/{name}",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "validateToolContract",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/tools/{name}/validate",
+      "status" : "planned",
+      "contract" : "wagent-v1.yaml"
+    }
+  ],
+  "commands" : [
+    {
+      "name" : "doctor",
+      "description" : "环境与连通性自检（网关可达 / 认知读面 / 监控 / 凭据有效性）；只读",
+      "accessMode" : "READ",
+      "operationIds" : [
+        "getGatewayHealth",
+        "listCognitiveModels",
+        "getMonitorHealth",
+        "getCurrentUserProfile"
+      ],
+      "flags" : [ ]
+    },
+    {
+      "name" : "cognition models list",
+      "description" : "认知模型注册表只读列表；参数名取自契约 listCognitiveModels",
+      "accessMode" : "READ",
+      "operationIds" : [
+        "listCognitiveModels"
+      ],
+      "flags" : [
+        {
+          "flag" : "--model-type",
+          "operationId" : "listCognitiveModels",
+          "parameter" : "modelType",
+          "description" : "模型类型过滤"
+        },
+        {
+          "flag" : "--registry-state",
+          "operationId" : "listCognitiveModels",
+          "parameter" : "registryState",
+          "description" : "注册表状态过滤（如 PUBLISHED）"
+        },
+        {
+          "flag" : "--model-kind",
+          "operationId" : "listCognitiveModels",
+          "parameter" : "cognitiveModelType",
+          "description" : "认知模型类型（CM-01~CM-xx）"
+        }
+      ]
+    },
+    {
+      "name" : "capabilities list",
+      "description" : "命令发现与自描述（含每个命令的操作映射与实现状态）；只读",
+      "accessMode" : "READ",
+      "operationIds" : [ ],
+      "flags" : [ ]
+    }
+  ]
+}
