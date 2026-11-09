@@ -1172,7 +1172,7 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 | topic 路由：聚合名 `cognition` → `ecos.cognitive`；`scenario` 走默认 `ecos.audit` | `KafkaTopics.topicForAggregate`（additive case 分支） | §13 |
 | 认知域路径单源追加：`CONTEXT_BUILD` / `ASSETS_CATALOG` / `ASSETS_RESOLVE` / `ASSETS_PROPOSALS` / `OUTCOMES_EVALUATE` | `CognitiveApiPaths.java`（append-only） | §5/§8/§9 端点 |
 | 错误码增量：来源引用缺失 / 权限拒绝 / 状态非法 / 版本失配 / BLOCKER 缺口未关 / 语义冲突 / 依赖不可用 / 预算耗尽 | `CognitiveErrorCode.java`（append-only，冻结字面量） | §13.1 |
-| OpenAPI 单源（12 端点 + 2 逻辑事件 + trace 维度） | `docs/30-设计/openapi/supplementary-cognitive-ai-v1.yaml` | §13 / §12.2 / P-5 |
+| OpenAPI 单源（12 端点 + 2 逻辑事件 + trace 维度） | `docs/10-架构/api-contracts/openapi/supplementary-cognitive-ai-v1.yaml`（2026-11-09 由 `docs/30-设计/openapi/` 迁位） | §13 / §12.2 / P-5 |
 
 ### 19.2 DDL（V267~V274，仅文件，未实跑）
 
@@ -1246,7 +1246,7 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 | SUP-FEEDBACK-01 | 各模块 · 四层指标复用既有可观测性（C.7 事件日志面 + §12.1 指标目录已定义）；端到端仪表/报告查询 live 记「未执行（需实跑+前端）」 | 数据/认知/场景/业务指标可查定义与来源 |
 | SUP-GOV-01 | data-engine/ai-engine · fail-closed 分支（安全服务超时/无策略/无凭证 → DENY）复用既有 ArchUnit 安全卡 | 所有写操作 fail-closed |
 | SUP-GOV-02 | ai-engine · `CapabilityTaskLedgerTest#asyncSubmitOnlyGoesThroughInjectedRuntimeTask` + `#submitWithoutRuntimeTaskFailsExplicitly`（**载体名订正**：原登 `CapabilityTaskServiceTest` 仓内零实存，SUP-MODEL-02/03 两行已订正但本行漏改，2026-10-11 实测补齐）+ 既有 NoDirectScheduler ArchTest | 无新增私有调度器/裸线程 |
-| SUP-GOV-03 | `docs/30-设计/openapi/supplementary-cognitive-ai-v1.yaml` + 各 ApiPaths 单源（12 端点 operationId 齐） | 新增 API 均有 operationId 与契约校验 |
+| SUP-GOV-03 | `docs/10-架构/api-contracts/openapi/supplementary-cognitive-ai-v1.yaml`（2026-11-09 迁位）+ 各 ApiPaths 单源（12 端点 operationId 齐） | 新增 API 均有 operationId 与契约校验 |
 
 ### 19.6 未决项（下沉后续批次，不冒充完成）
 

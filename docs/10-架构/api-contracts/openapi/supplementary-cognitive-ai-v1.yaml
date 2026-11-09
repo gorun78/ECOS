@@ -60,6 +60,8 @@ tags:
     description: §10 能力目录/执行/长任务（Model & Capability Center）
   - name: scenario-blueprints
     description: §6 场景蓝图（属主 workspace 场景层；2026-10-12 复盘补登，ScenarioBlueprintController.java:34 类前缀实测）
+  - name: cognitive-models
+    description: 认知模型注册表只读查询（ForecastController.java:70 实测；CLI 首批只读命令 cognition models list 的契约锚）
 
 paths:
   /api/v1/cognitive/context/build:
@@ -155,6 +157,39 @@ paths:
         "400": { description: evidenceRefs 缺失/变更类型非法 }
         "409": { description: 资产状态冻结（如 PUBLISHED 模型版本） }
       x-event: "CognitiveCandidateProposed（EventTypes.Cognition → ecos.cognitive）"
+
+  /api/v1/cognitive/models:
+    get:
+      tags: [cognitive-models]
+      operationId: listCognitiveModels
+      summary: 认知模型注册表只读列表（CLI 首批命令 cognition models list）
+      x-implementation-status: implemented
+      x-implementation-ref: "ForecastController.java:70（类 @RequestMapping /api/v1/cognitive + @GetMapping /models）"
+      x-design-ref: "合并需求册 v2.1-R6 §4.7 REQ-CLI-03；R-71 ① 首批只读命令"
+      parameters:
+        - name: modelType
+          in: query
+          required: false
+          schema: { type: string }
+        - name: registryState
+          in: query
+          required: false
+          schema: { type: string }
+          description: 注册表状态过滤（如 PUBLISHED）；与 cognitiveModelType 同传时走注册表过滤口径
+        - name: cognitiveModelType
+          in: query
+          required: false
+          schema: { type: string }
+          description: 认知模型类型（CM-01~CM-xx）
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 模型行列表（无命中返回空数组，禁把依赖不可用伪装成空集合）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "403":
+          $ref: "#/components/responses/E403"
 
   /api/v1/cognitive/outcomes/evaluate:
     post:
@@ -344,6 +379,7 @@ paths:
       operationId: executeCapability
       summary: §10.3 同步执行（经 Model Router 选模；质量/校准/密级/预算各维度评分链）
       x-implementation-status: implemented
+      x-fix-2026-11-09: "D-CLI-1 已修：删 AiCapabilityController 类级 @RequestMapping(BASE_PREFIX)（方法常量本为全路径，叠加成双前缀）；回归由 AiCapabilityControllerPathContractTest 守护（单前缀命中 handler、双前缀不命中）"
       x-design-ref: "SUP-MODEL-02/03；§10.6 未通过质量阈值的备用模型不得被自动选中"
       x-correction-2026-10-12: "路径参数名按代码单源订正为 id（AiCapabilityApiPaths.java:18,28；原登记 capabilityId 与代码 P_ID=\"id\" 不符，路由结构不变）"
       parameters:
@@ -360,13 +396,14 @@ paths:
       operationId: submitCapabilityTask
       summary: §10.3 异步长任务提交（经 runtime-task，返回 taskId）
       x-implementation-status: implemented
+      x-fix-2026-11-09: "D-CLI-1 已修：同 executeCapability（AiCapabilityControllerPathContractTest 守护）"
       x-design-ref: "长任务唯一入口 = runtime-task（铁律 §2.5；SUP-GOV-02）"
       x-correction-2026-10-12: "路径参数名按代码单源订正为 id（AiCapabilityApiPaths.java:31）"
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       security: [{ bearerAuth: [] }]
       responses:
-        "202": { description: AsyncCapabilityHandle{taskId,capabilityId,submittedAt} }
+        "202": { description: "AsyncCapabilityHandle{taskId,capabilityId,submittedAt}" }
 
   # ═════════════════════════════════════════════════════════════════
   # 2026-10-12 全量设计复盘补登区（实现已在位、原 yaml 未登记的端点；
@@ -711,6 +748,7 @@ paths:
       operationId: getCapabilityTaskStatus
       summary: §10.4 长任务状态回读（GET /api/v1/ai/capabilities/tasks/{taskId}/status）
       x-implementation-status: implemented
+      x-fix-2026-11-09: "D-CLI-1 已修：同 executeCapability（AiCapabilityControllerPathContractTest 守护）"
       parameters:
         - { name: taskId, in: path, required: true, schema: { type: string } }
       security: [{ bearerAuth: [] }]

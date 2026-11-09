@@ -1,0 +1,149 @@
+# =====================================================================
+# platform-v1.yaml — 平台面（健康/身份）机器可读契约 · CLI 首批只读命令的契约锚
+# ---------------------------------------------------------------------
+# 溯源：合并需求册 v2.1-R6 §4.7（REQ-CLI-03/04/06/09）；R-71 ① 首批只读命令；
+#       ADR-21 §2.2（每条 CLI 命令必须映射到一个 operationId，禁手写 URL）；
+#       PRD-01 REQ-PLT-26/27（机器可读契约单源 + CLI 控制面）。
+# ---------------------------------------------------------------------
+# 工件属性（诚实声明）：
+#   1. 本文件是**手工登记**的机器可读契约，不是 springdoc 生成物。
+#      springdoc 已在 gateway 挂载（gateway/pom.xml:141），但运行时 /v3/api-docs
+#      与本文的一致性门禁归 P-5 后续批次，本文件不据此声明"已自动对齐"。
+#   2. x-implementation-status 三值口径与 wagent-v1.yaml 一致，另加 framework：
+#      framework = 由框架/运行时提供（非本仓 Controller），Controller 对位门禁豁免，
+#      但必须在此显式登记，不得用豁免掩盖真实缺位。
+#   3. 本文件只收录 CLI 已批准命令实际调用的端点，不预登记未立项能力；
+#      新增命令必须先在此（或对应域契约）登记 operationId，再写 CLI 代码。
+#   4. 安全：除 /actuator/health 为运维探活匿名面外，全部要求 JWT；
+#      鉴权/授权裁决一律在服务端（security-engine + ABAC），CLI 本地判断无效。
+# =====================================================================
+openapi: 3.0.3
+info:
+  title: ECOS Platform API（health / identity）
+  version: 1.0.0
+  description: |
+    平台面只读端点：网关与引擎健康、当前调用者身份投影。
+    供 CLI 首批只读命令（`ecos doctor` / 身份检查）作契约锚使用。
+    失败语义：依赖真实不可用 → 5xx/503 或结构化 BLOCKED，禁伪空集合、禁伪成功。
+  contact:
+    name: ECOS CLI MVP 批次（2026-11-09）
+  license:
+    name: Proprietary
+servers:
+  - url: http://localhost:8080
+    description: 网关聚合入口（gateway:8080；CLI 只允许经此入口）
+tags:
+  - name: health
+    description: 网关/引擎/监控健康面（doctor 预检数据源）
+  - name: identity
+    description: 当前调用者身份投影（凭据有效性校验）
+
+paths:
+  /actuator/health:
+    get:
+      tags: [health]
+      operationId: getGatewayHealth
+      summary: 网关自身健康（Spring Actuator，匿名探活面）
+      x-implementation-status: framework
+      x-implementation-ref: "spring-boot-starter-actuator（gateway/pom.xml:149）；AnonymousEndpointRegistry.java:87"
+      x-design-ref: "R-71 ①；REQ-CLI-11 预检四分类"
+      security: []
+      responses:
+        "200":
+          description: 网关进程健康（status=UP/DOWN/OUT_OF_SERVICE）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: UP }
+                additionalProperties: true
+        "503":
+          description: 健康检查失败（真实透传，禁伪 UP）
+
+  /api/monitor/health:
+    get:
+      tags: [health]
+      operationId: getMonitorHealth
+      summary: 运行时监控健康聚合（gateway MonitorController）
+      x-implementation-status: implemented
+      x-implementation-ref: "MonitorController.java:97（类 @RequestMapping /api/monitor + @GetMapping /health）"
+      x-design-ref: "R-71 ①；REQ-CLI-04 只读依赖预检"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 监控聚合健康视图（MonitorHealthVO）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401":
+          $ref: "#/components/responses/E401"
+        "403":
+          $ref: "#/components/responses/E403"
+        "503":
+          $ref: "#/components/responses/E503"
+
+  /api/v1/cognitive/health:
+    get:
+      tags: [health]
+      operationId: getCognitiveHealth
+      summary: 认知引擎健康（cognitive-engine CognitiveEngineHealthController）
+      x-implementation-status: partial
+      x-blocker-2026-11-09: "D-CLI-2：该 Controller 被 gateway GatewayApplication.java:86-88 的 excludeFilters 排除（与 ai-engine CognitiveController 同路径冲突）⇒ 经网关实测 404，仅能直连 aiming 服务；CLI 只允许经 gateway，故不作为 doctor 检查项（doctor 改用 listCognitiveModels 判认知读面）。若需网关暴露，须先解冲突并改扫描配置，属独立裁决。"
+      x-implementation-ref: "CognitiveEngineHealthController.java:93（类 @RequestMapping /api/v1/cognitive + @GetMapping /health）"
+      x-design-ref: "R-71 ①；REQ-CLI-04 只读依赖预检"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 引擎健康快照（Map 形态，非 ApiResponse 信封；字段以实测为准）
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/E401"
+        "503":
+          $ref: "#/components/responses/E503"
+
+  /api/v1/system/users/me/profile:
+    get:
+      tags: [identity]
+      operationId: getCurrentUserProfile
+      summary: 当前登录用户基础信息投影（凭据有效性 + 调用者关联）
+      x-implementation-status: implemented
+      x-implementation-ref: "UserController.java:112（类 @RequestMapping /api/v1/system/users + @GetMapping /me/profile）"
+      x-design-ref: "REQ-CLI-09 复用既有认证；REQ-CLI-10 审计与身份关联"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 白名单字段投影（userId/username/realName/orgId/status/locked/userType）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401":
+          $ref: "#/components/responses/E401"
+        "403":
+          $ref: "#/components/responses/E403"
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    ApiResponse:
+      type: object
+      description: runtime/common-api ApiResponse 统一信封（实测字段）
+      properties:
+        code: { type: integer, example: 0 }
+        errorCode: { type: string, nullable: true }
+        message: { type: string, nullable: true }
+        data: { type: object, additionalProperties: true, nullable: true }
+        timestamp: { type: integer, format: int64, nullable: true }
+        traceId: { type: string, nullable: true }
+  responses:
+    E401:
+      description: 未认证或 Token 过期（CLI 记 BLOCKED，禁重试成假成功）
+    E403:
+      description: 已认证但准入/权限拒绝（服务端 ABAC 裁决，CLI 不得自行放行）
+    E503:
+      description: 依赖真实不可用（CLI 记 UNAVAILABLE）

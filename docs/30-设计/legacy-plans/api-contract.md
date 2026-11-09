@@ -1,9 +1,9 @@
 # ECOS 微服务改造 — API 契约
 
 > **【已被取代 · 2026-10-12 全量设计复盘登记】** 本文大半内容已被现行契约单源取代：机器可读契约见
-> `docs/30-设计/openapi/supplementary-cognitive-ai-v1.yaml` 与 `wagent-v1.yaml`（P-5 回写口径见
-> `详细设计-08-前端与BFF-2026-09-29.md` §9.1 2026-10-12 注记块，含 R-56 目标位 `docs/10-架构/api-contracts/`
-> 实测暂缺的位置裁决悬置注记）；自认基准 `current-plan.md` 已缺失（断链）；`ecos_backend/common` 路径不存在；
+> `docs/10-架构/api-contracts/openapi/supplementary-cognitive-ai-v1.yaml`、`wagent-v1.yaml` 与
+> `platform-v1.yaml`（2026-11-09 由 `docs/30-设计/openapi/` 按 REQ-PLT-26 原文位迁入；P-5 回写口径见
+> `详细设计-08-前端与BFF-2026-09-29.md` §9.1 2026-10-12 注记块，原 "R-56 目标位实测暂缺" 已结案）；自认基准 `current-plan.md` 已缺失（断链）；`ecos_backend/common` 路径不存在；
 > §2 ApiResponse 无 traceId 已被实测补齐。**残值保留**：ontology 32 Controller/204 端点快照、Kafka topic 表、
 > X-ECOS-* 头清单。后续施工不得以本文为权威（判定出处：`docs/50-测试/复盘报告-设计域全量分册-2026-10-12.md` §3.13）。
 
