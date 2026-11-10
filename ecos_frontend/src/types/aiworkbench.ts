@@ -49,6 +49,17 @@ export interface AIPAgent {
   guardrailIds: string[];
   status: 'active' | 'development';
   lastModified: string;
+  // ── Copilot 内置智能体扩展（metadata 单源；非内置智能体为空/未定义） ──
+  /** 所属引擎（data-engine/ontology-engine/kb-engine/ai-engine/workspace/security-engine） */
+  engine?: string;
+  /** 页面路由前缀（Copilot 按当前界面自动切换） */
+  routes?: string[];
+  /** 引擎工具白名单（真值 = metadata.toolWhitelist；空数组 = 未配置） */
+  toolWhitelist?: string[];
+  /** RAG 知识库绑定 {docIds, categories, topK} */
+  rag?: { docIds: string[]; categories: string[]; topK: number };
+  /** 发布与嵌入 {status, version, channel} */
+  publish?: { status: 'draft' | 'published'; version: number; channel?: string };
 }
 
 export interface AIPModel {

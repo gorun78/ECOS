@@ -30,4 +30,15 @@ public interface AgentMcpCapability {
      * @throws AgentRuntimeCapabilityUnavailableException 通道不可用时
      */
     String callTool(String toolName, Map<String, Object> args);
+
+    /**
+     * MCP {@code tools/list} 工具发现（P1-8）。
+     *
+     * <p>默认实现返回错误文本（未实现方不得冒充「无工具」）；支持方返回
+     * {@code tools/list} 的 JSON 文本（{@code {"tools":[{name,description,...}]}}）。
+     * 只增方法（SPI 只增不改）。</p>
+     */
+    default String listTools() {
+        return "{\"error\":\"tools/list not implemented by provider\"}";
+    }
 }

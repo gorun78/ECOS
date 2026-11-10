@@ -41,6 +41,11 @@ public class ChatResponse {
     private int retriesAttempted;
     /** 是否已在网关内部路由到备用 provider（F06-14 要点 2，引擎侧禁绕行） */
     private boolean fallbackProviderUsed;
+    /**
+     * 原生工具调用（OpenAI 兼容 {@code message.tool_calls} 元素：id/type/function{name,arguments}）。
+     * 流式路径按 index 聚合后同样落此字段；空列表 = 本轮为纯文本回复。
+     */
+    private java.util.List<java.util.Map<String, Object>> toolCalls = new java.util.ArrayList<>();
 
     public ChatResponse() {}
 
@@ -139,6 +144,16 @@ public class ChatResponse {
     public boolean isFallbackProviderUsed() { return fallbackProviderUsed; }
     public void setFallbackProviderUsed(boolean fallbackProviderUsed) {
         this.fallbackProviderUsed = fallbackProviderUsed;
+    }
+
+    public java.util.List<java.util.Map<String, Object>> getToolCalls() { return toolCalls; }
+    public void setToolCalls(java.util.List<java.util.Map<String, Object>> toolCalls) {
+        this.toolCalls = toolCalls == null ? new java.util.ArrayList<>() : toolCalls;
+    }
+
+    /** 本轮是否返回了原生工具调用。 */
+    public boolean hasToolCalls() {
+        return toolCalls != null && !toolCalls.isEmpty();
     }
 }
 

@@ -82,8 +82,8 @@ export default function KnowledgeArticleCreateForm({ onCreated }: { onCreated?: 
       <div className="flex justify-end">
         <button
           type="button"
-          className="px-2.5 py-1 rounded-md border text-xs inline-flex items-center gap-1"
-          style={{ borderColor: styles.cardBorder, color: styles.cardText, background: styles.cardBg }}
+          className={`px-2.5 py-1 rounded-md border text-xs inline-flex items-center gap-1 ${styles.cardBorder} ${styles.cardText} ${styles.cardBg}`}
+
           onClick={() => setOpen(true)}
           data-testid="knowledge-article-create-open"
         >
@@ -102,16 +102,16 @@ export default function KnowledgeArticleCreateForm({ onCreated }: { onCreated?: 
 
   return (
     <section
-      className="rounded-md border p-3 flex flex-col gap-2"
-      style={{ borderColor: styles.cardBorder, background: styles.cardBg, color: styles.cardText }}
+      className={`rounded-md border p-3 flex flex-col gap-2 ${styles.cardBorder} ${styles.cardBg} ${styles.cardText}`}
+
       data-testid="knowledge-article-create-form"
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{t('knowledge.articleForm.title')}</span>
         <button
           type="button"
-          className="p-1 rounded"
-          style={{ color: styles.cardTextMuted }}
+          className={`p-1 rounded ${styles.cardTextMuted}`}
+
           onClick={() => { setOpen(false); reset(); }}
           aria-label={t('knowledge.articleForm.close')}
         >
@@ -138,7 +138,7 @@ export default function KnowledgeArticleCreateForm({ onCreated }: { onCreated?: 
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-xs" style={{ color: styles.cardTextMuted }}>
+        <label className={`text-xs ${styles.cardTextMuted}`}>
           {t('knowledge.articleForm.category')}
         </label>
         <select
@@ -166,7 +166,7 @@ export default function KnowledgeArticleCreateForm({ onCreated }: { onCreated?: 
       </div>
 
       {state === 'error' && message && (
-        <div className="text-xs flex items-center gap-1.5" style={{ color: styles.warningText }}
+        <div className={`text-xs flex items-center gap-1.5 ${styles.warningText}`}
              data-testid="knowledge-article-error">
           <AlertTriangle className="w-3.5 h-3.5" />
           {message}
@@ -174,7 +174,7 @@ export default function KnowledgeArticleCreateForm({ onCreated }: { onCreated?: 
       )}
 
       {state === 'ok' && message && (
-        <div className="text-xs flex items-center gap-1.5" style={{ color: styles.successText }}
+        <div className={`text-xs flex items-center gap-1.5 ${styles.successText}`}
              data-testid="knowledge-article-ok">
           <CheckCircle2 className="w-3.5 h-3.5" />
           {message}
@@ -184,8 +184,8 @@ export default function KnowledgeArticleCreateForm({ onCreated }: { onCreated?: 
       <div className="flex justify-end">
         <button
           type="button"
-          className="px-3 py-1 rounded-md border text-xs inline-flex items-center gap-1"
-          style={{ borderColor: styles.accentBorder, color: styles.cardText }}
+          className={`px-3 py-1 rounded-md border text-xs inline-flex items-center gap-1 ${styles.accentBorder} ${styles.cardText}`}
+
           onClick={() => void submit()}
           disabled={state === 'submitting'}
           data-testid="knowledge-article-submit"

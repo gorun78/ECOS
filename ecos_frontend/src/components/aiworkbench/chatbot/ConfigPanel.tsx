@@ -65,8 +65,10 @@ interface ConfigPanelProps {
   apiLang: string;
   setApiLang: React.Dispatch<React.SetStateAction<string>>;
   // Actions
-  onEditConfig: () => void;
-  onDelete: () => void;
+  onEditConfig: () => void;  onDelete: () => void;
+  /** P1-Copilot：发布（配置级，写 metadata.publish，版本+1）；未传则保持禁用 */
+  onPublish?: () => void;
+  publishing?: boolean;
   styles: Record<string, string>;
 }
 
@@ -105,6 +107,8 @@ export default function ConfigPanel({
   setApiLang,
   onEditConfig,
   onDelete,
+  onPublish,
+  publishing,
   styles,
 }: ConfigPanelProps) {
   const { t } = useLanguage();
@@ -268,6 +272,34 @@ export default function ConfigPanel({
                 <strong>{t('aiworkbench.chatbot.ontologyProtocol')}</strong>{t('aiworkbench.chatbot.ontologyProtocolDesc')}
               </p>
             </div>
+
+            {/* P1-Copilot 引擎工具面：metadata.toolWhitelist 真值展示（编辑经元数据弹窗的引擎工具清单） */}
+            {activeChatbot.toolWhitelist && activeChatbot.toolWhitelist.length > 0 && (
+              <div className={`p-3 ${styles.cardBg} border ${styles.cardBorder} rounded-xl space-y-2`}>
+                <h4 className={`text-[11px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono flex items-center gap-1`}>
+                  <Icon name="Wrench" size={11} />
+                  <span>{t('aiworkbench.chatbot.toolFaceTitle')}</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${styles.badgeBg} ${styles.muted}`}>
+                    {activeChatbot.toolWhitelist.length}
+                  </span>
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeChatbot.toolWhitelist.slice(0, 18).map(name => (
+                    <span key={name} className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${styles.badgeBg} ${styles.cardTextMuted}`}>
+                      {name}
+                    </span>
+                  ))}
+                  {activeChatbot.toolWhitelist.length > 18 && (
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${styles.badgeBg} ${styles.muted}`}>
+                      +{activeChatbot.toolWhitelist.length - 18}
+                    </span>
+                  )}
+                </div>
+                <p className={`text-[10px] ${styles.cardTextMuted}`}>
+                  {t('aiworkbench.chatbot.toolFaceHint')}
+                </p>
+              </div>
+            )}
 
             {/* 1. Object Types */}
             <div className="space-y-2">
@@ -528,8 +560,8 @@ export default function ConfigPanel({
         {/* TAB 5: Publishing & Deployment options */}
         {activeWorkspaceTab === 'publish' && (
           <div className="space-y-4 font-sans">
-            {/* §4.5 P0：编译/发布无后端端点（status/versions/rollback 均为 ghost）→
-                发布控件禁用 + 「能力未上线」，假进度罐头日志控制台已移除 */}
+            {/* P1-Copilot：发布改为配置级真实通道 —— 写 metadata.publish（版本+1），
+                嵌入信息基于真实端点 /api/v1/agent/copilot/chat 生成；编译/部署管道仍不在此范围 */}
             <div className={`p-4 ${styles.accentBg} rounded-2xl text-white space-y-4 relative overflow-hidden shadow-md`}>
               <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-4 translate-y-4 scale-150">
                 <Icon name="Send" size={120} />
@@ -537,22 +569,28 @@ export default function ConfigPanel({
               <div className="space-y-1">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="px-1.5 py-0.5 bg-blue-500 text-white rounded text-[8px] font-extrabold uppercase">
-                    Sovereign Compiler
+                    {t('aiworkbench.chatbot.publishTitle')}
                   </span>
-                  <DemoBadge />
                 </span>
                 <h3 className="font-extrabold text-sm">{t('aiworkbench.chatbot.publishTitle')}</h3>
                 <p className={`text-[10px] ${styles.cardText}`}>
-                  {t('aiworkbench.chatbot.publishOfflineDesc')}
+                  {t('aiworkbench.chatbot.publishConfigDesc')}
+                </p>
+                <p className={`text-[10px] font-mono ${styles.cardText}`}>
+                  {chatbotVersion}
                 </p>
               </div>
               <button type="button"
-                disabled
-                title={t('aiworkbench.chatbot.publishOfflineDesc')}
-                className={`px-4 py-2 ${styles.badgeBg} ${styles.badgeText} font-extrabold rounded-xl text-xs flex items-center gap-1.5 cursor-not-allowed opacity-60`}
+                onClick={() => { if (onPublish && !publishing) onPublish(); }}
+                disabled={!onPublish || publishing}
+                className={`px-4 py-2 font-extrabold rounded-xl text-xs flex items-center gap-1.5 transition-opacity ${
+                  onPublish && !publishing
+                    ? 'bg-white/20 hover:bg-white/30 text-white cursor-pointer'
+                    : `${styles.badgeBg} ${styles.badgeText} cursor-not-allowed opacity-60`
+                }`}
               >
                 <Icon name="Cpu" size={13} />
-                <span>{t('aiworkbench.chatbot.publishBtn')}</span>
+                <span>{publishing ? t('aiworkbench.chatbot.publishCompiling') : t('aiworkbench.chatbot.publishBtn')}</span>
               </button>
             </div>
 

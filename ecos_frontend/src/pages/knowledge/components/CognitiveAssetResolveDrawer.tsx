@@ -38,7 +38,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] uppercase tracking-wider opacity-50">{label}</span>
-      <span className="text-xs" style={{ color: styles.cardText }}>{value ?? '—'}</span>
+      <span className={`text-xs ${styles.cardText}`}>{value ?? '—'}</span>
     </div>
   );
 }
@@ -73,12 +73,12 @@ export default function CognitiveAssetResolveDrawer({ assetId, onClose }: Props)
 
   return (
     <aside
-      className="fixed right-0 top-0 h-full w-full sm:w-96 z-40 border-l flex flex-col"
-      style={{ borderColor: styles.cardBorder, background: styles.cardBg, color: styles.cardText }}
+      className={`fixed right-0 top-0 h-full w-full sm:w-96 z-40 border-l flex flex-col ${styles.cardBorder} ${styles.cardBg} ${styles.cardText}`}
+
       role="dialog"
       aria-label={t('knowledge.cognitiveAsset.drawer_title')}
     >
-      <div className="h-12 flex items-center justify-between px-4 border-b" style={{ borderColor: styles.cardBorder }}>
+      <div className={`h-12 flex items-center justify-between px-4 border-b ${styles.cardBorder}`}>
         <span className="text-xs font-semibold">{t('knowledge.cognitiveAsset.drawer_title')}</span>
         <button type="button" onClick={onClose} className="p-1 rounded hover:opacity-70 cursor-pointer" aria-label={t('common.close') || 'close'}>
           <X className="w-4 h-4" />
@@ -93,7 +93,7 @@ export default function CognitiveAssetResolveDrawer({ assetId, onClose }: Props)
         )}
 
         {state.kind === 'error' && (
-          <div className="rounded-md border p-3 flex flex-col gap-2" style={{ borderColor: styles.warningBorder, background: styles.warningBg, color: styles.warningText }}>
+          <div className={`rounded-md border p-3 flex flex-col gap-2 ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`}>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
               <span>{isEngineDown ? t('knowledge.cognitiveAsset.engine_unavailable') : t('knowledge.cognitiveAsset.resolve_failed')}</span>
@@ -105,8 +105,8 @@ export default function CognitiveAssetResolveDrawer({ assetId, onClose }: Props)
             <button
               type="button"
               onClick={() => void run(assetId)}
-              className="inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded border text-[11px] cursor-pointer"
-              style={{ borderColor: styles.cardBorder, color: styles.cardText }}
+              className={`inline-flex items-center gap-1.5 self-start px-2.5 py-1 rounded border text-[11px] cursor-pointer ${styles.cardBorder} ${styles.cardText}`}
+
             >
               <RefreshCw className="w-3 h-3" />{t('knowledge.cognitiveAsset.retry')}
             </button>
@@ -142,7 +142,7 @@ export default function CognitiveAssetResolveDrawer({ assetId, onClose }: Props)
             )}
 
             {state.data.assetClass === 'BELIEF' && (
-              <div className="rounded-md border p-3 flex flex-col gap-3" style={{ borderColor: styles.cardBorder }}>
+              <div className={`rounded-md border p-3 flex flex-col gap-3 ${styles.cardBorder}`}>
                 <div className="text-[10px] uppercase tracking-wider opacity-50">{t('knowledge.cognitiveAsset.confidence_title')}</div>
                 <div className="grid grid-cols-2 gap-3">
                   <Field
@@ -161,7 +161,7 @@ export default function CognitiveAssetResolveDrawer({ assetId, onClose }: Props)
                   />
                 </div>
                 {isUncalibratedKind(state.data.confidenceKind ?? null) && (
-                  <div className="flex items-center gap-1.5 text-[11px]" style={{ color: styles.warningText }}>
+                  <div className={`flex items-center gap-1.5 text-[11px] ${styles.warningText}`}>
                     <AlertTriangle className="w-3 h-3" />{t('knowledge.cognitiveAsset.uncalibrated_warn')}
                   </div>
                 )}
@@ -174,7 +174,7 @@ export default function CognitiveAssetResolveDrawer({ assetId, onClose }: Props)
               </div>
             )}
 
-            <div className="border-t pt-3 flex flex-col gap-3" style={{ borderColor: styles.cardBorder }}>
+            <div className={`border-t pt-3 flex flex-col gap-3 ${styles.cardBorder}`}>
               <Field label={t('knowledge.cognitiveAsset.field_objectKey')} value={state.data.objectKey} />
               {/* 来源标识（§1.4.3 流程 3 / 复盘 S6）：resolve DTO 服务端实核不含
                   sourceScenarioId/blueprintId/originRef 类字段 → 如实呈现受限说明，不伪造跳转。 */}

@@ -143,10 +143,10 @@ class ServiceThrownSecurityExceptionFaceRatchetTest {
      * 两种减法，且都必须在台账留痕。</p>
      */
     private static final Map<String, Integer> BASELINE_FACE = new TreeMap<>(Map.of(
-            AI_FILE_TOOL_SERVICE, 2));
+            AI_FILE_TOOL_SERVICE, 4));
 
     /** 面集总数基线（必须与 {@link #BASELINE_FACE} 各值之和同号，防拆细后总数对不上）。 */
-    private static final int BASELINE_SITES = 2;
+    private static final int BASELINE_SITES = 4;
 
     /** 承流面前提基线：主源码面覆盖 {@code SecurityException} 的 {@code @ExceptionHandler} 腿数。 */
     private static final int BASELINE_SECURITY_EXCEPTION_HANDLERS = 0;
@@ -281,8 +281,9 @@ class ServiceThrownSecurityExceptionFaceRatchetTest {
                         + "出现第三个绕过白名单的调用方即红：实跑 " + occurrences(opa, "resolveSafe"));
 
         // ① 活体：留在面集内不豁免，且「逃不到状态行」的归因必须由本类消化腿背书
-        assertEquals(Integer.valueOf(2), scan.face.get(AI_FILE_TOOL_SERVICE),
-                "FileToolService 的 2 枚是运行期真会抛的路径护栏，删它＝拆护栏；本批只登记归因、不改码："
+        assertEquals(Integer.valueOf(4), scan.face.get(AI_FILE_TOOL_SERVICE),
+                "FileToolService 的 4 枚是运行期真会抛的路径护栏（空/越界/符号链接越界/解析失败，"
+                        + "P1-7 符号链接防护新增 2 枚），删它＝拆护栏；本批只登记归因、不改码："
                         + scan.face);
         String fileTool = strippedRepoFile(AI_FILE_TOOL_SERVICE);
         assertEquals(FILE_TOOL_SELF_DIGEST_CATCHES, count(CATCH_SECURITY_EXCEPTION, fileTool),

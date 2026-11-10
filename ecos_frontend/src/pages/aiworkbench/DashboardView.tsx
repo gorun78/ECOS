@@ -535,7 +535,7 @@ export default function DashboardView({
               {session.progress}%
             </span>
           </div>
-          <div className="w-full rounded-full h-2 overflow-hidden" style={{ backgroundColor: "color-mix(in srgb, var(--muted-foreground, #64748B) 25%, transparent)" }}>
+          <div className={`w-full rounded-full h-2 overflow-hidden ${styles.badgeBg}`}>
             <div
               className={`h-full rounded-full transition-all duration-500 ${session.status === 'completed' ? `${styles.successBg}` : `${styles.accentBg}`}`}
               style={{ width: `${session.progress}%` }}

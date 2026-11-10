@@ -32,9 +32,14 @@ public class FileToolService {
 
     private static final int MAX_READ_LINES = 2000;
     private static final int MAX_SEARCH_RESULTS = 50;
+    /** P1-7：单文件写入/补丁字节上限（1 MiB，UTF-8 按字节计） */
+    static final long MAX_WRITE_BYTES = 1024L * 1024L;
 
     /**
      * 解析并安全检查路径：拒绝路径越界（{@code ../../etc/passwd} → SecurityException）。
+     *
+     * <p>P1-7：符号链接逃逸防护——目标父目录存在时按真实路径（toRealPath）判界，
+     * 防止 {@code link -> ../../etc} 绕过词法 normalize。</p>
      *
      * @param relativePath 用户传入的相对路径
      * @return 规范化后的绝对路径
@@ -50,6 +55,20 @@ public class FileToolService {
 
         if (!resolved.startsWith(root)) {
             throw new SecurityException("路径越界拒绝: " + relativePath);
+        }
+
+        // 符号链接逃逸防护：父目录存在时按真实路径再判界（新建文件按父目录判）
+        try {
+            Path parent = resolved.getParent();
+            if (parent != null && Files.exists(parent)) {
+                Path realParent = parent.toRealPath();
+                Path realRoot = Files.exists(root) ? root.toRealPath() : root;
+                if (!realParent.startsWith(realRoot)) {
+                    throw new SecurityException("路径越界拒绝（符号链接）: " + relativePath);
+                }
+            }
+        } catch (IOException e) {
+            throw new SecurityException("路径解析失败: " + relativePath);
         }
         return resolved;
     }
@@ -124,12 +143,19 @@ public class FileToolService {
         }
 
         try {
+            // P1-7：写入字节上限（按 UTF-8 计）
+            String payload = content != null ? content : "";
+            long bytes = payload.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            if (bytes > MAX_WRITE_BYTES) {
+                return new WriteFileResult(false,
+                        "写入超限: " + bytes + " 字节 > 上限 " + MAX_WRITE_BYTES);
+            }
             // 确保父目录存在
             Path parent = filePath.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.writeString(filePath, content != null ? content : "",
+            Files.writeString(filePath, payload,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             log.info("写入文件成功: {}", filePath);
             return new WriteFileResult(true, null);
@@ -245,6 +271,13 @@ public class FileToolService {
             } else {
                 return new PatchResult(false,
                         "未找到匹配的字符串", null);
+            }
+
+            // P1-7：补丁产物字节上限（按 UTF-8 计）
+            long bytes = newContent.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+            if (bytes > MAX_WRITE_BYTES) {
+                return new PatchResult(false,
+                        "补丁产物超限: " + bytes + " 字节 > 上限 " + MAX_WRITE_BYTES, null);
             }
 
             Files.writeString(filePath, newContent,

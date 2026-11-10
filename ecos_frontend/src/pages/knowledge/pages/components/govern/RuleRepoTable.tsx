@@ -190,15 +190,14 @@ export default function RuleRepoTable() {
 
   return (
     <div
-      className="rounded-md border flex flex-col"
-      style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+      className={`rounded-md border flex flex-col ${styles.cardBorder} ${styles.cardBg}`}
     >
       {/* 标题栏 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: styles.cardBorder }}>
+      <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}>
         <div className="flex items-center gap-2 text-sm font-semibold">
-          <ShieldCheck className="w-4 h-4" style={{ color: styles.accentText }} />
+          <ShieldCheck className={`w-4 h-4 ${styles.accentText}`} />
           <span>{t('knowledge.govern.rule_repo')}</span>
-          <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+          <span className={`text-[10px] font-mono ${styles.muted}`}>
             {t('knowledge.govern.rule_count', { count: rules.length })}
           </span>
         </div>
@@ -206,8 +205,7 @@ export default function RuleRepoTable() {
           <button
             type="button"
             onClick={() => void loadRules(search, domain)}
-            className="p-1 rounded border cursor-pointer hover:opacity-70 transition disabled:opacity-50"
-            style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}
+            className={`p-1 rounded border cursor-pointer hover:opacity-70 transition disabled:opacity-50 ${styles.cardBorder} ${styles.cardTextMuted}`}
             title={t('knowledge.govern.rule_refresh')}
             disabled={loading}
           >
@@ -227,8 +225,8 @@ export default function RuleRepoTable() {
       </div>
 
       {errorBanner && (
-        <div className="px-3 py-1.5 text-[11px] border-b flex items-center gap-2"
-             style={{ borderColor: styles.cardBorder, background: styles.dangerBg, color: styles.dangerText }}>
+        <div className={`px-3 py-1.5 text-[11px] border-b flex items-center gap-2 ${styles.cardBorder} ${styles.dangerBg} ${styles.dangerText}`}
+             >
           <X className="w-3 h-3 flex-shrink-0" />
           <span className="truncate">{errorBanner}</span>
         </div>
@@ -236,10 +234,10 @@ export default function RuleRepoTable() {
 
       {/* 创建表单（showCreate 时展开） */}
       {showCreate && (
-        <div className="px-3 py-2 border-b space-y-2" style={{ borderColor: styles.cardBorder, background: styles.inputBg }}>
+        <div className={`px-3 py-2 border-b space-y-2 ${styles.cardBorder} ${styles.inputBg}`}>
           <div className="flex flex-col md:flex-row md:items-end gap-2">
             <div className="flex-1 space-y-1">
-              <label className="text-[9px] font-bold uppercase" style={{ color: styles.cardTextMuted }}>
+              <label className={`text-[9px] font-bold uppercase ${styles.cardTextMuted}`}>
                 {t('knowledge.govern.rule_field_name')}
               </label>
               <input
@@ -247,12 +245,11 @@ export default function RuleRepoTable() {
                 value={createForm.name}
                 onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
                 placeholder={t('knowledge.govern.rule_field_name_placeholder')}
-                className="w-full px-2 py-1 rounded text-[11px] outline-none"
-                style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+                className={`border w-full px-2 py-1 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
               />
             </div>
             <div className="flex-1 space-y-1">
-              <label className="text-[9px] font-bold uppercase" style={{ color: styles.cardTextMuted }}>
+              <label className={`text-[9px] font-bold uppercase ${styles.cardTextMuted}`}>
                 {t('knowledge.govern.rule_field_domain')}
               </label>
               <input
@@ -260,8 +257,7 @@ export default function RuleRepoTable() {
                 value={createForm.domain}
                 onChange={(e) => setCreateForm((p) => ({ ...p, domain: e.target.value }))}
                 placeholder={t('knowledge.govern.rule_field_domain_placeholder')}
-                className="w-full px-2 py-1 rounded text-[11px] outline-none"
-                style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+                className={`border w-full px-2 py-1 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
               />
             </div>
             <div className="flex gap-1.5">
@@ -269,16 +265,14 @@ export default function RuleRepoTable() {
                 type="button"
                 onClick={() => void handleCreate()}
                 disabled={saving}
-                className="px-3 py-1 rounded text-[10px] font-bold disabled:opacity-50 cursor-pointer"
-                style={{ background: styles.successBg, color: styles.successText }}
+                className={`px-3 py-1 rounded text-[10px] font-bold disabled:opacity-50 cursor-pointer ${styles.successBg} ${styles.successText}`}
               >
                 {t('knowledge.govern.rule_action_save')}
               </button>
               <button
                 type="button"
                 onClick={() => { setShowCreate(false); setCreateForm(DEFAULT_FORM); }}
-                className="px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
-                style={{ background: styles.inputBg, color: styles.cardTextMuted, border: `1px solid ${styles.inputBorder}` }}
+                className={`border px-2 py-1 rounded text-[10px] font-bold cursor-pointer ${styles.inputBg} ${styles.cardTextMuted} ${styles.inputBorder}`}
               >
                 {t('knowledge.govern.rule_action_cancel')}
               </button>
@@ -288,16 +282,15 @@ export default function RuleRepoTable() {
       )}
 
       {/* 搜索 + domain 过滤 */}
-      <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ borderColor: styles.cardBorder }}>
+      <div className={`px-3 py-2 flex items-center gap-2 border-b ${styles.cardBorder}`}>
         <div className="flex-1 relative">
-          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2" style={{ color: styles.muted }} />
+          <Search className={`w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 ${styles.muted}`} />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('knowledge.govern.rule_search_placeholder')}
-            className="w-full pl-7 pr-2 py-1 rounded text-[11px] outline-none"
-            style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+            className={`border w-full pl-7 pr-2 py-1 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
           />
         </div>
         <button
@@ -311,8 +304,8 @@ export default function RuleRepoTable() {
       </div>
 
       {/* 表格头 */}
-      <div className="grid grid-cols-[1fr_100px_110px_50px_140px] gap-2 px-3 py-1.5 border-b text-[9px] font-bold uppercase tracking-wider"
-           style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}>
+      <div className={`grid grid-cols-[1fr_100px_110px_50px_140px] gap-2 px-3 py-1.5 border-b text-[9px] font-bold uppercase tracking-wider ${styles.cardBorder} ${styles.cardTextMuted}`}
+           >
         <span>{t('knowledge.govern.rule_col_name')}</span>
         <span>{t('knowledge.govern.rule_col_domain')}</span>
         <span>{t('knowledge.govern.rule_col_status')}</span>
@@ -322,12 +315,12 @@ export default function RuleRepoTable() {
 
       <div className="flex-1 overflow-y-auto max-h-56">
         {loading ? (
-          <div className="p-4 text-center text-[11px] flex items-center justify-center" style={{ color: styles.muted }}>
+          <div className={`p-4 text-center text-[11px] flex items-center justify-center ${styles.muted}`}>
             <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
             {t('knowledge.govern.rule_loading')}
           </div>
         ) : downloadFiltered.length === 0 ? (
-          <div className="p-4 text-center text-[11px]" style={{ color: styles.muted }}>
+          <div className={`p-4 text-center text-[11px] ${styles.muted}`}>
             <BookOpen className="w-5 h-5 mx-auto mb-1 opacity-40" />
             {t('knowledge.govern.rule_empty')}
           </div>
@@ -337,8 +330,8 @@ export default function RuleRepoTable() {
             const isEditing = editingId === r.id;
             return (
               <div key={r.id}
-                   className="grid grid-cols-[1fr_100px_110px_50px_140px] gap-2 px-3 py-2 border-b items-center"
-                   style={{ borderColor: styles.cardBorder }}>
+                   className={`grid grid-cols-[1fr_100px_110px_50px_140px] gap-2 px-3 py-2 border-b items-center ${styles.cardBorder}`}
+                   >
                 {/* name + 行内编辑 */}
                 <div className="flex items-center gap-2 min-w-0">
                   {isEditing ? (
@@ -346,14 +339,13 @@ export default function RuleRepoTable() {
                       type="text"
                       value={editForm.name}
                       onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full flex-1 px-1.5 py-0.5 rounded text-[10px] outline-none"
-                      style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+                      className={`border w-full flex-1 px-1.5 py-0.5 rounded text-[10px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                     />
                   ) : (
-                    <span className="text-[11px] font-bold truncate" style={{ color: styles.cardText }}>{r.name}</span>
+                    <span className={`text-[11px] font-bold truncate ${styles.cardText}`}>{r.name}</span>
                   )}
                   {r.updatedAt && !isEditing && (
-                    <span className="text-[9px] font-mono shrink-0" style={{ color: styles.muted }}>
+                    <span className={`text-[9px] font-mono shrink-0 ${styles.muted}`}>
                       {r.updatedAt.slice(0, 10)}
                     </span>
                   )}
@@ -366,11 +358,10 @@ export default function RuleRepoTable() {
                       type="text"
                       value={editForm.domain}
                       onChange={(e) => setEditForm((p) => ({ ...p, domain: e.target.value }))}
-                      className="w-full px-1.5 py-0.5 rounded text-[10px] outline-none"
-                      style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+                      className={`border w-full px-1.5 py-0.5 rounded text-[10px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                     />
                   ) : (
-                    <span className="text-[10px] font-mono truncate block" style={{ color: styles.cardTextMuted }}>{r.domain}</span>
+                    <span className={`text-[10px] font-mono truncate block ${styles.cardTextMuted}`}>{r.domain}</span>
                   )}
                 </div>
 
@@ -384,7 +375,7 @@ export default function RuleRepoTable() {
                 </span>
 
                 {/* version */}
-                <span className="text-[10px] font-mono text-right" style={{ color: styles.cardTextMuted }}>
+                <span className={`text-[10px] font-mono text-right ${styles.cardTextMuted}`}>
                   v{r.version || 1}
                 </span>
 
@@ -396,8 +387,7 @@ export default function RuleRepoTable() {
                         type="button"
                         onClick={() => void handleSaveEdit()}
                         disabled={saving}
-                        className="p-1 rounded cursor-pointer disabled:opacity-50"
-                        style={{ background: styles.successBg, color: styles.successText }}
+                        className={`p-1 rounded cursor-pointer disabled:opacity-50 ${styles.successBg} ${styles.successText}`}
                         title={t('knowledge.govern.rule_action_save')}
                       >
                         <CheckCircle2 className="w-3 h-3" />
@@ -405,8 +395,7 @@ export default function RuleRepoTable() {
                       <button
                         type="button"
                         onClick={() => { setEditingId(null); setEditForm(DEFAULT_FORM); }}
-                        className="p-1 rounded cursor-pointer"
-                        style={{ background: styles.inputBg, color: styles.cardTextMuted, border: `1px solid ${styles.inputBorder}` }}
+                        className={`border p-1 rounded cursor-pointer ${styles.inputBg} ${styles.cardTextMuted} ${styles.inputBorder}`}
                         title={t('knowledge.govern.rule_action_cancel')}
                       >
                         <X className="w-3 h-3" />
@@ -417,8 +406,7 @@ export default function RuleRepoTable() {
                       <button
                         type="button"
                         onClick={() => startEdit(r)}
-                        className="p-1 rounded cursor-pointer hover:opacity-70 transition"
-                        style={{ color: styles.accentText }}
+                        className={`p-1 rounded cursor-pointer hover:opacity-70 transition ${styles.accentText}`}
                         title={t('knowledge.govern.rule_action_edit')}
                       >
                         <Edit3 className="w-3.5 h-3.5" />
@@ -427,8 +415,7 @@ export default function RuleRepoTable() {
                         type="button"
                         onClick={() => void handleDisable(r)}
                         disabled={saving || r.status === 'DEPRECATED'}
-                        className="p-1 rounded cursor-pointer disabled:opacity-30 hover:opacity-70 transition"
-                        style={{ color: styles.warningText }}
+                        className={`p-1 rounded cursor-pointer disabled:opacity-30 hover:opacity-70 transition ${styles.warningText}`}
                         title={t('knowledge.govern.rule_action_disable')}
                       >
                         <Archive className="w-3.5 h-3.5" />
@@ -437,8 +424,7 @@ export default function RuleRepoTable() {
                         type="button"
                         onClick={() => void handleDelete(r)}
                         disabled={saving}
-                        className="p-1 rounded cursor-pointer disabled:opacity-30 hover:opacity-70 transition"
-                        style={{ color: styles.dangerText }}
+                        className={`p-1 rounded cursor-pointer disabled:opacity-30 hover:opacity-70 transition ${styles.dangerText}`}
                         title={t('knowledge.govern.rule_action_delete')}
                       >
                         <Trash2 className="w-3.5 h-3.5" />

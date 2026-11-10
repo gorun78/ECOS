@@ -5,12 +5,17 @@ import java.time.LocalDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 /**
  * Agent注册实体 — 映射 ecos_agent_registry (PG实际结构)
  */
 public class AgentRegistryEntity {
 
     private static final Logger log = LoggerFactory.getLogger(AgentRegistryEntity.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private String id;
     private String name;
@@ -44,6 +49,55 @@ public class AgentRegistryEntity {
 
     public String getMetadata() { return metadata; }
     public void setMetadata(String metadata) { this.metadata = metadata; }
+
+    // ── 兼容旧代码的派生属性写面（P1-Copilot D1） ──
+    // 派生 getter 读 metadata；若无对应 setter，Jackson 会把这些属性当只读而静默丢弃，
+    // 导致 AI 工作台保存 prompt/model/description 全部丢失。以下 setter 统一读-改-写 metadata JSON，
+    // 不动其他键（routes/rag/toolWhitelist 等）。
+
+    public void setSystemPrompt(String systemPrompt) {
+        putMetadataText("systemPrompt", systemPrompt);
+    }
+
+    public void setModel(String model) {
+        putMetadataText("model", model);
+    }
+
+    public void setDescription(String description) {
+        putMetadataText("description", description);
+    }
+
+    public void setMaxIterations(Integer maxIterations) {
+        if (maxIterations == null) {
+            return;
+        }
+        ObjectNode node = metadataNode();
+        node.put("maxIterations", maxIterations);
+        this.metadata = node.toString();
+    }
+
+    private void putMetadataText(String key, String value) {
+        if (value == null) {
+            return;
+        }
+        ObjectNode node = metadataNode();
+        node.put(key, value);
+        this.metadata = node.toString();
+    }
+
+    private ObjectNode metadataNode() {
+        if (metadata != null && !metadata.isBlank()) {
+            try {
+                JsonNode parsed = MAPPER.readTree(metadata);
+                if (parsed instanceof ObjectNode objectNode) {
+                    return objectNode;
+                }
+            } catch (Exception ignored) {
+                log.debug("Agent metadata JSON 解析失败，重建对象: id={} reason={}", id, ignored.getMessage());
+            }
+        }
+        return MAPPER.createObjectNode();
+    }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

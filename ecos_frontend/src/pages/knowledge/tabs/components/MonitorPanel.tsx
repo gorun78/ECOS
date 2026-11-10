@@ -195,7 +195,7 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
 
   return (
     <div className={`border rounded-xl p-4 space-y-4 ${styles.cardBg} ${styles.cardBorder}`}>
-      <div className="flex items-center justify-between flex-wrap gap-2 border-b pb-2" style={{ borderColor: styles.cardBorder }}>
+      <div className={`flex items-center justify-between flex-wrap gap-2 border-b pb-2 ${styles.cardBorder}`}>
         <span className={`text-[10px] font-extrabold uppercase tracking-wider ${styles.muted} font-mono flex items-center gap-1`}>
           <Activity size={12} />
           {t('knowledge.datasync.section.monitor')}
@@ -215,8 +215,8 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
             type="button"
             disabled={!job || exporting}
             onClick={() => void exportLog()}
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-bold border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition ${exporting ? 'opacity-60' : 'hover:opacity-80'}`}
-            style={{ borderColor: styles.cardBorder, background: styles.inputBg, color: styles.cardText }}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-mono font-bold border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition ${exporting ? 'opacity-60' : 'hover:opacity-80'} ${styles.cardBorder} ${styles.inputBg} ${styles.cardText}`}
+
           >
             {exporting ? (
               <RefreshCw size={10} className="animate-spin" />
@@ -237,23 +237,23 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
           {/* 灰态 KPI（值=0，提示面板结构） */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {kpiValues.map(k => (
-              <div key={k.label} className={`rounded-lg px-3 py-2 border ${styles.badgeBg} opacity-50`} style={{ borderColor: styles.cardBorder }}>
-                <p className="text-[10px] font-mono uppercase tracking-wider" style={{ color: styles.muted }}>{k.label}</p>
-                <p className="text-sm font-bold font-mono" style={{ color: styles.muted }}>{k.value}</p>
+              <div key={k.label} className={`rounded-lg px-3 py-2 border ${styles.badgeBg} opacity-50 ${styles.cardBorder}`}>
+                <p className={`text-[10px] font-mono uppercase tracking-wider ${styles.muted}`}>{k.label}</p>
+                <p className={`text-sm font-bold font-mono ${styles.muted}`}>{k.value}</p>
               </div>
             ))}
           </div>
           {/* 0% 进度条（灰态） */}
-          <div className={`h-2 rounded-md overflow-hidden ${styles.inputBg} border opacity-50`} style={{ borderColor: styles.cardBorder }}>
+          <div className={`h-2 rounded-md overflow-hidden ${styles.inputBg} border opacity-50 ${styles.cardBorder}`}>
             <div className={`h-full ${styles.accentBg}`} style={{ width: '0%' }} />
           </div>
           {/* 空日志占位 */}
-          <div className={`rounded-lg p-3 ${styles.badgeBg}`} style={{ borderColor: styles.cardBorder }}>
-            <p className="text-[10px] font-mono uppercase tracking-wider flex items-center gap-1.5" style={{ color: styles.muted }}>
+          <div className={`rounded-lg p-3 ${styles.badgeBg} ${styles.cardBorder}`}>
+            <p className={`text-[10px] font-mono uppercase tracking-wider flex items-center gap-1.5 ${styles.muted}`}>
               <FileText size={10} />
               {t('knowledge.datasync.monitor.select_text')}
             </p>
-            <pre className="text-[10px] font-mono mt-1.5" style={{ color: styles.muted }}>{t('knowledge.datasync.monitor.no_logs')}</pre>
+            <pre className={`text-[10px] font-mono mt-1.5 ${styles.muted}`}>{t('knowledge.datasync.monitor.no_logs')}</pre>
           </div>
         </div>
       ) : (
@@ -262,19 +262,19 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <StatusBadge status={job.status} styles={styles} />
-              <span className={`text-[10px] font-mono ${styles.muted}`} style={{ color: styles.cardTextMuted }}>
+              <span className={`text-[10px] font-mono ${styles.muted} ${styles.cardTextMuted}`}>
                 {job.trigger === 'SCHEDULED' ? t('knowledge.tick_mode.scheduled') : t('knowledge.tick_mode.now')}
                 {job.mode === 'FULL' ? t('knowledge.sync_mode.full') : t('knowledge.sync_mode.incremental')}
                 {isDryRun ? ` · ${t('knowledge.datasync.monitor.dry_run_badge')}` : ''}
               </span>
             </div>
-            <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+            <span className={`text-[10px] font-mono ${styles.muted}`}>
               {t('knowledge.job_monitor.duration')}: {formatDuration(job.durationMs)}
             </span>
           </div>
 
           {/* 进度条 */}
-          <div className={`h-2 rounded-md overflow-hidden ${styles.inputBg} border`} style={{ borderColor: styles.cardBorder }}>
+          <div className={`h-2 rounded-md overflow-hidden ${styles.inputBg} border ${styles.cardBorder}`}>
             <div
               className={`h-full transition-all duration-300 ${job.status === 'FAILED' ? styles.dangerBg : styles.accentBg}`}
               style={{ width: `${progressPct}%` }}
@@ -284,23 +284,23 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
           {/* 4 KPI 卡（grid） */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {kpiValues.map(k => (
-              <div key={k.label} className={`rounded-lg px-3 py-2 border ${styles.badgeBg}`} style={{ borderColor: styles.cardBorder }}>
-                <p className="text-[10px] font-mono uppercase tracking-wider" style={{ color: styles.muted }}>{k.label}</p>
-                <p className="text-sm font-bold font-mono" style={{ color: styles.cardText }}>{k.value}</p>
+              <div key={k.label} className={`rounded-lg px-3 py-2 border ${styles.badgeBg} ${styles.cardBorder}`}>
+                <p className={`text-[10px] font-mono uppercase tracking-wider ${styles.muted}`}>{k.label}</p>
+                <p className={`text-sm font-bold font-mono ${styles.cardText}`}>{k.value}</p>
               </div>
             ))}
           </div>
 
           {/* 失败提示：error + advice */}
           {job.status === 'FAILED' && (job.error || job.advice) && (
-            <div className={`rounded-lg p-3 border ${styles.dangerBg}`} style={{ borderColor: styles.dangerBorder }}>
+            <div className={`rounded-lg p-3 border ${styles.dangerBg} ${styles.dangerBorder}`}>
               {job.error && (
-                <p className="text-xs" style={{ color: styles.dangerText }}>
+                <p className={`text-xs ${styles.dangerText}`}>
                   <span className="font-bold">{t('knowledge.job_monitor.error_reason')}:</span> {job.error}
                 </p>
               )}
               {job.advice && (
-                <p className="text-[11px] mt-1" style={{ color: styles.muted }}>
+                <p className={`text-[11px] mt-1 ${styles.muted}`}>
                   <span className="font-bold">{t('knowledge.job_monitor.error_advice')}:</span> {job.advice}
                 </p>
               )}
@@ -309,9 +309,9 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
 
           {/* statusMessage hint */}
           {job.statusMessage && (
-            <div className={`flex items-start gap-1.5 p-2 rounded-md border ${styles.badgeBg}`} style={{ borderColor: styles.cardBorder }}>
-              <Info size={11} className="mt-0.5 shrink-0" style={{ color: styles.accentText }} />
-              <p className="text-[11px]" style={{ color: styles.cardTextMuted }}>{job.statusMessage}</p>
+            <div className={`flex items-start gap-1.5 p-2 rounded-md border ${styles.badgeBg} ${styles.cardBorder}`}>
+              <Info size={11} className={`mt-0.5 shrink-0 ${styles.accentText}`} />
+              <p className={`text-[11px] ${styles.cardTextMuted}`}>{job.statusMessage}</p>
             </div>
           )}
         </div>
@@ -319,15 +319,15 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
 
       {/* 日志区 */}
       {active !== null && active !== undefined && (
-        <div className={`border rounded-lg p-3 space-y-2 ${styles.badgeBg}`} style={{ borderColor: styles.cardBorder }}>
+        <div className={`border rounded-lg p-3 space-y-2 ${styles.badgeBg} ${styles.cardBorder}`}>
           <p className={`text-[10px] font-mono uppercase tracking-wider ${styles.muted} flex items-center gap-1.5`}>
             <FileText size={10} />
             {t('knowledge.datasync.monitor.select_text')}
-            {exportFailed && <span style={{ color: styles.dangerText }}> · {t('knowledge.datasync.monitor.export_failed')}</span>}
+            {exportFailed && <span className={styles.dangerText} > · {t('knowledge.datasync.monitor.export_failed')}</span>}
           </p>
           <pre
-            className="text-[10px] font-mono leading-relaxed whitespace-pre-wrap break-words max-h-56 overflow-y-auto p-2 rounded"
-            style={{ background: styles.inputBg, color: styles.cardText }}
+            className={`text-[10px] font-mono leading-relaxed whitespace-pre-wrap break-words max-h-56 overflow-y-auto p-2 rounded ${styles.inputBg} ${styles.cardText}`}
+
           >
             {logs.length === 0
               ? (job?.status === 'RUNNING' ? '…' : t('knowledge.datasync.monitor.no_logs'))
@@ -342,12 +342,12 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
           {t('knowledge.datasync.recent_jobs_title')}
         </p>
         {recentJobs.length === 0 ? (
-          <p className="text-xs py-3 text-center" style={{ color: styles.muted }}>{t('knowledge.datasync.monitor.empty')}</p>
+          <p className={`text-xs py-3 text-center ${styles.muted}`}>{t('knowledge.datasync.monitor.empty')}</p>
         ) : (
           <div className="w-full overflow-x-auto">
             <table className="w-full text-[11px] whitespace-nowrap">
               <thead>
-                <tr className="text-left font-mono text-[9px] uppercase tracking-wider" style={{ color: styles.muted }}>
+                <tr className={`text-left font-mono text-[9px] uppercase tracking-wider ${styles.muted}`}>
                   <th className="py-1 pr-2">jobId</th>
                   <th className="py-1 pr-2">status</th>
                   <th className="py-1 pr-2">mode</th>
@@ -360,15 +360,15 @@ export default function MonitorPanel({ active, trigger = 'MANUAL' }: MonitorPane
               </thead>
               <tbody>
                 {recentJobs.slice(0, 10).map(j => (
-                  <tr key={j.jobId} className="border-t" style={{ borderColor: styles.cardBorder }}>
-                    <td className="py-1 pr-2 font-mono" style={{ color: styles.cardText }}>{j.jobId}</td>
+                  <tr key={j.jobId} className={`border-t ${styles.cardBorder}`}>
+                    <td className={`py-1 pr-2 font-mono ${styles.cardText}`}>{j.jobId}</td>
                     <td className="py-1 pr-2"><StatusBadge status={j.status} styles={styles} /></td>
-                    <td className="py-1 pr-2 font-mono" style={{ color: styles.cardText }}>{j.mode}</td>
-                    <td className="py-1 pr-2 font-mono" style={{ color: styles.cardText }}>{j.trigger}</td>
-                    <td className="py-1 pr-2 font-mono" style={{ color: styles.cardText }}>{`${j.progress ?? 0}%`}</td>
-                    <td className="py-1 pr-2 font-mono" style={{ color: styles.cardText }}>{j.rowsWritten ?? '—'}</td>
-                    <td className="py-1 pr-2 font-mono" style={{ color: styles.cardText }}>{j.mismatches ?? '—'}</td>
-                    <td className="py-1 font-mono" style={{ color: styles.cardText }}>{formatDuration(j.durationMs)}</td>
+                    <td className={`py-1 pr-2 font-mono ${styles.cardText}`}>{j.mode}</td>
+                    <td className={`py-1 pr-2 font-mono ${styles.cardText}`}>{j.trigger}</td>
+                    <td className={`py-1 pr-2 font-mono ${styles.cardText}`}>{`${j.progress ?? 0}%`}</td>
+                    <td className={`py-1 pr-2 font-mono ${styles.cardText}`}>{j.rowsWritten ?? '—'}</td>
+                    <td className={`py-1 pr-2 font-mono ${styles.cardText}`}>{j.mismatches ?? '—'}</td>
+                    <td className={`py-1 font-mono ${styles.cardText}`}>{formatDuration(j.durationMs)}</td>
                   </tr>
                 ))}
               </tbody>

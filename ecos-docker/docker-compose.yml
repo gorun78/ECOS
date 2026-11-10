@@ -6,7 +6,10 @@
 services:
   # ===== Infrastructure =====
   postgres:
-    image: postgres:16-alpine
+    # 2026-11-10 起改用官方 pgvector 镜像：原 postgres:16-alpine + 手工挂载 vector.so 的方案
+    # 有版本错配缺陷（挂的 .so 是 0.6.2 编译产物，而基础 SQL 声明 0.8.1，CREATE EXTENSION 报
+    # "could not find function l2_normalize"）。pg16 变体自带匹配的 0.8.x 扩展，无需任何挂载。
+    image: pgvector/pgvector:pg16
     container_name: ecos-postgres
     restart: unless-stopped
     environment:
@@ -18,13 +21,6 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d
-      # pgvector 0.8.1 扩展持久化：镜像 postgres:16-alpine 未内置 vector，容器删除重建后
-      # 会丢失扩展导致 V137__knowledge_embedding_vector_column.sql 的 CREATE EXTENSION 失败。
-      # 此处以文件级挂载固化 vector.so / 控制文件 / 基础 SQL；文件由 Alpine v3.20 的
-      # postgresql-pgvector-0.6.2 包解出（Docker Hub 不可达时的离线替代，版本 0.8.1）。
-      - ./postgres-extensions/vector.so:/usr/local/lib/postgresql/vector.so:ro
-      - ./postgres-extensions/vector.control:/usr/share/postgresql/extension/vector.control:ro
-      - ./postgres-extensions/vector--0.8.1.sql:/usr/share/postgresql/extension/vector--0.8.1.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

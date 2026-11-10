@@ -360,24 +360,22 @@ export default function GraphPage() {
   const showDetailPanel = !!detailDisplayNode;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0" style={{ color: styles.cardText }}>
+    <div className={`flex flex-col flex-1 min-h-0 ${styles.cardText}`}>
       {/* ═══ 顶搜索栏（input + select + 搜索按钮） ═══ */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-        <Search className="w-4 h-4 shrink-0" style={{ color: styles.muted }} />
+      <div className={`flex items-center gap-2 px-3 py-2 border-b ${styles.cardBorder} ${styles.cardBg}`}>
+        <Search className={`w-4 h-4 shrink-0 ${styles.muted}`} />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => { setSearchQuery(e.target.value); setShowSearchResults(false); }}
           onKeyDown={(e) => { if (e.key === 'Enter') void handleSearch(); }}
           placeholder={t('knowledge.graph.search_placeholder_top')}
-          className="flex-1 px-2.5 py-1.5 rounded-md text-[11px] outline-none"
-          style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+          className={`border flex-1 px-2.5 py-1.5 rounded-md text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
         />
         <select
           value={searchType}
           onChange={(e) => setSearchType(e.target.value as 'entity' | 'relation')}
-          className="px-2 py-1.5 rounded-md text-[10px] font-bold outline-none"
-          style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+          className={`border px-2 py-1.5 rounded-md text-[10px] font-bold outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
         >
           <option value="entity">{t('knowledge.graph.search_type_entity')}</option>
           <option value="relation">{t('knowledge.graph.search_type_relation')}</option>
@@ -393,19 +391,18 @@ export default function GraphPage() {
         </button>
         {/* search results dropdown */}
         {showSearchResults && searchResults.length > 0 && (
-          <div className="absolute top-12 left-3 right-3 z-30 rounded-md border shadow-xl max-h-72 overflow-y-auto"
-               style={{ background: styles.sidebarBg, borderColor: styles.sidebarBorder }}>
+          <div className={`absolute top-12 left-3 right-3 z-30 rounded-md border shadow-xl max-h-72 overflow-y-auto ${styles.sidebarBg} ${styles.sidebarBorder}`}
+               >
             {searchResults.slice(0, 30).map((r) => (
               <button
                 key={r.id}
                 type="button"
                 onClick={() => handleSearchResultClick(r.id)}
-                className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 hover:opacity-70 transition"
-                style={{ color: styles.cardText }}
+                className={`w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 hover:opacity-70 transition ${styles.cardText}`}
               >
-                <Tag className="w-3 h-3 shrink-0" style={{ color: styles.muted }} />
+                <Tag className={`w-3 h-3 shrink-0 ${styles.muted}`} />
                 <span className="truncate flex-1">{r.label}</span>
-                <span className="text-[9px] font-mono shrink-0" style={{ color: styles.muted }}>{r.type}</span>
+                <span className={`text-[9px] font-mono shrink-0 ${styles.muted}`}>{r.type}</span>
               </button>
             ))}
           </div>
@@ -413,15 +410,15 @@ export default function GraphPage() {
       </div>
 
       {/* ═══ 主体：左工具栏 + 中画布 + 右详情（3 列） ═══ */}
-      <div className="flex-1 min-h-0 grid grid-cols-[200px_1fr_auto]" style={{ borderColor: styles.inputBorder }}>
+      <div className={`flex-1 min-h-0 grid grid-cols-[200px_1fr_auto] ${styles.inputBorder}`}>
         {/* ───── 左工具栏 ───── */}
-        <div className="border-r flex flex-col overflow-y-auto p-3 space-y-3" style={{ borderColor: styles.cardBorder }}>
+        <div className={`border-r flex flex-col overflow-y-auto p-3 space-y-3 ${styles.cardBorder}`}>
           {/* 顶搜索栏已负责全文搜索；左栏不再重复放 readOnly 输入 + onClick=handleSearch 的假控件（历史 hack，已删）。 */}
 
           {/* Path finder */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
-                   style={{ color: styles.cardTextMuted }}>
+            <label className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${styles.cardTextMuted}`}
+                   >
               <GitBranch className="w-3 h-3" />
               {t('knowledge.graph.pathFinder')}
             </label>
@@ -431,17 +428,15 @@ export default function GraphPage() {
                 value={pathSource}
                 onChange={(e) => setPathSource(e.target.value)}
                 placeholder={t('knowledge.graph.pathSourcePlaceholder')}
-                className="flex-1 min-w-0 px-2 py-1 text-[10px] rounded outline-none"
-                style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+                className={`border flex-1 min-w-0 px-2 py-1 text-[10px] rounded outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
               />
-              <ArrowRight className={`w-3 h-3 self-center shrink-0`} style={{ color: styles.muted }} />
+              <ArrowRight className={`w-3 h-3 self-center shrink-0 ${styles.muted}`} />
               <input
                 type="text"
                 value={pathTarget}
                 onChange={(e) => setPathTarget(e.target.value)}
                 placeholder={t('knowledge.graph.pathTargetPlaceholder')}
-                className="flex-1 min-w-0 px-2 py-1 text-[10px] rounded outline-none"
-                style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+                className={`border flex-1 min-w-0 px-2 py-1 text-[10px] rounded outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
               />
             </div>
             <button
@@ -456,14 +451,13 @@ export default function GraphPage() {
 
           {/* Domain filter (nav domain) */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>
+            <label className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
               {t('knowledge.graph.domain_filter')}
             </label>
             <select
               value={navDomain}
               onChange={(e) => setNavDomain(e.target.value)}
-              className="w-full px-2 py-1.5 text-[11px] rounded outline-none cursor-pointer"
-              style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
+              className={`border w-full px-2 py-1.5 text-[11px] rounded outline-none cursor-pointer ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
             >
               {navDomains.map((d) => (
                 <option key={d} value={d}>{d === 'default' ? t('knowledge.nav.domain_default') : d}</option>
@@ -473,21 +467,20 @@ export default function GraphPage() {
 
           {/* Category multi-checkbox（categoryIds 后端下沉，12a20d6） */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>
+            <label className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
               {t('knowledge.graph.category_filter')}
               {selectedCategoryIds.length > 0 && (
                 <span className={`ml-1 font-mono ${styles.accentText}`}>({selectedCategoryIds.length})</span>
               )}
             </label>
             {navCategories.length === 0 ? (
-              <p className="text-[9px]" style={{ color: styles.muted }}>{t('knowledge.graph.category_empty')}</p>
+              <p className={`text-[9px] ${styles.muted}`}>{t('knowledge.graph.category_empty')}</p>
             ) : (
               <div className="max-h-32 overflow-y-auto space-y-0.5 pr-1">
                 {navCategories.slice(0, 20).map((cat) => (
                   <label
                     key={cat.id}
-                    className="flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] cursor-pointer hover:opacity-70"
-                    style={{ color: styles.cardTextMuted }}
+                    className={`flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] cursor-pointer hover:opacity-70 ${styles.cardTextMuted}`}
                   >
                     <input
                       type="checkbox"
@@ -502,7 +495,7 @@ export default function GraphPage() {
                       className="h-3 w-3"
                     />
                     <span className="truncate flex-1">{cat.name}</span>
-                    <span className="text-[8px] font-mono" style={{ color: styles.muted }}>({cat.articleCount})</span>
+                    <span className={`text-[8px] font-mono ${styles.muted}`}>({cat.articleCount})</span>
                   </label>
                 ))}
               </div>
@@ -511,8 +504,8 @@ export default function GraphPage() {
 
           {/* Neighbor degree */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider flex items-center justify-between"
-                   style={{ color: styles.cardTextMuted }}>
+            <label className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${styles.cardTextMuted}`}
+                   >
               <span>{t('knowledge.graph.neighborDegree')}</span>
               <span className={`font-mono ${styles.accentText}`}>{neighborDegree}</span>
             </label>
@@ -532,17 +525,16 @@ export default function GraphPage() {
             type="button"
             onClick={handleLoadFull}
             disabled={loading}
-            className="w-full px-2 py-1.5 rounded text-[10px] font-bold disabled:opacity-50 cursor-pointer"
-            style={{ background: styles.sidebarHoverBg, color: styles.cardText, border: `1px solid ${styles.cardBorder}` }}
+            className={`border w-full px-2 py-1.5 rounded text-[10px] font-bold disabled:opacity-50 cursor-pointer ${styles.sidebarHoverBg} ${styles.cardText} ${styles.cardBorder}`}
           >
             {loading ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : <Network className="w-3 h-3 mx-auto" />}
             {t('knowledge.graph.loadFullGraph')}
           </button>
 
           {/* Legend（5 类色） */}
-          <div className="mt-auto p-2 rounded border space-y-1"
-               style={{ background: styles.sidebarBg, borderColor: styles.cardBorder }}>
-            <span className="text-[9px] font-bold uppercase" style={{ color: styles.muted }}>
+          <div className={`mt-auto p-2 rounded border space-y-1 ${styles.sidebarBg} ${styles.cardBorder}`}
+               >
+            <span className={`text-[9px] font-bold uppercase ${styles.muted}`}>
               {t('knowledge.graph.legend')}
             </span>
             <div className="space-y-0.5 text-[10px]">
@@ -571,18 +563,18 @@ export default function GraphPage() {
         </div>
 
         {/* ───── 中画布 ───── */}
-        <div className="relative min-h-0" style={{ background: styles.appBg }}>
+        <div className={`relative min-h-0 ${styles.appBg}`}>
           {loading && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-md flex items-center gap-2 shadow-md"
-                 style={{ background: styles.sidebarBg, borderColor: styles.cardBorder, color: styles.cardText, border: `1px solid ${styles.cardBorder}` }}>
+            <div className={`border absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-md flex items-center gap-2 shadow-md ${styles.sidebarBg} ${styles.cardBorder} ${styles.cardText} ${styles.cardBorder}`}
+                 >
               <Loader2 className="w-3 h-3 animate-spin" />
               {t('knowledge.graph.loadingGraph')}
             </div>
           )}
           {/* F04-03 错误态分治：KbApiError（5xx / ECOS-KB-*）→ 显式故障 + retry */}
           {graphError && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[min(90%,520px)] rounded-md border shadow-md p-3 space-y-2"
-                 style={{ background: styles.dangerBg, borderColor: styles.dangerBorder, color: styles.dangerText }}>
+            <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-30 w-[min(90%,520px)] rounded-md border shadow-md p-3 space-y-2 ${styles.dangerBg} ${styles.dangerBorder} ${styles.dangerText}`}
+                 >
               <div className="flex items-center gap-2 text-xs font-bold">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 <span className="flex-1">{t('knowledge.common.error')}</span>
@@ -600,8 +592,8 @@ export default function GraphPage() {
             </div>
           )}
           {graphNotice && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 max-w-[80%] px-3 py-1.5 rounded-md flex items-center gap-2 text-[11px] shadow-md"
-                 style={{ background: styles.warningBg, color: styles.warningText, border: `1px solid ${styles.cardBorder}` }}>
+            <div className={`border absolute top-3 left-1/2 -translate-x-1/2 z-20 max-w-[80%] px-3 py-1.5 rounded-md flex items-center gap-2 text-[11px] shadow-md ${styles.warningBg} ${styles.warningText} ${styles.cardBorder}`}
+                 >
               <Info className="w-3 h-3 shrink-0" />
               <span className="break-words">{graphNotice}</span>
               <button type="button" aria-label={t('common.close')} onClick={() => setGraphNotice(null)}
@@ -611,7 +603,7 @@ export default function GraphPage() {
             </div>
           )}
           {nodes.length === 0 && !loading ? (
-            <div className="h-full flex items-center justify-center text-xs" style={{ color: styles.muted }}>
+            <div className={`h-full flex items-center justify-center text-xs ${styles.muted}`}>
               <div className="text-center space-y-2 p-4">
                 <Network className="w-8 h-8 mx-auto opacity-40" />
                 {edges.length > 0 ? (
@@ -624,8 +616,7 @@ export default function GraphPage() {
                       type="button"
                       onClick={() => void loadGraph(navDomain === 'default' ? undefined : navDomain,
                             selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined)}
-                      className="px-3 py-1.5 rounded-md text-[11px] font-bold cursor-pointer inline-flex items-center gap-1.5 border"
-                      style={{ borderColor: styles.cardBorder, color: styles.cardText, background: styles.sidebarBg }}
+                      className={`px-3 py-1.5 rounded-md text-[11px] font-bold cursor-pointer inline-flex items-center gap-1.5 border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarBg}`}
                     >
                       <RefreshCw className="w-3.5 h-3.5" /> {t('knowledge.graph.reconcile')}
                     </button>
@@ -650,8 +641,8 @@ export default function GraphPage() {
           )}
 
           {/* 底栏：实体 N · 关系 M · 当前视图 K 个节点 */}
-          <div className="absolute bottom-2 left-3 right-3 z-20 flex items-center gap-3 text-[10px] font-mono"
-               style={{ color: styles.cardTextMuted }}>
+          <div className={`absolute bottom-2 left-3 right-3 z-20 flex items-center gap-3 text-[10px] font-mono ${styles.cardTextMuted}`}
+               >
             <span className="flex items-center gap-1">
               <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.entity)}`} />
               {t('knowledge.graph.kpi_nodes', { n: nodes.length })}
@@ -672,17 +663,16 @@ export default function GraphPage() {
 
         {/* ───── 右详情面板（条件渲染） ───── */}
         {showDetailPanel && detailDisplayNode && (
-          <div className="w-72 border-l flex flex-col overflow-y-auto" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-            <div className="px-3 py-2 border-b flex items-center justify-between" style={{ borderColor: styles.cardBorder }}>
+          <div className={`w-72 border-l flex flex-col overflow-y-auto ${styles.cardBorder} ${styles.cardBg}`}>
+            <div className={`px-3 py-2 border-b flex items-center justify-between ${styles.cardBorder}`}>
               <div className="flex items-center gap-1.5 text-xs font-bold">
-                <Info className="w-3.5 h-3.5" style={{ color: styles.accentText }} />
+                <Info className={`w-3.5 h-3.5 ${styles.accentText}`} />
                 {t('knowledge.graph.nodeDetail')}
               </div>
               <button
                 type="button"
                 onClick={() => { setNodeDetail(null); setSelectedNodeId(null); setNodeEdges([]); }}
-                className="p-1 cursor-pointer hover:opacity-70"
-                style={{ color: styles.muted }}
+                className={`p-1 cursor-pointer hover:opacity-70 ${styles.muted}`}
                 title={t('knowledge.graph.close_detail')}
               >
                 <X className="w-3.5 h-3.5" />
@@ -694,9 +684,9 @@ export default function GraphPage() {
               <div>
                 <div className="flex items-center gap-1.5">
                   <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${nodeDotClass(nodeColorClass(mapCanvasNodeToPrimitiveType(detailDisplayNode.type)))}`} />
-                  <span className="font-bold truncate" style={{ color: styles.cardText }}>{detailDisplayNode.label}</span>
+                  <span className={`font-bold truncate ${styles.cardText}`}>{detailDisplayNode.label}</span>
                 </div>
-                <div className="text-[10px] font-mono mt-0.5" style={{ color: styles.muted }}>
+                <div className={`text-[10px] font-mono mt-0.5 ${styles.muted}`}>
                   {detailDisplayNode.type}
                 </div>
               </div>
@@ -704,14 +694,14 @@ export default function GraphPage() {
               {/* 属性 */}
               {detailDisplayNode.properties && Object.keys(detailDisplayNode.properties).length > 0 && (
                 <div>
-                  <span className="text-[9px] font-bold uppercase" style={{ color: styles.muted }}>
+                  <span className={`text-[9px] font-bold uppercase ${styles.muted}`}>
                     {t('knowledge.graph.properties')}
                   </span>
-                  <div className="mt-1 rounded p-2 space-y-1" style={{ background: styles.sidebarBg }}>
+                  <div className={`mt-1 rounded p-2 space-y-1 ${styles.sidebarBg}`}>
                     {Object.entries(detailDisplayNode.properties).slice(0, 12).map(([k, v]) => (
                       <div key={k} className="flex justify-between text-[10px]">
-                        <span style={{ color: styles.cardTextMuted }}>{k}</span>
-                        <span className="font-mono" style={{ color: styles.cardText }}>
+                        <span className={styles.cardTextMuted} >{k}</span>
+                        <span className={`font-mono ${styles.cardText}`}>
                           {typeof v === 'object' ? JSON.stringify(v) : String(v)}
                         </span>
                       </div>
@@ -722,22 +712,22 @@ export default function GraphPage() {
 
               {/* 关联关系 */}
               <div>
-                <span className="text-[9px] font-bold uppercase" style={{ color: styles.muted }}>
+                <span className={`text-[9px] font-bold uppercase ${styles.muted}`}>
                   {t('knowledge.graph.relatedEdges', { count: nodeEdges.length })}
                 </span>
                 {nodeEdges.length === 0 ? (
-                  <p className="text-[10px] mt-1" style={{ color: styles.muted }}>{t('knowledge.graph.noRelatedEdges')}</p>
+                  <p className={`text-[10px] mt-1 ${styles.muted}`}>{t('knowledge.graph.noRelatedEdges')}</p>
                 ) : (
                   <div className="space-y-0.5 mt-1 max-h-40 overflow-y-auto">
                     {nodeEdges.slice(0, 20).map((e) => (
                       <div key={e.id}
-                           className="rounded px-2 py-1 text-[10px] flex items-center justify-between"
-                           style={{ background: styles.sidebarBg }}>
-                        <span className="truncate flex-1" style={{ color: styles.cardText }}>
+                           className={`rounded px-2 py-1 text-[10px] flex items-center justify-between ${styles.sidebarBg}`}
+                           >
+                        <span className={`truncate flex-1 ${styles.cardText}`}>
                           {edgeEndpointLabel(e.source)} → {edgeEndpointLabel(e.target)}
                         </span>
                         {e.relation && (
-                          <span className="font-mono shrink-0 ml-1" style={{ color: styles.accentText }}>{e.relation}</span>
+                          <span className={`font-mono shrink-0 ml-1 ${styles.accentText}`}>{e.relation}</span>
                         )}
                       </div>
                     ))}
@@ -746,13 +736,12 @@ export default function GraphPage() {
               </div>
 
               {/* 操作按钮：展开邻居 / 设路径源 */}
-              <div className="pt-2 border-t space-y-1.5" style={{ borderColor: styles.cardBorder }}>
+              <div className={`pt-2 border-t space-y-1.5 ${styles.cardBorder}`}>
                 {expandedNodeIds.has(detailDisplayNode.id) ? (
                   <button
                     type="button"
                     onClick={() => handleCollapse(detailDisplayNode.id)}
-                    className="w-full px-2 py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                    style={{ background: styles.dangerBg, color: styles.dangerText }}
+                    className={`w-full px-2 py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer ${styles.dangerBg} ${styles.dangerText}`}
                   >
                     <Minimize2 className="w-3 h-3" />
                     {t('knowledge.graph.collapseNode')}
@@ -761,8 +750,7 @@ export default function GraphPage() {
                   <button
                     type="button"
                     onClick={() => void handleExpandNeighbors(detailDisplayNode.id)}
-                    className="w-full px-2 py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                    style={{ background: styles.infoBg, color: styles.infoText }}
+                    className={`w-full px-2 py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer ${styles.infoBg} ${styles.infoText}`}
                   >
                     <Network className="w-3 h-3" />
                     {t('knowledge.graph.expandNode')}
@@ -771,8 +759,7 @@ export default function GraphPage() {
                 <button
                   type="button"
                   onClick={() => setPathSource(detailDisplayNode.id)}
-                  className="w-full px-2 py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer"
-                  style={{ background: styles.warningBg, color: styles.warningText }}
+                  className={`w-full px-2 py-1.5 rounded text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer ${styles.warningBg} ${styles.warningText}`}
                 >
                   <GitBranch className="w-3 h-3" />
                   {t('knowledge.graph.setAsPathSource')}

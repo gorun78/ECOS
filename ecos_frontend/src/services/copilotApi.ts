@@ -17,7 +17,58 @@
  * 才拿得到应答。补 Bearer 会把这两条腿从「匿名面」搬到「身份 + clearance 裁决面」，
  * 属语义变化、不在传输批授权内 ⇒ 与 D-B5-36 一并待产品裁决（加身份 or 登记 permitAll）。</p>
  */
-import { API_BASE, rawAnonUrlFetch } from './httpClient';
+import { API_BASE, apiFetchData, rawAnonUrlFetch } from './httpClient';
+
+/** Copilot 内置智能体目录项（服务端 CopilotAgentCatalog 下发；不含系统提示词）。 */
+export interface CopilotAgentInfo {
+  id: string;
+  name: string;
+  engine: string;
+  description: string;
+  routes: string[];
+  tools: string[];
+  quickQuestions: string[];
+}
+
+/**
+ * 拉取内置智能体目录（6 个）。
+ *
+ * <p>走身份通道（apiFetchData 自动携带 Authorization）：Copilot 对话与目录都属于
+ * 「身份 + clearance」面，匿名腿经 gateway 必 401（D-B5-36）。</p>
+ */
+export async function fetchCopilotAgents(): Promise<CopilotAgentInfo[]> {
+  const data = await apiFetchData<CopilotAgentInfo[]>(`${API_BASE}/v1/agent/copilot/agents`);
+  return Array.isArray(data) ? data : [];
+}
+
+/** Copilot 对话结果（agent-loop 真实执行，含工具调用记录）。 */
+export interface CopilotChatResult {
+  agentId?: string;
+  agentName?: string;
+  engine?: string;
+  sessionId?: string;
+  success?: boolean;
+  answer?: string;
+  turns?: number;
+  totalTokens?: number;
+  traceId?: string;
+  toolCalls?: Array<{ toolName?: string; success?: boolean; decision?: string }>;
+  errorCode?: string;
+  errorClass?: string;
+}
+
+/** 目录内智能体的真实对话（agent-loop + 引擎工具白名单）。 */
+export async function copilotAgentChat(body: {
+  agentId: string;
+  message: string;
+  sessionId: string;
+}): Promise<CopilotChatResult> {
+  const data = await apiFetchData<CopilotChatResult>(`${API_BASE}/v1/agent/copilot/chat`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return data && typeof data === 'object' ? data : {};
+}
 
 export async function fetchCopilotQuickQuestions(agentType: string): Promise<{ ok: boolean; json?: any }> {
   const res = await rawAnonUrlFetch(`${API_BASE}/v1/agent/copilot/quick-questions?agentId=agent-${agentType}`);

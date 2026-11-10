@@ -256,18 +256,17 @@ export default function DatasyncTab() {
 
         {/* §1 标题 + hero */}
         <div className="space-y-1">
-          <h2 className="font-bold text-xl tracking-tight flex items-center gap-2" style={{ color: styles.cardText }}>
-            <Database className="w-5 h-5" style={{ color: styles.accentText }} />
+          <h2 className={`font-bold text-xl tracking-tight flex items-center gap-2 ${styles.cardText}`}>
+            <Database className={`w-5 h-5 ${styles.accentText}`} />
             {t('knowledge.datasync.title')}
           </h2>
         </div>
 
         {/* §1b tier banner（T12 · full width） */}
         <div
-          className={`w-full flex items-center justify-between gap-4 px-4 py-2.5 rounded-xl border ${styles.warningBg}`}
-          style={{ borderColor: styles.warningBorder }}
+          className={`w-full flex items-center justify-between gap-4 px-4 py-2.5 rounded-xl border ${styles.warningBg} ${styles.warningBorder}`}
         >
-          <span className="text-xs font-mono tracking-wide" style={{ color: styles.warningText }}>
+          <span className={`text-xs font-mono tracking-wide ${styles.warningText}`}>
             {t('knowledge.tier.storage_tier_banner', {
               tier: TIER_PLACEHOLDER,
               storage: STORAGE_OF[TIER_PLACEHOLDER] || 'PostgreSQL',
@@ -281,12 +280,12 @@ export default function DatasyncTab() {
         {/* §2 本体选取（T7） */}
         <div className={`border rounded-xl p-4 space-y-3 ${styles.cardBg} ${styles.cardBorder}`}>
           <div className="flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" style={{ color: styles.accentText }} />
+            <ShieldCheck className={`w-4 h-4 mt-0.5 shrink-0 ${styles.accentText}`} />
             <div className="flex-1 space-y-0.5">
-              <h3 className="font-semibold text-sm" style={{ color: styles.cardText }}>
+              <h3 className={`font-semibold text-sm ${styles.cardText}`}>
                 {t('knowledge.datasync.section.ontology_title')}
               </h3>
-              <p className="text-[11px] leading-normal" style={{ color: styles.cardTextMuted }}>
+              <p className={`text-[11px] leading-normal ${styles.cardTextMuted}`}>
                 {t('knowledge.datasync.section.ontology_desc')}
               </p>
             </div>
@@ -298,11 +297,11 @@ export default function DatasyncTab() {
         </div>
 
         {/* §2b 映射契约摘要（Wave 0 保留 · 本体工作台契约只读） */}
-        <div className={`w-full flex items-center justify-between border rounded-xl px-4 py-2 ${styles.inputBg}`} style={{ borderColor: styles.cardBorder }}>
-          <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: styles.muted }}>
+        <div className={`w-full flex items-center justify-between border rounded-xl px-4 py-2 ${styles.inputBg} ${styles.cardBorder}`}>
+          <span className={`text-[10px] font-mono uppercase tracking-wider ${styles.muted}`}>
             {t('knowledge.datasync.mappings_title')}
           </span>
-          <span className="text-xs font-mono" style={{ color: styles.cardText }}>
+          <span className={`text-xs font-mono ${styles.cardText}`}>
             {mappings.length}
           </span>
         </div>
@@ -310,7 +309,7 @@ export default function DatasyncTab() {
         {/* §3 抽取方式（T5 + T8） */}
         <div className={`border rounded-xl p-4 space-y-4 ${styles.cardBg} ${styles.cardBorder}`}>
           <div>
-            <h3 className="font-semibold text-sm" style={{ color: styles.cardText }}>
+            <h3 className={`font-semibold text-sm ${styles.cardText}`}>
               {t('knowledge.datasync.section.extract_mode')}
             </h3>
           </div>
@@ -333,7 +332,7 @@ export default function DatasyncTab() {
 
           {/* 错误横幅 */}
           {error && (
-            <div className={`px-3 py-2 rounded-lg border text-xs ${styles.dangerBg}`} style={{ borderColor: styles.dangerBorder, color: styles.dangerText }}>
+            <div className={`px-3 py-2 rounded-lg border text-xs ${styles.dangerBg} ${styles.dangerBorder} ${styles.dangerText}`}>
               {error}
             </div>
           )}
@@ -400,7 +399,7 @@ function NowMode(props: {
     <div className="space-y-3">
       {/* mode 单选（全量覆盖 / 增量更新） */}
       <div className="flex items-center gap-2">
-        <span className="text-[11px]" style={{ color: styles.muted }}>{t('knowledge.datasync.mode.label')}:</span>
+        <span className={`text-[11px] ${styles.muted}`}>{t('knowledge.datasync.mode.label')}:</span>
         <RadioPill
           active={syncMode === 'FULL'}
           onClick={() => onSyncMode('FULL')}
@@ -420,8 +419,7 @@ function NowMode(props: {
           type="button"
           disabled={busy}
           onClick={onPickDryRun}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition hover:opacity-80 ${styles.badgeBg}`}
-          style={{ borderColor: styles.cardBorder, color: styles.cardText }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition hover:opacity-80 ${styles.badgeBg} ${styles.cardBorder} ${styles.cardText}`}
           title={t('knowledge.datasync.extract.erase_hint')}
         >
           {dryRunning ? <Layers size={12} className="animate-pulse" /> : <Layers size={12} />}
@@ -431,8 +429,7 @@ function NowMode(props: {
           type="button"
           disabled={busy}
           onClick={onPickExec}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition hover:opacity-90`}
-          style={{ background: styles.accentBg, color: '#fff' }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition hover:opacity-90 ${styles.accentBg} ${styles.accentSolidText}`}
         >
           {running ? <Database className="animate-pulse" size={12} /> : <Database size={12} />}
           {t('knowledge.datasync.monitor.pick_exec')}
@@ -477,8 +474,7 @@ function ScheduledMode(props: {
           type="button"
           onClick={onOpenNew}
           disabled={saving}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-40 transition hover:opacity-90`}
-          style={{ background: styles.accentBg, color: '#fff' }}
+          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-40 transition hover:opacity-90 ${styles.accentBg} ${styles.accentSolidText}`}
         >
           <Plus size={12} />
           {t('knowledge.datasync.sched.new')}
@@ -489,11 +485,10 @@ function ScheduledMode(props: {
       {formOpen && (
         <form
           onSubmit={onSubmit}
-          className={`border rounded-lg p-3 space-y-3 ${styles.badgeBg}`}
-          style={{ borderColor: styles.cardBorder }}
+          className={`border rounded-lg p-3 space-y-3 ${styles.badgeBg} ${styles.cardBorder}`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold" style={{ color: styles.cardText }}>
+            <span className={`text-xs font-semibold ${styles.cardText}`}>
               {draft.id === null
                 ? t('knowledge.datasync.sched.new_title')
                 : t('knowledge.datasync.sched.edit_title', { name: draft.name || '…' })}
@@ -506,8 +501,7 @@ function ScheduledMode(props: {
                 type="text"
                 value={draft.name}
                 onChange={e => onDraftChange({ ...draft, name: e.target.value })}
-                className={`w-full px-2 py-1 rounded-md text-xs outline-none ${styles.inputBg} ${styles.inputText}`}
-                style={{ border: `1px solid ${styles.inputBorder}` }}
+                className={`border w-full px-2 py-1 rounded-md text-xs outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                 required
               />
             </Field>
@@ -515,8 +509,7 @@ function ScheduledMode(props: {
               <select
                 value={draft.period}
                 onChange={e => onDraftChange({ ...draft, period: e.target.value as TickPeriod })}
-                className={`w-full px-2 py-1 rounded-md text-xs outline-none ${styles.inputBg} ${styles.inputText}`}
-                style={{ border: `1px solid ${styles.inputBorder}` }}
+                className={`border w-full px-2 py-1 rounded-md text-xs outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
               >
                 {(['DAILY', 'WEEKLY', 'MONTHLY'] as TickPeriod[]).map(p => (
                   <option key={p} value={p}>{t(PERIOD_LABEL_KEY[p])}</option>
@@ -528,34 +521,31 @@ function ScheduledMode(props: {
                 type="time"
                 value={draft.timeOfDay}
                 onChange={e => onDraftChange({ ...draft, timeOfDay: e.target.value })}
-                className={`w-full px-2 py-1 rounded-md text-xs outline-none ${styles.inputBg} ${styles.inputText}`}
-                style={{ border: `1px solid ${styles.inputBorder}` }}
+                className={`border w-full px-2 py-1 rounded-md text-xs outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
               />
             </Field>
           </div>
           {/* mode 单选（与立即抽取联动） */}
           <div className="flex items-center gap-2">
-            <span className="text-[11px]" style={{ color: styles.muted }}>{t('knowledge.datasync.mode.label')}:</span>
+            <span className={`text-[11px] ${styles.muted}`}>{t('knowledge.datasync.mode.label')}:</span>
             <RadioPill active={draft.mode === 'FULL'} onClick={() => onDraftChange({ ...draft, mode: 'FULL' })} styles={styles} label={t('knowledge.sync_mode.full')} />
             <RadioPill active={draft.mode === 'INCREMENTAL'} onClick={() => onDraftChange({ ...draft, mode: 'INCREMENTAL' })} styles={styles} label={t('knowledge.sync_mode.incremental')} />
           </div>
-          <p className="text-[10px] font-mono" style={{ color: styles.muted }}>
+          <p className={`text-[10px] font-mono ${styles.muted}`}>
             {t('knowledge.datasync.sched.use_ontology_hint')} · {selectedCount}
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="submit"
               disabled={saving || !draft.name.trim() || selectedCount === 0}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition`}
-              style={{ background: styles.accentBg, color: '#fff' }}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition ${styles.accentBg} ${styles.accentSolidText}`}
             >
               {t('knowledge.tick_mode.save')}
             </button>
             <button
               type="button"
               onClick={onCloseForm}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition hover:opacity-80 ${styles.badgeBg}`}
-              style={{ borderColor: styles.cardBorder, color: styles.cardText }}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition hover:opacity-80 ${styles.badgeBg} ${styles.cardBorder} ${styles.cardText}`}
             >
               ✕
             </button>
@@ -565,18 +555,18 @@ function ScheduledMode(props: {
 
       {/* 列表 */}
       {loading ? (
-        <div className="py-8 text-center text-xs" style={{ color: styles.muted }}>
+        <div className={`py-8 text-center text-xs ${styles.muted}`}>
           {t('knowledge.tree_picker.loading')}
         </div>
       ) : schedules.length === 0 ? (
-        <p className="text-xs py-4 text-center" style={{ color: styles.muted }}>
+        <p className={`text-xs py-4 text-center ${styles.muted}`}>
           {t('knowledge.datasync.monitor.empty')}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[11px]">
             <thead>
-              <tr className="text-left font-mono text-[9px] uppercase tracking-wider" style={{ color: styles.muted }}>
+              <tr className={`text-left font-mono text-[9px] uppercase tracking-wider ${styles.muted}`}>
                 <th className="py-1 pr-2">{t('knowledge.datasync.sched.col.name')}</th>
                 <th className="py-1 pr-2">{t('knowledge.datasync.sched.col.period')}</th>
                 <th className="py-1 pr-2">{t('knowledge.datasync.sched.col.timeOfDay')}</th>
@@ -589,11 +579,11 @@ function ScheduledMode(props: {
             </thead>
             <tbody>
               {schedules.map(row => (
-                <tr key={row.id} className="border-t" style={{ borderColor: styles.cardBorder }}>
-                  <td className="py-1.5 pr-2 font-mono" style={{ color: styles.cardText }}>{row.name}</td>
-                  <td className="py-1.5 pr-2" style={{ color: styles.cardText }}>{t(periodLabelKey(row.period))}</td>
-                  <td className="py-1.5 pr-2 font-mono" style={{ color: styles.cardText }}>{row.timeOfDay || '—'}</td>
-                  <td className="py-1.5 pr-2" style={{ color: styles.cardText }}>{row.ontologyIds?.length ?? 0}</td>
+                <tr key={row.id} className={`border-t ${styles.cardBorder}`}>
+                  <td className={`py-1.5 pr-2 font-mono ${styles.cardText}`}>{row.name}</td>
+                  <td className={`py-1.5 pr-2 ${styles.cardText}`}>{t(periodLabelKey(row.period))}</td>
+                  <td className={`py-1.5 pr-2 font-mono ${styles.cardText}`}>{row.timeOfDay || '—'}</td>
+                  <td className={`py-1.5 pr-2 ${styles.cardText}`}>{row.ontologyIds?.length ?? 0}</td>
                   <td className="py-1.5 pr-2">
                     <button
                       type="button"
@@ -604,8 +594,8 @@ function ScheduledMode(props: {
                       {row.enabled ? t('knowledge.tick_mode.enabled') : t('knowledge.tick_mode.disabled')}
                     </button>
                   </td>
-                  <td className="py-1.5 pr-2 font-mono text-[10px]" style={{ color: styles.muted }}>{row.lastRunAt || '—'}</td>
-                  <td className="py-1.5 pr-2 font-mono text-[10px]" style={{ color: row.lastStatus === 'FAILED' ? styles.dangerText : styles.muted }}>{row.lastStatus || '—'}</td>
+                  <td className={`py-1.5 pr-2 font-mono text-[10px] ${styles.muted}`}>{row.lastRunAt || '—'}</td>
+                  <td className={`py-1.5 pr-2 font-mono text-[10px] ${row.lastStatus === 'FAILED' ? styles.dangerText : styles.muted}`}>{row.lastStatus || '—'}</td>
                   <td className="py-1.5">
                     <div className="flex items-center gap-1 justify-end">
                       <button
@@ -619,8 +609,7 @@ function ScheduledMode(props: {
                       <button
                         type="button"
                         onClick={() => void onDelete(row)}
-                        className={`p-1 rounded-md cursor-pointer hover:opacity-70`}
-                        style={{ color: styles.dangerText }}
+                        className={`p-1 rounded-md cursor-pointer hover:opacity-70 ${styles.dangerText}`}
                         title={t('knowledge.tick_mode.delete')}
                       >
                         <Trash2 size={11} />
@@ -685,7 +674,7 @@ function Field({ label, styles, children }: {
 }) {
   return (
     <label className="block">
-      <span className="block text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: styles.muted }}>{label}</span>
+      <span className={`block text-[10px] font-mono uppercase tracking-wider mb-1 ${styles.muted}`}>{label}</span>
       {children}
     </label>
   );

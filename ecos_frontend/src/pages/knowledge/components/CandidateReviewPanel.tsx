@@ -97,7 +97,7 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
 
   if (!assetId) {
     return (
-      <div className="rounded-md border p-4 text-xs opacity-60" style={{ borderColor: styles.cardBorder, background: styles.cardBg, color: styles.cardText }}>
+      <div className={`rounded-md border p-4 text-xs opacity-60 ${styles.cardBorder} ${styles.cardBg} ${styles.cardText}`}>
         {t('knowledge.candidate.need_asset')}
       </div>
     );
@@ -172,9 +172,9 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
   const inputStyle = { borderColor: styles.cardBorder, background: styles.inputBg, color: styles.inputText };
 
   return (
-    <div className="rounded-md border" style={{ borderColor: styles.cardBorder, background: styles.cardBg, color: styles.cardText }}>
-      <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: styles.cardBorder }}>
-        <ShieldCheck className="w-4 h-4" style={{ color: styles.accentText }} />
+    <div className={`rounded-md border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText}`}>
+      <div className={`px-4 py-3 border-b flex items-center gap-2 ${styles.cardBorder}`}>
+        <ShieldCheck className={`w-4 h-4 ${styles.accentText}`} />
         <span className="text-xs font-semibold">{t('knowledge.candidate.title')}</span>
         <span className="text-[10px] opacity-50">{t('knowledge.candidate.subtitle')}</span>
       </div>
@@ -187,14 +187,14 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
           </div>
         )}
         {resolve.kind === 'error' && (
-          <div className="rounded-md border p-3 flex flex-col gap-1.5" style={{ borderColor: styles.warningBorder, background: styles.warningBg, color: styles.warningText }}>
+          <div className={`rounded-md border p-3 flex flex-col gap-1.5 ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`}>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
               <span>{resolve.engineDown ? t('knowledge.candidate.err_engine') : t('knowledge.candidate.err_resolve')}</span>
             </div>
             <div className="opacity-70 break-words">{resolve.message}</div>
             {resolve.traceId && <div className="font-mono text-[10px] opacity-60 break-all">traceId: {resolve.traceId}</div>}
-            <button type="button" onClick={() => void runResolve(assetId)} className="inline-flex items-center gap-1 self-start px-2 py-0.5 rounded border text-[11px] cursor-pointer" style={{ borderColor: styles.cardBorder, color: styles.cardText }}>
+            <button type="button" onClick={() => void runResolve(assetId)} className={`inline-flex items-center gap-1 self-start px-2 py-0.5 rounded border text-[11px] cursor-pointer ${styles.cardBorder} ${styles.cardText}`}>
               {t('knowledge.candidate.retry')}
             </button>
           </div>
@@ -203,14 +203,14 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
         {current && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-[11px] opacity-70 break-all">{current.assetId}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded border" style={{ borderColor: styles.cardBorder }}>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${styles.cardBorder}`}>
               {t(`knowledge.cognitiveAsset.class.${current.assetClass}`) || current.assetClass}
             </span>
             <span className="text-[10px] px-1.5 py-0.5 rounded border" style={toneStyle}>
               {current.lifecycleState ? stateLabel(current.lifecycleState) : t('knowledge.candidate.state_legacy')}
             </span>
             {isUncalibratedKind(current.confidenceKind ?? null) && (
-              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border" style={{ borderColor: styles.warningBorder, color: styles.warningText }}>
+              <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border ${styles.warningBorder} ${styles.warningText}`}>
                 <BadgeAlert className="w-3 h-3" />{t('knowledge.candidate.badge_uncalibrated')}
               </span>
             )}
@@ -227,7 +227,7 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
         {formReady && (
           <div className="flex flex-col gap-2.5">
             {!statesReady && (
-              <div className="rounded-md border p-2 text-[11px] flex items-center gap-1.5" style={{ borderColor: styles.warningBorder, background: styles.warningBg, color: styles.warningText }}>
+              <div className={`rounded-md border p-2 text-[11px] flex items-center gap-1.5 ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`}>
                 <AlertTriangle className="w-3.5 h-3.5" />{t('knowledge.candidate.states_not_ready')}
               </div>
             )}
@@ -266,8 +266,8 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
                 type="button"
                 onClick={() => void doPropose()}
                 disabled={!canSubmit || busy}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ borderColor: styles.accentBorder, color: styles.accentText }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles.accentBorder} ${styles.accentText}`}
+
               >
                 <ClipboardPlus className="w-3.5 h-3.5" />{busy ? t('knowledge.candidate.busy') : t('knowledge.candidate.action_propose')}
               </button>
@@ -275,8 +275,8 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
                 type="button"
                 onClick={() => void doTransition()}
                 disabled={!canSubmit || busy}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ borderColor: styles.cardBorder, color: styles.cardText }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles.cardBorder} ${styles.cardText}`}
+
               >
                 <ArrowRightLeft className="w-3.5 h-3.5" />{busy ? t('knowledge.candidate.busy') : t('knowledge.candidate.action_transition')}
               </button>
@@ -287,9 +287,9 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
 
         {/* 动作结果区（服务端原值呈现，禁本地合成） */}
         {action.kind === 'proposal' && (
-          <div className="rounded-md border p-3 flex flex-col gap-1.5" style={{ borderColor: styles.cardBorder }}>
+          <div className={`rounded-md border p-3 flex flex-col gap-1.5 ${styles.cardBorder}`}>
             <div className="flex items-center gap-2 text-[11px]">
-              <ClipboardPlus className="w-3.5 h-3.5" style={{ color: styles.accentText }} />
+              <ClipboardPlus className={`w-3.5 h-3.5 ${styles.accentText}`} />
               <span className="font-semibold">{t('knowledge.candidate.receipt_proposal_title')}</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded border opacity-80">{action.receipt.status ?? '—'}</span>
             </div>
@@ -305,7 +305,7 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
                 targetState/reason/evidenceRef(单值)/operator/note，回执仅
                 proposalId/assetId/status/carrier/eventRef/traceId —— evidenceRefs 列表按本次提交
                 快照如实渲染，assumptions/impact/回滚 后端未提供，显式「—」+ 统一说明，禁造演示值。 */}
-            <div className="rounded-md border p-2.5 flex flex-col gap-1" style={{ borderColor: styles.cardBorder }}>
+            <div className={`rounded-md border p-2.5 flex flex-col gap-1 ${styles.cardBorder}`}>
               <div className="text-[10px] uppercase tracking-wider opacity-50">{t('knowledge.candidate.protocol_fields_title')}</div>
               <div className="flex items-baseline gap-2 text-[11px]">
                 <span className="opacity-60 flex-shrink-0">{t('knowledge.candidate.field_evidenceRefs')}</span>
@@ -329,7 +329,7 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
           </div>
         )}
         {action.kind === 'transition' && (
-          <div className="rounded-md border p-3 flex flex-col gap-1.5" style={{ borderColor: styles.successBorder, background: styles.successBg, color: styles.successText }}>
+          <div className={`rounded-md border p-3 flex flex-col gap-1.5 ${styles.successBorder} ${styles.successBg} ${styles.successText}`}>
             <div className="flex items-center gap-2 text-[11px] font-semibold">
               <ArrowRightLeft className="w-3.5 h-3.5" />
               {t('knowledge.candidate.receipt_transition', {
@@ -343,7 +343,7 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
           </div>
         )}
         {action.kind === 'conflict' && (
-          <div className="rounded-md border p-3 flex flex-col gap-1.5" style={{ borderColor: styles.dangerBorder, background: styles.dangerBg, color: styles.dangerText }}>
+          <div className={`rounded-md border p-3 flex flex-col gap-1.5 ${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText}`}>
             <div className="flex items-center gap-2 text-[11px] font-semibold">
               <AlertTriangle className="w-3.5 h-3.5" />{t('knowledge.candidate.err_conflict')}
             </div>
@@ -353,7 +353,7 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
           </div>
         )}
         {action.kind === 'failed' && (
-          <div className="rounded-md border p-3 flex flex-col gap-1.5" style={{ borderColor: styles.warningBorder, background: styles.warningBg, color: styles.warningText }}>
+          <div className={`rounded-md border p-3 flex flex-col gap-1.5 ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`}>
             <div className="flex items-center gap-2 text-[11px] font-semibold">
               <AlertTriangle className="w-3.5 h-3.5" />
               {action.engineDown ? t('knowledge.candidate.err_engine') : t('knowledge.candidate.err_action')}
@@ -373,7 +373,7 @@ function ProtocolAbsentField({ label }: { label: string }) {
   return (
     <div className="flex items-baseline gap-2 text-[11px]">
       <span className="opacity-60 flex-shrink-0">{label}</span>
-      <span className="font-mono" style={{ color: styles.cardTextMuted }}>—</span>
+      <span className={`font-mono ${styles.cardTextMuted}`}>—</span>
     </div>
   );
 }

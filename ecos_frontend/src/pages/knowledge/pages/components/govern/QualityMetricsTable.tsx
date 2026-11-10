@@ -134,23 +134,21 @@ export default function QualityMetricsTable() {
 
   return (
     <div
-      className="rounded-md border flex flex-col"
-      style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+      className={`rounded-md border flex flex-col ${styles.cardBorder} ${styles.cardBg}`}
     >
       {/* 标题栏 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: styles.cardBorder }}>
+      <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}>
         <div className="flex items-center gap-2 text-sm font-semibold">
-          <Gauge className="w-4 h-4" style={{ color: styles.accentText }} />
+          <Gauge className={`w-4 h-4 ${styles.accentText}`} />
           <span>{t('knowledge.govern.quality_metrics')}</span>
-          <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+          <span className={`text-[10px] font-mono ${styles.muted}`}>
             {t('knowledge.govern.metric_refresh_at', { at: lastFetchAt || '—' })}
           </span>
         </div>
         <button
           type="button"
           onClick={() => void loadMetrics()}
-          className="p-1 rounded border cursor-pointer hover:opacity-70 transition disabled:opacity-50"
-          style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}
+          className={`p-1 rounded border cursor-pointer hover:opacity-70 transition disabled:opacity-50 ${styles.cardBorder} ${styles.cardTextMuted}`}
           title={t('knowledge.govern.metric_refresh')}
           disabled={loading}
         >
@@ -161,28 +159,27 @@ export default function QualityMetricsTable() {
       {/* 3 指标行 */}
       <div className="p-3 grid grid-cols-1 md:grid-cols-3 gap-3">
         {loading && metrics.length === 0 ? (
-          <div className="col-span-full py-4 text-center text-[11px] flex items-center justify-center" style={{ color: styles.muted }}>
+          <div className={`col-span-full py-4 text-center text-[11px] flex items-center justify-center ${styles.muted}`}>
             <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
             {t('knowledge.govern.metric_loading')}
           </div>
         ) : metrics.length === 0 ? (
-          <div className="col-span-full py-4 text-center text-[11px]" style={{ color: styles.muted }}>
+          <div className={`col-span-full py-4 text-center text-[11px] ${styles.muted}`}>
             {t('knowledge.govern.metric_empty')}
           </div>
         ) : metrics.map((m) => {
           const { Icon, bg, color } = statusChip(m.status);
           return (
             <div key={m.key}
-                 className="rounded-md border p-2.5 space-y-2 flex flex-col"
-                 style={{ borderColor: styles.cardBorder, background: styles.inputBg }}>
+                 className={`rounded-md border p-2.5 space-y-2 flex flex-col ${styles.cardBorder} ${styles.inputBg}`}
+                 >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider truncate"
-                      style={{ color: styles.cardTextMuted }}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider truncate ${styles.cardTextMuted}`}
+                      >
                   {t(m.labelKey)}
                 </span>
                 <span
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0"
-                  style={{ background: bg, color }}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 ${bg} ${color}`}
                   title={t(m.hintKey)}
                 >
                   <Icon className="w-3 h-3" />
@@ -192,36 +189,32 @@ export default function QualityMetricsTable() {
 
               {/* 大数字 */}
               <div className="flex items-end gap-2">
-                <span className="text-2xl font-black font-mono leading-none"
-                      style={{ color: color }}>{m.value.toFixed(1)}</span>
-                <span className="text-[10px] font-mono pb-0.5" style={{ color: styles.muted }}>%</span>
+                <span className={`text-2xl font-black font-mono leading-none ${color}`}
+                      >{m.value.toFixed(1)}</span>
+                <span className={`text-[10px] font-mono pb-0.5 ${styles.muted}`}>%</span>
               </div>
 
               {/* 进度条（3 档颜色） */}
-              <div className="h-1.5 w-full rounded-full overflow-hidden relative"
-                   style={{ background: styles.inputBg, border: `1px solid ${styles.inputBorder}` }}>
+              <div className={`border h-1.5 w-full rounded-full overflow-hidden relative ${styles.inputBg} ${styles.inputBorder}`}
+                   >
                 <div
-                  className="h-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, m.value)}%`,
-                    background: color,
-                    opacity: 0.7,
-                  }}
+                  className={`h-full transition-all duration-500 ${bg}`}
+                  style={{ width: `${Math.min(100, m.value)}%`, opacity: 0.7 }}
                 />
                 {/* 阈值刻线 — warn / fail */}
                 <div
-                  className="absolute top-0 bottom-0 w-px"
-                  style={{ left: `${m.thresholdWarn}%`, background: styles.warningText, opacity: 0.5 }}
+                  className={`absolute top-0 bottom-0 w-px ${styles.warningText}`}
+                  style={{ left: `${m.thresholdWarn}%`, opacity: 0.5 }}
                   title={`${t('knowledge.govern.metric_threshold_warn')} ${m.thresholdWarn}%`}
                 />
                 <div
-                  className="absolute top-0 bottom-0 w-px"
-                  style={{ left: `${m.thresholdFail}%`, background: styles.dangerText, opacity: 0.5 }}
+                  className={`absolute top-0 bottom-0 w-px ${styles.dangerText}`}
+                  style={{ left: `${m.thresholdFail}%`, opacity: 0.5 }}
                   title={`${t('knowledge.govern.metric_threshold_fail')} ${m.thresholdFail}%`}
                 />
               </div>
 
-              <p className="text-[9px] font-mono leading-snug" style={{ color: styles.muted }}>
+              <p className={`text-[9px] font-mono leading-snug ${styles.muted}`}>
                 {t(m.hintKey)}
               </p>
             </div>

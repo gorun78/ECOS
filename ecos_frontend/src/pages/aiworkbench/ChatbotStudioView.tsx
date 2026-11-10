@@ -20,7 +20,7 @@ import { AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from '../../types/aiwor
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
-import ChatHeader from '../../components/aiworkbench/chatbot/ChatHeader';
+import AgentSelector from '../../components/aiworkbench/chatbot/AgentSelector';
 import ConfigPanel from '../../components/aiworkbench/chatbot/ConfigPanel';
 import ChatPanel from '../../components/aiworkbench/chatbot/ChatPanel';
 import CitationList from '../../components/common/structured/CitationList';
@@ -78,7 +78,36 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   const [ragDocs, setRagDocs] = useState<RAGDocument[]>([]);
   const [dragOver, setDragOver] = useState(false);
   // §4.5 P0：发布无后端通道 → 版本恒为「未发布」，不再 v1.0.4→v1.0.5 硬跳
-  const [chatbotVersion] = useState<string>(() => t('aiworkbench.chatbot.versionUnpublished'));
+  const [publishing, setPublishing] = useState(false);
+  const [chatbotVersion, setChatbotVersion] = useState<string>(() => t('aiworkbench.chatbot.versionUnpublished'));
+  // 发布状态随 activeChatbot.publish（metadata 单源）派生
+  useEffect(() => {
+    const p = activeChatbot?.publish;
+    setChatbotVersion(p && p.status === 'published'
+      ? t('aiworkbench.chatbot.version').replace('{version}', String(p.version))
+      : t('aiworkbench.chatbot.versionUnpublished'));
+  }, [activeChatbot?.publish, t]);
+
+  /** P1-Copilot 发布（配置级）：写 metadata.publish（版本+1），不新增发布管道 */
+  const hPublish = async () => {
+    if (!activeChatbot || publishing) return;
+    setPublishing(true);
+    try {
+      const current = activeChatbot.publish ?? { status: 'draft' as const, version: 0, channel: 'workbench' };
+      const updated = await updateMeshAgent(activeChatbot.id, {
+        ...activeChatbot,
+        publish: { status: 'published', version: (current.version || 0) + 1, channel: 'workbench' },
+      });
+      onUpdateAgents(agents.map(a => a.id === activeChatbot.id ? updated : a));
+      showToast?.('success', t('aiworkbench.chatbot.toastPublishSuccess').replace('{name}', activeChatbot.name));
+    } catch (e: unknown) {
+      const msg = e instanceof Error && e.message ? e.message : String(e);
+      showToast?.('error', t('aiworkbench.chatbot.toastSaveFailed').replace('{message}', msg));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const [embedTab, setEmbedTab] = useState<'iframe'|'web-component'|'widget-json'>('iframe');
   const [apiLang, setApiLang] = useState<'typescript'|'curl'>('curl');
   const [showMetadataModal, setShowMetadataModal] = useState(false);
@@ -274,10 +303,22 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   const hSaveMeta = async (e:React.FormEvent) => {
     e.preventDefault();
     if (!tempName.trim() || !tempRole.trim() || isSaving) return;
+    // Copilot 扩展面随保存透传（metadata 单源；后端 PUT 合并，未传键不丢）
+    const extended = activeChatbot ? {
+      engine: activeChatbot.engine,
+      routes: activeChatbot.routes,
+      toolWhitelist: [
+        ...selectedActions, ...selectedFunctions,
+        ...(activeChatbot.toolWhitelist ?? []).filter(n => !n.startsWith('act_') && !n.startsWith('func_')),
+      ],
+      rag: activeChatbot.rag,
+      publish: activeChatbot.publish,
+    } : {};
     const payload: Partial<AIPAgent> = {
       name:tempName.trim(), role:tempRole.trim(), description:tempDesc.trim(), modelId:tempModel,
       systemPrompt:tempPrompt.trim(), guardrailIds:selectedGuardrails,
       assignedTools:{ actionIds:selectedActions, functionIds:selectedFunctions },
+      ...extended,
     };
     setIsSaving(true);
     try {
@@ -323,10 +364,7 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
 
   return (
     <div className={`h-full w-full flex flex-col md:flex-row overflow-hidden ${styles.appBg} ${styles.appText} text-xs`}>
-      <ChatHeader agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onStartCreate={hCreate}
-        activeChatbot={activeChatbot} chatbotVersion={chatbotVersion} chatMessages={chatMessages}
-        activeUserRole={activeUserRole} setActiveUserRole={setActiveUserRole} activeContextDataset={activeContextDataset} setActiveContextDataset={setActiveContextDataset}
-        onResetChat={hReset} showToast={showToast} styles={styles} />
+      <AgentSelector agents={agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} onStartCreate={hCreate} styles={styles} />
       {activeChatbot ? (
         <div className={`flex-1 flex flex-col md:flex-row overflow-hidden ${styles.inputBg}`}>
           <ConfigPanel activeChatbot={activeChatbot} chatbotVersion={chatbotVersion} activeWorkspaceTab={activeWorkspaceTab} setActiveWorkspaceTab={setActiveWorkspaceTab}
@@ -337,7 +375,8 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
             guardrails={guardrails} handleDragOver={hfo} handleDragLeave={hfl} handleDrop={hfd} handleFileSelect={hfs}
             dragOver={dragOver} ragDocs={ragDocs} setRagDocs={setRagDocs}
             embedTab={embedTab} setEmbedTab={setEmbedTab}
-            apiLang={apiLang} setApiLang={setApiLang} onEditConfig={()=>setShowMetadataModal(!showMetadataModal)} onDelete={()=>hDelete(activeChatbot.id)} styles={styles} />
+            apiLang={apiLang} setApiLang={setApiLang} onEditConfig={()=>setShowMetadataModal(!showMetadataModal)} onDelete={()=>hDelete(activeChatbot.id)} styles={styles}
+            onPublish={() => { void hPublish(); }} publishing={publishing} />
           <ChatPanel activeChatbot={activeChatbot} chatMessages={liveChatMessages} chatInput={chatInput} setChatInput={setChatInput}
             isReplying={isReplying} onSend={hSend} onProposalConsent={hConsent} onResetChat={hReset}
             activeUserRole={activeUserRole} setActiveUserRole={setActiveUserRole} activeContextDataset={activeContextDataset} setActiveContextDataset={setActiveContextDataset}

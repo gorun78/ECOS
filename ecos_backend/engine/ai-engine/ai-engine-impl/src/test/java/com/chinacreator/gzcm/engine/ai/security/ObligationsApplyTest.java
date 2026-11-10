@@ -105,7 +105,12 @@ class ObligationsApplyTest {
             // 二者只引用 PolicyEffect.ALLOW_WITH_MASK 枚举名作裁决效果判定，零本地脱敏算法
             // （algorithmHits 断言在同用例内已单独校验），符合 §2.4-7「只点名不实现」口径。
             "WAgentEnums.java",              // PolicyEffect 四值单源：allow_with_mask 枚举字面量
-            "WAgentPolicyGuardPort.java"     // 依据 PolicyEffect 判定放行，不执行脱敏
+            "WAgentPolicyGuardPort.java",    // 依据 PolicyEffect 判定放行，不执行脱敏
+            // 2026-11-09 Copilot 全生命周期工具批登记：CopilotToolCatalog 只把
+            // security_mask_apply 工具名/属主端点（/api/security/mask）作为纯静态声明
+            //（工具执行仍经 ToolExecutorService → AiSecurityEngineClient 单一出口），
+            // 文本含 "mask" 字样属点名而非实现，零本地脱敏算法。
+            "CopilotToolCatalog.java"
     );
 
     // ── 验收 1：脱敏义务在结果回 LLM 之前生效 ────────────────────────────────

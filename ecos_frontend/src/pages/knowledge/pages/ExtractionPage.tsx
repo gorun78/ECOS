@@ -222,13 +222,13 @@ export default function ExtractionPage() {
   const submitDisabled = useMemo(() => submitting, [submitting]);
 
   return (
-    <div className="p-2" style={{ color: styles.cardText }}>
+    <div className={`p-2 ${styles.cardText}`}>
       {/* 总标题 */}
-      <div className="flex items-center gap-2 px-3 py-2 rounded-md border mb-3"
-           style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-        <ArrowDownUp className="w-4 h-4" style={{ color: styles.accentText }} />
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-md border mb-3 ${styles.cardBorder} ${styles.cardBg}`}
+           >
+        <ArrowDownUp className={`w-4 h-4 ${styles.accentText}`} />
         <span className="text-base font-bold">{t('knowledge.nav.page_extract')}</span>
-        <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+        <span className={`text-[10px] font-mono ${styles.muted}`}>
           {t('knowledge.extract.page_subtitle')}
         </span>
       </div>
@@ -237,32 +237,31 @@ export default function ExtractionPage() {
       <div className="grid grid-cols-1 md:grid-cols-[1.25fr_0.75fr] gap-3">
         {/* ═══════ 左栏 · 结构化 I→K（DW 层源头，1.25fr） ═══════ */}
         <div
-          className="rounded-md border flex flex-col min-h-72"
-          style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+          className={`rounded-md border flex flex-col min-h-72 ${styles.cardBorder} ${styles.cardBg}`}
         >
           {/* 头：I→K badge + 标题 */}
-          <div className="flex items-center justify-between px-3 py-2 border-b"
-               style={{ borderColor: styles.cardBorder }}>
+          <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}
+               >
             <div className="flex items-center gap-2">
-              <Boxes className="w-4 h-4" style={{ color: styles.accentText }} />
+              <Boxes className={`w-4 h-4 ${styles.accentText}`} />
               <span className="text-sm font-semibold">{t('knowledge.extract.structured')}</span>
             </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
-                  style={{ background: styles.badgeBg, color: styles.badgeText }}>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${styles.badgeBg} ${styles.badgeText}`}
+                  >
               I → K
             </span>
           </div>
 
           <div className="p-3 space-y-3 flex-1">
             {/* 诚实标注：执行端点仅接受 {dryRun, mode}，所选映射/目标不参与预览/执行 */}
-            <div className="px-2.5 py-1.5 rounded border text-[10px] font-mono flex items-start gap-1.5"
-                 style={{ borderColor: styles.warningBorder, background: styles.warningBg, color: styles.warningText }}>
+            <div className={`px-2.5 py-1.5 rounded border text-[10px] font-mono flex items-start gap-1.5 ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`}
+                 >
               <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
               <span>{t('knowledge.extract.execution_binding_unavailable')}</span>
             </div>
             {/* 映射契约 select（fetchOntologyMappings published 过滤） */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>
+              <label className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
                 {t('knowledge.extract.mapping_contract')}
               </label>
               <div className="relative">
@@ -270,12 +269,7 @@ export default function ExtractionPage() {
                   value={selectedMappingId}
                   onChange={(e) => { setSelectedMappingId(e.target.value); setSubmitResult(null); }}
                   disabled
-                  className="w-full px-2.5 py-1.5 text-[11px] rounded border outline-none disabled:opacity-50"
-                  style={{
-                    background: styles.inputBg,
-                    color: mappingsAvailable ? styles.inputText : styles.muted,
-                    borderColor: styles.inputBorder,
-                  }}
+                  className={`w-full px-2.5 py-1.5 text-[11px] rounded border outline-none disabled:opacity-50 ${styles.inputBg} ${styles.inputBorder} ${mappingsAvailable ? styles.inputText : styles.muted}`}
                   title={mappingsError || ''}
                 >
                   <option value="">
@@ -292,12 +286,12 @@ export default function ExtractionPage() {
                   ))}
                 </select>
                 {mappingsLoading && (
-                  <Loader2 className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin"
-                           style={{ color: styles.muted }} />
+                  <Loader2 className={`w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin ${styles.muted}`}
+                            />
                 )}
               </div>
               {mappingsError && !mappingsLoading && (
-                <p className="text-[10px] font-mono" style={{ color: styles.warningText }}>
+                <p className={`text-[10px] font-mono ${styles.warningText}`}>
                   {t('knowledge.extract.mapping_unavailable_hint')}
                 </p>
               )}
@@ -305,7 +299,7 @@ export default function ExtractionPage() {
 
             {/* 3 checkbox（图谱实体/属性 · 图谱关系 · 向量索引） */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>
+              <label className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
                 {t('knowledge.extract.targets_label')}
               </label>
               <div className="space-y-1">
@@ -323,8 +317,7 @@ export default function ExtractionPage() {
                   return (
                     <label
                       key={target.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded border text-[11px] opacity-70"
-                      style={{ borderColor: styles.cardBorder, background: checked ? styles.sidebarBg : 'transparent' }}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded border text-[11px] opacity-70 ${styles.cardBorder} ${checked ? styles.sidebarBg : ''}`}
                       title={t('knowledge.extract.execution_binding_unavailable')}
                     >
                       <input
@@ -334,10 +327,10 @@ export default function ExtractionPage() {
                         disabled
                         className="h-3.5 w-3.5 cursor-not-allowed"
                       />
-                      <span className="flex-1" style={{ color: checked ? styles.cardText : styles.cardTextMuted }}>
+                      <span className={`flex-1 ${checked ? styles.cardText : styles.cardTextMuted}`}>
                         {t(target.labelKey)}
                       </span>
-                      {checked && <Check className="w-3 h-3" style={{ color: styles.successText }} />}
+                      {checked && <Check className={`w-3 h-3 ${styles.successText}`} />}
                     </label>
                   );
                 })}
@@ -371,18 +364,17 @@ export default function ExtractionPage() {
 
         {/* ═══════ 右栏 · 文档导入 Document→K（0.75fr） ═══════ */}
         <div
-          className="rounded-md border flex flex-col min-h-72"
-          style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+          className={`rounded-md border flex flex-col min-h-72 ${styles.cardBorder} ${styles.cardBg}`}
         >
           {/* 头：Document→K badge + 标题 */}
-          <div className="flex items-center justify-between px-3 py-2 border-b"
-               style={{ borderColor: styles.cardBorder }}>
+          <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}
+               >
             <div className="flex items-center gap-2">
-              <FileUp className="w-4 h-4" style={{ color: styles.accentText }} />
+              <FileUp className={`w-4 h-4 ${styles.accentText}`} />
               <span className="text-sm font-semibold">{t('knowledge.extract.document')}</span>
             </div>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
-                  style={{ background: styles.badgeBg, color: styles.badgeText }}>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${styles.badgeBg} ${styles.badgeText}`}
+                  >
               Document → K
             </span>
           </div>
@@ -390,15 +382,14 @@ export default function ExtractionPage() {
           <div className="p-3 space-y-3 flex-1">
             {/* 4 能力 badge（文档导入 / OCR / 分块 / 实体关系抽取） */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>
+              <label className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
                 {t('knowledge.extract.doc_capabilities')}
               </label>
               <div className="grid grid-cols-2 gap-1.5">
                 {DOC_CAPABILITIES.map((cap) => (
                   <div
                     key={cap.id}
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-bold"
-                    style={{ borderColor: styles.cardBorder, background: styles.sidebarBg, color: styles.cardTextMuted }}
+                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-bold ${styles.cardBorder} ${styles.sidebarBg} ${styles.cardTextMuted}`}
                   >
                     {capabilityIconFor(cap.icon)}
                     <span>{t(cap.labelKey)}</span>
@@ -409,8 +400,8 @@ export default function ExtractionPage() {
 
             {/* 「→ DW 层 → 知识审」标注（PRD F4 右栏） */}
             <div
-              className="px-2.5 py-1.5 rounded border text-[10px] font-mono tracking-wider"
-              style={{ borderColor: styles.inputBorder, background: styles.sidebarBg, color: styles.accentText }}>
+              className={`px-2.5 py-1.5 rounded border text-[10px] font-mono tracking-wider ${styles.inputBorder} ${styles.sidebarBg} ${styles.accentText}`}
+              >
               {t('knowledge.extract.doc_pipeline_hint')}
             </div>
 
@@ -452,19 +443,19 @@ export default function ExtractionPage() {
                     {t(docPhaseLabelKey(docPhase))}
                   </span>
                   {docFileName && (
-                    <span className="text-[10px] font-mono truncate max-w-[50%]" style={{ color: styles.muted }}>
+                    <span className={`text-[10px] font-mono truncate max-w-[50%] ${styles.muted}`}>
                       {docFileName}
                     </span>
                   )}
                   {docPhase === 'uploading' && (
-                    <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+                    <span className={`text-[10px] font-mono ${styles.muted}`}>
                       {Math.round(docProgress * 100)}%
                     </span>
                   )}
                 </div>
               )}
               {docError && (
-                <p className="text-[10px] font-mono truncate" style={{ color: styles.dangerText }}>{docError}</p>
+                <p className={`text-[10px] font-mono truncate ${styles.dangerText}`}>{docError}</p>
               )}
             </div>
           </div>
@@ -473,7 +464,7 @@ export default function ExtractionPage() {
 
       {/* 底部 3 KPI — 反映最近一次「预览」的真实返回；未预览或无端点来源 → 「—」不臆造 */}
       <div className="mt-3 space-y-1.5">
-        <div className="text-[10px] font-mono" style={{ color: styles.muted }}>
+        <div className={`text-[10px] font-mono ${styles.muted}`}>
           {lastPreview ? t('knowledge.extract.kpi_from_preview') : t('knowledge.extract.kpi_no_preview')}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -519,8 +510,7 @@ function KpiCard({
   const unavailable = value === null;
   return (
     <div
-      className="rounded-md border p-3 space-y-1.5 flex flex-col"
-      style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+      className={`rounded-md border p-3 space-y-1.5 flex flex-col ${styles.cardBorder} ${styles.cardBg}`}
     >
       <div className={`flex items-center gap-1.5 ${unavailable ? styles.muted : styles.cardTextMuted}`}>
         <span className={unavailable ? styles.muted : accent}>{icon}</span>
@@ -530,7 +520,7 @@ function KpiCard({
         {unavailable ? '—' : value.toLocaleString()}
       </p>
       {unavailable && unavailableHint && (
-        <span className="text-[9px] font-mono" style={{ color: styles.muted }}>{unavailableHint}</span>
+        <span className={`text-[9px] font-mono ${styles.muted}`}>{unavailableHint}</span>
       )}
     </div>
   );

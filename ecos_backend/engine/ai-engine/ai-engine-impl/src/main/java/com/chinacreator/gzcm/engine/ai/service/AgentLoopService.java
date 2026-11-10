@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -71,6 +72,9 @@ public class AgentLoopService {
     /** Agent 推理最大轮次 */
     private static final int MAX_TURNS = 5;
 
+    /** P0-5：会话历史回灌窗口（最近 N 条 user/assistant 消息） */
+    private static final int HISTORY_REPLAY_LIMIT = 20;
+
     /** 工具调用超时（毫秒） */
     private static final long TOOL_TIMEOUT_MS = 30_000L;
 
@@ -98,6 +102,14 @@ public class AgentLoopService {
 
     @Autowired(required = false)
     private MemoryExtractor memoryExtractor;
+
+    /** P0-4：RAG 知识上下文（required=false；kb-engine 不可用/无命中 ⇒ 不注入，禁编造） */
+    @Autowired(required = false)
+    private KnowledgeContextClient knowledgeContextClient;
+
+    /** P0-5：会话历史回灌与记忆提取（required=false；缺失即不回灌） */
+    @Autowired(required = false)
+    private AgentSessionService agentSessionService;
 
     @Autowired
     private AgentConfigResolver agentConfigResolver;
@@ -154,15 +166,26 @@ public class AgentLoopService {
      * @return AgentLoopResult 推理结果
      */
     public AgentLoopResult run(AgentLoopConfig config, String userMessage, AgentSession session) {
+        return run(config, userMessage, session, null);
+    }
+
+    /**
+     * 执行 Agent 推理循环（流式）：最终答复增量按句/段先过输出护栏再经 {@code deltaSink} 外发。
+     *
+     * <p>{@code deltaSink == null} 时与 {@link #run(AgentLoopConfig, String, AgentSession)} 完全等价；
+     * 非空时走 llm-gateway 流式传输（P0-2），正文增量来源为 provider 真实增量，不再整段切分。</p>
+     */
+    public AgentLoopResult run(AgentLoopConfig config, String userMessage, AgentSession session,
+                               Consumer<String> deltaSink) {
         // F06-09 ⑥：压缩判定在循环内产生，结果统一附着到本轮返回的 AgentLoopResult（done 帧/状态条）
         CompressionReport compression = new CompressionReport();
-        AgentLoopResult result = doRun(config, userMessage, session, compression);
+        AgentLoopResult result = doRun(config, userMessage, session, compression, deltaSink);
         compression.applyTo(result);
         return result;
     }
 
     private AgentLoopResult doRun(AgentLoopConfig config, String userMessage, AgentSession session,
-                                  CompressionReport compression) {
+                                  CompressionReport compression, Consumer<String> deltaSink) {
         long startTime = System.currentTimeMillis();
         String sessionId = session != null ? session.getSessionId() : null;
         String agentId = session != null ? session.getProfileName() : "default";
@@ -171,6 +194,8 @@ public class AgentLoopService {
         // F06-12 引用后校验的比对基准（工具返回体原文）+ F06-13 规则 3 的失败分类计数
         List<String> toolResultBodies = new ArrayList<>();
         List<AiErrorClass> toolFailureClasses = new ArrayList<>();
+        // P0-2：承流段护栏（仅 deltaSink 非空时创建；null ⇒ 非流式路径零变化）
+        GuardedDeltaStreamer streamer = deltaSink == null ? null : new GuardedDeltaStreamer(deltaSink);
 
         // F06-06 要点 1：traceId 唯一源 = MDC（入口过滤器写入）；AgentTracer 只登记本地调试视图
         String traceId = AgentTracer.newTrace();
@@ -262,9 +287,18 @@ public class AgentLoopService {
             long thinkStart = System.currentTimeMillis();
 
             // 2a. 调用 LLM
-            ChatResponse resp = callLLM(messages, resolvedConfig, sessionId);
+            ChatResponse resp = callLLM(messages, resolvedConfig, sessionId, streamer);
             long thinkElapsed = System.currentTimeMillis() - thinkStart;
             emitLlmCallStep(agentId, traceId, resolvedConfig, turn, resp, thinkElapsed);
+            if (streamer != null) {
+                streamer.finish();
+                if (streamer.failed()) {
+                    log.error("[AgentLoop] 承流段护栏失败 → FAIL_CLOSED: session={} err={}",
+                            sessionId, streamer.failureMessage());
+                    return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                            "输出护栏在流式增量校验中失败: " + streamer.failureMessage(), null);
+                }
+            }
 
             if (resp == null || !resp.isSuccess()) {
                 // F06-14 要点 2：LLM 出口的有界退避与降备用 provider 已在网关单源结算，
@@ -405,9 +439,18 @@ public class AgentLoopService {
                             pc.diagnostic(), sessionId);
                     long regenStart = System.currentTimeMillis();
                     messages.add(Message.user(CitationPostCheckService.REGENERATION_INSTRUCTION));
-                    ChatResponse regen = callLLM(messages, resolvedConfig, sessionId);
+                    ChatResponse regen = callLLM(messages, resolvedConfig, sessionId, streamer);
                     emitLlmCallStep(agentId, traceId, resolvedConfig, turn, regen,
                             System.currentTimeMillis() - regenStart);
+                    if (streamer != null) {
+                        streamer.finish();
+                        if (streamer.failed()) {
+                            log.error("[AgentLoop] 承流段护栏失败（重生成轮）→ FAIL_CLOSED: session={} err={}",
+                                    sessionId, streamer.failureMessage());
+                            return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                                    "输出护栏在流式增量校验中失败: " + streamer.failureMessage(), null);
+                        }
+                    }
                     if (regen != null && regen.isSuccess()) {
                         if (regen.hasUsage()) {
                             totalTokens += regen.getTokensInput() + regen.getTokensOutput();
@@ -496,6 +539,8 @@ public class AgentLoopService {
             }
 
             AgentLoopResult result = AgentLoopResult.success(finalContent, turn, sessionId, totalTokens, toolCallRecords);
+            // P1-6：技能沉淀——含工具调用的成功轨迹登记为技能草稿（失败不翻转本轮结果）
+            curateSkillFromRun(agentId, userMessage, toolCallRecords);
             result.setTraceId(traceId);
             result.setAnswerType(RefusalRulesService.TYPE_NORMAL);
             if (citation.assessed) {
@@ -608,9 +653,24 @@ public class AgentLoopService {
             systemPrompt = session.getSystemPrompt();
         }
 
+        // P0-5：会话历史回灌（最近 HISTORY_REPLAY_LIMIT 条；同一份历史供记忆提取复用）
+        String sessionId = session != null ? session.getSessionId() : null;
+        List<AgentSessionService.AgentMessage> history = loadSessionHistory(sessionId);
+
         // T1: 注入Skill列表到System Prompt（运行时加载）
         String agentId = session != null ? session.getProfileName() : null;
-        systemPrompt = buildSystemPrompt(systemPrompt, agentId, null);
+        systemPrompt = buildSystemPrompt(systemPrompt, agentId, null, history);
+
+        // P0-4：RAG 知识上下文（检索失败/无命中 ⇒ 不注入；内容仅作参考，禁无据引用）
+        if (knowledgeContextClient != null && userMessage != null && !userMessage.isBlank()) {
+            String ragContext = knowledgeContextClient.retrieve(userMessage, 5);
+            if (ragContext != null && !ragContext.isBlank()) {
+                systemPrompt = (systemPrompt == null ? "" : systemPrompt)
+                        + "\n\n## 知识上下文（RAG 检索，仅供参考）\n"
+                        + ragContext
+                        + "回答中引用上述数字/结论时须注明来自知识库检索，不得编造未出现的数值。";
+            }
+        }
 
         // F06-12 双保险第一重：场景受控工具一轮必须带数值引用硬规则（模板单源在 ToolCitation）
         if (ScenarioToolCatalog.isScenarioWhitelist(config == null ? null : config.getToolWhitelist())) {
@@ -622,7 +682,25 @@ public class AgentLoopService {
             messages.add(Message.system(systemPrompt));
         }
 
-        // TODO T0.3: 注入记忆上下文（KG 记忆事实）
+        // P0-5：历史消息回灌（user/assistant 两类；system/tool 不回灌，避免伪造工具上下文）
+        if (!history.isEmpty()) {
+            int start = Math.max(0, history.size() - HISTORY_REPLAY_LIMIT);
+            for (int i = start; i < history.size(); i++) {
+                AgentSessionService.AgentMessage hm = history.get(i);
+                String role = hm.getRole();
+                String content = hm.getContent();
+                if (content == null || content.isBlank()) {
+                    continue;
+                }
+                if ("user".equals(role)) {
+                    messages.add(Message.user(content));
+                } else if ("assistant".equals(role)) {
+                    messages.add(Message.assistant(content));
+                }
+            }
+            log.info("[AgentLoop] 回灌历史消息 {} 条 (session={})",
+                    messages.size() - (systemPrompt == null || systemPrompt.isBlank() ? 0 : 1), sessionId);
+        }
 
         // 当前用户消息
         if (userMessage != null && !userMessage.isBlank()) {
@@ -635,6 +713,82 @@ public class AgentLoopService {
                 ? config.getMaxContextTokens() : 8000;
         messages = trimHistory(messages, maxCtx);
         return messages;
+    }
+
+    /** 会话历史读取；服务未装配/会话为空/读取异常 ⇒ 空列表（禁把失败伪装成"没有历史"以外的东西）。 */
+    private List<AgentSessionService.AgentMessage> loadSessionHistory(String sessionId) {
+        if (agentSessionService == null || sessionId == null || sessionId.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            List<AgentSessionService.AgentMessage> messages = agentSessionService.getMessages(sessionId);
+            return messages == null ? Collections.emptyList() : messages;
+        } catch (RuntimeException e) {
+            log.warn("[AgentLoop] 会话历史加载失败（本轮不回灌）: session={} err={}",
+                    sessionId, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    // ─── 技能沉淀（P1-6） ───────────────────────────────────────────────
+
+    /**
+     * 成功且含工具调用的本轮轨迹提炼为技能草稿。
+     *
+     * <p>闭环语义：成功轨迹（用户意图 + 工具序列）→ 登记 {@code enabled=false} 草稿
+     * （人工启用才会经 T1 Skill 注入进入 System Prompt——未经评审的技能禁直接入模）；
+     * 同名草稿已存在则跳过，不重复造版本。沉淀失败只记日志，不翻转本轮结果。</p>
+     */
+    private void curateSkillFromRun(String agentId, String userMessage,
+                                    List<Map<String, Object>> toolCallRecords) {
+        if (skillService == null || toolCallRecords == null || toolCallRecords.isEmpty()) {
+            return;
+        }
+        try {
+            List<String> tools = toolCallRecords.stream()
+                    .map(r -> r.get("toolName") == null ? "" : String.valueOf(r.get("toolName")))
+                    .filter(s -> !s.isBlank())
+                    .distinct()
+                    .toList();
+            if (tools.isEmpty()) {
+                return;
+            }
+            String name = "auto-" + agentId + "-" + String.join("+", tools);
+            if (name.length() > 60) {
+                name = name.substring(0, 60);
+            }
+            final String skillName = name;
+            List<SkillEntity> existing = skillService.listSkills("auto-curated", null);
+            if (existing != null && existing.stream().anyMatch(s -> skillName.equals(s.getName()))) {
+                log.debug("[AgentLoop] 技能草稿已存在，跳过沉淀: name={}", skillName);
+                return;
+            }
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("name", skillName);
+            body.put("description", "自动沉淀：问「" + abbreviate(userMessage, 80)
+                    + "」时成功调用了工具 " + tools);
+            body.put("version", "0.1.0");
+            body.put("enabled", false);
+            body.put("category", "auto-curated");
+            Map<String, Object> packageInfo = new LinkedHashMap<>();
+            packageInfo.put("toolSequence", tools);
+            packageInfo.put("sampleQuestion", abbreviate(userMessage, 200));
+            packageInfo.put("createdFrom", "agent-loop");
+            body.put("packageInfo", packageInfo);
+            body.put("createdBy", "skill-curator");
+            skillService.createSkill(body);
+            log.info("[AgentLoop] 技能沉淀：成功轨迹已登记为技能草稿 name={} tools={}", skillName, tools);
+        } catch (RuntimeException e) {
+            log.warn("[AgentLoop] 技能沉淀失败（不影响本轮回答）: {}", e.getMessage());
+        }
+    }
+
+    private static String abbreviate(String text, int max) {
+        if (text == null) {
+            return "";
+        }
+        String trimmed = text.replaceAll("\\s+", " ").trim();
+        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max - 3) + "...";
     }
 
     // ─── System Prompt 构建 (T1: Skill 运行时加载) ─────────────────────
@@ -651,7 +805,8 @@ public class AgentLoopService {
      * @param userId     用户标识（预留，当前从会话上下文获取）
      * @return 增强后的 System Prompt
      */
-    private String buildSystemPrompt(String basePrompt, String agentId, String userId) {
+    private String buildSystemPrompt(String basePrompt, String agentId, String userId,
+                                     List<AgentSessionService.AgentMessage> history) {
         if (basePrompt == null) {
             basePrompt = "";
         }
@@ -704,8 +859,8 @@ public class AgentLoopService {
             log.warn("[AgentLoop] Failed to load skills for system prompt: {}", e.getMessage());
         }
 
-        // T3: 注入记忆上下文（MemoryExtractor 规则引擎）
-        injectMemorySection(sb, agentId);
+        // T3: 注入记忆上下文（MemoryExtractor 规则引擎，输入 = 真实会话历史）
+        injectMemorySection(sb, agentId, history);
 
         return sb.toString();
     }
@@ -724,41 +879,148 @@ public class AgentLoopService {
      *
      * @param sb      System Prompt StringBuilder（原地追加）
      * @param agentId Agent 标识（预留，供后续按 Agent 过滤记忆）
+     * @param history 真实会话历史（P0-5：由 {@link AgentSessionService#getMessages} 读取）
      */
-    private void injectMemorySection(StringBuilder sb, String agentId) {
+    private void injectMemorySection(StringBuilder sb, String agentId,
+                                     List<AgentSessionService.AgentMessage> history) {
         if (memoryExtractor == null) {
             log.debug("[AgentLoop] MemoryExtractor not available, skipping memory injection");
             return;
         }
 
         try {
-            // 注：当前从空消息列表提取 — T3 阶段仅留下注入点，
-            // 后续迭代通过 AgentSessionService.getMessages() 获取会话历史
-            List<AgentSessionService.AgentMessage> sessionMessages = null;
-
-            if (sessionMessages == null || sessionMessages.isEmpty()) {
+            if (history == null || history.isEmpty()) {
                 log.debug("[AgentLoop] No session messages available for memory extraction");
                 return;
             }
 
-            List<String> facts = memoryExtractor.extractFacts(sessionMessages);
+            List<String> facts = memoryExtractor.extractFacts(history);
             if (facts == null || facts.isEmpty()) {
                 log.debug("[AgentLoop] No memory facts extracted");
                 return;
             }
 
             sb.append("\n\n## Memory (from previous conversations)\n");
+            int written = 0;
+            List<String> seen = new ArrayList<>();
             for (String fact : facts) {
+                if (fact == null || fact.isBlank() || seen.contains(fact)) {
+                    continue;
+                }
+                seen.add(fact);
                 sb.append("- ").append(fact).append("\n");
+                written++;
+                if (written >= 20) {
+                    break;
+                }
             }
 
-            log.info("[AgentLoop] Injected {} memory facts into system prompt", facts.size());
+            log.info("[AgentLoop] Injected {} memory facts into system prompt (agent={})", written, agentId);
         } catch (Exception e) {
             log.warn("[AgentLoop] Failed to inject memory section: {}", e.getMessage());
         }
     }
 
     // ─── Token 预算管理 ─────────────────────────────────────────────────
+
+    /**
+     * 承流段护栏（P0-2）：provider 增量按句/段攒批，每段先过输出护栏（security-engine 单源）
+     * 再经 sink 外发——禁止未护栏正文出网。护栏 fail-closed 即置失败位，由调用方终止本轮。
+     */
+    private final class GuardedDeltaStreamer {
+
+        private static final int MIN_SEGMENT_CHARS = 24;
+        private static final int MAX_SEGMENT_CHARS = 240;
+
+        private final Consumer<String> sink;
+        private final StringBuilder buffer = new StringBuilder();
+        private boolean failed;
+        private String failureMessage;
+
+        private GuardedDeltaStreamer(Consumer<String> sink) {
+            this.sink = sink;
+        }
+
+        void accept(String delta) {
+            if (failed || delta == null || delta.isEmpty()) {
+                return;
+            }
+            buffer.append(delta);
+            drain(false);
+        }
+
+        void finish() {
+            if (!failed) {
+                drain(true);
+            }
+        }
+
+        boolean failed() {
+            return failed;
+        }
+
+        String failureMessage() {
+            return failureMessage;
+        }
+
+        private void drain(boolean flushAll) {
+            while (!failed) {
+                int cut = flushAll ? buffer.length() : nextBoundary();
+                if (cut <= 0) {
+                    return;
+                }
+                String segment = buffer.substring(0, cut);
+                buffer.delete(0, cut);
+                emit(segment);
+            }
+        }
+
+        /** 句末/换行/分号成段；攒满 240 字符强制成段（保证首字延迟有上界）。 */
+        private int nextBoundary() {
+            if (buffer.length() < MIN_SEGMENT_CHARS) {
+                return 0;
+            }
+            for (int i = MIN_SEGMENT_CHARS - 1; i < buffer.length(); i++) {
+                char c = buffer.charAt(i);
+                if (c == '\n' || c == '。' || c == '！' || c == '？'
+                        || c == '!' || c == '?' || c == '.' || c == '；' || c == ';') {
+                    return i + 1;
+                }
+            }
+            return buffer.length() >= MAX_SEGMENT_CHARS ? MAX_SEGMENT_CHARS : 0;
+        }
+
+        private void emit(String segment) {
+            if (segment.isEmpty()) {
+                return;
+            }
+            if (guardrailsService == null) {
+                failed = true;
+                failureMessage = "GuardrailsService 未装配";
+                return;
+            }
+            try {
+                Map<String, Object> check = guardrailsService.validate(Map.of(
+                        "llmOutput", segment,
+                        "stage", GuardrailsServiceImpl.STAGE_OUTPUT));
+                if (!Boolean.TRUE.equals(check.get("passed"))) {
+                    if (isGuardrailFailClosed(check)) {
+                        failed = true;
+                        failureMessage = "security-engine 不可用（fail-closed）";
+                        return;
+                    }
+                    // 段级命中：与整段替换策略一致，外发占位文案（命中不是不可用）
+                    sink.accept(GuardrailsServiceImpl.FILTERED_PLACEHOLDER);
+                    return;
+                }
+                Object masked = check.get("content");
+                sink.accept(masked instanceof String s && !s.isEmpty() ? s : segment);
+            } catch (RuntimeException e) {
+                failed = true;
+                failureMessage = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            }
+        }
+    }
 
     /**
      * Token 预算裁剪 — system 消息始终保留在最前，其余消息从近到远保留直到超出预算。
@@ -838,18 +1100,36 @@ public class AgentLoopService {
      * </p>
      */
     private ChatResponse callLLM(List<Message> messages, AgentLoopConfig config, String sessionId) {
+        return callLLM(messages, config, sessionId, null);
+    }
+
+    /**
+     * 调用 LLM（P0-1/P0-2）：工具面以原生 {@code tools} 下发、工具结果按 {@code role=tool} 协议回传；
+     * {@code streamer} 非空时走 llm-gateway 流式传输，正文增量经承流段护栏后外发。
+     */
+    private ChatResponse callLLM(List<Message> messages, AgentLoopConfig config, String sessionId,
+                                 GuardedDeltaStreamer streamer) {
+        List<Map<String, Object>> toolSchemas = nativeToolSchemas(config);
+        boolean nativeTools = !toolSchemas.isEmpty();
+
         // 转换消息
         List<ChatMessage> chatMessages = new ArrayList<>();
         for (Message m : messages) {
             ChatMessage cm = new ChatMessage();
             cm.setRole(m.getRole());
-
-            // 对于 assistant 消息携带 tool_calls，序列化为 JSON
             if ("assistant".equals(m.getRole()) && m.hasToolCalls()) {
-                cm.setContent(serializeToolCallsForLLM(m.getToolCalls()));
+                if (nativeTools) {
+                    // 原生协议：content 与 tool_calls 分离（与 OpenAI/DeepSeek 一致）
+                    cm.setContent(m.getContent());
+                    cm.setToolCalls(serializeToolCalls(m.getToolCalls()));
+                } else {
+                    // 无工具面（注册表未装配）：保留旧文本协议
+                    cm.setContent(serializeToolCallsForLLM(m.getToolCalls()));
+                }
             } else if ("tool".equals(m.getRole())) {
-                // tool 结果消息 — role=tool, content=结果文本
                 cm.setContent(m.getContent());
+                cm.setToolCallId(m.getToolCallId());
+                cm.setName(m.getToolName());
             } else {
                 cm.setContent(m.getContent());
             }
@@ -864,13 +1144,20 @@ public class AgentLoopService {
         Integer maxTokens = config != null && config.getMaxTokens() != null
                 ? config.getMaxTokens() : 4096;
 
-        ChatRequest request = new ChatRequest(model, chatMessages, temperature, maxTokens, false);
+        ChatRequest request = new ChatRequest(model, chatMessages, temperature, maxTokens, streamer != null);
+        if (nativeTools) {
+            request.setTools(toolSchemas);
+            request.setToolChoice("auto");
+        }
         // F06-05 要点 3：引擎侧不携带任何密钥（明文或引用）。provider 密钥一律由 llm-gateway
         // 服务端经 security-engine 密钥服务按 llm.gateway.default-api-key-ref 解析（I-4）。
         request.setCallerId("service:ai-engine-agent-loop");
         // F06-07：会话作用域随请求下传 —— 网关按它记 LLM_USAGE 与账行，配额查询才有真值
         request.setSessionId(sessionId);
         try {
+            if (streamer != null) {
+                return llmGateway.callStream(request, streamer::accept);
+            }
             return llmGateway.call(request);
         } catch (Exception e) {
             // F06-15 边界才捕、捕后必分类：网关抛出异常（非失败响应）也必须带类上浮，
@@ -879,6 +1166,62 @@ public class AgentLoopService {
             log.error("[AgentLoop] LLM gateway call exception: class={} raw={}",
                     error.errorClass().name(), error.rawReason(), e);
             return ChatResponse.fail(error.errorClass(), error.rawReason());
+        }
+    }
+
+    /**
+     * 原生工具面：{@code ToolRegistry} 的 function schema 包成 OpenAI {@code tools} 数组。
+     *
+     * <p>白名单语义：{@code config.toolWhitelist} 非空时只向模型下发白名单内工具
+     * （未列出的工具既不可见也不可调，避免模型尝试越权工具后再被拒）；为空/未配置时下发全量。</p>
+     */
+    private List<Map<String, Object>> nativeToolSchemas(AgentLoopConfig config) {
+        if (toolRegistry == null) {
+            return Collections.emptyList();
+        }
+        List<Map<String, Object>> functions = toolRegistry.getToolSchemas();
+        if (functions == null || functions.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<String> whitelist = config == null ? null : config.getToolWhitelist();
+        boolean filtered = whitelist != null && !whitelist.isEmpty();
+        List<Map<String, Object>> tools = new ArrayList<>(functions.size());
+        for (Map<String, Object> fn : functions) {
+            if (filtered) {
+                Object name = fn.get("name");
+                if (name == null || !whitelist.contains(String.valueOf(name))) {
+                    continue;
+                }
+            }
+            Map<String, Object> tool = new LinkedHashMap<>();
+            tool.put("type", "function");
+            tool.put("function", fn);
+            tools.add(tool);
+        }
+        return tools;
+    }
+
+    /** 原生 tool_calls 序列化（assistant 历史消息回传用）。 */
+    private List<Map<String, Object>> serializeToolCalls(List<ToolCall> toolCalls) {
+        List<Map<String, Object>> serialized = new ArrayList<>();
+        for (ToolCall tc : toolCalls) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", tc.getId());
+            entry.put("type", "function");
+            Map<String, Object> function = new LinkedHashMap<>();
+            function.put("name", tc.getName());
+            function.put("arguments", toJsonString(tc.getArguments()));
+            entry.put("function", function);
+            serialized.add(entry);
+        }
+        return serialized;
+    }
+
+    private static String toJsonString(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+        } catch (Exception e) {
+            return "{}";
         }
     }
 
@@ -933,6 +1276,31 @@ public class AgentLoopService {
         if (llmResponse == null) {
             return Collections.emptyList();
         }
+
+        // 0. 原生 tool_calls（P0-1，OpenAI 兼容结构）——优先于一切文本解析
+        if (llmResponse.hasToolCalls()) {
+            List<ToolCall> nativeCalls = new ArrayList<>();
+            for (Map<String, Object> raw : llmResponse.getToolCalls()) {
+                Object fnObj = raw.get("function");
+                String name = null;
+                Object argsObj = null;
+                if (fnObj instanceof Map<?, ?> fn) {
+                    name = fn.get("name") == null ? null : String.valueOf(fn.get("name"));
+                    argsObj = fn.get("arguments");
+                }
+                if (name != null && !name.isBlank()) {
+                    String id = raw.get("id") == null
+                            ? "call_native_" + nativeCalls.size() : String.valueOf(raw.get("id"));
+                    nativeCalls.add(new ToolCall(id, name.trim(), parseArguments(argsObj)));
+                }
+            }
+            if (!nativeCalls.isEmpty()) {
+                log.debug("[AgentLoop] Native tool_calls detected: {}",
+                        nativeCalls.stream().map(ToolCall::getName).toList());
+                return validateToolCalls(nativeCalls);
+            }
+        }
+
         String content = llmResponse.getContent();
         if (content == null || content.isBlank()) {
             return Collections.emptyList();

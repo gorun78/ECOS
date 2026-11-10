@@ -1,21 +1,24 @@
 /**
- * AIP Copilot — Intelligent Co-Processor Drawer (主壳)
+ * ECOS Copilot — Intelligent Co-Processor Drawer (主壳)
  *
- * Wave-2A T1: 拆分为 4 子组件 + 1 自动化 hook
- *   - useAipAutomation:    业务逻辑 (12 场景执行流)
- *   - CopilotMessageList:  消息列表 + typing 指示器
- *   - AgentQuickActions:   一键智能代理按钮网格
- *   - CopilotInputBar:     自然语言输入栏
+ * 组成（Wave-2A 拆分 + 2026-11-09 Copilot 批）：
+ *   - useAipAutomation:      既有 12 场景自动化执行流（保留，关键字/预设命中时使用）
+ *   - CopilotAgentSwitcher:  6 个内置智能体切换（默认按当前页面路由自动选择）
+ *   - CopilotMessageList:    消息列表 + typing 指示器
+ *   - CopilotSuggestions:    底部「一键智能代理协同」动态建议区（默认收起）
+ *   - CopilotInputBar:       自然语言输入栏
  *
- * 中文显示全部经 `copilot.*` i18n namespace (~156 keys)。
- * 备注：handleSendMessage 的 query.includes(...) 关键字检测是**逻辑**
- * (用户预设 prompt 匹配)，保留中文原文以便做语义路由，不算显示字符串。
+ * 对话路由：命中预设场景 → 既有自动化流；否则 → 当前智能体经
+ * `/api/v1/agent/copilot/chat`（agent-loop + 引擎工具白名单）真实执行。
+ *
+ * 中文显示全部经 `copilot.*` i18n namespace。
  *
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Bot,
   Loader2,
@@ -23,12 +26,13 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
-import AgentQuickActions from './AgentQuickActions';
+import CopilotAgentSwitcher from './CopilotAgentSwitcher';
+import CopilotSuggestions from './CopilotSuggestions';
 import CopilotMessageList from './CopilotMessageList';
 import CopilotInputBar from './CopilotInputBar';
 import { useAipAutomation } from './useAipAutomation';
 import { AgentScenarioType, scenarioPrompt } from './AgentScenarioData';
-import { knowledgeQueryAnonymous, fetchSecurityAuditLogs } from '../../services/knowledgeQueryApi';
+import { fetchCopilotAgents, copilotAgentChat, type CopilotAgentInfo } from '../../services/copilotApi';
 
 interface AIPCopilotDrawerProps {
   isOpen: boolean;
@@ -75,8 +79,6 @@ interface AIPCopilotDrawerProps {
 /**
  * Detect scenario type from a free-form user query,
  * by matching key Chinese/English keywords (logic keywords only, not display text).
- * Kept inside the drawer since it bridges viewMode and semantically
- * routes to the right AgentScenarioType.
  */
 function detectScenarioType(
   viewMode: 'ontology' | 'explorer' | 'integration' | 'knowledge' | 'aip' | 'security' | 'workshop',
@@ -112,6 +114,23 @@ function isScenarioQuery(t: (k: string) => string, query: string): boolean {
     'ws_generate_dashboard', 'ws_auto_bind', 'ws_inject_copilot', 'ws_transform_theme',
   ];
   return typeList.some((type) => query.includes(scenarioPrompt(t, type).slice(0, 15)));
+}
+
+/** 当前路由 → 默认智能体（前缀最长匹配；无命中回 AI 智能体）。 */
+function resolveAgentForRoute(agents: CopilotAgentInfo[], pathname: string): CopilotAgentInfo | undefined {
+  let best: CopilotAgentInfo | undefined;
+  let bestLen = -1;
+  for (const agent of agents) {
+    for (const route of agent.routes ?? []) {
+      if (pathname === route || pathname.startsWith(route + '/')) {
+        if (route.length > bestLen) {
+          best = agent;
+          bestLen = route.length;
+        }
+      }
+    }
+  }
+  return best ?? agents.find((a) => a.id === 'agent-ai') ?? agents[0];
 }
 
 export default function AIPCopilotDrawer({
@@ -157,7 +176,14 @@ export default function AIPCopilotDrawer({
 }: AIPCopilotDrawerProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
+  const location = useLocation();
   const [inputText, setInputText] = useState('');
+  const [agents, setAgents] = useState<CopilotAgentInfo[]>([]);
+  const [manualAgentId, setManualAgentId] = useState<string | null>(null);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  /** Copilot 会话 id（同一次应用中保持上下文） */
+  const sessionIdRef = useRef(`copilot-${Date.now()}`);
 
   const {
     messages,
@@ -205,78 +231,115 @@ export default function AIPCopilotDrawer({
     setSecuritySelectedRowColDs,
   } as any);
 
+  // 6 内置智能体目录（服务端单源）；不可用时保持空列表（不伪造智能体）
+  useEffect(() => {
+    let cancelled = false;
+    fetchCopilotAgents()
+      .then((list) => { if (!cancelled) setAgents(list); })
+      .catch(() => { if (!cancelled) setAgents([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // 路由变化 → 回到该页面的默认智能体（清掉手动覆盖）
+  useEffect(() => {
+    setManualAgentId(null);
+  }, [location.pathname]);
+
+  const routeAgent = useMemo(
+    () => resolveAgentForRoute(agents, location.pathname),
+    [agents, location.pathname],
+  );
+  const selectedAgentId = manualAgentId && agents.some((a) => a.id === manualAgentId)
+    ? manualAgentId
+    : (routeAgent?.id ?? 'agent-ai');
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+
+  // 动态建议：当前智能体能力建议 + 本会话最近用户提问（用户数据驱动）
+  const suggestions = useMemo(() => {
+    const defaults = selectedAgent?.quickQuestions ?? [];
+    const recentTopics = messages
+      .filter((m) => m.sender === 'user')
+      .slice(-3)
+      .map((m) => m.text.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .map((text) => (text.length > 28 ? `${text.slice(0, 28)}…` : text))
+      .map((topic) => t('copilot.suggestions.followUp', { topic }));
+    return Array.from(new Set([...recentTopics, ...defaults])).slice(0, 4);
+  }, [selectedAgent, messages, t]);
+
+  const suggestionHint = useMemo(() => {
+    const userCount = messages.filter((m) => m.sender === 'user').length;
+    if (userCount > 0) {
+      return t('copilot.suggestions.hintUser', { count: userCount });
+    }
+    return t('copilot.suggestions.hintAgent', { name: selectedAgent?.name ?? 'ECOS Copilot' });
+  }, [messages, selectedAgent, t]);
+
+  const busy = isTyping || !!currentStep || chatSending;
+
   /**
-   * Free-text send: detect scenario, run automation; else call Q&A endpoint.
+   * 统一发送：命中预设场景 → 既有自动化流；否则 → 当前智能体真实对话（agent-loop + 工具）。
    */
+  const sendQuery = useCallback(async (raw: string) => {
+    const query = raw.trim();
+    if (!query || busy) return;
+
+    if (isScenarioQuery(t, query)) {
+      await runAgentAutomation(detectScenarioType(viewMode, query), query);
+      return;
+    }
+
+    const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setMessages((prev) => [...prev, {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: query,
+      timestamp: now(),
+    }]);
+    setChatSending(true);
+    try {
+      const res = await copilotAgentChat({
+        agentId: selectedAgentId,
+        message: query,
+        sessionId: sessionIdRef.current,
+      });
+      const tools = Array.from(new Set(
+        (res.toolCalls ?? [])
+          .map((tc) => tc.toolName)
+          .filter((name): name is string => !!name),
+      ));
+      let text = res.answer && res.answer.trim() ? res.answer : t('copilot.chat.noAnswer');
+      if (tools.length > 0) {
+        text += `\n\n> ${t('copilot.chat.toolCalls')}: ${tools.join(', ')}`;
+      }
+      if (res.success === false) {
+        text = `${t('copilot.chat.agentFail')}${res.errorCode ?? ''}\n\n${text}`.trim();
+      }
+      setMessages((prev) => [...prev, {
+        id: `agent-qa-${Date.now()}`,
+        sender: 'agent',
+        text,
+        timestamp: now(),
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: `agent-err-${Date.now()}`,
+        sender: 'agent',
+        text: t('copilot.chat.gatewayOffline'),
+        timestamp: now(),
+      }]);
+    } finally {
+      setChatSending(false);
+    }
+  }, [busy, t, viewMode, selectedAgentId, runAgentAutomation, setMessages]);
+
   const handleSendMessage = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     const query = inputText.trim();
     if (!query) return;
     setInputText('');
-
-    // Re-use the runAgentAutomation entrypoint to push the user message —
-    // If a preset prompt matched, route to the matching scenario; else,
-    // fire the backend Q&A.
-    if (isScenarioQuery(t, query)) {
-      const detectedType = detectScenarioType(viewMode, query);
-      await runAgentAutomation(detectedType, query);
-    } else {
-      try {
-        // Org / project / IP defaults mapped from current simulator context
-        let orgId = 'org_aviation_hq';
-        if (securitySimUser === 'operator_zhang') orgId = 'org_logistics_p';
-        else if (securitySimUser === 'contractor_eng' || securitySimUser === 'external_auditor') orgId = 'org_contractor';
-        else if (securitySimUser === 'EU_DPO') orgId = 'Org_EU_Ops';
-        else if (securitySimUser === 'auditor_wang') orgId = 'Org_Finance_Dept';
-
-        let projectId = 'proj_aviation_core';
-        if (securitySimDataset === 'ds_ticket_sales') projectId = 'proj_flight_analytics';
-        else if (securitySimDataset === 'ds_pilots_biography') projectId = 'proj_pilot_credentials';
-        else if (securitySimDataset === 'ds_passenger_manifest') projectId = 'proj_passenger_eu';
-
-        let clientIp = '10.120.5.23';
-        if (securitySimUser === 'operator_zhang') clientIp = '172.16.45.12';
-        else if (securitySimUser === 'contractor_eng' || securitySimUser === 'external_auditor') clientIp = '202.96.128.44';
-        else if (securitySimUser === 'EU_DPO') clientIp = '10.120.9.15';
-        else if (securitySimUser === 'unauthorized_ip_user') clientIp = '198.51.100.45';
-
-        const data = await knowledgeQueryAnonymous({
-          query,
-          userId: securitySimUser,
-          orgId,
-          projectId,
-          datasetId: securitySimDataset,
-          purposeId: securitySimPurpose,
-          clientIp,
-        });
-        const answerMsgId = `agent-qa-${Date.now()}`;
-        // Push message through the hook's setMessages
-        setMessages((prev: any) => [...(prev || []), {
-          id: answerMsgId,
-          sender: 'agent',
-          text: data.answer || t('copilot.chat.noAnswer'),
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }]);
-
-        if (data.verdict === 'DENIED') {
-          showToast('error', t('copilot.qa.denied'));
-          const logs = await fetchSecurityAuditLogs();
-          if (logs.ok) {
-            (setSecurityAuditLogs as any)(logs.json);
-          }
-        }
-      } catch (err) {
-        console.error('Copilot Q&A backend query failed:', err);
-        const errMsgId = `agent-err-${Date.now()}`;
-        setMessages((prev: any) => [...(prev || []), {
-          id: errMsgId,
-          sender: 'agent',
-          text: t('copilot.chat.gatewayOffline'),
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }]);
-      }
-    }
-  }, [inputText, t, viewMode, securitySimUser, securitySimDataset, securitySimPurpose, runAgentAutomation, showToast, setSecurityAuditLogs, messages]);
+    await sendQuery(query);
+  }, [inputText, sendQuery]);
 
   if (!isOpen) return null;
 
@@ -289,8 +352,8 @@ export default function AIPCopilotDrawer({
             <Bot size={15} />
           </span>
           <div>
-            <h3 className="text-xs font-black tracking-wide font-sans text-white">ECOS AIP Copilot</h3>
-            <span className="text-[9px] text-indigo-400 font-mono">Agent-driven Co-Processor Active</span>
+            <h3 className="text-xs font-black tracking-wide font-sans text-white">{t('copilot.header.title')}</h3>
+            <span className="text-[9px] text-indigo-400 font-mono">{t('copilot.header.subtitle')}</span>
           </div>
         </div>
         <button type="button"
@@ -302,7 +365,15 @@ export default function AIPCopilotDrawer({
         </button>
       </div>
 
-      {/* 2. Live Agent Steps Indicator Banner */}
+      {/* 2. Built-in agent switcher (route-driven default) */}
+      <CopilotAgentSwitcher
+        agents={agents}
+        selectedId={selectedAgentId}
+        onSelect={setManualAgentId}
+        disabled={busy}
+      />
+
+      {/* 3. Live Agent Steps Indicator Banner */}
       {currentStep && (
         <div className="bg-indigo-900/90 text-indigo-100 px-3 py-2 flex items-center gap-2 text-[10px] font-mono shrink-0 border-b border-indigo-950">
           <Loader2 size={12} className="animate-spin text-indigo-400" />
@@ -311,25 +382,30 @@ export default function AIPCopilotDrawer({
         </div>
       )}
 
-      {/* 3. Messages Chat History */}
+      {/* 4. Messages Chat History */}
       <CopilotMessageList
         messages={messages as any}
-        isTyping={isTyping}
+        isTyping={isTyping || chatSending}
       />
 
-      {/* 4. Quick Automation Agents */}
-      <AgentQuickActions
-        viewMode={viewMode}
-        isExecuting={isTyping || !!currentStep}
-        onRun={(type) => { void runAgentAutomation(type); }}
+      {/* 5. Dynamic suggestions — collapsed by default */}
+      <CopilotSuggestions
+        open={suggestOpen}
+        title={t('copilot.chat.quickHeader')}
+        hint={suggestionHint}
+        items={suggestions}
+        emptyText={t('copilot.suggestions.empty')}
+        disabled={busy}
+        onToggle={() => setSuggestOpen((v) => !v)}
+        onAsk={(text) => { void sendQuery(text); }}
       />
 
-      {/* 5. Natural Language Input Bar */}
+      {/* 6. Natural Language Input Bar */}
       <CopilotInputBar
         value={inputText}
         onChange={setInputText}
         onSubmit={handleSendMessage}
-        disabled={isTyping || !!currentStep}
+        disabled={busy}
       />
     </div>
   );

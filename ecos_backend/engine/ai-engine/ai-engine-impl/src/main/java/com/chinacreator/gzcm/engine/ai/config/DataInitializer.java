@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 
 import com.chinacreator.gzcm.engine.ai.CronJobService;
 import com.chinacreator.gzcm.engine.ai.SkillService;
+import com.chinacreator.gzcm.engine.ai.copilot.CopilotSeedCatalog;
+import com.chinacreator.gzcm.engine.ai.copilot.CopilotToolCatalog;
 import com.chinacreator.gzcm.engine.ai.dao.CronJobDao;
 import com.chinacreator.gzcm.engine.ai.dao.CronJobExecutionDao;
 import com.chinacreator.gzcm.engine.ai.dao.DataSeedDao;
@@ -41,57 +43,11 @@ public class DataInitializer implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    // 六大内置 Agent 的模板数据
-    private static final List<Map<String, Object>> BUILTIN_AGENTS = List.of(
-        // 1. 数据引擎 Agent
-        Map.of(
-            "id", "builtin-data-agent",
-            "name", "数据引擎Agent",
-            "description", "ECOS 内置数据引擎 Agent，负责数据查询、表结构探查、数据血缘追踪和数据质量检查。",
-            "toolWhitelist", List.of("query_db", "list_tables", "get_table_schema", "get_lineage", "run_dq_check"),
-            "systemPrompt", "你是 ECOS 数据引擎的智能助手，专门负责数据治理相关操作。你能够查询数据库、列出表结构、获取数据血缘关系以及执行数据质量检查。请在回答时保持严谨、精确，引用具体的表名和字段名。"
-        ),
-        // 2. 本体引擎 Agent
-        Map.of(
-            "id", "builtin-ontology-agent",
-            "name", "本体引擎Agent",
-            "description", "ECOS 内置本体引擎 Agent，负责领域管理、对象类型查询、对象检索和关系链接。",
-            "toolWhitelist", List.of("list_domains", "get_object_type", "query_objects", "get_links", "get_functions", "search"),
-            "systemPrompt", "你是 ECOS 本体引擎的智能助手，专门负责企业本体建模和信息组织。你能够列出知识领域、查询对象类型定义、检索具体业务对象、浏览对象间关联关系。"
-        ),
-        // 3. 认知引擎 Agent
-        Map.of(
-            "id", "builtin-cognitive-agent",
-            "name", "认知引擎Agent",
-            "description", "ECOS 内置认知引擎 Agent，负责 RAG 检索、知识图谱查询、诊断分析和因果链追踪。",
-            "toolWhitelist", List.of("rag_search", "kg_query", "diagnose", "scenario_analysis", "get_goals", "get_causal_chain"),
-            "systemPrompt", "你是 ECOS 认知引擎的智能助手，具备企业级认知推理能力。你能够进行 RAG 增强检索、知识图谱结构化查询、业务诊断分析、情景模拟推理、目标体系查询以及因果链追踪。"
-        ),
-        // 4. 安全引擎 Agent
-        Map.of(
-            "id", "builtin-security-agent",
-            "name", "安全引擎Agent",
-            "description", "ECOS 内置安全引擎 Agent，负责权限校验、用户权限查询和数据分级分类。",
-            "toolWhitelist", List.of("check_permission", "my_permissions", "data_class"),
-            "systemPrompt", "你是 ECOS 安全引擎的智能助手，专注于权限管理和数据安全。你能够校验用户对特定资源的访问权限、查询当前用户拥有的所有权限列表，以及获取数据的分类分级信息。"
-        ),
-        // 5. 知识库 Agent
-        Map.of(
-            "id", "builtin-kb-agent",
-            "name", "知识库Agent",
-            "description", "ECOS 内置知识库 Agent，负责文件搜索、文件读写、知识抽取和文档补丁。",
-            "toolWhitelist", List.of("search_files", "read_file", "write_file", "patch", "knowledge_extract"),
-            "systemPrompt", "你是 ECOS 知识库的智能助手，负责企业知识文档的管理和维护。你能够搜索文件系统中的文档、读取文件内容、创建/更新文件、应用文本补丁，以及从非结构化文本中抽取结构化知识。"
-        ),
-        // 6. AI 编排 Agent
-        Map.of(
-            "id", "builtin-ai-agent",
-            "name", "AI编排Agent",
-            "description", "ECOS 内置 AI 编排 Agent，负责多 Agent 委托调度和 Agent 元信息查询。",
-            "toolWhitelist", List.of("delegate_to_agent"),
-            "systemPrompt", "你是 ECOS AI 引擎的编排助手，负责协调多个子 Agent 完成复杂任务。你能够将用户任务拆解为子任务并委托给合适的 Agent 执行，也能够查询所有已注册 Agent 的元信息以辅助决策。"
-        )
-    );
+    /** 旧 builtin-* 种子 id（Copilot 六智能体上线后停用保留，可改回 ACTIVE 复原）。 */
+    private static final List<String> LEGACY_BUILTIN_IDS = List.of(
+            "builtin-data-agent", "builtin-ontology-agent", "builtin-cognitive-agent",
+            "builtin-security-agent", "builtin-kb-agent", "builtin-ai-agent");
+
 
     private final CronJobDao cronJobRepository;
     private final CronJobExecutionDao executionRepository;
@@ -315,51 +271,99 @@ public class DataInitializer implements CommandLineRunner {
     @SuppressWarnings("unchecked")
     private void seedBuiltinAgents() {
         if (agentRepo == null) {
-            log.warn("AgentRegistryRepository 未就绪，跳过内置 Agent 种子数据初始化");
+            log.warn("AgentRegistryRepository 未就绪，跳过 Copilot 内置智能体种子初始化");
             return;
         }
 
-        for (Map<String, Object> template : BUILTIN_AGENTS) {
-            String agentId = String.valueOf(template.get("id"));
-            AgentRegistryEntity existing = agentRepo.findById(agentId);
-            if (existing != null) {
-                log.debug("Built-in agent {} already exists, skip seeding", agentId);
-                continue;
-            }
-
-            AgentRegistryEntity entity = new AgentRegistryEntity();
-            entity.setId(agentId);
-            entity.setName(String.valueOf(template.get("name")));
-            entity.setRole("builtin");
-            entity.setStatus("active");
-
-            // metadata JSON
-            Map<String, Object> meta = new LinkedHashMap<>();
-            meta.put("description", String.valueOf(template.get("description")));
-            meta.put("systemPrompt", String.valueOf(template.get("systemPrompt")));
-            meta.put("model", "deepseek-chat");
-            meta.put("maxIterations", 5);
-            meta.put("temperature", 0.1);
-            meta.put("modelProvider", "deepseek");
-            meta.put("modelName", "deepseek-chat");
+        // 1) 六个 Copilot 内置智能体：合并 upsert（缺键补齐；seedVersion 只升不覆盖用户改值）
+        for (CopilotSeedCatalog.Seed seed : CopilotSeedCatalog.all()) {
             try {
-                entity.setMetadata(mapper.writeValueAsString(meta));
+                AgentRegistryEntity existing = agentRepo.findById(seed.id());
+                if (existing == null) {
+                    agentRepo.insert(toEntity(seed));
+                    log.info("Copilot 内置智能体创建: id={} tools={}", seed.id(),
+                            CopilotToolCatalog.namesForAgent(seed.id()).size());
+                } else {
+                    agentRepo.update(mergeSeed(existing, seed));
+                }
             } catch (Exception e) {
-                entity.setMetadata("{}");
+                log.warn("Copilot 内置智能体种子失败（不中断其余种子）: id={} reason={}",
+                        seed.id(), e.getMessage());
             }
-
-            // capability JSON — tool whitelist
-            List<String> tools = (List<String>) template.get("toolWhitelist");
-            try {
-                entity.setCapability(mapper.writeValueAsString(Map.of("tools", tools != null ? tools : List.of())));
-            } catch (Exception e) {
-                entity.setCapability("{}");
-            }
-
-            agentRepo.insert(entity);
-            log.info("Seed built-in Agent created: id={} name={}", entity.getId(), entity.getName());
         }
 
-        log.info("Seeded {} built-in Agents", BUILTIN_AGENTS.size());
+        // 2) 旧 builtin-* 种子停用（保留行以保内置删除 403 / 归档审计；可改回 ACTIVE 复原）
+        for (String legacyId : LEGACY_BUILTIN_IDS) {
+            try {
+                AgentRegistryEntity legacy = agentRepo.findById(legacyId);
+                if (legacy != null && "ACTIVE".equalsIgnoreCase(legacy.getStatus())) {
+                    legacy.setStatus("INACTIVE");
+                    agentRepo.update(legacy);
+                    log.info("旧内置 Agent 已停用: {}", legacyId);
+                }
+            } catch (Exception e) {
+                log.warn("旧内置 Agent 停用失败: id={} reason={}", legacyId, e.getMessage());
+            }
+        }
+
+        log.info("Copilot 内置智能体种子完成: {} 个", CopilotSeedCatalog.all().size());
+    }
+
+    private static AgentRegistryEntity toEntity(CopilotSeedCatalog.Seed seed) {
+        AgentRegistryEntity entity = new AgentRegistryEntity();
+        entity.setId(seed.id());
+        entity.setName(seed.name());
+        entity.setRole("builtin");
+        entity.setStatus("ACTIVE");
+        entity.setEndpoint("");
+        try {
+            entity.setMetadata(mapper.writeValueAsString(CopilotSeedCatalog.seedMetadata(seed)));
+            entity.setCapability(mapper.writeValueAsString(java.util.Map.of(
+                    "tools", CopilotToolCatalog.namesForAgent(seed.id()))));
+        } catch (Exception e) {
+            entity.setMetadata("{}");
+            entity.setCapability("{}");
+        }
+        entity.setCreatedAt(LocalDateTime.now());
+        entity.setUpdatedAt(LocalDateTime.now());
+        return entity;
+    }
+
+    /**
+     * 种子合并：只补缺失键 / 升级 seedVersion 相关字段，不覆盖用户在工作台改过的值
+     * （systemPrompt/toolWhitelist/guardrails/rag/publish 等用户键存在即保留）。
+     */
+    private AgentRegistryEntity mergeSeed(AgentRegistryEntity existing, CopilotSeedCatalog.Seed seed) {
+        try {
+            Map<String, Object> meta = mapper.readValue(
+                    existing.getMetadata() == null || existing.getMetadata().isBlank()
+                            ? "{}" : existing.getMetadata(),
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+            Map<String, Object> seedMeta = CopilotSeedCatalog.seedMetadata(seed);
+            for (Map.Entry<String, Object> entry : seedMeta.entrySet()) {
+                // routes/quickQuestions/name/engine 描述随种子演进可刷新；用户键（提示词/白名单/绑定）存在即保留
+                boolean refreshKey = "kind".equals(entry.getKey()) || "engine".equals(entry.getKey())
+                        || "routes".equals(entry.getKey()) || "quickQuestions".equals(entry.getKey())
+                        || "model".equals(entry.getKey()) || "modelProvider".equals(entry.getKey())
+                        || "modelName".equals(entry.getKey()) || "maxIterations".equals(entry.getKey())
+                        || "temperature".equals(entry.getKey()) || "seedVersion".equals(entry.getKey());
+                boolean userTouched = meta.containsKey(entry.getKey())
+                        && !"seedVersion".equals(entry.getKey());
+                if (refreshKey || !userTouched) {
+                    meta.put(entry.getKey(), entry.getValue());
+                }
+            }
+            existing.setMetadata(mapper.writeValueAsString(meta));
+            existing.setName(existing.getName() == null || existing.getName().isBlank()
+                    ? seed.name() : existing.getName());
+            if (existing.getRole() == null || existing.getRole().isBlank()) {
+                existing.setRole("builtin");
+            }
+            existing.setStatus("ACTIVE");
+            existing.setUpdatedAt(LocalDateTime.now());
+        } catch (Exception e) {
+            log.warn("种子合并失败（保留现状）: id={} reason={}", seed.id(), e.getMessage());
+        }
+        return existing;
     }
 }

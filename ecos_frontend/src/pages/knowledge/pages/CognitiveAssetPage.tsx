@@ -122,17 +122,17 @@ export default function CognitiveAssetPage() {
   const options = ['ALL', ...governed];
 
   return (
-    <div className="flex flex-col gap-3" style={{ color: styles.cardText }}>
+    <div className={`flex flex-col gap-3 ${styles.cardText}`}>
       {/* 只读说明（§8.4 守护） */}
       <div className="text-[11px] opacity-60 px-1">{t('knowledge.cognitiveAsset.scope_note')}</div>
 
       {/* 工具栏 */}
-      <div className="rounded-md border p-3 flex flex-wrap items-center gap-3" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+      <div className={`rounded-md border p-3 flex flex-wrap items-center gap-3 ${styles.cardBorder} ${styles.cardBg}`}>
         <label className="flex items-center gap-2 text-xs">
           <span className="opacity-60">{t('knowledge.cognitiveAsset.filter_class')}</span>
           <select
-            className="px-2 py-1.5 rounded-md border text-xs"
-            style={{ borderColor: styles.cardBorder, background: styles.inputBg, color: styles.inputText }}
+            className={`px-2 py-1.5 rounded-md border text-xs ${styles.cardBorder} ${styles.inputBg} ${styles.inputText}`}
+
             value={activeClass}
             onChange={(e) => setActiveClass(e.target.value)}
           >
@@ -144,8 +144,8 @@ export default function CognitiveAssetPage() {
         <div className="relative flex-1 min-w-[180px]">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 opacity-40" />
           <input
-            className="w-full pl-7 pr-2 py-1.5 rounded-md border text-xs"
-            style={{ borderColor: styles.cardBorder, background: styles.inputBg, color: styles.inputText }}
+            className={`w-full pl-7 pr-2 py-1.5 rounded-md border text-xs ${styles.cardBorder} ${styles.inputBg} ${styles.inputText}`}
+
             placeholder={t('knowledge.cognitiveAsset.domain_placeholder')}
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
@@ -155,8 +155,8 @@ export default function CognitiveAssetPage() {
         <button
           type="button"
           onClick={() => { void loadCatalog(); void loadRows(); }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer"
-          style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer ${styles.cardBorder} ${styles.cardTextMuted}`}
+
           aria-label={t('knowledge.cognitiveAsset.refresh')}
         >
           <RefreshCw className="w-3.5 h-3.5" />{t('knowledge.cognitiveAsset.refresh')}
@@ -165,7 +165,7 @@ export default function CognitiveAssetPage() {
 
       {/* 分层图例（catalog.layers 服务端下发，只读） */}
       {catalog.status === 'ok' && catalog.data && Object.keys(catalog.data.layers).length > 0 && (
-        <div className="rounded-md border p-3 flex flex-col gap-1.5" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+        <div className={`rounded-md border p-3 flex flex-col gap-1.5 ${styles.cardBorder} ${styles.cardBg}`}>
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider opacity-50">
             <Layers className="w-3.5 h-3.5" />{t('knowledge.cognitiveAsset.layers_title')}
           </div>
@@ -184,8 +184,8 @@ export default function CognitiveAssetPage() {
           信息性呈现（非错误态），如实标注后端增量边界。 */}
       {catalog.status === 'ok' && (
         <div
-          className="rounded-md border p-3 flex flex-col gap-1.5"
-          style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+          className={`rounded-md border p-3 flex flex-col gap-1.5 ${styles.cardBorder} ${styles.cardBg}`}
+
         >
           <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider opacity-50">
             <Info className="w-3.5 h-3.5" />{t('knowledge.cognitiveAsset.pending_classes_title')}
@@ -201,7 +201,7 @@ export default function CognitiveAssetPage() {
 
       {/* catalog 错误态 */}
       {catalog.status === 'error' && catalog.error && (
-        <div className="rounded-md border p-3 flex items-start gap-2 text-xs" style={{ borderColor: styles.warningBorder, background: styles.warningBg, color: styles.warningText }}>
+        <div className={`rounded-md border p-3 flex items-start gap-2 text-xs ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`}>
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <div>{catalog.error.engineDown ? t('knowledge.cognitiveAsset.engine_unavailable') : t('knowledge.cognitiveAsset.catalog_failed')}</div>
@@ -215,20 +215,20 @@ export default function CognitiveAssetPage() {
       <div className="flex flex-col gap-2">
         {listStatus === 'loading' && <div className="text-xs opacity-50 py-6 text-center">{t('knowledge.cognitiveAsset.loading')}</div>}
         {listStatus === 'error' && listError && (
-          <div className="rounded-md border p-3 flex items-start gap-2 text-xs" style={{ borderColor: styles.warningBorder, background: styles.warningBg, color: styles.warningText }}>
+          <div className={`rounded-md border p-3 flex items-start gap-2 text-xs ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`}>
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <div>{listError.engineDown ? t('knowledge.cognitiveAsset.engine_unavailable') : t('knowledge.cognitiveAsset.list_failed')}</div>
               <div className="opacity-70 mt-0.5">{listError.message}</div>
               {listError.traceId && <div className="font-mono text-[10px] opacity-60 mt-1 break-all">traceId: {listError.traceId}</div>}
             </div>
-            <button type="button" onClick={() => void loadRows()} className="inline-flex items-center gap-1 px-2 py-1 rounded border text-[11px] cursor-pointer" style={{ borderColor: styles.cardBorder, color: styles.cardText }}>
+            <button type="button" onClick={() => void loadRows()} className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-[11px] cursor-pointer ${styles.cardBorder} ${styles.cardText}`}>
               <RefreshCw className="w-3 h-3" />{t('knowledge.cognitiveAsset.retry')}
             </button>
           </div>
         )}
         {listStatus === 'ok' && rows.length === 0 && (
-          <div className="rounded-md border p-8 flex flex-col items-center gap-2 text-center" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+          <div className={`rounded-md border p-8 flex flex-col items-center gap-2 text-center ${styles.cardBorder} ${styles.cardBg}`}>
             <Inbox className="w-6 h-6 opacity-30" />
             <span className="text-xs opacity-50">{t('knowledge.cognitiveAsset.empty')}</span>
           </div>

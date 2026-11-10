@@ -55,6 +55,10 @@ public class AgentEvaluator {
     @Autowired
     private AgentLoopService agentLoopService;
 
+    /** P1-11：LLM judge 打分（required=false；未装配/调用失败 ⇒ 启发式兜底，评估通道降级可见） */
+    @Autowired(required = false)
+    private com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway llmGateway;
+
     // ═══════════════════════════════════════════════════════════════
     //  内嵌 POJO
     // ═══════════════════════════════════════════════════════════════
@@ -450,6 +454,12 @@ public class AgentEvaluator {
      */
     private DimensionScores judgeDimensions(EvalQuestion q, AgentLoopResult loopResult,
                                             String answer, List<String> matchedKw) {
+        // P1-11：优先 LLM judge（真实模型裁判）；不可用/失败 ⇒ 启发式兜底
+        DimensionScores judged = llmJudgeDimensions(q, loopResult, answer);
+        if (judged != null) {
+            return judged;
+        }
+
         String expectedTool = q.getExpectedTool();
         String actualTool = extractActualTool(loopResult);
 
@@ -471,6 +481,71 @@ public class AgentEvaluator {
 
         return new DimensionScores(d1ToolAccuracy, d2KeywordCoverage, d3AnswerQuality,
                 d4ExecEfficiency, d5Hallucination);
+    }
+
+    /**
+     * LLM judge（P1-11）：真实模型按五维打分；网关未装配/调用失败/输出非法 ⇒ 返回 null（启发式兜底）。
+     */
+    private DimensionScores llmJudgeDimensions(EvalQuestion q, AgentLoopResult loopResult, String answer) {
+        if (llmGateway == null) {
+            return null;
+        }
+        try {
+            StringBuilder user = new StringBuilder();
+            user.append("题目: ").append(q.getQuestion()).append('\n');
+            user.append("期望工具: ").append(String.valueOf(q.getExpectedTool())).append('\n');
+            user.append("期望关键词: ").append(String.valueOf(q.getExpectedKeywords())).append('\n');
+            user.append("实际调用工具: ").append(String.valueOf(extractActualTool(loopResult))).append('\n');
+            user.append("Agent 回答: ").append(answer).append('\n');
+            user.append("仅输出 JSON（d1~d5 各为 1-5 整数，含义：工具准确性/关键词覆盖/回答质量/执行效率/幻觉抵抗）");
+
+            com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest request =
+                    new com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest("deepseek-chat",
+                            List.of(
+                                    new com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage("system",
+                                            "你是严格的 Agent 评估裁判。只输出 JSON，禁止输出任何解释文字。"),
+                                    new com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage("user", user.toString())),
+                            0.0, 512, false);
+            request.setCallerId("service:ai-engine-evaluator");
+            com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse resp = llmGateway.call(request);
+            if (!resp.isSuccess() || resp.getContent() == null || resp.getContent().isBlank()) {
+                log.warn("[Eval] LLM judge 调用失败/空响应，回落启发式: qId={}", q.getId());
+                return null;
+            }
+            DimensionScores parsed = parseJudgeScores(resp.getContent());
+            if (parsed == null) {
+                log.warn("[Eval] LLM judge 输出非预期 JSON，回落启发式: qId={} content={}", q.getId(),
+                        resp.getContent().length() > 200 ? resp.getContent().substring(0, 200) : resp.getContent());
+            }
+            return parsed;
+        } catch (RuntimeException e) {
+            log.warn("[Eval] LLM judge 异常，回落启发式: qId={} err={}", q.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    /** 解析 judge JSON（容忍前后解释文字，取首个 {...} 块；五维齐全且在 1-5 才采纳）。 */
+    private DimensionScores parseJudgeScores(String content) {
+        int start = content.indexOf('{');
+        int end = content.lastIndexOf('}');
+        if (start < 0 || end <= start) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(content.substring(start, end + 1));
+            int[] values = new int[5];
+            String[] keys = {"d1", "d2", "d3", "d4", "d5"};
+            for (int i = 0; i < keys.length; i++) {
+                int v = node.path(keys[i]).asInt(-1);
+                if (v < 1 || v > 5) {
+                    return null;
+                }
+                values[i] = v;
+            }
+            return new DimensionScores(values[0], values[1], values[2], values[3], values[4]);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

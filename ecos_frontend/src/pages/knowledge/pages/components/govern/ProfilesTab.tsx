@@ -157,8 +157,8 @@ export default function ProfilesTab() {
     <div className="flex flex-col gap-3 h-full min-h-0">
       {/* 错误态分治 banner */}
       {bizError && (
-        <div className="flex items-start gap-2 px-3 py-2 rounded-md border text-xs"
-             style={{ background: styles.dangerBg, borderColor: styles.dangerBorder, color: styles.dangerText }}>
+        <div className={`flex items-start gap-2 px-3 py-2 rounded-md border text-xs ${styles.dangerBg} ${styles.dangerBorder} ${styles.dangerText}`}
+             >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <div className="font-bold flex items-center gap-1.5">
@@ -168,8 +168,8 @@ export default function ProfilesTab() {
             <p className="opacity-80 break-all mt-0.5">{bizError.message}</p>
           </div>
           <button type="button" onClick={() => void loadProfiles()}
-                  className="px-2 py-1 rounded border text-[10px] font-bold cursor-pointer shrink-0"
-                  style={{ borderColor: styles.dangerBorder, color: styles.dangerText }}>
+                  className={`px-2 py-1 rounded border text-[10px] font-bold cursor-pointer shrink-0 ${styles.dangerBorder} ${styles.dangerText}`}
+                  >
             <RefreshCw className="w-3 h-3 inline mr-1" />
             {t('knowledge.common.retry')}
           </button>
@@ -177,28 +177,28 @@ export default function ProfilesTab() {
       )}
 
       {/* 生成表单 */}
-      <div className="rounded-md border p-3 space-y-2" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-        <div className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: styles.cardText }}>
+      <div className={`rounded-md border p-3 space-y-2 ${styles.cardBorder} ${styles.cardBg}`}>
+        <div className={`text-[11px] font-bold flex items-center gap-1.5 ${styles.cardText}`}>
           <TrendingUp className="w-3.5 h-3.5" />
           {t('knowledge.profiles.generate')}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <input value={metric} onChange={(e) => setMetric(e.target.value)}
                  placeholder={t('knowledge.profiles.field_metric')}
-                 className="px-2 py-1.5 rounded text-[11px] outline-none"
-                 style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                 className={`border px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                  />
           <input value={dims} onChange={(e) => setDims(e.target.value)}
                  placeholder={t('knowledge.profiles.field_dims')}
-                 className="px-2 py-1.5 rounded text-[11px] outline-none"
-                 style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                 className={`border px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                  />
           <input type="month" value={windowFrom} onChange={(e) => setWindowFrom(e.target.value)}
                  aria-label={t('knowledge.profiles.field_window_from')}
-                 className="px-2 py-1.5 rounded text-[11px] outline-none"
-                 style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                 className={`border px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                  />
           <input type="month" value={windowTo} onChange={(e) => setWindowTo(e.target.value)}
                  aria-label={t('knowledge.profiles.field_window_to')}
-                 className="px-2 py-1.5 rounded text-[11px] outline-none"
-                 style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                 className={`border px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                  />
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => void handleGenerate()}
@@ -208,13 +208,13 @@ export default function ProfilesTab() {
             {t('knowledge.profiles.submit_task')}
           </button>
           {lastTask && (
-            <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+            <span className={`text-[10px] font-mono ${styles.muted}`}>
               {t('knowledge.profiles.task_submitted')} {lastTask.taskId}
               {lastTask.traceId ? ` · ${lastTask.traceId}` : ''}
             </span>
           )}
           {taskPolling && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-mono" style={{ color: styles.infoText }}>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-mono ${styles.infoText}`}>
               <Loader2 className="w-3 h-3 animate-spin" />
               {t('knowledge.profiles.task_polling')}
             </span>
@@ -223,27 +223,27 @@ export default function ProfilesTab() {
       </div>
 
       {/* DRAFT / PUBLISHED 列表 */}
-      <div className="rounded-md border flex-1 min-h-0 flex flex-col overflow-hidden" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-        <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: styles.cardBorder }}>
-          <span className="text-[11px] font-bold" style={{ color: styles.cardText }}>{t('knowledge.profiles.list')}</span>
-          <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+      <div className={`rounded-md border flex-1 min-h-0 flex flex-col overflow-hidden ${styles.cardBorder} ${styles.cardBg}`}>
+        <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}>
+          <span className={`text-[11px] font-bold ${styles.cardText}`}>{t('knowledge.profiles.list')}</span>
+          <span className={`text-[10px] font-mono ${styles.muted}`}>
             {loading ? <Loader2 className="w-3 h-3 inline animate-spin" /> : `${rows.length} ${t('knowledge.profiles.unit')}`}
           </span>
         </div>
 
         {loading && rows.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-[11px]" style={{ color: styles.muted }}>
+          <div className={`flex-1 flex items-center justify-center text-[11px] ${styles.muted}`}>
             <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />{t('knowledge.profiles.loading')}
           </div>
         ) : rows.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-[11px]" style={{ color: styles.muted }}>
+          <div className={`flex-1 flex items-center justify-center text-[11px] ${styles.muted}`}>
             {t('knowledge.profiles.empty')}
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
             <table className="w-full text-[10px] font-mono">
-              <thead className="sticky top-0" style={{ background: styles.sidebarBg }}>
-                <tr style={{ color: styles.cardTextMuted }}>
+              <thead className={`sticky top-0 ${styles.sidebarBg}`}>
+                <tr className={styles.cardTextMuted} >
                   <Th>{t('knowledge.profiles.col_key')}</Th>
                   <Th>{t('knowledge.profiles.col_metric')}</Th>
                   <Th>{t('knowledge.profiles.col_window')}</Th>
@@ -288,11 +288,11 @@ function ProfileRow({ row, expanded, onToggleExpand, onPublish }: {
 
   return (
     <>
-      <tr className="border-t" style={{ borderColor: styles.cardBorder, color: styles.cardText }}
+      <tr className={`border-t ${styles.cardBorder} ${styles.cardText}`}
           title={expanded ? t('knowledge.profiles.collapse_degrade') : t('knowledge.profiles.expand_degrade')}>
         <td className="px-2 py-1.5">
           <button type="button" onClick={onToggleExpand}
-                  className="cursor-pointer flex items-center gap-1 hover:opacity-70" style={{ color: styles.cardText }}>
+                  className={`cursor-pointer flex items-center gap-1 hover:opacity-70 ${styles.cardText}`}>
             {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
             <span className="truncate max-w-[140px]">{row.profileKey}</span>
           </button>
@@ -304,12 +304,12 @@ function ProfileRow({ row, expanded, onToggleExpand, onPublish }: {
         <td className="px-2 py-1.5 text-right num">{num(st?.p90)}</td>
         <td className="px-2 py-1.5 text-right num">{st?.sampleCount ?? 0}
           {st?.missingRate != null && st.missingRate > 0 ? (
-            <span className="ml-1 text-[9px]" style={{ color: styles.warningText }}
+            <span className={`ml-1 text-[9px] ${styles.warningText}`}
                   title={t('knowledge.profiles.missing_rate')}>missing {Math.round(st.missingRate * 100)}%</span>
           ) : null}
         </td>
         <td className="px-2 py-1.5 text-right">
-          <span style={{ color: confColor }}>{(conf * 100).toFixed(0)}%</span>
+          <span className={`${confColor}`}>{(conf * 100).toFixed(0)}%</span>
         </td>
         <td className="px-2 py-1.5">
           <StatusChip status={row.status ?? 'DRAFT'} />
@@ -317,27 +317,27 @@ function ProfileRow({ row, expanded, onToggleExpand, onPublish }: {
         <td className="px-2 py-1.5 text-right">
           <button type="button" onClick={onPublish} disabled={!isDraft}
                   title={t('knowledge.profiles.publish')}
-                  className="inline-flex items-center gap-1 px-1.5 py-1 rounded border text-[9px] font-bold cursor-pointer disabled:opacity-40"
-                  style={{ borderColor: styles.inputBorder, color: styles.accentText }}>
+                  className={`inline-flex items-center gap-1 px-1.5 py-1 rounded border text-[9px] font-bold cursor-pointer disabled:opacity-40 ${styles.inputBorder} ${styles.accentText}`}
+                  >
             <Send className="w-2.5 h-2.5" />{t('knowledge.profiles.publish')}
           </button>
         </td>
       </tr>
       {expanded && (
-        <tr style={{ background: styles.sidebarBg }}>
+        <tr className={styles.sidebarBg} >
           <td colSpan={10} className="px-4 py-2">
-            <div className="text-[9px] font-bold uppercase tracking-wider mb-1.5" style={{ color: styles.cardTextMuted }}>
+            <div className={`text-[9px] font-bold uppercase tracking-wider mb-1.5 ${styles.cardTextMuted}`}>
               {t('knowledge.profiles.degrade_chain')}
-              {row.degradeFrom && <span className="ml-1 normal-case" style={{ color: styles.muted }}>← {row.degradeFrom}</span>}
+              {row.degradeFrom && <span className={`ml-1 normal-case ${styles.muted}`}>← {row.degradeFrom}</span>}
             </div>
             {row.degradeFrom ? (
               <div className="flex items-center gap-1 flex-wrap text-[10px]">
                 <ChainNode label={`${row.metric ?? row.profileKey} · ${fmtDims(row.dims)}`} highlight />
-                <span style={{ color: styles.muted }}>→</span>
+                <span className={styles.muted} >→</span>
                 <ChainNode label={row.degradeFrom} />
               </div>
             ) : (
-              <p className="text-[10px]" style={{ color: styles.muted }}>{t('knowledge.profiles.no_degrade')}</p>
+              <p className={`text-[10px] ${styles.muted}`}>{t('knowledge.profiles.no_degrade')}</p>
             )}
           </td>
         </tr>
@@ -349,11 +349,8 @@ function ProfileRow({ row, expanded, onToggleExpand, onPublish }: {
 function ChainNode({ label, highlight = false }: { label: string; highlight?: boolean }) {
   const { styles } = useTheme();
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border font-mono"
-          style={{
-            borderColor: highlight ? styles.accentText : styles.inputBorder,
-            color: highlight ? styles.accentText : styles.cardTextMuted,
-          }}>
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded border font-mono ${highlight ? styles.accentText : styles.inputBorder} ${highlight ? styles.accentText : styles.cardTextMuted}`}
+          >
       <Building2 className="w-2.5 h-2.5" />
       {label}
     </span>

@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.runtime.llm.gateway;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * LLM 调用网关接口 — 屏蔽不同 provider 的 API 差异
@@ -12,6 +13,17 @@ public interface LLMGateway {
      * 调用 LLM 并返回完整响应
      */
     ChatResponse call(ChatRequest request);
+
+    /**
+     * 流式调用：增量正文经 {@code onDelta} 实时回调，最终仍返回聚合后的完整响应
+     * （含 usage 与按 index 聚合的 {@code tool_calls}）。
+     *
+     * <p>语义约束：{@code onDelta} 可能在调用线程上被多次调用；回调抛异常视为消费端断链，
+     * 本次调用以失败分类返回且<b>不再重试</b>（已外发的增量重放会造成正文重复）。</p>
+     *
+     * <p>只增方法（API 只增不改）。</p>
+     */
+    ChatResponse callStream(ChatRequest request, Consumer<String> onDelta);
 
     /**
      * 带重试的 LLM 调用

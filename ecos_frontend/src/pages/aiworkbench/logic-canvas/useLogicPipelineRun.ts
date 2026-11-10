@@ -62,12 +62,12 @@ export default function useLogicPipelineRun({
    * 启动 Pipeline 真执行 + 轮询 executions。
    * 后端端点:
    *   POST /api/v1/aip/studio/pipelines/{pipelineId}/execute  → { executionId, status:'running', ... }
-   *   GET  /api/v1/aip/studio/pipelines/{executionId}/executions → { executionId, status, ... }
+   *   GET  /api/v1/aip/studio/pipelines/{executionId}/executions → { executionId, status, nodeTraces? }
    * 语义：
    *   - 启动失败（后端不可用 / 404 / 未注册）→ toast error，画布保留，节点保持 idle
+   *   - 执行体携带画布节点图（nodes: {id,type,label,config}）——后端六类节点真实执行
    *   - 轮询每 2s 一次，到 completed/failed 或 5min 自动 abort
-   *   - 后端 P2 暂无 nodeTraces 字段，状态回写以 pipeline 整体为粒度:
-   *     running → 全部 inTopoOrder 标 running，completed → 全 success，failed → 全 error
+   *   - 返回 nodeTraces 时按节点级状态回写；否则按整体状态回写
    */
   const startPipelineRun = useCallback(async () => {
     if (nodes.length === 0 || !selectedPipeline) return;
@@ -85,12 +85,19 @@ export default function useLogicPipelineRun({
       inputParams[inp.name] = selectedPipeline.testInputs?.[inp.name] || '';
     }
 
-    // ── 1. 启动执行 ──
+    // ── 1. 启动执行（携带画布节点图：后端六类节点真实执行） ──
     let execId = '';
     try {
+      const nodeGraph = nodes.map(n => ({
+        id: n.id,
+        type: n.data.type,
+        label: n.data.label,
+        config: n.data.config,
+      }));
+      const edgeList = edges.map(e => ({ source: e.source, target: e.target, condition: e.data?.condition }));
       const exec = await apiFetchData<BackendPipelineExec & { executionId?: string }>(
         `${API_BASE}/v1/aip/studio/pipelines/${encodeURIComponent(selectedPipeline.id)}/execute`,
-        { method: 'POST', body: JSON.stringify(inputParams) }
+        { method: 'POST', body: JSON.stringify({ ...inputParams, nodes: nodeGraph, edges: edgeList }) }
       );
       execId = (exec && (exec as BackendPipelineExec).executionId) || '';
     } catch (e) {
@@ -119,11 +126,22 @@ export default function useLogicPipelineRun({
           { signal: ac.signal }
         );
         if (!res) return;
-        // 后端 P1: 仅 status/startedAt/completedAt/result.message，无 nodeTraces
-        // 状态回写：按拓扑顺序遍历 nodes，把整体状态映射到每个节点
+        // 后端 P0-3: 返回 nodeTraces（节点级真实执行轨迹）；缺失时按整体状态回写
         const topo = topologicalSort(nodes, edges);
         const finalStatusMap: Record<string, LogicNodeStatus> = {};
-        for (const nodeId of topo) finalStatusMap[nodeId] = res.status === 'completed' ? 'success' : res.status === 'failed' ? 'error' : 'running';
+        const traces = res.nodeTraces && Object.keys(res.nodeTraces).length > 0 ? res.nodeTraces : null;
+        if (traces) {
+          setTraceMap(traces);
+          for (const nodeId of topo) {
+            const st = traces[nodeId]?.status;
+            finalStatusMap[nodeId] = st === 'success' ? 'success'
+              : st === 'failed' ? 'error'
+              : st === 'skipped' ? 'idle'
+              : 'running';
+          }
+        } else {
+          for (const nodeId of topo) finalStatusMap[nodeId] = res.status === 'completed' ? 'success' : res.status === 'failed' ? 'error' : 'running';
+        }
         setNodes(prev => prev.map(n => finalStatusMap[n.id] ? { ...n, data: { ...n.data, status: finalStatusMap[n.id] } } : n));
         setLogs(prev => [...prev, res.status === 'running' ? t('aiworkbench.logic.run.polling', { id: execId }) : t('aiworkbench.logic.run.finished', { msg: res.result?.message || res.status, elapsed: Date.now() - (runStartRef.current || Date.now()) })]);
         if (res.status === 'completed' || res.status === 'failed') {

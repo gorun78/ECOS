@@ -96,7 +96,7 @@ export default function ExtractionReviewTab() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {/* 左：候选文件列表 */}
           <div className={`border rounded-lg ${styles.cardBg} ${styles.cardBorder} flex flex-col`}>
-            <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: styles.cardBorder }}>
+            <div className={`flex items-center justify-between px-4 py-2.5 border-b ${styles.cardBorder}`}>
               <div className="flex items-center gap-2 text-sm font-medium">
                 <ListChecks className="w-4 h-4" />
                 {t("knowledge.review.files_list")}
@@ -113,8 +113,8 @@ export default function ExtractionReviewTab() {
                 </div>
                 <button type="button"
                   onClick={() => void loadFiles()}
-                  className="p-1 rounded border hover:opacity-70"
-                  style={{ borderColor: styles.cardBorder }}
+                  className={`p-1 rounded border hover:opacity-70 ${styles.cardBorder}`}
+
                   title={t("knowledge.common.refresh")}
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
@@ -135,8 +135,8 @@ export default function ExtractionReviewTab() {
                   onClick={() => setSelected(f)}
                   className={`w-full text-left px-4 py-2.5 border-b hover:opacity-80 transition-opacity ${
                     selected?.fileId === f.fileId ? `${styles.accentBg} text-white` : ""
-                  }`}
-                  style={{ borderColor: styles.cardBorder }}
+                  } ${styles.cardBorder}`}
+
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs flex items-center gap-1.5 truncate">
@@ -158,7 +158,7 @@ export default function ExtractionReviewTab() {
 
           {/* 右：候选详情 */}
           <div className={`border rounded-lg ${styles.cardBg} ${styles.cardBorder} flex flex-col`}>
-            <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: styles.cardBorder }}>
+            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${styles.cardBorder}`}>
               <div className="text-sm font-medium flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 {t("knowledge.review.candidates_detail")}
@@ -189,7 +189,7 @@ export default function ExtractionReviewTab() {
               {selected && !candidatesLoading && candidates.length > 0 && (
                 <div className="space-y-2">
                   {candidates.map((c, i) => (
-                    <div key={i} className="border rounded-md p-2.5 text-xs" style={{ borderColor: styles.cardBorder }}>
+                    <div key={i} className={`border rounded-md p-2.5 text-xs ${styles.cardBorder}`}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium">
                           {String(c.type ?? c.entityType ?? c.kind ?? c.candidateId ?? `#${i + 1}`)}

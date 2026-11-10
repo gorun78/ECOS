@@ -118,6 +118,35 @@ public class HermesMCPClient implements Closeable {
         }
     }
 
+    /** MCP tools/list — 工具发现（P1-8）。返回 tools/list 的 JSON 文本。 */
+    public String toolsList() {
+        if (!available && !initialized) ensureInitialized();
+        if (!available) return "{\"error\":\"MCP server unavailable\"}";
+
+        try {
+            ObjectNode req = mapper.createObjectNode();
+            req.put("jsonrpc", "2.0");
+            req.put("id", requestId.getAndIncrement());
+            req.put("method", "tools/list");
+
+            String raw = sendRaw(req.toString());
+            if (raw == null) return "{\"error\":\"no response\"}";
+
+            JsonNode node = mapper.readTree(raw);
+            JsonNode result = node.get("result");
+            if (result != null) {
+                return result.toString();
+            }
+            JsonNode error = node.get("error");
+            if (error != null) return "{\"error\":\"" + error.get("message").asText() + "\"}";
+
+            return "{\"error\":\"unknown response format\"}";
+        } catch (Exception e) {
+            log.error("tools/list failed: {}", e.getMessage());
+            return "{\"error\":\"" + e.getMessage() + "\"}";
+        }
+    }
+
     private synchronized String sendRaw(String json) {
         if (writer == null || reader == null) return null;
         try {

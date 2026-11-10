@@ -25,4 +25,6 @@ export interface BackendPipelineExec {
   startedAt: string;
   completedAt?: string;
   result?: { message?: string; pipelineId?: string; params?: Record<string, unknown> };
+  /** 节点级真实执行轨迹（P0-3 后由后端返回；缺省 ⇒ 按整体状态回写） */
+  nodeTraces?: Record<string, NodeTrace & { status?: string; nodeId?: string; nodeName?: string }>;
 }

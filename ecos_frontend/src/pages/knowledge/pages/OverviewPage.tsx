@@ -304,19 +304,19 @@ export default function OverviewPage() {
   ];
 
   return (
-    <div className="p-3 space-y-4" style={{ color: styles.cardText }}>
+    <div className={`p-3 space-y-4 ${styles.cardText}`}>
       {/* ═══ 顶栏：标题 + 查看任务按钮 ═══ */}
-      <div className="flex items-center justify-between border-b pb-3"
-           style={{ borderColor: styles.cardBorder }}>
+      <div className={`flex items-center justify-between border-b pb-3 ${styles.cardBorder}`}
+           >
         <div className="space-y-0.5">
           <h2 className="text-sm font-black flex items-center gap-2">
-            <ListChecks className="w-4 h-4" style={{ color: styles.accentText }} />
+            <ListChecks className={`w-4 h-4 ${styles.accentText}`} />
             <span>{t('knowledge.nav.page_overview')}</span>
           </h2>
-          <p className="text-[11px]" style={{ color: styles.cardTextMuted }}>
+          <p className={`text-[11px] ${styles.cardTextMuted}`}>
             {t('knowledge.overview.subtitle')}
             {graphStats.lastUpdatedAt && (
-              <span className="ml-2 font-mono" style={{ color: styles.muted }}>
+              <span className={`ml-2 font-mono ${styles.muted}`}>
                 {t('knowledge.overview.last_sync')}: {new Date(graphStats.lastUpdatedAt).toLocaleString()}
               </span>
             )}
@@ -329,8 +329,7 @@ export default function OverviewPage() {
             type="button"
             onClick={() => { void loadAll(); void loadAssets(); }}
             disabled={refreshing}
-            className="p-1.5 rounded-md border cursor-pointer hover:opacity-70 transition disabled:opacity-50"
-            style={{ borderColor: styles.cardBorder, background: styles.cardBg, color: styles.cardTextMuted }}
+            className={`p-1.5 rounded-md border cursor-pointer hover:opacity-70 transition disabled:opacity-50 ${styles.cardBorder} ${styles.cardBg} ${styles.cardTextMuted}`}
             title={t('knowledge.overview.refresh')}
           >
             {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
@@ -339,8 +338,7 @@ export default function OverviewPage() {
           <button
             type="button"
             disabled
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold disabled:opacity-50 cursor-not-allowed"
-            style={{ background: styles.inputBg, color: styles.muted, border: `1px solid ${styles.inputBorder}` }}
+            className={`border inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold disabled:opacity-50 cursor-not-allowed ${styles.inputBg} ${styles.muted} ${styles.inputBorder}`}
             title={t('knowledge.overview.task_center_p3')}
           >
             <Briefcase className="w-3.5 h-3.5" />
@@ -355,8 +353,7 @@ export default function OverviewPage() {
         {kpiCards.map((kpi) => (
           <div
             key={kpi.id}
-            className="rounded-md border p-3 space-y-1.5 flex flex-col"
-            style={{ borderColor: kpi.error ? styles.dangerBorder : styles.cardBorder, background: styles.cardBg }}
+            className={`rounded-md border p-3 space-y-1.5 flex flex-col ${styles.cardBg} ${kpi.error ? styles.dangerBorder : styles.cardBorder}`}
           >
             <div className={`flex items-center gap-1.5 ${kpi.error ? styles.dangerText : styles.cardTextMuted}`}>
               <span className={kpi.error ? styles.dangerText : kpi.accent} style={{ opacity: kpi.muted && !kpi.error ? 0.5 : 1 }}>
@@ -367,7 +364,7 @@ export default function OverviewPage() {
             <p className={`text-[25px] font-black font-mono leading-none ${kpi.error ? styles.dangerText : kpi.accent}`}>
               {kpi.error ? '—' : kpi.value.toLocaleString()}
             </p>
-            <span className="text-[9px] font-mono" style={{ color: styles.muted }}>
+            <span className={`text-[9px] font-mono ${styles.muted}`}>
               {kpi.error ? t('knowledge.overview.kpi_unavailable') : kpi.muted ? t('knowledge.overview.kpi_zero') : ''}
             </span>
           </div>
@@ -375,15 +372,15 @@ export default function OverviewPage() {
       </div>
 
       {/* ═══ 知识生产流水线（5 步横条 · PRD F2 验收 3） ═══ */}
-      <div className="rounded-md border p-3 space-y-2"
-           style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-        <div className="flex items-center justify-between border-b pb-2"
-             style={{ borderColor: styles.cardBorder }}>
+      <div className={`rounded-md border p-3 space-y-2 ${styles.cardBorder} ${styles.cardBg}`}
+           >
+        <div className={`flex items-center justify-between border-b pb-2 ${styles.cardBorder}`}
+             >
           <h3 className="text-xs font-extrabold flex items-center gap-1.5">
-            <GitBranch className="w-3.5 h-3.5" style={{ color: styles.accentText }} />
+            <GitBranch className={`w-3.5 h-3.5 ${styles.accentText}`} />
             <span>{t('knowledge.overview.pipeline_title')}</span>
           </h3>
-          <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: styles.muted }}>
+          <span className={`text-[10px] font-mono uppercase tracking-wider ${styles.muted}`}>
             {t('knowledge.overview.pipeline_strategy')}
           </span>
         </div>
@@ -391,22 +388,16 @@ export default function OverviewPage() {
           {PIPELINE_STEPS.map((step, i) => (
             <React.Fragment key={step.id}>
               <div
-                className="flex-1 rounded-md px-3 py-2 flex flex-col items-center justify-center text-center gap-1 border"
-                style={{
-                  borderColor: styles.cardBorder,
-                  background: styles.sidebarBg,
-                  color: styles.cardText,
-                }}
+                className={`flex-1 rounded-md px-3 py-2 flex flex-col items-center justify-center text-center gap-1 border ${styles.cardBorder} ${styles.sidebarBg} ${styles.cardText}`}
               >
-                <span className="text-[9px] font-mono font-bold" style={{ color: styles.muted }}>
+                <span className={`text-[9px] font-mono font-bold ${styles.muted}`}>
                   {String(i + 1).padStart(2, '0')}
                 </span>
                 <span className="text-[11px] font-bold" title={t(step.hintKey)}>{t(step.labelKey)}</span>
               </div>
               {i < PIPELINE_STEPS.length - 1 && (
                 <ArrowRight
-                  className="w-4 h-4 shrink-0 hidden md:block mx-0.5"
-                  style={{ color: styles.muted }}
+                  className={`w-4 h-4 shrink-0 hidden md:block mx-0.5 ${styles.muted}`}
                 />
               )}
             </React.Fragment>
@@ -417,15 +408,15 @@ export default function OverviewPage() {
       {/* ═══ 主体双栏：左 3 待办 + 右最近资产表 ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3">
         {/* ───── 左 · 待处理事项（3 行 · 点击跳 F7 GovernPage） ───── */}
-        <div className="rounded-md border flex flex-col"
-             style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-          <div className="flex items-center justify-between px-3 py-2 border-b"
-               style={{ borderColor: styles.cardBorder }}>
+        <div className={`rounded-md border flex flex-col ${styles.cardBorder} ${styles.cardBg}`}
+             >
+          <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}
+               >
             <h3 className="text-xs font-extrabold flex items-center gap-1.5">
-              <Package className="w-3.5 h-3.5" style={{ color: styles.warningText }} />
+              <Package className={`w-3.5 h-3.5 ${styles.warningText}`} />
               <span>{t('knowledge.overview.todo_title')}</span>
             </h3>
-            <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+            <span className={`text-[10px] font-mono ${styles.muted}`}>
               {t('knowledge.overview.todo_click_hint')}
             </span>
           </div>
@@ -443,31 +434,22 @@ export default function OverviewPage() {
                     type="button"
                     disabled={!row.available}
                     onClick={() => { if (row.available && row.target) window.location.hash = row.target; }}
-                    className={`w-full text-left rounded-md px-3 py-2.5 flex items-center justify-between gap-2 border transition ${row.available ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60'}`}
-                    style={{
-                      borderColor: hasWork ? styles.warningBorder : styles.cardBorder,
-                      background: hasWork ? styles.warningBg : styles.inputBg,
-                      color: hasWork ? styles.warningText : styles.cardTextMuted,
-                    }}
+                    className={`w-full text-left rounded-md px-3 py-2.5 flex items-center justify-between gap-2 border transition ${row.available ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60'} ${hasWork ? styles.warningBorder : styles.cardBorder} ${hasWork ? styles.warningBg : styles.inputBg} ${hasWork ? styles.warningText : styles.cardTextMuted}`}
                   >
                     <span className="text-[11px] font-bold truncate">{t(row.labelKey)}</span>
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0 ${hasWork ? styles.warningText : styles.cardTextMuted}`}
-                      style={{
-                        background: hasWork ? styles.warningBg : styles.cardBorder,
-                        color: hasWork ? 'inherit' : styles.cardText,
-                      }}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0 ${hasWork ? styles.warningText : styles.cardTextMuted} ${hasWork ? styles.warningBg : styles.cardBorder} ${hasWork ? '' : styles.cardText}`}
                     >
                       {badge}
                     </span>
                   </button>
                   {row.error && (
-                    <p className="text-[9px] font-mono pl-1" style={{ color: styles.dangerText }}>
+                    <p className={`text-[9px] font-mono pl-1 ${styles.dangerText}`}>
                       {t('knowledge.overview.todo_fetch_failed')}
                     </p>
                   )}
                   {!row.available && !row.error && row.reasonKey && (
-                    <p className="text-[9px] font-mono pl-1" style={{ color: styles.muted }}>
+                    <p className={`text-[9px] font-mono pl-1 ${styles.muted}`}>
                       {t(row.reasonKey)}
                     </p>
                   )}
@@ -478,14 +460,14 @@ export default function OverviewPage() {
         </div>
 
         {/* ───── 右 · 最近知识资产表（5 列 · PRD F2 验收 4） ───── */}
-        <div className="rounded-md border flex flex-col min-h-40"
-             style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-          <div className="flex items-center justify-between px-3 py-2 border-b"
-               style={{ borderColor: styles.cardBorder }}>
+        <div className={`rounded-md border flex flex-col min-h-40 ${styles.cardBorder} ${styles.cardBg}`}
+             >
+          <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}
+               >
             <h3 className="text-xs font-extrabold flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5" style={{ color: styles.accentText }} />
+              <FileText className={`w-3.5 h-3.5 ${styles.accentText}`} />
               <span>{t('knowledge.overview.recent_assets_title')}</span>
-              <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+              <span className={`text-[10px] font-mono ${styles.muted}`}>
                 {t('knowledge.overview.recent_assets_count', { n: assets.length })}
               </span>
             </h3>
@@ -493,8 +475,7 @@ export default function OverviewPage() {
               type="button"
               onClick={() => void loadAssets()}
               disabled={assetsLoading}
-              className="p-1 rounded border cursor-pointer hover:opacity-70 transition disabled:opacity-50"
-              style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}
+              className={`p-1 rounded border cursor-pointer hover:opacity-70 transition disabled:opacity-50 ${styles.cardBorder} ${styles.cardTextMuted}`}
               title={t('knowledge.overview.refresh')}
             >
               {assetsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -502,8 +483,8 @@ export default function OverviewPage() {
           </div>
 
           {/* 表头 */}
-          <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1.2fr] gap-2 px-3 py-1.5 border-b text-[9px] font-bold uppercase tracking-wider"
-               style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}>
+          <div className={`grid grid-cols-[1.5fr_1fr_1fr_1fr_1.2fr] gap-2 px-3 py-1.5 border-b text-[9px] font-bold uppercase tracking-wider ${styles.cardBorder} ${styles.cardTextMuted}`}
+               >
             <span>{t('knowledge.asset.col_title')}</span>
             <span>{t('knowledge.asset.col_type')}</span>
             <span>{t('knowledge.asset.col_status')}</span>
@@ -513,7 +494,7 @@ export default function OverviewPage() {
 
           <div className="flex-1 overflow-y-auto max-h-56">
             {assetsLoading && assets.length === 0 ? (
-              <div className="p-4 text-center text-[11px] flex items-center justify-center" style={{ color: styles.muted }}>
+              <div className={`p-4 text-center text-[11px] flex items-center justify-center ${styles.muted}`}>
                 <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
                 {t('knowledge.overview.assets_loading')}
               </div>
@@ -530,7 +511,7 @@ export default function OverviewPage() {
                 </button>
               </div>
             ) : assets.length === 0 ? (
-              <div className="p-4 text-center text-[11px]" style={{ color: styles.muted }}>
+              <div className={`p-4 text-center text-[11px] ${styles.muted}`}>
                 <Search className="w-5 h-5 mx-auto mb-1 opacity-40" />
                 {t('knowledge.asset.empty')}
               </div>
@@ -538,11 +519,10 @@ export default function OverviewPage() {
               assets.slice(0, 8).map((a) => (
                 <div
                   key={a.id}
-                  className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1.2fr] gap-2 px-3 py-2 border-b items-center text-[10px]"
-                  style={{ borderColor: styles.cardBorder }}
+                  className={`grid grid-cols-[1.5fr_1fr_1fr_1fr_1.2fr] gap-2 px-3 py-2 border-b items-center text-[10px] ${styles.cardBorder}`}
                 >
-                  <span className="font-bold truncate" style={{ color: styles.cardText }} title={a.title}>{a.title}</span>
-                  <span className="font-mono truncate" style={{ color: styles.cardTextMuted }}>{a.type}</span>
+                  <span className={`font-bold truncate ${styles.cardText}`}  title={a.title}>{a.title}</span>
+                  <span className={`font-mono truncate ${styles.cardTextMuted}`}>{a.type}</span>
                   <span>
                     <span
                       className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${statusChipClass(a.status)}`}
@@ -550,8 +530,8 @@ export default function OverviewPage() {
                       {t(statusLabelKey(a.status))}
                     </span>
                   </span>
-                  <span className="font-mono truncate" style={{ color: styles.cardTextMuted }}>{a.source}</span>
-                  <span className="font-mono flex items-center gap-1" style={{ color: styles.muted }}>
+                  <span className={`font-mono truncate ${styles.cardTextMuted}`}>{a.source}</span>
+                  <span className={`font-mono flex items-center gap-1 ${styles.muted}`}>
                     <Clock className="w-2.5 h-2.5 shrink-0" />
                     <span className="truncate">{a.updatedAt || '—'}</span>
                   </span>
@@ -563,10 +543,10 @@ export default function OverviewPage() {
       </div>
 
       {/* 底栏：图引擎提示（信息架构对齐既有 EngineeringStatus） */}
-      <div className="flex items-center gap-3 text-[10px] font-mono py-1"
-           style={{ color: styles.muted }}>
+      <div className={`flex items-center gap-3 text-[10px] font-mono py-1 ${styles.muted}`}
+           >
         <span className="inline-flex items-center gap-1">
-          <CheckCircle2 className="w-3 h-3 shrink-0" style={{ color: styles.successText }} />
+          <CheckCircle2 className={`w-3 h-3 shrink-0 ${styles.successText}`} />
           {t('knowledge.overview.engine_hint')}
         </span>
         <span className="ml-auto">

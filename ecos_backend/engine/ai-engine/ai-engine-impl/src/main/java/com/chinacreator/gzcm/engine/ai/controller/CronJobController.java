@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.engine.ai.CronJobService;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentMcpCapability;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentRuntimeCapability;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentRuntimeCapabilityUnavailableException;
@@ -44,9 +45,13 @@ public class CronJobController {
     private static final int CODE_RUNTIME_NOT_ASSEMBLED = 501;
 
     private final ObjectProvider<AgentRuntimeProvider> runtimeProvider;
+    /** P1-10：本地调度通道（runtime-task 单源）；provider 不可用时的回退执行面 */
+    private final ObjectProvider<CronJobService> localCronService;
 
-    public CronJobController(ObjectProvider<AgentRuntimeProvider> runtimeProvider) {
+    public CronJobController(ObjectProvider<AgentRuntimeProvider> runtimeProvider,
+                             ObjectProvider<CronJobService> localCronService) {
         this.runtimeProvider = runtimeProvider;
+        this.localCronService = localCronService;
     }
 
     /** List all cron jobs */
@@ -55,15 +60,24 @@ public class CronJobController {
         AgentMcpCapability mcp;
         try {
             mcp = resolveMcp();
+            if (!mcp.isAvailable()) {
+                return listLocal();
+            }
         } catch (AgentRuntimeCapabilityUnavailableException e) {
-            return unavailable(e);
-        }
-        if (!mcp.isAvailable()) {
-            return unavailable(new AgentRuntimeCapabilityUnavailableException(
-                    AgentRuntimeCapability.MCP, "MCP channel not connected"));
+            return listLocal();
         }
         String result = mcp.callTool("cronjob_list", null);
         return ApiResponse.success(result);
+    }
+
+    /** P1-10：MCP 不可用时回落本地 runtime-task 通道（失败则如实 501，不伪造空列表） */
+    private ApiResponse<Object> listLocal() {
+        CronJobService local = localCronService.getIfAvailable();
+        if (local == null) {
+            return unavailable(new AgentRuntimeCapabilityUnavailableException(
+                    AgentRuntimeCapability.MCP, "MCP 与本地调度通道均不可用"));
+        }
+        return ApiResponse.success(local.listCronJobs(null, null));
     }
 
     /**
@@ -89,8 +103,11 @@ public class CronJobController {
         AgentMcpCapability mcp;
         try {
             mcp = resolveMcp();
+            if (!mcp.isAvailable()) {
+                return createLocal(name, schedule, prompt, body);
+            }
         } catch (AgentRuntimeCapabilityUnavailableException e) {
-            return unavailable(e);
+            return createLocal(name, schedule, prompt, body);
         }
         Map<String, Object> args = new HashMap<>();
         args.put("name", name);
@@ -100,19 +117,55 @@ public class CronJobController {
         return ApiResponse.success(result);
     }
 
+    /** P1-10：本地创建（经 AgentCronJobBridge 注册到 runtime-task，调度链闭环）。 */
+    private ApiResponse<Object> createLocal(String name, String schedule, String prompt,
+                                            Map<String, String> body) {
+        CronJobService local = localCronService.getIfAvailable();
+        if (local == null) {
+            return unavailable(new AgentRuntimeCapabilityUnavailableException(
+                    AgentRuntimeCapability.MCP, "MCP 与本地调度通道均不可用"));
+        }
+        Map<String, Object> createBody = new LinkedHashMap<>();
+        createBody.put("name", name);
+        createBody.put("cronExpression", schedule);
+        createBody.put("description", prompt);
+        createBody.put("prompt", prompt);
+        createBody.put("agentId", body.getOrDefault("agentId", "default"));
+        createBody.put("userId", body.getOrDefault("userId", "system"));
+        return ApiResponse.success(local.createCronJob(createBody));
+    }
+
     /** Pause a cron job */
     @PostMapping("/{jobId}/pause")
     public ApiResponse<Object> pause(@PathVariable String jobId) {
         AgentMcpCapability mcp;
         try {
             mcp = resolveMcp();
+            if (!mcp.isAvailable()) {
+                return pauseLocal(jobId);
+            }
         } catch (AgentRuntimeCapabilityUnavailableException e) {
-            return unavailable(e);
+            return pauseLocal(jobId);
         }
         Map<String, Object> args = new HashMap<>();
         args.put("job_id", jobId);
         String result = mcp.callTool("cronjob_pause", args);
         return ApiResponse.success(result);
+    }
+
+    /** P1-10：本地 pause = toggleCronJob(enabled=false)。 */
+    private ApiResponse<Object> pauseLocal(String jobId) {
+        CronJobService local = localCronService.getIfAvailable();
+        if (local == null) {
+            return unavailable(new AgentRuntimeCapabilityUnavailableException(
+                    AgentRuntimeCapability.MCP, "MCP 与本地调度通道均不可用"));
+        }
+        try {
+            Long id = Long.valueOf(jobId);
+            return ApiResponse.success(local.toggleCronJob(id, false));
+        } catch (NumberFormatException e) {
+            return ApiResponse.badRequest("jobId 必须为数字（本地通道）: " + jobId);
+        }
     }
 
     private AgentMcpCapability resolveMcp() {

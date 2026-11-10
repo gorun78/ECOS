@@ -92,12 +92,7 @@ export default function KnowledgeCategoryFilter() {
         key={code}
         type="button"
         onClick={() => setSelected(code)}
-        className="px-2.5 py-1 rounded-md border text-xs transition-colors"
-        style={{
-          borderColor: active ? styles.accentBorder : styles.cardBorder,
-          background: active ? styles.badgeBg : 'transparent',
-          color: active ? styles.cardText : styles.cardTextMuted,
-        }}
+        className={`px-2.5 py-1 rounded-md border text-xs transition-colors ${active ? styles.accentBorder : styles.cardBorder} ${active ? styles.badgeBg : ''} ${active ? styles.cardText : styles.cardTextMuted}`}
       >
         {t(CATEGORY_LABEL_KEY[code])}
       </button>
@@ -106,14 +101,13 @@ export default function KnowledgeCategoryFilter() {
 
   return (
     <section
-      className="rounded-md border p-3 flex flex-col gap-3"
-      style={{ borderColor: styles.cardBorder, background: styles.cardBg, color: styles.cardText }}
+      className={`rounded-md border p-3 flex flex-col gap-3 ${styles.cardBorder} ${styles.cardBg} ${styles.cardText}`}
       data-testid="knowledge-category-filter"
     >
       <div className="flex items-center gap-2">
-        <Filter className="w-4 h-4" style={{ color: styles.cardTextMuted }} />
+        <Filter className={`w-4 h-4 ${styles.cardTextMuted}`} />
         <span className="text-sm font-medium">{t('knowledge.categoryFilterTitle')}</span>
-        <span className="text-xs" style={{ color: styles.cardTextMuted }}>
+        <span className={`text-xs ${styles.cardTextMuted}`}>
           {t('knowledge.categoryFilterHint')}
         </span>
       </div>
@@ -121,7 +115,7 @@ export default function KnowledgeCategoryFilter() {
       <div className="flex flex-wrap gap-1.5">{KNOWLEDGE_CATEGORIES.map(chip)}</div>
 
       {state === 'idle' && (
-        <div className="text-xs flex items-center gap-2" style={{ color: styles.cardTextMuted }}
+        <div className={`text-xs flex items-center gap-2 ${styles.cardTextMuted}`}
              data-testid="knowledge-category-idle">
           <Tags className="w-3.5 h-3.5" />
           {t('knowledge.categoryFilterIdle')}
@@ -129,7 +123,7 @@ export default function KnowledgeCategoryFilter() {
       )}
 
       {state === 'loading' && (
-        <div className="text-xs flex items-center gap-2" style={{ color: styles.cardTextMuted }}
+        <div className={`text-xs flex items-center gap-2 ${styles.cardTextMuted}`}
              data-testid="knowledge-category-loading">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
           {t('knowledge.categoryFilterLoading')}
@@ -137,14 +131,13 @@ export default function KnowledgeCategoryFilter() {
       )}
 
       {state === 'error' && (
-        <div className="text-xs flex items-center gap-2" style={{ color: styles.warningText }}
+        <div className={`text-xs flex items-center gap-2 ${styles.warningText}`}
              data-testid="knowledge-category-error">
           <AlertTriangle className="w-3.5 h-3.5" />
           {t('knowledge.categoryFilterError')}（{errorCode}）
           <button
             type="button"
-            className="ml-1 px-2 py-0.5 rounded border inline-flex items-center gap-1"
-            style={{ borderColor: styles.cardBorder, color: styles.cardText }}
+            className={`ml-1 px-2 py-0.5 rounded border inline-flex items-center gap-1 ${styles.cardBorder} ${styles.cardText}`}
             onClick={() => selected && void load(selected)}
           >
             <RefreshCw className="w-3 h-3" />
@@ -154,7 +147,7 @@ export default function KnowledgeCategoryFilter() {
       )}
 
       {state === 'ready' && rows.length === 0 && (
-        <div className="text-xs flex flex-col gap-1" style={{ color: styles.cardTextMuted }}
+        <div className={`text-xs flex flex-col gap-1 ${styles.cardTextMuted}`}
              data-testid="knowledge-category-empty">
           <span>{t('knowledge.categoryFilterEmpty')}</span>
           <span>{t('knowledge.categoryFilterEmptyHint')}</span>
@@ -162,13 +155,13 @@ export default function KnowledgeCategoryFilter() {
       )}
 
       {state === 'ready' && rows.length > 0 && (
-        <ul className="flex flex-col divide-y" style={{ borderColor: styles.cardBorder }}
+        <ul className={`flex flex-col divide-y ${styles.cardBorder}`}
             data-testid="knowledge-category-list">
           {rows.map((row) => (
             <li key={row.id} className="py-1.5 flex items-center gap-2 text-xs">
               <span className="flex-1 truncate">{row.title}</span>
               {row.status && (
-                <span className="px-1.5 py-0.5 rounded" style={{ background: styles.badgeBg, color: styles.badgeText }}>
+                <span className={`px-1.5 py-0.5 rounded ${styles.badgeBg} ${styles.badgeText}`}>
                   {row.status}
                 </span>
               )}
@@ -184,14 +177,13 @@ export default function KnowledgeCategoryFilter() {
             data-testid="knowledge-category-load-more"
             disabled={loadingMore}
             onClick={() => void loadMore()}
-            className="px-2 py-0.5 rounded border inline-flex items-center gap-1 disabled:opacity-60"
-            style={{ borderColor: styles.cardBorder, color: styles.cardText }}
+            className={`px-2 py-0.5 rounded border inline-flex items-center gap-1 disabled:opacity-60 ${styles.cardBorder} ${styles.cardText}`}
           >
             {loadingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Tags className="w-3 h-3" />}
             {loadingMore ? t('knowledge.categoryLoadingMore') : t('knowledge.categoryLoadMore')}
           </button>
           {loadMoreError && (
-            <span data-testid="knowledge-category-load-more-error" style={{ color: styles.warningText }}>
+            <span data-testid="knowledge-category-load-more-error" className={styles.warningText} >
               {t('knowledge.categoryLoadMoreError')}
             </span>
           )}

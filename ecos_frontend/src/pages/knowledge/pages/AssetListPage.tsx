@@ -231,17 +231,15 @@ export default function AssetListPage() {
   };
 
   return (
-    <div className="flex flex-col gap-3" style={{ color: styles.cardText }}>
+    <div className={`flex flex-col gap-3 ${styles.cardText}`}>
       {/* 顶工具栏 */}
       <div
-        className="rounded-md border p-3 flex flex-wrap items-center gap-3"
-        style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+        className={`rounded-md border p-3 flex flex-wrap items-center gap-3 ${styles.cardBorder} ${styles.cardBg}`}
       >
         <div className="relative flex-1 min-w-[220px]">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 opacity-40" />
           <input
-            className="w-full pl-7 pr-2 py-1.5 rounded-md border text-xs"
-            style={{ borderColor: styles.cardBorder, background: styles.inputBg, color: styles.inputText }}
+            className={`w-full pl-7 pr-2 py-1.5 rounded-md border text-xs ${styles.cardBorder} ${styles.inputBg} ${styles.inputText}`}
             placeholder={t('knowledge.asset.search_placeholder')}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
@@ -250,8 +248,7 @@ export default function AssetListPage() {
           />
         </div>
         <select
-          className="px-2 py-1.5 rounded-md border text-xs"
-          style={{ borderColor: styles.cardBorder, background: styles.inputBg, color: styles.inputText }}
+          className={`px-2 py-1.5 rounded-md border text-xs ${styles.cardBorder} ${styles.inputBg} ${styles.inputText}`}
           value={assetType}
           onChange={(e) => setAssetType(e.target.value)}
           aria-label={t('knowledge.asset.col_type')}
@@ -263,8 +260,7 @@ export default function AssetListPage() {
           <option value="knowledge_set">{t('knowledge.asset.type_knowledge_set')}</option>
         </select>
         <select
-          className="px-2 py-1.5 rounded-md border text-xs"
-          style={{ borderColor: styles.cardBorder, background: styles.inputBg, color: styles.inputText }}
+          className={`px-2 py-1.5 rounded-md border text-xs ${styles.cardBorder} ${styles.inputBg} ${styles.inputText}`}
           value={status}
           onChange={(e) => setStatus(e.target.value)}
           aria-label={t('knowledge.asset.col_status')}
@@ -275,8 +271,7 @@ export default function AssetListPage() {
           <option value="published">{t('knowledge.asset.status_published')}</option>
         </select>
         <select
-          className="px-2 py-1.5 rounded-md border text-xs"
-          style={{ borderColor: styles.cardBorder, background: styles.inputBg, color: styles.inputText }}
+          className={`px-2 py-1.5 rounded-md border text-xs ${styles.cardBorder} ${styles.inputBg} ${styles.inputText}`}
           value={domain}
           onChange={(e) => handleDomainChange(e.target.value)}
           aria-label={t('knowledge.asset.col_domain')}
@@ -294,8 +289,7 @@ export default function AssetListPage() {
         <button
           type="button"
           onClick={() => void loadList()}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer"
-          style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer ${styles.cardBorder} ${styles.cardTextMuted}`}
           aria-label={t('knowledge.asset.action_refresh')}
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -303,8 +297,7 @@ export default function AssetListPage() {
         <button
           type="button"
           onClick={handleReset}
-          className="px-2 py-1.5 rounded-md text-[11px] border cursor-pointer"
-          style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}
+          className={`px-2 py-1.5 rounded-md text-[11px] border cursor-pointer ${styles.cardBorder} ${styles.cardTextMuted}`}
         >
           {t('knowledge.asset.action_reset')}
         </button>
@@ -312,7 +305,7 @@ export default function AssetListPage() {
 
       {/* 诚实标注：类型/状态为当前页客户端过滤，总数为服务端未过滤值 */}
       {(assetType !== 'all' || status !== 'all') && (
-        <div className="text-[10px] font-mono flex items-center gap-1.5" style={{ color: styles.muted }}>
+        <div className={`text-[10px] font-mono flex items-center gap-1.5 ${styles.muted}`}>
           <AlertCircle className="w-3 h-3 shrink-0" />
           <span>{t('knowledge.asset.filter_page_only_hint')}</span>
         </div>
@@ -329,15 +322,13 @@ export default function AssetListPage() {
       <div className="flex flex-col xl:flex-row gap-3">
         {/* 左列表 */}
         <div
-          className="flex-1 min-w-0 rounded-md border overflow-hidden flex flex-col"
-          style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+          className={`flex-1 min-w-0 rounded-md border overflow-hidden flex flex-col ${styles.cardBorder} ${styles.cardBg}`}
         >
           <div className="flex-1 overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr
-                  className="text-left text-[11px] uppercase tracking-wider opacity-70 border-b"
-                  style={{ borderColor: styles.cardBorder, background: styles.badgeBg }}
+                  className={`text-left text-[11px] uppercase tracking-wider opacity-70 border-b ${styles.cardBorder} ${styles.badgeBg}`}
                 >
                   <th className="px-3 py-2 font-medium">{t('knowledge.asset.col_title')}</th>
                   <th className="px-3 py-2 font-medium">{t('knowledge.asset.col_type')}</th>
@@ -359,8 +350,7 @@ export default function AssetListPage() {
                         <button
                           type="button"
                           onClick={() => void loadList()}
-                          className="px-2 py-0.5 rounded border text-[11px] cursor-pointer"
-                          style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}
+                          className={`px-2 py-0.5 rounded border text-[11px] cursor-pointer ${styles.cardBorder} ${styles.cardTextMuted}`}
                         >
                           {t('knowledge.asset.action_refresh')}
                         </button>
@@ -390,20 +380,16 @@ export default function AssetListPage() {
                             setSelectedId(isSelected ? null : item.id);
                           }
                         }}
-                        className="border-b cursor-pointer transition-colors"
-                        style={{
-                          borderColor: styles.cardBorder,
-                          background: isSelected ? styles.badgeBg : 'transparent',
-                        }}
+                        className={`border-b cursor-pointer transition-colors ${styles.cardBorder} ${isSelected ? styles.badgeBg : ''}`}
                       >
                         <td className="px-3 py-2 font-medium">{item.title}</td>
                         <td className="px-3 py-2">
-                          <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: styles.badgeBg, color: styles.badgeText }}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] ${styles.badgeBg} ${styles.badgeText}`}>
                             {item.category || assetType || '—'}
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] border ${statusClass}`} style={{ borderColor: styles.cardBorder }}>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] border ${statusClass} ${styles.cardBorder}`}>
                             {t(statusBadgeLabelKey(item.status || ''))}
                           </span>
                         </td>
@@ -425,8 +411,7 @@ export default function AssetListPage() {
           </div>
           {/* 分页 + 状态 */}
           <div
-            className="flex items-center justify-between px-3 py-2 border-t text-[11px] opacity-70"
-            style={{ borderColor: styles.cardBorder }}
+            className={`flex items-center justify-between px-3 py-2 border-t text-[11px] opacity-70 ${styles.cardBorder}`}
           >
             <span>
               {t('knowledge.asset.pagination_meta')}
@@ -438,8 +423,7 @@ export default function AssetListPage() {
                 type="button"
                 disabled={pageNum <= 1}
                 onClick={() => setPageNum(p => Math.max(1, p - 1))}
-                className="px-2 py-0.5 rounded border text-[11px] disabled:opacity-40 cursor-pointer"
-                style={{ borderColor: styles.cardBorder }}
+                className={`px-2 py-0.5 rounded border text-[11px] disabled:opacity-40 cursor-pointer ${styles.cardBorder}`}
               >
                 {t('knowledge.asset.pagination_prev')}
               </button>
@@ -448,8 +432,7 @@ export default function AssetListPage() {
                 type="button"
                 disabled={pageNum >= totalPages}
                 onClick={() => setPageNum(p => Math.min(totalPages, p + 1))}
-                className="px-2 py-0.5 rounded border text-[11px] disabled:opacity-40 cursor-pointer"
-                style={{ borderColor: styles.cardBorder }}
+                className={`px-2 py-0.5 rounded border text-[11px] disabled:opacity-40 cursor-pointer ${styles.cardBorder}`}
               >
                 {t('knowledge.asset.pagination_next')}
               </button>
@@ -459,8 +442,7 @@ export default function AssetListPage() {
 
         {/* 右详情面板：xl 及以上侧栏；以下堆叠在列表下方（避免点击选中后无反馈的死区） */}
         <aside
-          className="flex flex-col rounded-md border p-3 w-full xl:w-80 xl:flex-shrink-0"
-          style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+          className={`flex flex-col rounded-md border p-3 w-full xl:w-80 xl:flex-shrink-0 ${styles.cardBorder} ${styles.cardBg}`}
         >
           <div className="text-[11px] font-semibold uppercase tracking-wider opacity-60 mb-2">
             {t('knowledge.asset.detail_title')}
@@ -469,10 +451,10 @@ export default function AssetListPage() {
             <div className="flex flex-col gap-3 text-xs">
               <div className="font-medium">{selected.title}</div>
               <div className="flex flex-wrap gap-1.5">
-                <span className="px-1.5 py-0.5 rounded text-[10px] border" style={{ borderColor: styles.cardBorder }}>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] border ${styles.cardBorder}`}>
                   {t('knowledge.asset.detail_field_type')}: {selected.category || '—'}
                 </span>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] border ${statusBadgeClass(selected.status || '')}`} style={{ borderColor: styles.cardBorder }}>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] border ${statusBadgeClass(selected.status || '')} ${styles.cardBorder}`}>
                   {t(statusBadgeLabelKey(selected.status || ''))}
                 </span>
               </div>
@@ -482,11 +464,11 @@ export default function AssetListPage() {
               <div className="opacity-70">
                 {t('knowledge.asset.detail_field_updated')}: {selected.updatedAt ? new Date(selected.updatedAt).toLocaleString() : '—'}
               </div>
-              <div className="border-t pt-2" style={{ borderColor: styles.cardBorder }}>
+              <div className={`border-t pt-2 ${styles.cardBorder}`}>
                 <div className="opacity-60 mb-1">{t('knowledge.asset.detail_graph_context')}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {(selected.matchedTags && selected.matchedTags.length > 0 ? selected.matchedTags : []).map(tag => (
-                    <span key={tag} className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: styles.badgeBg, color: styles.badgeText }}>
+                    <span key={tag} className={`px-1.5 py-0.5 rounded text-[10px] ${styles.badgeBg} ${styles.badgeText}`}>
                       @ {tag}
                     </span>
                   ))}
@@ -495,7 +477,7 @@ export default function AssetListPage() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 pt-1" style={{ borderTopColor: styles.cardBorder }}>
+              <div className={`flex items-center gap-2 pt-1 ${styles.cardBorder}`}>
                 <span className="opacity-60">{t('knowledge.asset.col_graph')}:</span>
                 {renderGraphGlyph(selected.id)}
                 <span className="opacity-60 ml-2">{t('knowledge.asset.col_vector')}:</span>

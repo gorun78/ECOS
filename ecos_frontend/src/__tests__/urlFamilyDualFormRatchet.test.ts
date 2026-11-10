@@ -442,7 +442,10 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `DATANET_DATASOURCE_BASE` ⇒ 只在属主声明位计数一次、本文件对两把尺子都脱面）。裸形态面 0 变（该幻影 URL 改前
     // 就不以裸字面量形态存在，见同批 `dataWorkbenchApiBaseSingleSource` 的退役条目）。
     // 两向实跑：改前 HEAD 读 280 且旧锚通过、改后首跑在 279 变红 ⇒ 判据活性成立，非把数字改成当前值。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(282); // 2026-11-07：新增蓝图/心智面按实跑重设（原 280）
+    // Copilot 六智能体批（2026-11-09）：282 → **284** = 增 2 枚消费点（`services/copilotApi.ts` 的
+    // `${API_BASE}/v1/agent/copilot/agents` 与 `/chat` 两条身份腿；同文件另两枚 `quick-questions`/匿名 `chat`
+    // 腿属既有匿名面，不在本批新增）。全部复用单源 `API_BASE`，未新造族根 ⇒ 债面无新增，族面 +1 见下条。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(284); // 2026-11-09：Copilot 目录/对话腿按实跑重设（原 282）
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     // 三个数 = 本批实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）。
@@ -693,7 +696,9 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 属主族根 ⇒ 幻影族零生产成员、从 idx 消失。族面 −1 不是进度倒退，而是「一张只有幻影的族谱行」被注销；
     // 若台账不记这一笔，`toBe(253)` 会把「幻影被清干净」判成缺陷 ⇒ 硬锚必须随实跑读数走。
     // 两向实跑：改前 HEAD 读 253 且旧锚通过、改后首跑在 252 变红 ⇒ 判据活性成立。
-    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(255); // 2026-11-07：按实跑重设（原 253）
+    // Copilot 六智能体批（2026-11-09）：255 → **256** = 族面 +1（`/v1/agent/copilot/quick-questions` 这条
+    // 既有匿名腿此前无族可见性登记，随本批同文件改动进入扫描面）；属主仍为单源 `copilotApi.ts`，无重复族。
+    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(256); // 2026-11-09：按实跑重设（原 255）
     for (const owners of snapshot.idx.values()) expect(owners.has(CANONICAL)).toBe(false);
     // 名字变体面归零（#145/B6-11）：prod 面不得再有 `import { API_BASE as X }` 形态的基址别名——
     // 它虽然已被 derivedRe 计入族面，但这个形状本身就是 D-B5-40 在名字轴上的成因，出现即红。

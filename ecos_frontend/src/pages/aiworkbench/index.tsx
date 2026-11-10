@@ -15,36 +15,36 @@ import {
 } from './api';
 import DashboardView from './DashboardView';
 import LogicView from './LogicView';
-import AgentStudioView from './AgentStudioView';
 import ModelCatalogView from './ModelCatalogView';
 import AgentPlayground from './AgentPlayground';
 import EvalsView from './EvalsView';
 import {
-  LayoutDashboard, Network, FlaskConical, Cpu, BarChart3, Layers,
+  LayoutDashboard, FlaskConical, Cpu, BarChart3, Layers,
   CloudOff, RefreshCw, MessageSquare,
 } from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
-type TabId = 'overview' | 'agent' | 'playground' | 'orchestration' | 'evals' | 'models';
+type TabId = 'overview' | 'playground' | 'orchestration' | 'evals' | 'models';
 
 const NAV_TABS: Array<{
-  id: TabId;
+  id: TabId | 'chatbotStudio';
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
   labelKey: string;
   descKey: string;
+  /** 设 route 即跳独立路由（智能体 = /chatbot_studio），否则切页内 Tab */
+  route?: string;
 }> = [
   { id: 'overview', icon: LayoutDashboard, labelKey: 'aiworkbench.tab.overview', descKey: 'aiworkbench.tabdesc.overview' },
-  { id: 'agent', icon: Network, labelKey: 'aiworkbench.tab.agent', descKey: 'aiworkbench.tabdesc.agent' },
-  { id: 'playground', icon: FlaskConical, labelKey: 'aiworkbench.tab.playground', descKey: 'aiworkbench.tabdesc.playground' },
+  { id: 'chatbotStudio', icon: MessageSquare, labelKey: 'aiworkbench.tab.chatbotStudio', descKey: 'aiworkbench.tabdesc.chatbotStudio', route: '/chatbot_studio' },
   { id: 'orchestration', icon: Cpu, labelKey: 'aiworkbench.tab.orchestration', descKey: 'aiworkbench.tabdesc.orchestration' },
+  { id: 'playground', icon: FlaskConical, labelKey: 'aiworkbench.tab.playground', descKey: 'aiworkbench.tabdesc.playground' },
   { id: 'evals', icon: BarChart3, labelKey: 'aiworkbench.tab.evals', descKey: 'aiworkbench.tabdesc.evals' },
   { id: 'models', icon: Layers, labelKey: 'aiworkbench.tab.models', descKey: 'aiworkbench.tabdesc.models' },
 ];
 
 const VIEW_TITLES: Record<TabId, string> = {
   overview: 'aiworkbench.viewTitle.overview',
-  agent: 'aiworkbench.viewTitle.agent',
   playground: 'aiworkbench.viewTitle.playground',
   orchestration: 'aiworkbench.viewTitle.orchestration',
   evals: 'aiworkbench.viewTitle.evals',
@@ -114,17 +114,13 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
     loadAuditLogs();
   }, [loadAgents, loadGuardrails, loadPipelines, loadModels, loadAuditLogs]);
 
-  const handleAddAuditLog = (newLog: AIPAuditLog) => {
-    // 本地会话追加必须标记 localOrigin，UI 明示「本地」，与引擎审计区分
-    setAuditLogs((prev) => [{ ...newLog, localOrigin: true }, ...prev]);
-  };
-
-  // DashboardView 的导航按钮落地到真实 Tab（护栏绑定矩阵在 Models 子 Tab）
+  // DashboardView 的导航按钮落地到真实入口（护栏绑定矩阵在 Models 子 Tab；
+  // 智能体管理已收敛到 Chatbot Studio 独立路由）
   const handleNavigateToView = useCallback((view: 'logic' | 'agent' | 'model' | 'guardrails') => {
     if (view === 'logic') setCurrentTab('orchestration');
     else if (view === 'model' || view === 'guardrails') setCurrentTab('models');
-    else setCurrentTab('agent');
-  }, []);
+    else navigate('/chatbot_studio');
+  }, [navigate]);
 
   const hasLoadError = Boolean(loadErrors.pipelines || loadErrors.agents || loadErrors.models || loadErrors.guardrails || auditError);
 
@@ -141,17 +137,6 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
           onRetryAudit={loadAuditLogs}
           onNavigateToView={handleNavigateToView}
         />
-      )}
-      {currentTab === 'agent' && (loadErrors.agents
-        ? <ErrorState message={loadErrors.agents} onRetry={loadAgents} />
-        : <AgentStudioView
-            agents={agents}
-            models={models}
-            guardrails={guardrails}
-            onUpdateAgents={setAgents}
-            onAddAuditLog={handleAddAuditLog}
-            showToast={showToast}
-          />
       )}
       {currentTab === 'playground' && (
         <AgentPlayground agents={agents} models={models} showToast={showToast} />
@@ -197,17 +182,17 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
           </span>
         </div>
 
-        {/* Horizontal scroll tab bar — flat, all 6 tabs in a single row */}
-        <div className={`flex-shrink-0 border-b overflow-x-auto whitespace-nowrap -mx-1 px-1 ${styles.cardBg}`} style={{ borderColor: styles.cardBorder }}>
+        {/* Horizontal scroll tab bar — flat, all 6 entries in a single row */}
+        <div className={`flex-shrink-0 border-b overflow-x-auto whitespace-nowrap -mx-1 px-1 ${styles.cardBg} ${styles.cardBorder}`}>
           <div className="flex flex-nowrap gap-0.5 items-end pt-2">
             {NAV_TABS.map((tab) => {
-              const isActive = currentTab === tab.id;
+              const isActive = !tab.route && currentTab === tab.id;
               const IconComp = tab.icon;
               return (
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setCurrentTab(tab.id)}
+                  onClick={() => (tab.route ? navigate(tab.route) : setCurrentTab(tab.id as TabId))}
                   className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition ${
                     isActive
                       ? `bg-transparent ${styles.accentText} font-bold ${styles.accentBorder}`
@@ -219,22 +204,12 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
                 </button>
               );
             })}
-            {/* §4.5 P1（行232）：navConfig 注释所称「ai-workbench 页内跳转」入口实装 —
-                chatbot_studio 独立路由由此进入（此前全 src 零链接，仅手输 URL 可达） */}
-            <button
-              type="button"
-              onClick={() => navigate('/chatbot_studio')}
-              className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition border-transparent opacity-70 hover:opacity-100 ${styles.cardTextMuted}`}
-            >
-              <MessageSquare size={13} className="shrink-0" />
-              {t('aiworkbench.tab.chatbotStudio')}
-            </button>
           </div>
         </div>
       </div>
 
       {/* Desktop: left sidebar (md+) */}
-      <div className="hidden md:flex w-64 flex-shrink-0 border-r flex-col h-full text-xs" style={{ borderColor: styles.sidebarBorder, background: styles.sidebarBg, color: styles.sidebarText }}>
+      <div className={`hidden md:flex w-64 flex-shrink-0 border-r flex-col h-full text-xs ${styles.sidebarBg} ${styles.sidebarBorder}`}>
         {/* Title / Branding */}
         <div className={`p-3 border-b ${styles.sidebarBorder}`}>
           <div className={`py-2 px-3 ${styles.cardBg} ${styles.sidebarText} rounded-lg flex items-center justify-between shadow-xs`}>
@@ -260,13 +235,13 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
         {/* Sidebar Nav Items */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
           {NAV_TABS.map((tab) => {
-            const isActive = currentTab === tab.id;
+            const isActive = !tab.route && currentTab === tab.id;
             const IconComp = tab.icon;
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setCurrentTab(tab.id)}
+                onClick={() => (tab.route ? navigate(tab.route) : setCurrentTab(tab.id as TabId))}
                 className={`w-full p-2.5 rounded-lg text-left transition-all cursor-pointer flex items-start gap-3 border ${
                   isActive
                     ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText}`
@@ -289,25 +264,6 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
               </button>
             );
           })}
-
-          {/* §4.5 P1（行232）：Chatbot Studio 独立路由入口（桌面侧栏） */}
-          <button
-            type="button"
-            onClick={() => navigate('/chatbot_studio')}
-            className={`w-full p-2.5 rounded-lg text-left transition-all cursor-pointer flex items-start gap-3 border ${styles.sidebarBorder} ${styles.sidebarText} ${styles.sidebarHoverBg}`}
-          >
-            <span className={`p-1.5 rounded-md flex items-center justify-center shrink-0 ${styles.badgeBg} ${styles.muted}`}>
-              <MessageSquare size={13} />
-            </span>
-            <div className="flex flex-col min-w-0">
-              <span className={`text-[11px] font-bold leading-normal ${styles.sidebarText}`}>
-                {t('aiworkbench.tab.chatbotStudio')}
-              </span>
-              <span className={`text-[9px] truncate mt-0.5 font-medium leading-none ${styles.muted}`}>
-                {t('aiworkbench.tabdesc.chatbotStudio')}
-              </span>
-            </div>
-          </button>
         </div>
 
         {/* Sidebar Footer — 在线/降级徽章按真实加载结果判定，禁恒亮 */}

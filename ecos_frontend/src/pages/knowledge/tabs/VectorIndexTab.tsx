@@ -122,8 +122,8 @@ export default function VectorIndexTab({ showToast }: TabProps) {
             <Binary size={12} /> {t('knowledge.vector_index.reembed_all')}
           </button>
           <button type="button" onClick={() => { showToast?.('info', t('knowledge.vector_index.monitor_stub')); }}
-            className={`px-3 py-2 rounded-lg text-xs cursor-pointer flex items-center gap-1.5 font-bold ${styles.cardBorder} ${styles.inputBg} hover:opacity-80`}
-            style={{ color: styles.cardText }}>
+            className={`px-3 py-2 rounded-lg text-xs cursor-pointer flex items-center gap-1.5 font-bold ${styles.cardBorder} ${styles.inputBg} hover:opacity-80 ${styles.cardText}`}
+            >
             <Database size={12} /> {t('knowledge.vector_index.monitor')}
           </button>
         </div>

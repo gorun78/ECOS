@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.runtime.llm.gateway;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * LLM 调用请求
@@ -12,6 +13,14 @@ public class ChatRequest {
     private Double temperature;
     private Integer maxTokens;
     private Boolean stream;
+    /**
+     * 原生工具定义（OpenAI 兼容 {@code tools} 数组，元素形如
+     * {@code {"type":"function","function":{name,description,parameters}}}）。
+     * 为空/未设置时请求体不出现 {@code tools} 键，旧调用面零变化。
+     */
+    private List<Map<String, Object>> tools;
+    /** {@code tool_choice}（auto|none|required）；null 时不下发，走 provider 默认。 */
+    private String toolChoice;
     /**
      * @deprecated PMO-74 N14 / 铁律 §2.4：调用方自报的明文 provider 密钥一律不被信任，
      *             {@code LLMGatewayImpl} 不再消费本字段（出现即 warn + 默认 DENY）。
@@ -79,15 +88,23 @@ public class ChatRequest {
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 
+    public List<Map<String, Object>> getTools() { return tools; }
+    public void setTools(List<Map<String, Object>> tools) { this.tools = tools; }
+
+    public String getToolChoice() { return toolChoice; }
+    public void setToolChoice(String toolChoice) { this.toolChoice = toolChoice; }
+
     /**
      * 以备用 model/provider 复制请求（F06-14 要点 2 的网关内部降级用）。
-     * 除 {@code model} 外全部字段原样携带（会话、主体、密钥引用不变），禁在降级时丢主体造成审计断链。
+     * 除 {@code model} 外全部字段原样携带（会话、主体、密钥引用、工具面不变），禁在降级时丢主体造成审计断链。
      */
     public ChatRequest copyWithModel(String fallbackModel) {
         ChatRequest copy = new ChatRequest(fallbackModel, messages, temperature, maxTokens, stream);
         copy.setApiKeyRef(apiKeyRef);
         copy.setCallerId(callerId);
         copy.setSessionId(sessionId);
+        copy.setTools(tools);
+        copy.setToolChoice(toolChoice);
         return copy;
     }
 }

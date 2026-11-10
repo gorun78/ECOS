@@ -100,7 +100,7 @@ class AgentLoopSseFrameSequenceTest {
         records.add(withCitation);
         AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。\n\n同比增长 8%。",
                 2, "sess-1", 321, records);
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查询 Q3 营收", "default"), frames());
 
@@ -123,7 +123,7 @@ class AgentLoopSseFrameSequenceTest {
     @DisplayName("§1.9.2 每帧带 traceId（同一条，取请求线程捕获值），且 meta 内容口径正确")
     void everyFrameCarriesTheSameTraceId() throws Exception {
         AgentLoopResult result = AgentLoopResult.success("今日无异常。", 1, "sess-1", 50, List.of());
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("随便聊聊", "default"), frames());
 
@@ -141,7 +141,7 @@ class AgentLoopSseFrameSequenceTest {
     void stepAndDeltaFramesCarryTheirOwnKeys() throws Exception {
         Map<String, Object> record = toolRecord("forecast_query", 1, AgentLoopTrace.Decision.ALLOW.name());
         AgentLoopResult result = AgentLoopResult.success("第一段。\n第二段。", 1, "sess-1", 80, List.of(record));
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -167,7 +167,7 @@ class AgentLoopSseFrameSequenceTest {
     @DisplayName("token 帧只有用量语义，分项未传播 ⇒ -1/-1 且 estimated=false（禁拿 totalTokens 折算冒充分项）")
     void usageFrameNeverFakesBreakdown() throws Exception {
         AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。", 1, "sess-1", 999, List.of());
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -186,7 +186,7 @@ class AgentLoopSseFrameSequenceTest {
     void noCitationFrameWithoutUpstreamBlock() throws Exception {
         AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。", 1, "sess-1", 30,
                 List.of(toolRecord("forecast_query", 1, AgentLoopTrace.Decision.ALLOW.name())));
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -202,7 +202,7 @@ class AgentLoopSseFrameSequenceTest {
         Map<String, Object> record = toolRecord("forecast_query", 1, AgentLoopTrace.Decision.ALLOW.name());
         record.put("citationBlock", "分析结论：" + CITATION_BLOCK);
         AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。", 1, "sess-1", 30, List.of(record));
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -225,7 +225,7 @@ class AgentLoopSseFrameSequenceTest {
         assertEquals("ECOS-AI-400", error.get(SseFrameContract.KEY_ERROR_CODE));
         assertEquals("INVALID_ARGUMENT", error.get(SseFrameContract.KEY_CLASS));
         assertFalse(error.containsKey(SseFrameContract.KEY_TEXT));
-        verify(service, never()).run(any(), anyString(), any());
+        verify(service, never()).run(any(), anyString(), any(), any());
     }
 
     @Test
@@ -233,7 +233,7 @@ class AgentLoopSseFrameSequenceTest {
     void openCircuitShortCircuitsBeforeLoop() throws Exception {
         AgentLoopResult failure = AgentLoopResult.error("sess-1", "下游服务异常（诊断码 " + TRACE + "）", 0);
         failure.setErrorClass("TOOL_BACKEND_ERROR");
-        when(service.run(any(), anyString(), any())).thenReturn(failure);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(failure);
 
         // 三次真实失败把该 agentId 的熔断推到 OPEN（走生产计数，不手工改状态）
         for (int i = 0; i < 3; i++) {
@@ -246,7 +246,7 @@ class AgentLoopSseFrameSequenceTest {
         assertEquals(List.of(SseFrameContract.FRAME_META, SseFrameContract.FRAME_ERROR,
                 SseFrameContract.FRAME_DONE), events);
         assertEquals("ECOS-AI-429", payloads.get(1).get(SseFrameContract.KEY_ERROR_CODE));
-        verify(service, times(3)).run(any(), anyString(), any());
+        verify(service, times(3)).run(any(), anyString(), any(), any());
     }
 
     @Test
@@ -256,7 +256,7 @@ class AgentLoopSseFrameSequenceTest {
                 "会话 token 配额超限: 已用 9,120/上限 8,000（诊断码 " + TRACE + "）", 10);
         failure.setErrorClass("CONTEXT_OVERFLOW");
         failure.setErrorCode("ECOS-AI-413");
-        when(service.run(any(), anyString(), any())).thenReturn(failure);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(failure);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -277,7 +277,7 @@ class AgentLoopSseFrameSequenceTest {
     @DisplayName("压缩态未判定 ⇒ done 三个键全缺席（前端渲染未上报，禁伪造默认值）")
     void compressionKeysAbsentWhenNotAssessed() throws Exception {
         AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。", 1, "sess-1", 30, List.of());
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -292,7 +292,7 @@ class AgentLoopSseFrameSequenceTest {
     void compressionKeysReportedWhenAssessed() throws Exception {
         AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。", 1, "sess-1", 30, List.of());
         result.applyCompression(null, 0, true);
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -306,7 +306,7 @@ class AgentLoopSseFrameSequenceTest {
     void missingDecisionInToolRecordNormalizesToNa() throws Exception {
         AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。", 1, "sess-1", 30,
                 List.of(toolRecord("forecast_query", 1, null)));
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -318,7 +318,7 @@ class AgentLoopSseFrameSequenceTest {
     void nullToolRecordsYieldNoStepFrames() throws Exception {
         AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。", 1, "sess-1", 30, List.of());
         result.setToolCalls(null);
-        when(service.run(any(), anyString(), any())).thenReturn(result);
+        when(service.run(any(), anyString(), any(), any())).thenReturn(result);
 
         controller.runStream(body("查营收", "default"), frames());
 
@@ -359,5 +359,30 @@ class AgentLoopSseFrameSequenceTest {
         assertDoesNotThrow(() -> controller.failClosedTail(broken,
                 new RuntimeException("boom")));
         assertEquals(List.of(), broken.emittedNames(), "写不出去的帧不得记入已写序列");
+    }
+
+    @Test
+    @DisplayName("P0-2 真流式：服务侧增量直接成 delta 帧，终稿兜底补发不得重复正文")
+    void streamedDeltasAreNotDuplicatedByFallback() throws Exception {
+        AgentLoopResult result = AgentLoopResult.success("营收 12 亿元。\n\n同比增长 8%。",
+                1, "sess-1", 20, List.of());
+        when(service.run(any(), anyString(), any(), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<String> sink = invocation.getArgument(3);
+            sink.accept("营收 12 亿元。");
+            sink.accept("\n\n同比增长 8%。");
+            return result;
+        });
+
+        controller.runStream(body("查营收", "default"), frames());
+
+        List<String> deltas = new ArrayList<>();
+        for (int i = 0; i < events.size(); i++) {
+            if (SseFrameContract.FRAME_DELTA.equals(events.get(i))) {
+                deltas.add(String.valueOf(payloads.get(i).get(SseFrameContract.KEY_TEXT)));
+            }
+        }
+        assertEquals(List.of("营收 12 亿元。", "\n\n同比增长 8%。"), deltas,
+                "流式增量应原样成帧，且不得再按终稿补发（避免重复正文）");
     }
 }

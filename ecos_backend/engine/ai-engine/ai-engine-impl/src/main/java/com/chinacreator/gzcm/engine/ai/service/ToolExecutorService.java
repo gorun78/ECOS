@@ -554,6 +554,14 @@ public class ToolExecutorService {
         // #143/B5-1：契约工具的 operation 同样取声明值（由 WAgentContractToolSource 按
         // operation_class 折算：READ→read，SUGGEST/WRITE→write，宁严勿宽）
         if (def != null && def.contract != null) return def.contract.operation();
+        // 声明优先（P1-Copilot）：registry 工具在 ToolSchema 上显式声明 read|write，
+        // 防止写工具（如 pipeline run / forecast create）被按只读裁决（提权漏洞）。
+        if (toolRegistry != null && toolName != null) {
+            ToolSchema schema = toolRegistry.get(toolName);
+            if (schema != null && schema.getOperation() != null && !schema.getOperation().isBlank()) {
+                return schema.getOperation();
+            }
+        }
         if (toolName != null && WRITE_TOOL_NAMES.contains(toolName)) return "write";
         if (def != null && def.httpMethod != null && !def.httpMethod.isBlank()) {
             String m = def.httpMethod.toUpperCase(Locale.ROOT);

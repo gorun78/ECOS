@@ -212,10 +212,15 @@ public class LLMGatewayImpl implements LLMGateway {
      * 单次 provider 调用（无重试）。护栏态与非护栏失败均带 {@link AiErrorClass} 分类返回。
      */
     private ChatResponse attemptOnce(ChatRequest request) {
+        return attemptOnce(request, null);
+    }
+
+    /**
+     * 单次 provider 调用（无重试）；{@code onDelta} 非空时走流式传输并实时回吐正文增量。
+     */
+    private ChatResponse attemptOnce(ChatRequest request, java.util.function.Consumer<String> onDelta) {
         // 获取 config
         String provider = detectProvider(request.getModel());
-        Double temperature = request.getTemperature();
-        Integer maxTokens = request.getMaxTokens();
         Boolean stream = request.getStream() != null && request.getStream();
 
         // 构造 LLMConfig (从 request 中提取, 用于 resolveBaseUrl)
@@ -225,15 +230,13 @@ public class LLMGatewayImpl implements LLMGateway {
 
         String baseUrl = resolveBaseUrl(config);
 
-        // 如果 request 没有显式设置 temperature/maxTokens，使用合理默认值
-        if (temperature == null) temperature = 0.7;
-        if (maxTokens == null) maxTokens = 4096;
+        // 增量回调意味着必须走流式传输（与原 stream 标志取或）
+        boolean streaming = stream || onDelta != null;
 
         // 构建请求体
         String requestBodyJson;
         try {
-            requestBodyJson = buildRequestBody(request.getModel(), request.getMessages(),
-                    temperature, maxTokens, stream);
+            requestBodyJson = buildRequestBody(request, streaming);
         } catch (JsonProcessingException e) {
             log.error("Failed to build request body JSON", e);
             return ChatResponse.fail(AiErrorClass.INVALID_ARGUMENT, "请求体序列化失败");
@@ -265,9 +268,9 @@ public class LLMGatewayImpl implements LLMGateway {
                             + "（默认 DENY — 不放行直连、不回退明文，详见 server 日志）");
         }
 
-        if (stream) {
+        if (streaming) {
             long streamStart = System.currentTimeMillis();
-            ChatResponse response = callStreaming(baseUrl, apiKey, requestBodyJson);
+            ChatResponse response = callStreaming(baseUrl, apiKey, requestBodyJson, onDelta);
             meterUsage(request, caller, provider, response, System.currentTimeMillis() - streamStart);
             return response;
         } else {
@@ -276,6 +279,19 @@ public class LLMGatewayImpl implements LLMGateway {
             meterUsage(request, caller, provider, response, System.currentTimeMillis() - callStart);
             return response;
         }
+    }
+
+    @Override
+    public ChatResponse callStream(ChatRequest request, java.util.function.Consumer<String> onDelta) {
+        if (request == null) {
+            return ChatResponse.fail(AiErrorClass.INVALID_ARGUMENT, "请求为空");
+        }
+        if (onDelta == null) {
+            return call(request);
+        }
+        request.setStream(true);
+        // 增量已外发时禁网关重试（重放正文会重复）；单次尝试，分类原样上浮
+        return attemptOnce(request, onDelta);
     }
 
 
@@ -611,9 +627,11 @@ public class LLMGatewayImpl implements LLMGateway {
     /**
      * 构建 OpenAI 兼容 /chat/completions 请求体 JSON
      */
-    private String buildRequestBody(String model, List<ChatMessage> messages,
-                                    Double temperature, Integer maxTokens,
-                                    Boolean stream) throws JsonProcessingException {
+    private String buildRequestBody(ChatRequest request, Boolean stream) throws JsonProcessingException {
+        String model = request.getModel();
+        List<ChatMessage> messages = request.getMessages();
+        Double temperature = request.getTemperature();
+        Integer maxTokens = request.getMaxTokens();
         ObjectNode root = objectMapper.createObjectNode();
         root.put("model", model);
 
@@ -621,7 +639,21 @@ public class LLMGatewayImpl implements LLMGateway {
         for (ChatMessage msg : messages) {
             ObjectNode msgNode = messagesArray.addObject();
             msgNode.put("role", msg.getRole());
-            msgNode.put("content", msg.getContent());
+            if (msg.getContent() == null) {
+                msgNode.putNull("content");
+            } else {
+                msgNode.put("content", msg.getContent());
+            }
+            // 原生 function calling：assistant 侧回传 tool_calls，tool 侧回传 tool_call_id
+            if (msg.getToolCalls() != null && !msg.getToolCalls().isEmpty()) {
+                msgNode.set("tool_calls", objectMapper.valueToTree(msg.getToolCalls()));
+            }
+            if (msg.getToolCallId() != null && !msg.getToolCallId().isBlank()) {
+                msgNode.put("tool_call_id", msg.getToolCallId());
+            }
+            if (msg.getName() != null && !msg.getName().isBlank()) {
+                msgNode.put("name", msg.getName());
+            }
         }
 
         if (temperature != null) {
@@ -632,6 +664,12 @@ public class LLMGatewayImpl implements LLMGateway {
         }
         if (stream != null) {
             root.put("stream", stream);
+        }
+        if (request.getTools() != null && !request.getTools().isEmpty()) {
+            root.set("tools", objectMapper.valueToTree(request.getTools()));
+            if (request.getToolChoice() != null && !request.getToolChoice().isBlank()) {
+                root.put("tool_choice", request.getToolChoice());
+            }
         }
 
         return objectMapper.writeValueAsString(root);
@@ -788,7 +826,8 @@ public class LLMGatewayImpl implements LLMGateway {
     /**
      * 流式调用 — 使用 OkHttp SSE
      */
-    private ChatResponse callStreaming(String baseUrl, String apiKey, String requestBodyJson) {
+    private ChatResponse callStreaming(String baseUrl, String apiKey, String requestBodyJson,
+                                       java.util.function.Consumer<String> onDelta) {
         String url = baseUrl + "/chat/completions";
 
         RequestBody body = RequestBody.create(requestBodyJson, MediaType.parse("application/json"));
@@ -808,6 +847,8 @@ public class LLMGatewayImpl implements LLMGateway {
         AtomicReference<String> modelUsed = new AtomicReference<>("");
         AtomicBoolean success = new AtomicBoolean(false);
         AtomicReference<String> errorMsg = new AtomicReference<>("");
+        // 原生工具调用按 index 聚合：id 取首帧，name 取首个非空，arguments 逐帧拼接
+        java.util.Map<Integer, java.util.Map<String, Object>> toolCallParts = new java.util.TreeMap<>();
         CountDownLatch latch = new CountDownLatch(1);
 
         EventSource.Factory factory = EventSources.createFactory(okHttpClient);
@@ -823,7 +864,48 @@ public class LLMGatewayImpl implements LLMGateway {
                         JsonNode choice = node.get("choices").get(0);
                         JsonNode delta = choice.get("delta");
                         if (delta != null && delta.has("content") && !delta.get("content").isNull()) {
-                            contentBuilder.append(delta.get("content").asText());
+                            String piece = delta.get("content").asText();
+                            if (!piece.isEmpty()) {
+                                contentBuilder.append(piece);
+                                if (onDelta != null) {
+                                    try {
+                                        onDelta.accept(piece);
+                                    } catch (RuntimeException sinkFailure) {
+                                        errorMsg.set("delta sink failure: " + sinkFailure.getMessage());
+                                        success.set(false);
+                                        latch.countDown();
+                                        eventSource.cancel();
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        if (delta != null && delta.has("tool_calls") && delta.get("tool_calls").isArray()) {
+                            for (JsonNode tc : delta.get("tool_calls")) {
+                                int idx = tc.has("index") ? tc.get("index").asInt() : 0;
+                                java.util.Map<String, Object> part =
+                                        toolCallParts.computeIfAbsent(idx, k -> new java.util.LinkedHashMap<>());
+                                if (tc.has("id") && !tc.get("id").isNull() && part.get("id") == null) {
+                                    part.put("id", tc.get("id").asText());
+                                }
+                                JsonNode fn = tc.get("function");
+                                if (fn != null) {
+                                    Object fnPart = part.get("function");
+                                    @SuppressWarnings("unchecked")
+                                    java.util.Map<String, Object> fnMap = fnPart instanceof java.util.Map
+                                            ? (java.util.Map<String, Object>) fnPart
+                                            : new java.util.LinkedHashMap<>();
+                                    if (fn.has("name") && !fn.get("name").isNull()) {
+                                        fnMap.put("name", fn.get("name").asText());
+                                    }
+                                    if (fn.has("arguments") && !fn.get("arguments").isNull()) {
+                                        String prev = fnMap.get("arguments") == null
+                                                ? "" : String.valueOf(fnMap.get("arguments"));
+                                        fnMap.put("arguments", prev + fn.get("arguments").asText());
+                                    }
+                                    part.put("function", fnMap);
+                                }
+                            }
                         }
                         // 记录 finish_reason
                         if (choice.has("finish_reason") && !choice.get("finish_reason").isNull()) {
@@ -892,6 +974,17 @@ public class LLMGatewayImpl implements LLMGateway {
             ChatResponse ok = ChatResponse.ok(contentBuilder.toString(),
                     tokensInput.get(), tokensOutput.get(), modelStr);
             ok.setUsageReported(usageSeen.get());
+            if (!toolCallParts.isEmpty()) {
+                java.util.List<java.util.Map<String, Object>> calls = new java.util.ArrayList<>();
+                for (java.util.Map<String, Object> part : toolCallParts.values()) {
+                    java.util.Map<String, Object> call = new java.util.LinkedHashMap<>();
+                    call.put("id", part.get("id") == null ? "call_stream" : part.get("id"));
+                    call.put("type", "function");
+                    call.put("function", part.get("function"));
+                    calls.add(call);
+                }
+                ok.setToolCalls(calls);
+            }
             return ok;
         } else {
             return ChatResponse.fail(AiErrorClass.PARSE_FAILURE, errorMsg.get());
@@ -912,11 +1005,28 @@ public class LLMGatewayImpl implements LLMGateway {
             }
 
             String content = "";
+            java.util.List<java.util.Map<String, Object>> toolCalls = new java.util.ArrayList<>();
             if (root.has("choices") && root.get("choices").isArray() && root.get("choices").size() > 0) {
                 JsonNode choice = root.get("choices").get(0);
                 JsonNode message = choice.get("message");
                 if (message != null && message.has("content") && !message.get("content").isNull()) {
                     content = message.get("content").asText();
+                }
+                if (message != null && message.has("tool_calls") && message.get("tool_calls").isArray()) {
+                    for (JsonNode tc : message.get("tool_calls")) {
+                        java.util.Map<String, Object> call = new java.util.LinkedHashMap<>();
+                        call.put("id", tc.has("id") && !tc.get("id").isNull() ? tc.get("id").asText() : "call");
+                        call.put("type", "function");
+                        JsonNode fn = tc.get("function");
+                        if (fn != null) {
+                            java.util.Map<String, Object> fnMap = new java.util.LinkedHashMap<>();
+                            fnMap.put("name", fn.has("name") && !fn.get("name").isNull() ? fn.get("name").asText() : null);
+                            fnMap.put("arguments", fn.has("arguments") && !fn.get("arguments").isNull()
+                                    ? fn.get("arguments").asText() : "{}");
+                            call.put("function", fnMap);
+                        }
+                        toolCalls.add(call);
+                    }
                 }
             }
 
@@ -934,6 +1044,9 @@ public class LLMGatewayImpl implements LLMGateway {
 
             ChatResponse ok = ChatResponse.ok(content, tokensInput, tokensOutput, model);
             ok.setUsageReported(usageReported);
+            if (!toolCalls.isEmpty()) {
+                ok.setToolCalls(toolCalls);
+            }
             return ok;
 
         } catch (Exception e) {

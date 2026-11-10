@@ -674,6 +674,10 @@ public class AiSecurityEngineClient {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set(AiTraceSupport.HEADER_REQUEST_ID, AiTraceSupport.currentTraceId());
+        // P1-Copilot：调用方凭据逐字中继 + 信任头还原。gateway 链首剥离 X-ECOS-*，只中继
+        // Authorization 会让属主恒 403 ECOS-AUTH-010（护栏再把它折成 503「不可用」，与策略
+        // 拒绝混态）；缺失即不写头由属主如实拒绝，禁自造服务账号。
+        ServicePrincipalTrustHeaders.apply(headers);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
         ResponseEntity<Map> resp = restTemplate.postForEntity(baseUrl + path, entity, Map.class);
         return resp == null ? null : resp.getBody();

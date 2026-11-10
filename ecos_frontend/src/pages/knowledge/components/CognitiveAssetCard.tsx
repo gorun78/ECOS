@@ -40,12 +40,7 @@ export default function CognitiveAssetCard({ row, active, onSelect }: CognitiveA
     <button
       type="button"
       onClick={() => onSelect(row.assetId)}
-      className="w-full text-left rounded-md border p-3 flex flex-col gap-2 transition-colors cursor-pointer"
-      style={{
-        borderColor: active ? styles.accentBorder : styles.cardBorder,
-        background: active ? styles.badgeBg : styles.cardBg,
-        color: styles.cardText,
-      }}
+      className={`w-full text-left rounded-md border p-3 flex flex-col gap-2 transition-colors cursor-pointer ${styles.cardText} ${active ? styles.accentBorder : styles.cardBorder} ${active ? styles.badgeBg : styles.cardBg}`}
       aria-label={row.label}
     >
       <div className="flex items-start gap-2">
@@ -57,16 +52,16 @@ export default function CognitiveAssetCard({ row, active, onSelect }: CognitiveA
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap">
-        <span className="px-1.5 py-0.5 rounded text-[10px] border" style={{ borderColor: styles.cardBorder, color: styles.badgeText }}>
+        <span className={`px-1.5 py-0.5 rounded text-[10px] border ${styles.cardBorder} ${styles.badgeText}`}>
           {t(`knowledge.cognitiveAsset.class.${row.assetClass}`) || row.assetClass}
         </span>
         {row.status && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] border" style={{ borderColor: styles.cardBorder, color: toneColor }}>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] border ${styles.cardBorder} ${toneColor}`}>
             {assetStatusLabelKey(row.status) ? t(assetStatusLabelKey(row.status) as string) || row.status : row.status}
           </span>
         )}
         {row.assetClass === 'BELIEF' && row.probability !== null && (
-          <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: styles.badgeBg, color: styles.badgeText }}>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] ${styles.badgeBg} ${styles.badgeText}`}>
             {row.probability.toFixed(2)}
             {isUncalibratedKind(row.probabilityKind) && <span className="ml-1 opacity-70">· {t('knowledge.cognitiveAsset.uncalibrated_tag')}</span>}
           </span>

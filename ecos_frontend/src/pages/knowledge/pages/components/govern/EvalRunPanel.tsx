@@ -178,17 +178,16 @@ export default function EvalRunPanel() {
 
   return (
     <div
-      className="rounded-md border flex flex-col"
-      style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+      className={`rounded-md border flex flex-col ${styles.cardBorder} ${styles.cardBg}`}
     >
       {/* 标题栏 */}
-      <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: styles.cardBorder }}>
+      <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}>
         <div className="flex items-center gap-2 text-sm font-semibold">
-          <FlaskConical className="w-4 h-4" style={{ color: styles.accentText }} />
+          <FlaskConical className={`w-4 h-4 ${styles.accentText}`} />
           <span>{t('knowledge.govern.eval_run')}</span>
           {isRunning && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded"
-                  style={{ background: styles.infoBg, color: styles.infoText }}>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded ${styles.infoBg} ${styles.infoText}`}
+                  >
               <Loader2 className="w-3 h-3 animate-spin" />
               {t('knowledge.govern.eval_polling', { attempt: pollCount, max: MAX_POLL_ATTEMPTS })}
             </span>
@@ -206,28 +205,28 @@ export default function EvalRunPanel() {
       </div>
 
       {errorBanner && (
-        <div className="px-3 py-1.5 text-[11px] border-b flex items-center gap-2"
-             style={{ borderColor: styles.cardBorder, background: styles.warningBg, color: styles.warningText }}>
+        <div className={`px-3 py-1.5 text-[11px] border-b flex items-center gap-2 ${styles.cardBorder} ${styles.warningBg} ${styles.warningText}`}
+             >
           <Gauge className="w-3 h-3 flex-shrink-0" />
           <span className="truncate">{errorBanner}</span>
         </div>
       )}
 
       {/* 看板（latest report） */}
-      <div className="px-3 py-2.5 border-b space-y-2" style={{ borderColor: styles.cardBorder }}>
+      <div className={`px-3 py-2.5 border-b space-y-2 ${styles.cardBorder}`}>
         {!displayReport ? (
-          <div className="py-4 text-center text-[11px] flex flex-col items-center gap-1.5" style={{ color: styles.muted }}>
+          <div className={`py-4 text-center text-[11px] flex flex-col items-center gap-1.5 ${styles.muted}`}>
             <Gauge className="w-6 h-6 opacity-40" />
             <p>{t('knowledge.govern.eval_no_report')}</p>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between text-[10px] font-mono">
-              <span style={{ color: styles.cardTextMuted }}>{displayReport.seedSetName}</span>
-              <span style={{ color: styles.muted }}>{new Date(displayReport.printedAt).toLocaleTimeString()}</span>
+              <span className={styles.cardTextMuted} >{displayReport.seedSetName}</span>
+              <span className={styles.muted} >{new Date(displayReport.printedAt).toLocaleTimeString()}</span>
               {displayReport.degraded && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                      style={{ background: styles.warningBg, color: styles.warningText }}>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${styles.warningBg} ${styles.warningText}`}
+                      >
                   {t('knowledge.govern.eval_degraded_badge')}
                 </span>
               )}
@@ -244,7 +243,7 @@ export default function EvalRunPanel() {
       {/* 历史列表（最多 10 条） */}
       <div className="px-3 py-2 flex-1 overflow-y-auto max-h-40">
         {history.length === 0 ? (
-          <div className="py-4 text-center text-[11px]" style={{ color: styles.muted }}>
+          <div className={`py-4 text-center text-[11px] ${styles.muted}`}>
             <History className="w-5 h-5 mx-auto mb-1 opacity-40" />
             {t('knowledge.govern.eval_no_history')}
           </div>
@@ -255,24 +254,20 @@ export default function EvalRunPanel() {
                 key={r.reportId}
                 type="button"
                 onClick={() => setActiveReportId(r.reportId)}
-                className="w-full text-left px-2 py-1.5 rounded flex items-center gap-2 text-[10px] transition hover:opacity-80 cursor-pointer"
-                style={{
-                  background: activeReportId === r.reportId ? styles.sidebarBg : 'transparent',
-                  border: `1px solid ${activeReportId === r.reportId ? styles.accentBorder : styles.cardBorder}`,
-                }}
+                className={`border w-full text-left px-2 py-1.5 rounded flex items-center gap-2 text-[10px] transition hover:opacity-80 cursor-pointer ${activeReportId === r.reportId ? styles.sidebarBg : ''} ${activeReportId === r.reportId ? styles.accentBorder : styles.cardBorder}`}
               >
-                <Clock className="w-3 h-3 shrink-0" style={{ color: styles.muted }} />
+                <Clock className={`w-3 h-3 shrink-0 ${styles.muted}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-mono truncate" style={{ color: styles.cardText }}>{r.seedSetName.slice(0, 32)}</p>
-                  <p className="text-[9px] font-mono" style={{ color: styles.muted }}>
+                  <p className={`font-mono truncate ${styles.cardText}`}>{r.seedSetName.slice(0, 32)}</p>
+                  <p className={`text-[9px] font-mono ${styles.muted}`}>
                     {new Date(r.printedAt).toLocaleString()}
                   </p>
                 </div>
                 <div className="flex gap-1 shrink-0 font-mono text-[9px]">
-                  <span style={{ color: styles.accentText }}>R{(r.recallAt5 * 100).toFixed(0)}</span>
-                  <span style={{ color: styles.successText }}>M{(r.mrrAt5 * 100).toFixed(0)}</span>
-                  <span style={{ color: styles.warningText }}>N{(r.ndcgAt5 * 100).toFixed(0)}</span>
-                  {r.degraded && <span style={{ color: styles.warningText }}>D</span>}
+                  <span className={styles.accentText} >R{(r.recallAt5 * 100).toFixed(0)}</span>
+                  <span className={styles.successText} >M{(r.mrrAt5 * 100).toFixed(0)}</span>
+                  <span className={styles.warningText} >N{(r.ndcgAt5 * 100).toFixed(0)}</span>
+                  {r.degraded && <span className={styles.warningText} >D</span>}
                 </div>
               </button>
             ))}

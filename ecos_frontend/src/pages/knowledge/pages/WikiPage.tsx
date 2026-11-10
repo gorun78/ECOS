@@ -67,17 +67,17 @@ const ENTITY_REF_RE = /@[\u4e00-\u9fa5A-Za-z0-9_]+/g;
 function renderMarkdownLite(content: string, s: ReturnType<typeof useTheme>['styles']): React.ReactNode {
   const lines = (content || '').split(/\r?\n/);
   return (
-    <div className="space-y-2 text-xs leading-relaxed" style={{ color: s.cardText }}>
+    <div className={`space-y-2 text-xs leading-relaxed ${s.cardText}`}>
       {lines.map((line, i) => {
         const trimmed = line.trim();
         if (trimmed.startsWith('# ')) {
-          return <h2 key={i} className="text-sm font-bold mt-2" style={{ color: s.cardText }}>{trimmed.slice(2)}</h2>;
+          return <h2 key={i} className={`text-sm font-bold mt-2 ${s.cardText}`}>{trimmed.slice(2)}</h2>;
         }
         if (trimmed.startsWith('## ')) {
-          return <h3 key={i} className="text-xs font-bold mt-2 uppercase tracking-wider" style={{ color: s.cardTextMuted }}>{trimmed.slice(3)}</h3>;
+          return <h3 key={i} className={`text-xs font-bold mt-2 uppercase tracking-wider ${s.cardTextMuted}`}>{trimmed.slice(3)}</h3>;
         }
         if (trimmed.startsWith('- ')) {
-          return <p key={i} className="pl-3 border-l-2 py-0.5" style={{ borderColor: s.inputBorder }}>{trimmed.slice(2)}</p>;
+          return <p key={i} className={`pl-3 border-l-2 py-0.5 ${s.inputBorder}`}>{trimmed.slice(2)}</p>;
         }
         if (trimmed === '') return <div key={i} className="h-1" />;
         // Inline: 加粗 + 行内代码 + 换行 chips
@@ -93,7 +93,7 @@ function renderMarkdownLite(content: string, s: ReturnType<typeof useTheme>['sty
         }
         while ((m = codeRe.exec(trimmed)) !== null) {
           if (m.index > lastIdx) parts.push(<span key={`n2${i}-${m.index}`}>{highlightEntityRef(trimmed.slice(lastIdx, m.index), s)}</span>);
-          parts.push(<code key={`c${i}-${m.index}`} className="px-1 py-0.5 font-mono text-[10px] rounded" style={{ background: s.sidebarBg, color: s.accentText }}>{m[1]}</code>);
+          parts.push(<code key={`c${i}-${m.index}`} className={`px-1 py-0.5 font-mono text-[10px] rounded ${s.sidebarBg} ${s.accentText}`}>{m[1]}</code>);
           lastIdx = m.index + m[0].length;
         }
         if (lastIdx < trimmed.length) parts.push(<span key={`tail${i}`}>{highlightEntityRef(trimmed.slice(lastIdx), s)}</span>);
@@ -116,8 +116,7 @@ function highlightEntityRef(text: string, s: ReturnType<typeof useTheme>['styles
       <span
         key={`chip${startIdx}`}
         title={m}
-        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 mx-0.5 rounded text-[10px] font-mono font-bold"
-        style={{ background: s.infoBg, color: s.infoText, border: `1px solid ${s.infoBorder.replace('#', '#')}`, borderStyle: 'solid', borderWidth: 1 }}
+        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 mx-0.5 rounded text-[10px] font-mono font-bold border ${s.infoBg} ${s.infoText} ${s.infoBorder}`}
       >
         <Tag className="w-2.5 h-2.5" />
         {m.slice(1)}
@@ -301,14 +300,14 @@ export default function WikiPage() {
     : 'knowledge.wiki.status_draft';
 
   return (
-    <div className="p-2" style={{ color: styles.cardText }}>
-      <div className="rounded-md border flex flex-col" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+    <div className={`p-2 ${styles.cardText}`}>
+      <div className={`rounded-md border flex flex-col ${styles.cardBorder} ${styles.cardBg}`}>
         {/* 顶栏：标题 + 上传 .md 按钮（PRD F6 验收 6） */}
-        <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: styles.cardBorder }}>
+        <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}>
           <div className="flex items-center gap-2 text-sm font-semibold">
             <BookOpen className="w-4 h-4" />
             <span>{t('knowledge.wiki.title')}</span>
-            <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+            <span className={`text-[10px] font-mono ${styles.muted}`}>
               {t('knowledge.wiki.subtitle')}
             </span>
           </div>
@@ -328,8 +327,7 @@ export default function WikiPage() {
               type="button"
               onClick={triggerFilePick}
               disabled={isUploading > 0}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border disabled:opacity-50"
-              style={{ borderColor: styles.accentBorder, color: styles.accentText, background: styles.accentBg }}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border disabled:opacity-50 ${styles.accentBorder} ${styles.accentText} ${styles.accentBg}`}
             >
               {isUploading > 0 ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
               {isUploading > 0
@@ -340,8 +338,8 @@ export default function WikiPage() {
         </div>
 
         {uploadError && (
-          <div className="px-3 py-1.5 text-[11px] border-b flex items-center gap-2"
-               style={{ borderColor: styles.cardBorder, background: styles.dangerBg, color: styles.dangerText }}>
+          <div className={`px-3 py-1.5 text-[11px] border-b flex items-center gap-2 ${styles.cardBorder} ${styles.dangerBg} ${styles.dangerText}`}
+               >
             <MessageSquare className="w-3 h-3 flex-shrink-0" />
             <span className="truncate">{uploadError}</span>
           </div>
@@ -352,8 +350,8 @@ export default function WikiPage() {
         <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_280px] gap-0">
           {/* ───── 左栏 · 知识空间 tree ───── */}
           <div className={`p-3 overflow-y-auto max-h-[64vh] min-h-80 border-b ${styles.cardBorder} md:border-b-0 md:border-r`}>
-            <div className="text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5"
-                 style={{ color: styles.cardTextMuted }}>
+            <div className={`text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 ${styles.cardTextMuted}`}
+                 >
               <FolderTree className="w-3 h-3" />
               <span>{t('knowledge.wiki.spaces_title')}</span>
             </div>
@@ -374,25 +372,24 @@ export default function WikiPage() {
                           if (!st || isParentLoading) void loadSpace(space);
                         }
                       }}
-                      className="w-full text-left px-2 py-1.5 rounded flex items-center gap-1.5 text-[11px] font-semibold hover:opacity-70 transition cursor-pointer"
-                      style={{ color: styles.cardText, background: isExpanded ? styles.sidebarBg : 'transparent' }}
+                      className={`w-full text-left px-2 py-1.5 rounded flex items-center gap-1.5 text-[11px] font-semibold hover:opacity-70 transition cursor-pointer ${styles.cardText} ${isExpanded ? styles.sidebarBg : ''}`}
                     >
                       {isExpanded ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-                      <Folder className="w-3.5 h-3.5 shrink-0" style={{ color: styles.infoText }} />
+                      <Folder className={`w-3.5 h-3.5 shrink-0 ${styles.infoText}`} />
                       <span className="truncate">{t(space.labelKey)}</span>
                       {isParentLoading && <Loader2 className="w-3 h-3 ml-auto animate-spin shrink-0" />}
                       {!isParentLoading && st && (
-                        <span className="text-[9px] font-mono ml-auto" style={{ color: styles.muted }}>
+                        <span className={`text-[9px] font-mono ml-auto ${styles.muted}`}>
                           {st.docs.length}
                         </span>
                       )}
                     </button>
                     {isExpanded && (
-                      <div className="ml-4 pl-2 border-l space-y-0.5 py-1" style={{ borderColor: styles.inputBorder }}>
+                      <div className={`ml-4 pl-2 border-l space-y-0.5 py-1 ${styles.inputBorder}`}>
                         {/* 检视报告行 205：loading 与「暂无数据」不再同屏 —— 加载中只显示 spinner，
                             拉完（!loading）才区分 故障态 / 真空态 */}
                         {st?.docs.length === 0 && st?.loading && (
-                          <div className="px-2 py-1 text-[10px] flex items-center gap-1.5" style={{ color: styles.muted }}>
+                          <div className={`px-2 py-1 text-[10px] flex items-center gap-1.5 ${styles.muted}`}>
                             <Loader2 className="w-3 h-3 animate-spin" />{t('knowledge.wiki.space_loading')}
                           </div>
                         )}
@@ -400,8 +397,8 @@ export default function WikiPage() {
                           st?.errorCode ? (
                             /* F04-03 显式故障态：KbApiError（5xx / ECOS-KB-050 nav 表缺失）
                                —— 禁止用「暂无数据」空态替代（PRD B.5 wiki） */
-                            <div className="px-2 py-1.5 rounded flex items-start gap-1.5"
-                                 style={{ background: styles.dangerBg, color: styles.dangerText }}>
+                            <div className={`px-2 py-1.5 rounded flex items-start gap-1.5 ${styles.dangerBg} ${styles.dangerText}`}
+                                 >
                               <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                               <div className="min-w-0 leading-snug">
                                 <span className="text-[10px] font-bold">{t('knowledge.wiki.unavailable')}</span>
@@ -409,7 +406,7 @@ export default function WikiPage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="px-2 py-1 text-[10px] space-y-1" style={{ color: styles.muted }}>
+                            <div className={`px-2 py-1 text-[10px] space-y-1 ${styles.muted}`}>
                               {st?.error ? (
                                 <div>
                                   <span>{t('knowledge.wiki.space_load_error')}</span>
@@ -449,9 +446,9 @@ export default function WikiPage() {
 
           {/* ───── 中栏 · md 预览（read-only） ───── */}
           <div className={`min-w-0 flex flex-col overflow-hidden md:border-l ${styles.cardBorder}`}>
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: styles.cardBorder }}>
+            <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}>
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-bold truncate" style={{ color: styles.cardText }}>
+                <span className={`text-sm font-bold truncate ${styles.cardText}`}>
                   {selectedDoc?.title || t('knowledge.wiki.preview_empty_title')}
                 </span>
                 {/* 状态 badge */}
@@ -461,7 +458,7 @@ export default function WikiPage() {
                   </span>
                 )}
               </div>
-              <div className="text-[10px] font-mono shrink-0 flex items-center gap-2" style={{ color: styles.muted }}>
+              <div className={`text-[10px] font-mono shrink-0 flex items-center gap-2 ${styles.muted}`}>
                 {previewVersion && <span>{previewVersion}</span>}
                 {previewAuthor && <span className="hidden md:inline truncate max-w-32">{previewAuthor}</span>}
                 {previewUpdated && <span className="hidden lg:inline">{previewUpdated}</span>}
@@ -470,7 +467,7 @@ export default function WikiPage() {
 
             <div className="flex-1 overflow-y-auto px-4 py-3 max-h-[60vh]">
               {!selectedDoc ? (
-                <div className="h-full flex items-center justify-center text-xs" style={{ color: styles.muted }}>
+                <div className={`h-full flex items-center justify-center text-xs ${styles.muted}`}>
                   <div className="text-center space-y-1.5 max-w-sm">
                     <FileText className="w-6 h-6 mx-auto opacity-40" />
                     <p>{t('knowledge.wiki.center_preview_placeholder')}</p>
@@ -481,7 +478,7 @@ export default function WikiPage() {
               ) : (
                 /* 检视报告行 180（P0）：不再本地拼装假正文；nav 产物接口无正文字段，
                    诚实显示「内容不可用」，禁止伪装成真实文档 */
-                <div className="h-full flex items-center justify-center text-xs" style={{ color: styles.muted }}>
+                <div className={`h-full flex items-center justify-center text-xs ${styles.muted}`}>
                   <div className="text-center space-y-1.5 max-w-sm">
                     <AlertTriangle className="w-6 h-6 mx-auto opacity-40" />
                     <p className="font-bold">{t('knowledge.wiki.content_unavailable')}</p>
@@ -493,26 +490,25 @@ export default function WikiPage() {
           </div>
 
           {/* ───── 右栏 · Knowledge Context ───── */}
-          <div className={`overflow-y-auto max-h-[64vh] min-h-80 md:border-l ${styles.cardBorder}`} style={{ background: styles.sidebarBg }}>
-            <div className="px-3 py-2 border-b text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
-                 style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}>
+          <div className={`overflow-y-auto max-h-[64vh] min-h-80 md:border-l ${styles.cardBorder} ${styles.sidebarBg}`}>
+            <div className={`px-3 py-2 border-b text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${styles.cardBorder} ${styles.cardTextMuted}`}
+                 >
               <ListChecks className="w-3 h-3" />
               <span>{t('knowledge.wiki.right_context')}</span>
             </div>
 
             {/* 语义实体 chips */}
             <div className="px-3 pt-2.5 pb-2 space-y-1.5">
-              <span className="text-[9px] font-bold uppercase" style={{ color: styles.muted }}>
+              <span className={`text-[9px] font-bold uppercase ${styles.muted}`}>
                 {t('knowledge.wiki.semantic_entities')}
               </span>
               <div className="flex flex-wrap gap-1">
                 {semanticEntities.length === 0 ? (
-                  <span className="text-[10px]" style={{ color: styles.muted }}>{t('knowledge.wiki.no_semantic_entities')}</span>
+                  <span className={`text-[10px] ${styles.muted}`}>{t('knowledge.wiki.no_semantic_entities')}</span>
                 ) : semanticEntities.map((e, i) => (
                   <span
                     key={`${e}-${i}`}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold inline-flex items-center gap-1"
-                    style={{ background: styles.infoBg, color: styles.infoText }}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold inline-flex items-center gap-1 ${styles.infoBg} ${styles.infoText}`}
                   >
                     <Tag className="w-2.5 h-2.5" />
                     {e.startsWith('@') ? e.slice(1) : e}
@@ -522,17 +518,17 @@ export default function WikiPage() {
             </div>
 
             {/* 相关知识链接（最多 3 个） */}
-            <div className="px-3 pt-2 pb-2 space-y-1.5 border-t" style={{ borderColor: styles.inputBorder }}>
-              <span className="text-[9px] font-bold uppercase" style={{ color: styles.muted }}>
+            <div className={`px-3 pt-2 pb-2 space-y-1.5 border-t ${styles.inputBorder}`}>
+              <span className={`text-[9px] font-bold uppercase ${styles.muted}`}>
                 {t('knowledge.wiki.related')}
               </span>
               {relatedRefs.length === 0 ? (
-                <p className="text-[10px]" style={{ color: styles.muted }}>{t('knowledge.wiki.no_related')}</p>
+                <p className={`text-[10px] ${styles.muted}`}>{t('knowledge.wiki.no_related')}</p>
               ) : (
                 <div className="space-y-0.5">
                   {relatedRefs.slice(0, 3).map((r, i) => (
-                    <div key={`${r}-${i}`} className="text-[10px] flex items-center gap-1.5 truncate"
-                         style={{ color: styles.accentText }}>
+                    <div key={`${r}-${i}`} className={`text-[10px] flex items-center gap-1.5 truncate ${styles.accentText}`}
+                         >
                       <MessageSquare className="w-3 h-3 shrink-0" />
                       <span className="truncate">{r}</span>
                     </div>
@@ -542,25 +538,25 @@ export default function WikiPage() {
             </div>
 
             {/* 图谱关系（"项目 → 遵循 → 交付规范"式） */}
-            <div className="px-3 pt-2 pb-2 space-y-1.5 border-t" style={{ borderColor: styles.inputBorder }}>
-              <span className="text-[9px] font-bold uppercase" style={{ color: styles.muted }}>
+            <div className={`px-3 pt-2 pb-2 space-y-1.5 border-t ${styles.inputBorder}`}>
+              <span className={`text-[9px] font-bold uppercase ${styles.muted}`}>
                 {t('knowledge.wiki.graph_relations')}
               </span>
               {graphRelations.length === 0 ? (
                 /* 检视报告行 180：原右栏「图谱关系」为本地 seed 假三元组，已删；
                    无真实端点数据时诚实标注不可用，不编造关系 */
-                <p className="text-[10px]" style={{ color: styles.muted }}>{t('knowledge.wiki.graph_relations_unavailable')}</p>
+                <p className={`text-[10px] ${styles.muted}`}>{t('knowledge.wiki.graph_relations_unavailable')}</p>
               ) : (
                 <div className="space-y-1">
                   {graphRelations.slice(0, 3).map((rel, i) => (
-                    <div key={i} className="text-[10px] font-mono" style={{ color: styles.cardText }}>
-                      <span style={{ color: styles.infoText }}>{rel.from}</span>
-                      <span className="mx-1" style={{ color: styles.muted }}>→</span>
-                      <span className="px-1 py-0.5 rounded" style={{ background: styles.badgeBg, color: styles.badgeText }}>
+                    <div key={i} className={`text-[10px] font-mono ${styles.cardText}`}>
+                      <span className={styles.infoText} >{rel.from}</span>
+                      <span className={`mx-1 ${styles.muted}`}>→</span>
+                      <span className={`px-1 py-0.5 rounded ${styles.badgeBg} ${styles.badgeText}`}>
                         {rel.verb}
                       </span>
-                      <span className="mx-1" style={{ color: styles.muted }}>→</span>
-                      <span style={{ color: styles.infoText }}>{rel.to}</span>
+                      <span className={`mx-1 ${styles.muted}`}>→</span>
+                      <span className={styles.infoText} >{rel.to}</span>
                     </div>
                   ))}
                 </div>
@@ -578,7 +574,7 @@ export default function WikiPage() {
                   <Network className="w-3.5 h-3.5" />
                   {t('knowledge.wiki.view_graph_context')}
                 </button>
-                <p className="mt-1.5 text-[9px] font-mono text-center" style={{ color: styles.muted }}>
+                <p className={`mt-1.5 text-[9px] font-mono text-center ${styles.muted}`}>
                   {t('knowledge.wiki.graph_focus_hint', { id: selectedDoc.id.slice(0, 12) })}
                 </p>
               </div>

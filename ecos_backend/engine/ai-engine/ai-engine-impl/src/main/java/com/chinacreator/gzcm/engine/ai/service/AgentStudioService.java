@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,8 +16,11 @@ import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
@@ -25,7 +28,13 @@ import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.chinacreator.gzcm.engine.ai.agent.vo.PipelineNodeTraceVO;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
+import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
+import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
+import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
+import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * AI工作台统一服务入口 — Agent创建/测试/对比/流水线/编排。
@@ -60,17 +69,41 @@ public class AgentStudioService {
     @Autowired(required = false)
     private AgentRegistryRepository agentRepo;
 
+    /** P0-3：LLM 节点真实执行（统一走 llm-gateway，禁本类直连 provider） */
+    @Autowired(required = false)
+    private LLMGateway llmGateway;
+
+    /** P0-3：tool 节点真实执行（含安全策略咽喉与超时预算） */
+    @Autowired(required = false)
+    private ToolExecutorService toolExecutorService;
+
+    /** P0-3：ontology / approval 节点属主端点的基址解析（route-manifest 双模寻址） */
+    @Autowired(required = false)
+    private ObjectProvider<ServiceEndpointResolver> endpointProvider;
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     /** 流水线执行记录 — 内存存储（后续迁移至 PG） */
     private final Map<String, PipelineExecution> pipelineStore = new ConcurrentHashMap<>();
 
-    /** 流水线节点伪执行线程池（mock 演示用，非生产负载，daemon 线程不阻塞 JVM 退出） */
+    /** 流水线节点真实执行线程池（daemon；节点内调 LLM/工具/属主端点，均为真实 IO） */
     private static final ExecutorService PIPELINE_EXECUTOR = Executors.newFixedThreadPool(
             Math.max(4, Runtime.getRuntime().availableProcessors()),
             r -> {
-                Thread t = new Thread(r, "pipeline-mock-executor");
+                Thread t = new Thread(r, "pipeline-executor");
                 t.setDaemon(true);
                 return t;
             });
+
+    /** 属主端点调用模板（短超时：节点执行不得拖垮轮询感知） */
+    private final RestTemplate pipelineRestTemplate = createPipelineRestTemplate();
+
+    private static RestTemplate createPipelineRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(1500);
+        factory.setReadTimeout(8000);
+        return new RestTemplate(factory);
+    }
 
     // ═══════════════ createAndTest ═══════════════════
 
@@ -276,17 +309,20 @@ public class AgentStudioService {
     // ═══════════════ startPipeline ═══════════════════
 
     /**
-     * 启动流水线执行（mock 拓扑伪执行）。
+     * 启动流水线执行（P0-3 真实节点执行器，替代 mock 伪执行）。
      *
-     * <p>按拓扑序创建 per-node {@link PipelineNodeTraceVO}，逐节点串行伪执行：
-     * 节点状态 PENDING → RUNNING → SUCCESS/FAILED，全部完成后置 overall status。
-     * 失败注入规则：拓扑序 index % 7 == 3 的节点标记 FAILED（模拟确定性失败）。</p>
+     * <p>节点图来源：{@code params.nodes}（前端画布拓扑序，元素 {id,type,label,config}）；
+     * 无节点图时回退为单 {@code trigger-0} 节点（兼容旧调用方，仅做手动触发标记，不产生副作用）。
+     * 逐节点串行执行，任一节点失败 → 后继 skipped、overall failed。
+     * 耗时/失败均为真实结果，禁随机失败注入与伪耗时。</p>
      *
-     * <p>节点 ID 从 {@code params} 中的 {@code nodeIds} 列表获取拓扑序，
-     * 无 {@code nodeIds} 时创建单个 {@code trigger-0} 节点（兼容旧调用方）。</p>
+     * <p>六类节点真实执行：llm → llm-gateway；tool → ToolExecutorService（含安全咽喉）；
+     * ontology → buszhi 属主 GET /api/v1/ontology/objects；approval → buszhi 属主
+     * POST /api/v1/ontology/proposals（生成待人工审批提案）；condition → 表达式求值；
+     * trigger → 手动触发标记（cron 注册归调度侧）。</p>
      *
      * @param pipelineId 流水线ID
-     * @param params     执行参数（可含 nodeIds: List&lt;String&gt;）
+     * @param params     执行参数（可含 nodes: List&lt;Map&gt; 或 nodeIds: List&lt;String&gt;）
      * @return PipelineExecution 包含执行ID和初始状态
      */
     public PipelineExecution startPipeline(String pipelineId, Map<String, Object> params) {
@@ -299,79 +335,68 @@ public class AgentStudioService {
         exec.setStartedAt(System.currentTimeMillis());
         pipelineStore.put(executionId, exec);
 
-        // 从 params 解析节点列表（前端 canvas 拓扑序；为空时创建单 trigger 节点保底）
-        List<String> nodeIds = new ArrayList<>();
-        if (params != null) {
-            Object nodeIdsObj = params.get("nodeIds");
-            if (nodeIdsObj instanceof List<?> rawNodeIds && !rawNodeIds.isEmpty()) {
-                for (Object item : rawNodeIds) {
-                    if (item instanceof String s && !s.isBlank()) {
-                        nodeIds.add(s);
-                    }
-                }
-            }
+        // 解析节点图（前端画布拓扑序；无图时回退单 trigger 节点，仅手动触发标记）
+        List<PipelineNodeDef> defs = parseNodeDefs(params);
+        if (defs.isEmpty()) {
+            defs = List.of(new PipelineNodeDef("trigger-0", "trigger", "trigger-0", Map.of()));
         }
-        List<String> effectiveNodeIds = nodeIds.isEmpty()
-                ? List.of("trigger-0")
-                : Collections.unmodifiableList(nodeIds);
-
-        // 初始化 nodeTraces（LinkedHashMap 保拓扑序）
-        for (String nodeId : effectiveNodeIds) {
+        for (PipelineNodeDef def : defs) {
             PipelineNodeTraceVO trace = new PipelineNodeTraceVO();
-            trace.setNodeId(nodeId);
-            trace.setNodeName(nodeId);
+            trace.setNodeId(def.id);
+            trace.setNodeName(def.label == null ? def.id : def.label);
             trace.setStatus("pending");
-            exec.getNodeTraces().put(nodeId, trace);
+            exec.getNodeTraces().put(def.id, trace);
         }
-        exec.setNodeIds(new ArrayList<>(effectiveNodeIds));
+        exec.setNodeIds(defs.stream().map(d -> d.id).toList());
 
-        log.info("[AgentStudio] Pipeline execution started (mock): {} for pipeline {}, nodes={}",
-                executionId, pipelineId, effectiveNodeIds.size());
+        log.info("[AgentStudio] Pipeline execution started: {} for pipeline {}, nodes={}",
+                executionId, pipelineId, defs.size());
 
-        // 异步伪执行：逐节点串行，CompletableFuture.runAsync 提交到 PIPELINE_EXECUTOR
+        Map<String, Object> inputParams = new LinkedHashMap<>();
+        if (params != null) {
+            inputParams.putAll(params);
+            inputParams.remove("nodes");
+        }
+        List<PipelineNodeDef> orderedDefs = defs;
+
         CompletableFuture.runAsync(() -> {
             try {
-                int nodeCount = effectiveNodeIds.size();
                 boolean hasFailure = false;
+                String previousOutput = null;
+                int executed = 0;
+                String failedNode = null;
 
-                for (int i = 0; i < nodeCount; i++) {
-                    String nodeId = effectiveNodeIds.get(i);
-                    PipelineNodeTraceVO trace = exec.getNodeTraces().get(nodeId);
+                for (int i = 0; i < orderedDefs.size(); i++) {
+                    PipelineNodeDef def = orderedDefs.get(i);
+                    PipelineNodeTraceVO trace = exec.getNodeTraces().get(def.id);
                     if (trace == null) {
                         continue;
                     }
 
-                    // PENDING → RUNNING
                     trace.setStatus("running");
-                    long startEpoch = System.nanoTime();
+                    long startNs = System.nanoTime();
                     trace.setStartedAt(LocalDateTime.now());
+                    trace.setInputJson(toJson(def.config));
 
-                    // mock 耗时：失败注入节点 index % 7 == 3 → FAILED；其余 SUCCESS
-                    boolean shouldFail = (i % 7 == 3);
-                    long sleepMs = shouldFail ? 100L : (150L + new Random().nextInt(151));
-                    Thread.sleep(sleepMs);
-
-                    long elapsedMs = (System.nanoTime() - startEpoch) / 1_000_000L;
-                    LocalDateTime now = LocalDateTime.now();
-                    trace.setCompletedAt(now);
+                    NodeOutcome outcome = executeNode(def, inputParams, previousOutput);
+                    long elapsedMs = (System.nanoTime() - startNs) / 1_000_000L;
+                    trace.setCompletedAt(LocalDateTime.now());
                     trace.setLatencyMs(elapsedMs);
+                    executed++;
 
-                    if (shouldFail) {
-                        trace.setStatus("failed");
-                        trace.setErrorMessage("mock failure for node " + nodeId + " (no real backend)");
-                        hasFailure = true;
-                        log.debug("[AgentStudio] Node {} FAILED (mock injection, index={})", nodeId, i);
-                    } else {
+                    if (outcome.success) {
                         trace.setStatus("success");
-                        trace.setInputJson("{\"mock\":true,\"nodeId\":\"" + nodeId + "\"}");
-                        trace.setOutputJson("{\"status\":\"ok\",\"latencyMs\":" + elapsedMs + "}");
-                    }
-
-                    // 前序节点失败 → 后继节点全部 skipped
-                    if (hasFailure) {
-                        for (int j = i + 1; j < nodeCount; j++) {
-                            String skipId = effectiveNodeIds.get(j);
-                            PipelineNodeTraceVO skipTrace = exec.getNodeTraces().get(skipId);
+                        trace.setOutputJson(outcome.outputJson);
+                        previousOutput = outcome.outputText;
+                    } else {
+                        trace.setStatus("failed");
+                        trace.setErrorMessage(outcome.error);
+                        trace.setOutputJson(outcome.outputJson);
+                        hasFailure = true;
+                        failedNode = def.id;
+                        log.warn("[AgentStudio] Node {} FAILED: {}", def.id, outcome.error);
+                        for (int j = i + 1; j < orderedDefs.size(); j++) {
+                            PipelineNodeTraceVO skipTrace = exec.getNodeTraces().get(orderedDefs.get(j).id);
                             if (skipTrace != null && "pending".equals(skipTrace.getStatus())) {
                                 skipTrace.setStatus("skipped");
                                 skipTrace.setStartedAt(LocalDateTime.now());
@@ -383,38 +408,390 @@ public class AgentStudioService {
                     }
                 }
 
-                // 汇总 overall status
                 exec.setCompletedAt(System.currentTimeMillis());
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("pipelineId", pipelineId);
+                result.put("executedNodes", executed);
                 if (hasFailure) {
                     exec.setStatus("failed");
-                    Map<String, Object> result = new LinkedHashMap<>();
-                    result.put("message", "Pipeline completed with node failure (mock)");
-                    result.put("pipelineId", pipelineId);
-                    exec.setResult(result);
+                    result.put("message", "Pipeline failed at node " + failedNode);
+                    result.put("failedNode", failedNode);
                 } else {
                     exec.setStatus("completed");
-                    Map<String, Object> result = new LinkedHashMap<>();
-                    result.put("message", "Pipeline executed successfully");
-                    result.put("pipelineId", pipelineId);
-                    result.put("params", params);
-                    exec.setResult(result);
+                    result.put("message", "Pipeline executed successfully (" + executed + " nodes)");
                 }
+                result.put("params", inputParams);
+                exec.setResult(result);
                 log.info("[AgentStudio] Pipeline execution completed: {} status={}",
                         executionId, exec.getStatus());
-
-            } catch (InterruptedException e) {
+            } catch (RuntimeException e) {
                 exec.setStatus("failed");
                 exec.setCompletedAt(System.currentTimeMillis());
                 Map<String, Object> result = new LinkedHashMap<>();
-                result.put("message", "Pipeline execution interrupted");
+                result.put("message", "Pipeline execution error: " + e.getMessage());
                 exec.setResult(result);
-                Thread.currentThread().interrupt();
-                log.error("[AgentStudio] Pipeline execution interrupted: {}", executionId, e);
+                log.error("[AgentStudio] Pipeline execution failed: {}", executionId, e);
             }
         }, PIPELINE_EXECUTOR);
 
         return exec;
     }
+
+    // ═══════════════ Pipeline 节点执行（P0-3） ═══════════════
+
+    /** 节点定义（前端画布透传，解析容忍 type/config 在 data 内的形态）。 */
+    private static final class PipelineNodeDef {
+        final String id;
+        final String type;
+        final String label;
+        final Map<String, Object> config;
+
+        PipelineNodeDef(String id, String type, String label, Map<String, Object> config) {
+            this.id = id;
+            this.type = type;
+            this.label = label;
+            this.config = config;
+        }
+    }
+
+    /** 节点执行结果。 */
+    private static final class NodeOutcome {
+        final boolean success;
+        final String outputJson;
+        final String outputText;
+        final String error;
+
+        private NodeOutcome(boolean success, String outputJson, String outputText, String error) {
+            this.success = success;
+            this.outputJson = outputJson;
+            this.outputText = outputText;
+            this.error = error;
+        }
+
+        static NodeOutcome ok(Map<String, Object> output, String text) {
+            return new NodeOutcome(true, toJson(output), text, null);
+        }
+
+        static NodeOutcome fail(String error) {
+            return new NodeOutcome(false, "{}", null, error);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<PipelineNodeDef> parseNodeDefs(Map<String, Object> params) {
+        List<PipelineNodeDef> defs = new ArrayList<>();
+        Object nodesObj = params == null ? null : params.get("nodes");
+        if (nodesObj instanceof List<?> nodes) {
+            for (Object item : nodes) {
+                if (!(item instanceof Map<?, ?> node)) {
+                    continue;
+                }
+                Map<String, Object> nodeMap = (Map<String, Object>) node;
+                String id = text(nodeMap.get("id"));
+                String type = text(nodeMap.get("type"));
+                String label = text(nodeMap.get("label"));
+                Map<String, Object> config = new LinkedHashMap<>();
+                Object cfg = nodeMap.get("config");
+                if (cfg instanceof Map<?, ?> cm) {
+                    config.putAll((Map<String, Object>) cm);
+                }
+                Object dataObj = nodeMap.get("data");
+                if (dataObj instanceof Map<?, ?> dm) {
+                    Map<String, Object> data = (Map<String, Object>) dm;
+                    if (isBlank(type)) {
+                        type = text(data.get("type"));
+                    }
+                    if (isBlank(label)) {
+                        label = text(data.get("label"));
+                    }
+                    Object dataCfg = data.get("config");
+                    if (dataCfg instanceof Map<?, ?> dcm) {
+                        config.putAll((Map<String, Object>) dcm);
+                    }
+                }
+                if (isBlank(id)) {
+                    id = (isBlank(type) ? "node" : type) + "-" + defs.size();
+                }
+                if (isBlank(type)) {
+                    type = "trigger";
+                }
+                defs.add(new PipelineNodeDef(id, type, isBlank(label) ? id : label, config));
+            }
+        }
+        return defs;
+    }
+
+    private NodeOutcome executeNode(PipelineNodeDef def, Map<String, Object> params,
+                                    String previousOutput) {
+        try {
+            return switch (def.type) {
+                case "llm" -> llmNode(def, params, previousOutput);
+                case "tool" -> toolNode(def, params);
+                case "ontology" -> ontologyNode(def);
+                case "approval" -> approvalNode(def);
+                case "condition" -> conditionNode(def, params, previousOutput);
+                case "trigger" -> triggerNode(def);
+                default -> NodeOutcome.fail("未知节点类型: " + def.type);
+            };
+        } catch (RuntimeException e) {
+            return NodeOutcome.fail("节点执行异常: " + e.getMessage());
+        }
+    }
+
+    private NodeOutcome llmNode(PipelineNodeDef def, Map<String, Object> params,
+                                String previousOutput) {
+        if (llmGateway == null) {
+            return NodeOutcome.fail("LLMGateway 未装配，llm 节点无法真实执行");
+        }
+        String prompt = firstNonBlank(
+                text(def.config.get("prompt")), text(params.get("prompt")),
+                previousOutput, "请执行节点：" + def.label);
+        String model = firstNonBlank(text(def.config.get("model")), "deepseek-chat");
+        List<ChatMessage> messages = new ArrayList<>();
+        String sysPrompt = text(def.config.get("systemPrompt"));
+        if (!isBlank(sysPrompt)) {
+            messages.add(new ChatMessage("system", sysPrompt));
+        }
+        messages.add(new ChatMessage("user", prompt));
+        ChatRequest request = new ChatRequest(model, messages,
+                numberOr(def.config.get("temperature"), 0.7),
+                intOr(def.config.get("maxTokens"), 2048), false);
+        request.setCallerId("service:ai-engine-aip-pipeline");
+        ChatResponse response = llmGateway.call(request);
+        if (!response.isSuccess()) {
+            return NodeOutcome.fail("LLM 调用失败: "
+                    + (response.getErrorCode() != null ? response.getErrorCode() + " " : "")
+                    + String.valueOf(response.getErrorClass()));
+        }
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("content", response.getContent());
+        output.put("model", response.getModel());
+        output.put("usageReported", response.isUsageReported());
+        return NodeOutcome.ok(output, response.getContent());
+    }
+
+    private NodeOutcome toolNode(PipelineNodeDef def, Map<String, Object> params) {
+        if (toolExecutorService == null) {
+            return NodeOutcome.fail("ToolExecutorService 未装配，tool 节点无法真实执行");
+        }
+        String toolName = text(def.config.get("toolName"));
+        if (isBlank(toolName)) {
+            return NodeOutcome.fail("tool 节点缺少 toolName");
+        }
+        Map<String, Object> args = parseJsonObject(text(def.config.get("parameters")), params);
+        ToolExecutorService.ToolResult result = toolExecutorService.execute(toolName, args);
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("toolName", toolName);
+        output.put("success", result.isSuccess());
+        output.put("content", result.getContent());
+        if (!result.isSuccess()) {
+            return NodeOutcome.fail("工具执行失败 [" + toolName + "]: " + result.getError());
+        }
+        return NodeOutcome.ok(output, result.getContent());
+    }
+
+    private NodeOutcome ontologyNode(PipelineNodeDef def) {
+        String base = resolveOwnerBase("buszhi");
+        if (base == null) {
+            return NodeOutcome.fail("buszhi 属主基址不可解析（route-manifest），ontology 节点无法执行");
+        }
+        String objectType = text(def.config.get("objectType"));
+        String url = base + "/api/v1/ontology/objects"
+                + (isBlank(objectType) ? "" : "?objectType=" + urlEncode(objectType));
+        Map<?, ?> resp = pipelineRestTemplate.getForObject(url, Map.class);
+        if (resp == null) {
+            return NodeOutcome.fail("ontology 查询无响应");
+        }
+        Object data = resp.get("data");
+        int count = data instanceof java.util.List<?> list ? list.size()
+                : (data instanceof Map<?, ?> m && m.get("items") instanceof java.util.List<?> l ? l.size() : 0);
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("objectType", objectType);
+        output.put("queryType", text(def.config.get("queryType")));
+        output.put("count", count);
+        return NodeOutcome.ok(output, "ontology 查询 " + objectType + " → " + count + " 条");
+    }
+
+    private NodeOutcome approvalNode(PipelineNodeDef def) {
+        String base = resolveOwnerBase("buszhi");
+        if (base == null) {
+            return NodeOutcome.fail("buszhi 属主基址不可解析（route-manifest），approval 节点无法执行");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("proposalType", "PIPELINE_APPROVAL");
+        body.put("domainCode", firstNonBlank(text(def.config.get("domainCode")), "default"));
+        body.put("targetEntity", firstNonBlank(text(def.config.get("approver")), "admin"));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("approver", text(def.config.get("approver")));
+        payload.put("timeout", def.config.get("timeout"));
+        payload.put("nodeId", def.id);
+        body.put("payload", payload);
+        Map<?, ?> resp = pipelineRestTemplate.postForObject(base + "/api/v1/ontology/proposals",
+                body, Map.class);
+        if (resp == null) {
+            return NodeOutcome.fail("approval 提案创建无响应");
+        }
+        Object data = resp.get("data");
+        String proposalId = data instanceof Map<?, ?> dm && dm.get("id") != null
+                ? String.valueOf(dm.get("id")) : null;
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("proposalId", proposalId);
+        output.put("approver", text(def.config.get("approver")));
+        output.put("status", "PENDING_APPROVAL");
+        return NodeOutcome.ok(output, "审批提案已创建: " + proposalId);
+    }
+
+    private NodeOutcome conditionNode(PipelineNodeDef def, Map<String, Object> params,
+                                      String previousOutput) {
+        String expr = text(def.config.get("conditionExpr"));
+        if (isBlank(expr)) {
+            return NodeOutcome.fail("condition 节点缺少 conditionExpr");
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^\\s*(?:\\$\\.)?([A-Za-z0-9_.-]+)\\s*(==|!=|>=|<=|>|<|contains)\\s*(.+)\\s*$")
+                .matcher(expr);
+        if (!m.matches()) {
+            return NodeOutcome.fail("conditionExpr 无法解析: " + expr);
+        }
+        String key = m.group(1);
+        String operator = m.group(2);
+        String rhs = stripQuotes(m.group(3).trim());
+        Object lhsRaw = params.containsKey(key) ? params.get(key) : previousOutput;
+        String lhs = lhsRaw == null ? "" : String.valueOf(lhsRaw);
+        boolean result = switch (operator) {
+            case "==" -> lhs.equals(rhs);
+            case "!=" -> !lhs.equals(rhs);
+            case "contains" -> lhs.contains(rhs);
+            case ">" -> compareNumber(lhs, rhs) > 0;
+            case "<" -> compareNumber(lhs, rhs) < 0;
+            case ">=" -> compareNumber(lhs, rhs) >= 0;
+            case "<=" -> compareNumber(lhs, rhs) <= 0;
+            default -> false;
+        };
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("expression", expr);
+        output.put("left", lhs);
+        output.put("result", result);
+        output.put("branch", result
+                ? firstNonBlank(text(def.config.get("thenBranch")), "then")
+                : firstNonBlank(text(def.config.get("elseBranch")), "else"));
+        return NodeOutcome.ok(output, "condition " + expr + " → " + result);
+    }
+
+    private NodeOutcome triggerNode(PipelineNodeDef def) {
+        String cron = text(def.config.get("cronExpr"));
+        String timezone = text(def.config.get("timezone"));
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("mode", "manual");
+        output.put("cronExpr", cron);
+        output.put("timezone", timezone);
+        output.put("note", "手动触发执行；周期注册归调度侧（runtime-task）");
+        return NodeOutcome.ok(output, "trigger（手动）cron=" + cron);
+    }
+
+    /** buszhi 属主基址解析；解析失败返回 null（调用方如实报失败，禁回落硬编码地址）。 */
+    private String resolveOwnerBase(String owner) {
+        ServiceEndpointResolver resolver = endpointProvider == null ? null : endpointProvider.getIfAvailable();
+        if (resolver == null) {
+            return null;
+        }
+        Optional<String> host = resolver.resolve(owner, ServiceEndpointResolver.RouteMode.SERVICE);
+        if (host.isEmpty()) {
+            return null;
+        }
+        String base = host.get();
+        return base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+    }
+
+    /** parameters（JSON 字符串或 Map）与执行参数合并（执行参数优先）。 */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> parseJsonObject(String json, Map<String, Object> overrides) {
+        Map<String, Object> args = new LinkedHashMap<>();
+        if (!isBlank(json)) {
+            try {
+                Object parsed = JSON.readValue(json, Object.class);
+                if (parsed instanceof Map<?, ?> m) {
+                    args.putAll((Map<String, Object>) m);
+                }
+            } catch (Exception e) {
+                log.warn("[AgentStudio] tool 节点 parameters 不是合法 JSON，忽略: {}", json);
+            }
+        }
+        if (overrides != null) {
+            args.putAll(overrides);
+        }
+        return args;
+    }
+
+    private static String toJson(Object value) {
+        try {
+            return JSON.writeValueAsString(value == null ? Map.of() : value);
+        } catch (Exception e) {
+            return "{}";
+        }
+    }
+
+    private static String urlEncode(String value) {
+        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static String stripQuotes(String value) {
+        if (value != null && value.length() >= 2
+                && ((value.startsWith("\"") && value.endsWith("\""))
+                || (value.startsWith("'") && value.endsWith("'")))) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
+    }
+
+    private static double compareNumber(String left, String right) {
+        try {
+            return Double.compare(Double.parseDouble(left.trim()), Double.parseDouble(right.trim()));
+        } catch (NumberFormatException e) {
+            return left.compareTo(right);
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static String text(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String v : values) {
+            if (!isBlank(v)) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    private static Double numberOr(Object value, double fallback) {
+        if (value instanceof Number n) {
+            return n.doubleValue();
+        }
+        try {
+            return value == null ? fallback : Double.parseDouble(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static Integer intOr(Object value, int fallback) {
+        if (value instanceof Number n) {
+            return n.intValue();
+        }
+        try {
+            return value == null ? fallback : Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    // ═══════════════ getPipelineStatus ═══════════════
 
     /**
      * 查询流水线执行状态。

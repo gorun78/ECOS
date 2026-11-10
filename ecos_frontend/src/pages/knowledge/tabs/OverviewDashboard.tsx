@@ -204,12 +204,12 @@ export default function OverviewDashboard() {
           />
           {/* W3 — KB 5 真实计数（graphNode/edge/doc/embedding/article），0 值灰色 muted */}
           <div className={`md:col-span-2 border rounded-xl p-4 ${styles.cardBg} ${styles.cardBorder}`}>
-            <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: styles.cardBorder }}>
+            <div className={`flex items-center justify-between border-b pb-2 ${styles.cardBorder}`}>
               <h3 className={`font-extrabold text-xs flex items-center gap-1.5 ${styles.cardText}`}>
                 <Gauge size={13} className={styles.accentText} />
                 {t('knowledge.stats.title')}
               </h3>
-              <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+              <span className={`text-[10px] font-mono ${styles.muted}`}>
                 {graphStats.lastUpdatedAt ?? t('knowledge.overview.stats_offline')}
               </span>
             </div>
@@ -385,16 +385,16 @@ function StatTile({ icon, label, value, muted, styles }: {
   const captionColor = muted ? styles.muted : styles.cardTextMuted;
   return (
     <div
-      className={`rounded-lg px-3 py-2 border flex flex-col gap-1 ${styles.badgeBg}`}
-      style={{ borderColor: styles.cardBorder, opacity: muted ? 0.85 : 1 }}
+      className={`rounded-lg px-3 py-2 border flex flex-col gap-1 ${styles.badgeBg} ${styles.cardBorder}`}
+      style={{ opacity: muted ? 0.85 : 1 }}
     >
-      <div className="flex items-center gap-1.5" style={{ color: captionColor }}>
-        <span style={{ color: styles.muted }}>
+      <div className={`flex items-center gap-1.5 ${captionColor}`}>
+        <span className={styles.muted} >
           {icon}
         </span>
         <span className="text-[10px] font-mono uppercase tracking-wider">{label}</span>
       </div>
-      <p className="text-sm font-black font-mono leading-none" style={{ color: valueColor }}>
+      <p className={`text-sm font-black font-mono leading-none ${valueColor}`}>
         {v.toLocaleString()}
       </p>
     </div>

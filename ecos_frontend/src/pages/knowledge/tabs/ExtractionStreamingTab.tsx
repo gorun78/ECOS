@@ -26,19 +26,19 @@ export default function ExtractionStreamingTab() {
       <div className="space-y-6">
         {/* 标题 */}
         <div className="space-y-1">
-          <h2 className="font-bold text-xl tracking-tight flex items-center gap-2" style={{ color: styles.cardText }}>
-            <Workflow className="w-5 h-5" style={{ color: styles.accentText }} />
+          <h2 className={`font-bold text-xl tracking-tight flex items-center gap-2 ${styles.cardText}`}>
+            <Workflow className={`w-5 h-5 ${styles.accentText}`} />
             {t('knowledge.streaming.title')}
           </h2>
-          <p className="text-xs" style={{ color: styles.cardTextMuted }}>{t('knowledge.streaming.subtitle')}</p>
-          <p className="font-mono text-[10px] tracking-wider uppercase mt-2" style={{ color: styles.cardTextMuted }}>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t('knowledge.streaming.subtitle')}</p>
+          <p className={`font-mono text-[10px] tracking-wider uppercase mt-2 ${styles.cardTextMuted}`}>
             {t('knowledge.streaming.priority')}
           </p>
         </div>
 
         {/* 通道选择（radio，抽象公共结构避免重复逻辑） */}
         <div className={`border rounded-xl p-4 space-y-3 ${styles.cardBg} ${styles.cardBorder}`}>
-          <h3 className="font-semibold text-sm" style={{ color: styles.cardText }}>
+          <h3 className={`font-semibold text-sm ${styles.cardText}`}>
             {t('knowledge.streaming.channel_select')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -51,17 +51,13 @@ export default function ExtractionStreamingTab() {
                   onClick={() => setChannel(opt.value)}
                   className={`p-3 rounded-lg border transition hover:opacity-80 text-left ${
                     active ? 'font-semibold' : 'opacity-80'
-                  }`}
-                  style={{
-                    borderColor: active ? styles.accentBg : styles.cardBorder,
-                    background: active ? styles.badgeBg : styles.inputBg,
-                  }}
+                  } ${active ? styles.accentBg : styles.cardBorder} ${active ? styles.badgeBg : styles.inputBg}`}
                 >
-                  <div className="flex items-center gap-2 text-xs" style={{ color: styles.cardText }}>
-                    <Icon className="w-4 h-4" style={{ color: active ? styles.accentText : styles.cardTextMuted }} />
+                  <div className={`flex items-center gap-2 text-xs ${styles.cardText}`}>
+                    <Icon className={`w-4 h-4 ${active ? styles.accentText : styles.cardTextMuted}`} />
                     {t(opt.i18nKey)}
                   </div>
-                  <div className="mt-1.5 text-[10px] font-mono tracking-wider uppercase" style={{ color: styles.cardTextMuted }}>
+                  <div className={`mt-1.5 text-[10px] font-mono tracking-wider uppercase ${styles.cardTextMuted}`}>
                     {t(opt.descKey)}
                   </div>
                 </button>
@@ -76,13 +72,12 @@ export default function ExtractionStreamingTab() {
           <button type="button"
             disabled
             title={t('knowledge.streaming.run_stub_hint')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold opacity-50 cursor-not-allowed transition"
-            style={{ background: styles.accentBg, color: '#fff' }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold opacity-50 cursor-not-allowed transition ${styles.accentBg} ${styles.accentSolidText}`}
           >
             <Radio className="w-3.5 h-3.5" />
             {t('knowledge.streaming.run_extract')}
           </button>
-          <p className="text-[10px] font-mono tracking-wider uppercase" style={{ color: styles.cardTextMuted }}>
+          <p className={`text-[10px] font-mono tracking-wider uppercase ${styles.cardTextMuted}`}>
             {t('knowledge.streaming.run_stub_hint')}
           </p>
         </div>
@@ -90,12 +85,12 @@ export default function ExtractionStreamingTab() {
         {/* 候选三元组审核入口（跳转提示，不嵌套 review 组件） */}
         <div className={`border rounded-xl p-4 flex items-center justify-between flex-wrap gap-3 ${styles.cardBg} ${styles.cardBorder}`}>
           <div className="flex items-center gap-2">
-            <ListChecks className="w-4 h-4" style={{ color: styles.accentText }} />
+            <ListChecks className={`w-4 h-4 ${styles.accentText}`} />
             <div>
-              <div className="text-xs font-semibold" style={{ color: styles.cardText }}>
+              <div className={`text-xs font-semibold ${styles.cardText}`}>
                 {t('knowledge.streaming.review_entry')}
               </div>
-              <div className="text-[10px]" style={{ color: styles.cardTextMuted }}>
+              <div className={`text-[10px] ${styles.cardTextMuted}`}>
                 {t('knowledge.streaming.review_entry_hint')}
               </div>
             </div>

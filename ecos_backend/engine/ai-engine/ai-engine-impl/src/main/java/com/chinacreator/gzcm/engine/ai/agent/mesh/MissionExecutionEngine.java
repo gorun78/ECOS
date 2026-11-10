@@ -1,10 +1,16 @@
 package com.chinacreator.gzcm.engine.ai.agent.mesh;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,6 +131,7 @@ public class MissionExecutionEngine {
         // 格式: AGENT:ag-data|指令内容
         String[] lines = planResult.getFinalAnswer().split("\n");
         int seq = 0;
+        List<MissionTaskEntity> planned = new ArrayList<>();
         for (String line : lines) {
             line = line.trim();
             if (!line.startsWith("AGENT:") && !line.contains("|")) continue;
@@ -148,10 +155,83 @@ public class MissionExecutionEngine {
             task.setInstruction(instruction);
             task.setStatus("PENDING");
             taskRepo.insert(task);
-
-            // 执行 Specialist
-            executeSpecialistTask(task, agent);
+            planned.add(task);
         }
+
+        // P1-9：Specialist 子任务并行执行（wave 式推进；dependsOn 只增消费，未配置即整波并行）
+        executeTasksInParallel(planned);
+    }
+
+    /**
+     * 并行执行子任务：每一波取依赖已满足的任务并行执行，wave 间等待全部落账。
+     *
+     * <p>dependsOn 字段此前从未被消费 —— 本次只增消费面：值为逗号分隔的任务 id 列表，
+     * 全部完成才可放行；依赖成环/缺失时如实降级为串行余量（禁死等）。</p>
+     */
+    private void executeTasksInParallel(List<MissionTaskEntity> planned) {
+        if (planned.isEmpty()) {
+            return;
+        }
+        int poolSize = Math.min(4, planned.size());
+        ExecutorService pool = Executors.newFixedThreadPool(poolSize, r -> {
+            Thread t = new Thread(r, "mission-specialist");
+            t.setDaemon(true);
+            return t;
+        });
+        try {
+            Set<String> completedIds = new HashSet<>();
+            List<MissionTaskEntity> remaining = new ArrayList<>(planned);
+            while (!remaining.isEmpty()) {
+                List<MissionTaskEntity> wave = new ArrayList<>();
+                List<MissionTaskEntity> blocked = new ArrayList<>();
+                for (MissionTaskEntity task : remaining) {
+                    if (depsSatisfied(task.getDependsOn(), completedIds)) {
+                        wave.add(task);
+                    } else {
+                        blocked.add(task);
+                    }
+                }
+                if (wave.isEmpty()) {
+                    // 依赖成环/缺失：降级串行推进，避免死等
+                    log.warn("Mission 任务依赖不可满足，降级为串行执行剩余 {} 个任务", blocked.size());
+                    wave.add(blocked.remove(0));
+                }
+                List<CompletableFuture<Void>> futures = new ArrayList<>();
+                for (MissionTaskEntity task : wave) {
+                    AgentRegistryEntity agent = agentRegistryRepo.findById(task.getAgentId());
+                    if (agent == null) {
+                        task.setStatus("FAILED");
+                        task.setErrorMessage("Agent " + task.getAgentId() + " 未注册");
+                        taskRepo.updateStatus(task.getId(), "FAILED");
+                        completedIds.add(task.getId());
+                        continue;
+                    }
+                    futures.add(CompletableFuture.runAsync(() -> executeSpecialistTask(task, agent), pool));
+                }
+                for (CompletableFuture<Void> future : futures) {
+                    future.join();
+                }
+                for (MissionTaskEntity task : wave) {
+                    completedIds.add(task.getId());
+                }
+                remaining = blocked;
+            }
+        } finally {
+            pool.shutdown();
+        }
+    }
+
+    /** dependsOn（逗号分隔任务 id）全部完成才放行；空/未配置即放行。 */
+    private static boolean depsSatisfied(String dependsOn, Set<String> completedIds) {
+        if (dependsOn == null || dependsOn.isBlank()) {
+            return true;
+        }
+        for (String dep : dependsOn.split(",")) {
+            if (!completedIds.contains(dep.trim())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // ── PIPELINE 模式 ──────────────────────────────

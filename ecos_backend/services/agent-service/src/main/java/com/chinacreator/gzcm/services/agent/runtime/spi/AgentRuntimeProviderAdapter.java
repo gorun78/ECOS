@@ -279,6 +279,15 @@ public class AgentRuntimeProviderAdapter implements AgentRuntimeProvider {
             }
             return delegate.callTool(toolName, args);
         }
+
+        @Override
+        public String listTools() {
+            if (!delegate.isAvailable()) {
+                throw unavailable(AgentRuntimeCapability.MCP,
+                        "MCP channel not connected; tools/list was not dispatched");
+            }
+            return delegate.toolsList();
+        }
     }
 
     private static final class EvolutionCapability implements AgentEvolutionCapability {

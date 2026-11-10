@@ -67,19 +67,19 @@ export default function GovernPage() {
   const activeMeta = useMemo(() => SUB_TABS.find((x) => x.id === active) ?? SUB_TABS[0], [active]);
 
   return (
-    <div className="p-2 flex flex-col gap-3 h-full min-h-0" style={{ color: styles.cardText }}>
+    <div className={`p-2 flex flex-col gap-3 h-full min-h-0 ${styles.cardText}`}>
       {/* 顶栏：标题 */}
-      <div className="flex items-center gap-2 px-3 py-2 rounded-md border"
-           style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-        <ShieldCheck className="w-4 h-4 flex-shrink-0" style={{ color: styles.accentText }} />
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-md border ${styles.cardBorder} ${styles.cardBg}`}
+           >
+        <ShieldCheck className={`w-4 h-4 flex-shrink-0 ${styles.accentText}`} />
         <span className="text-base font-bold">{t('knowledge.nav.page_govern')}</span>
-        <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
+        <span className={`text-[10px] font-mono ${styles.muted}`}>
           {t('knowledge.govern.page_subtitle')}
         </span>
       </div>
 
       {/* 7 子 Tab 切换条（B.0 + 孤儿组件回收） */}
-      <div className="flex items-center gap-1 border-b overflow-x-auto" style={{ borderColor: styles.cardBorder }}>
+      <div className={`flex items-center gap-1 border-b overflow-x-auto ${styles.cardBorder}`}>
         {SUB_TABS.map((tab) => {
           const Icon: LucideIcon = tab.icon;
           const isActive = active === tab.id;
@@ -94,8 +94,7 @@ export default function GovernPage() {
               onClick={() => setActive(tab.id)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-t-md text-[11px] font-medium border-b-2 -mb-px cursor-pointer transition whitespace-nowrap ${
                 isActive ? 'font-bold' : 'opacity-70 hover:opacity-100'
-              } border-transparent`}
-              style={{ color: isActive ? styles.accentText : styles.cardTextMuted }}
+              } border-transparent ${isActive ? styles.accentText : styles.cardTextMuted}`}
             >
               <Icon className="w-3.5 h-3.5" />
               {t(tab.i18nKey)}

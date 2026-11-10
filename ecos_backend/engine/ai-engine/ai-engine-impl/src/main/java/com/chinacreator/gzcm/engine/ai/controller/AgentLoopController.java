@@ -499,8 +499,22 @@ public class AgentLoopController {
 
         AgentSession session = buildRuntimeSession(body);
 
-        // 执行推理循环
-        AgentLoopResult result = agentLoopService.run(config, message, session);
+        // 执行推理循环（P0-2 真流式）：正文增量由 provider 流式回调、且已过承流段输出护栏；
+        // delta 帧在推理过程中实时外发，不再等整段回答返回后切分。
+        java.util.concurrent.atomic.AtomicInteger streamedChars = new java.util.concurrent.atomic.AtomicInteger();
+        AgentLoopResult result;
+        try {
+            result = agentLoopService.run(config, message, session, chunk -> {
+                streamedChars.addAndGet(chunk == null ? 0 : chunk.length());
+                try {
+                    frames.delta(chunk);
+                } catch (IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            });
+        } catch (java.io.UncheckedIOException e) {
+            throw e.getCause();
+        }
 
         // T0c-3: 记录结果
         if (result.isSuccess()) {
@@ -526,10 +540,12 @@ public class AgentLoopController {
                     AgentLoopTrace.Decision.NA.name());
             // 分项用量未随 AgentLoopResult 传播 ⇒ 按 §9.3.3 写 -1，禁以 totalTokens 折算冒充分项
             frames.tokenUsage(SseFrameContract.unknownToken(), SseFrameContract.unknownToken(), false);
-            for (String chunk : splitDeltaChunks(result.getContent())) {
-                frames.delta(chunk);
-                // 微小延迟保留原节奏（真流式增量待 llm-gateway stream 接入，非本批范围）
-                Thread.sleep(10);
+            if (streamedChars.get() == 0) {
+                // 兜底：provider 未产出增量（或测试桩不走流式）时按终稿语义分段补发，
+                // 帧序与「delta 拼接 == 终稿」契约保持不变；无整段 sleep（不再伪造节奏）。
+                for (String chunk : splitDeltaChunks(result.getContent())) {
+                    frames.delta(chunk);
+                }
             }
             String block = citationBlockOf(result);
             if (block != null) {

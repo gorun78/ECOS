@@ -97,8 +97,8 @@ export default function AssumptionsTab() {
   return (
     <div className="flex flex-col gap-3 h-full min-h-0">
       {bizError && (
-        <div className="flex items-start gap-2 px-3 py-2 rounded-md border text-xs"
-             style={{ background: styles.dangerBg, borderColor: styles.dangerBorder, color: styles.dangerText }}>
+        <div className={`flex items-start gap-2 px-3 py-2 rounded-md border text-xs ${styles.dangerBg} ${styles.dangerBorder} ${styles.dangerText}`}
+             >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <div className="font-bold flex items-center gap-1.5">
@@ -114,8 +114,8 @@ export default function AssumptionsTab() {
             </p>
           </div>
           <button type="button" onClick={() => void load()}
-                  className="px-2 py-1 rounded border text-[10px] font-bold cursor-pointer shrink-0"
-                  style={{ borderColor: styles.dangerBorder, color: styles.dangerText }}>
+                  className={`px-2 py-1 rounded border text-[10px] font-bold cursor-pointer shrink-0 ${styles.dangerBorder} ${styles.dangerText}`}
+                  >
             <RefreshCw className="w-3 h-3 inline mr-1" />{t('knowledge.common.retry')}
           </button>
         </div>
@@ -123,44 +123,42 @@ export default function AssumptionsTab() {
 
       {/* 头 + 新建 */}
       <div className="flex items-center justify-between px-1">
-        <span className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: styles.cardText }}>
+        <span className={`text-[11px] font-bold flex items-center gap-1.5 ${styles.cardText}`}>
           <GitFork className="w-3.5 h-3.5" />{t('knowledge.assumptions.title')}
         </span>
         <button type="button" onClick={() => setShowForm((s) => !s)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[10px] font-bold cursor-pointer"
-                style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}>
+                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[10px] font-bold cursor-pointer ${styles.accentBg} ${styles.accentSolidText}`}>
           <Plus className="w-3 h-3" />{t('knowledge.assumptions.new')}
         </button>
       </div>
 
       {showForm && (
-        <div className="rounded-md border p-3 space-y-2" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+        <div className={`rounded-md border p-3 space-y-2 ${styles.cardBorder} ${styles.cardBg}`}>
           <div className="grid grid-cols-2 gap-2">
             <input value={fScenario} onChange={(e) => setFScenario(e.target.value)}
                    placeholder={t('knowledge.assumptions.field_scenario')}
-                   className="px-2 py-1.5 rounded text-[11px] outline-none"
-                   style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                   className={`border px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                    />
             <input value={fMetric} onChange={(e) => setFMetric(e.target.value)}
                    placeholder={t('knowledge.assumptions.field_metric')}
-                   className="px-2 py-1.5 rounded text-[11px] outline-none"
-                   style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                   className={`border px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                    />
             <input value={fValue} onChange={(e) => setFValue(e.target.value)}
                    placeholder={t('knowledge.assumptions.field_value')}
-                   className="px-2 py-1.5 rounded text-[11px] outline-none"
-                   style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                   className={`border px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                    />
             <input value={fSemantic} onChange={(e) => setFSemantic(e.target.value)}
                    placeholder={t('knowledge.assumptions.field_semantic')}
-                   className="px-2 py-1.5 rounded text-[11px] outline-none"
-                   style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                   className={`border px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                    />
           </div>
           <input value={fReason} onChange={(e) => setFReason(e.target.value)}
                  placeholder={t('knowledge.assumptions.field_reason')}
-                 className="w-full px-2 py-1.5 rounded text-[11px] outline-none"
-                 style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }} />
+                 className={`border w-full px-2 py-1.5 rounded text-[11px] outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+                  />
           <button type="button" onClick={() => void handleCreate()}
                   disabled={creating || !fScenario.trim() || !fMetric.trim() || !fValue.trim()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-bold cursor-pointer disabled:opacity-50"
-                  style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}>
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-bold cursor-pointer disabled:opacity-50 ${styles.accentBg} ${styles.accentSolidText}`}>
             {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
             {t('knowledge.assumptions.create')}
           </button>
@@ -168,19 +166,19 @@ export default function AssumptionsTab() {
       )}
 
       {/* 列表 */}
-      <div className="rounded-md border flex-1 min-h-0 flex flex-col overflow-hidden" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
+      <div className={`rounded-md border flex-1 min-h-0 flex flex-col overflow-hidden ${styles.cardBorder} ${styles.cardBg}`}>
         <div className="flex-1 overflow-y-auto">
           {loading && rows.length === 0 ? (
-            <div className="p-6 flex items-center justify-center text-[11px]" style={{ color: styles.muted }}>
+            <div className={`p-6 flex items-center justify-center text-[11px] ${styles.muted}`}>
               <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />{t('knowledge.assumptions.loading')}
             </div>
           ) : rows.length === 0 ? (
-            <div className="p-6 flex items-center justify-center text-[11px]" style={{ color: styles.muted }}>
+            <div className={`p-6 flex items-center justify-center text-[11px] ${styles.muted}`}>
               {t('knowledge.assumptions.empty')}
             </div>
           ) : (
             <table className="w-full text-[10px] font-mono">
-              <thead className="sticky top-0" style={{ background: styles.sidebarBg, color: styles.cardTextMuted }}>
+              <thead className={`sticky top-0 ${styles.sidebarBg} ${styles.cardTextMuted}`}>
                 <tr>
                   <Th>{t('knowledge.assumptions.col_scenario')}</Th>
                   <Th>{t('knowledge.assumptions.col_metric')}</Th>
@@ -191,11 +189,11 @@ export default function AssumptionsTab() {
                   <Th className="text-right">{t('knowledge.assumptions.col_actions')}</Th>
                 </tr>
               </thead>
-              <tbody style={{ color: styles.cardText }}>
+              <tbody className={styles.cardText} >
                 {rows.map((a) => {
                   const hasBase = !!a.baseAssumptionId;
                   return (
-                    <tr key={a.id} className="border-t" style={{ borderColor: styles.cardBorder }}>
+                    <tr key={a.id} className={`border-t ${styles.cardBorder}`}>
                       <td className="px-2 py-1.5 truncate max-w-[120px]">{a.scenarioType ?? a.assumptionKey}</td>
                       <td className="px-2 py-1.5">{a.metric ?? '—'}</td>
                       <td className="px-2 py-1.5 text-right">
@@ -264,8 +262,8 @@ function ActionBtn({ title, onClick, children }: { title: string; onClick: () =>
   const { styles } = useTheme();
   return (
     <button type="button" title={title} onClick={onClick}
-            className="p-1 rounded border cursor-pointer hover:opacity-70"
-            style={{ borderColor: styles.inputBorder, color: styles.cardText }}>
+            className={`p-1 rounded border cursor-pointer hover:opacity-70 ${styles.inputBorder} ${styles.cardText}`}
+            >
       {children}
     </button>
   );

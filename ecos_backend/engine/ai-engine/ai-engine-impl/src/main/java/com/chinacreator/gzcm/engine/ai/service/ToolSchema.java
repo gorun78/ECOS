@@ -14,6 +14,13 @@ public class ToolSchema {
     private String name;
     private String description;
     private Map<String, ParamDef> parameters;
+    /**
+     * 声明式读写属性（read|write）。
+     *
+     * <p>安全裁决依据：{@code ToolExecutorService.inferOperation} 优先取本声明，
+     * 禁按参数或 HTTP 方法猜测（防止写工具被当只读裁决）。未声明（null）时保留旧推断链。</p>
+     */
+    private String operation;
 
     public ToolSchema() {
         this.parameters = new LinkedHashMap<>();
@@ -35,6 +42,15 @@ public class ToolSchema {
 
     public Map<String, ParamDef> getParameters() { return parameters; }
     public void setParameters(Map<String, ParamDef> parameters) { this.parameters = parameters; }
+
+    public String getOperation() { return operation; }
+    public void setOperation(String operation) { this.operation = operation; }
+
+    /** 链式声明读写属性（read|write）。 */
+    public ToolSchema operation(String operation) {
+        this.operation = operation;
+        return this;
+    }
 
     /**
      * 添加一个参数定义。

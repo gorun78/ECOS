@@ -451,7 +451,7 @@
   "knowledge.ragtab.检索中": "检索中...",
   "knowledge.ragtab.检索失败_请检查后端连接": "检索失败，请检查后端连接",
   "knowledge.ragtab.检索来源": "检索来源",
-  "knowledge.ragtab.模拟_aip_copilot_多轮检索问答_来源标注_置信度": "模拟 AIP Copilot 多轮检索问答 — 来源标注 · 置信度评估 · 多轮追问",
+  "knowledge.ragtab.模拟_aip_copilot_多轮检索问答_来源标注_置信度": "模拟 ECOS Copilot 多轮检索问答 — 来源标注 · 置信度评估 · 多轮追问",
   "knowledge.ragtab.等待_rag_仿真": "等待 RAG 仿真...",
   "knowledge.ragtab.综合置信度": "综合置信度",
   "knowledge.ragtab.评估_ds_ticket_sales_被高危扫描的风险": "评估 ds_ticket_sales 被高危扫描的风险",

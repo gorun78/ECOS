@@ -195,7 +195,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
 
         {/* 配置面板 — 行集来自服务端响应 */}
         <div className={`border rounded-lg overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}>
-          <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: styles.cardBorder }}>
+          <div className={`flex items-center justify-between px-4 py-2.5 border-b ${styles.cardBorder}`}>
             <div className="text-sm font-medium">{t("knowledge.engine_config.field_list_hint")}</div>
             <div className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
               {t("knowledge.engine_config.item_count", { count: rows.length })}
@@ -210,7 +210,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
           ) : rows.length === 0 ? (
             <div className="px-4 py-6 text-xs opacity-70">{t("knowledge.engine_config.empty_hint")}</div>
           ) : (
-            <div className="divide-y" style={{ borderColor: styles.cardBorder }}>
+            <div className={`divide-y ${styles.cardBorder}`}>
               {rows.map(k => {
                 const meta = FIELD_META[k];
                 const type = meta?.type ?? "string";
@@ -248,8 +248,8 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
                       {isChanged && !readOnly && (
                         <button type="button"
                           onClick={() => updateField(k, original)}
-                          className="text-[11px] px-2 py-1 rounded border hover:opacity-70"
-                          style={{ borderColor: styles.cardBorder }}
+                          className={`text-[11px] px-2 py-1 rounded border hover:opacity-70 ${styles.cardBorder}`}
+
                           title={t("knowledge.engine_config.reset")}
                         >
                           {t("knowledge.engine_config.reset")}
