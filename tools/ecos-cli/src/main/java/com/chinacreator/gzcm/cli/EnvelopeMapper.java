@@ -29,7 +29,7 @@ public final class EnvelopeMapper {
 
         if (result.transportFailed()) {
             status = CliStatus.UNAVAILABLE;
-            error = error("ECOS-CLI-UNAVAILABLE", "无法连接网关或请求超时",
+            error = error(CliErrorCodes.UNAVAILABLE, "无法连接网关或请求超时",
                     result.failureDetail() == null ? null : result.failureDetail());
         } else {
             JsonNode body = parse(result.body());
@@ -44,7 +44,7 @@ public final class EnvelopeMapper {
                         data = MAPPER.convertValue(body.get("data"), Object.class);
                     } else {
                         status = CliStatus.FAILED;
-                        error = error(body.path("errorCode").asText("ECOS-CLI-RESPONSE"),
+                        error = error(body.path("errorCode").asText(CliErrorCodes.RESPONSE),
                                 body.path("message").asText("后端返回非零 code"),
                                 "code=" + code);
                     }
@@ -54,17 +54,17 @@ public final class EnvelopeMapper {
                 }
             } else if (http == 401) {
                 status = CliStatus.BLOCKED;
-                error = error("ECOS-CLI-AUTH", "未认证或 Token 已过期", "见 --token / ECOS_TOKEN / --profile");
+                error = error(CliErrorCodes.AUTH, "未认证或 Token 已过期", "见 --token / ECOS_TOKEN / --profile");
             } else if (http == 403) {
                 status = CliStatus.BLOCKED;
-                error = error("ECOS-CLI-FORBIDDEN", "服务端准入/权限拒绝（ABAC）", "CLI 本地不得放行");
+                error = error(CliErrorCodes.FORBIDDEN, "服务端准入/权限拒绝（ABAC）", "CLI 本地不得放行");
             } else if (http == 502 || http == 503 || http == 504) {
                 status = CliStatus.UNAVAILABLE;
-                error = error("ECOS-CLI-DEP-UNAVAILABLE", "依赖真实不可用", "HTTP " + http);
+                error = error(CliErrorCodes.DEP_UNAVAILABLE, "依赖真实不可用", "HTTP " + http);
             } else {
                 status = CliStatus.FAILED;
-                String code = isEnvelope ? body.path("errorCode").asText("ECOS-CLI-HTTP-" + http)
-                        : "ECOS-CLI-HTTP-" + http;
+                String code = isEnvelope ? body.path("errorCode").asText(CliErrorCodes.http(http))
+                        : CliErrorCodes.http(http);
                 String message = isEnvelope ? body.path("message").asText("请求失败")
                         : "请求失败（无 ApiResponse 信封）";
                 error = error(code, message, "HTTP " + http);

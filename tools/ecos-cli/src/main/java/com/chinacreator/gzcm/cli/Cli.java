@@ -31,7 +31,8 @@ public final class Cli {
         OperationRegistry registry = null;
         try {
             if (args.length == 0 || Arrays.asList(args).contains("--help") || "help".equals(args[0])) {
-                Stdio.println(usage());
+                Match helpMatch = matchCommand(args);
+                Stdio.println(helpMatch == null ? usage() : usageFor(helpMatch.name()));
                 return ExitCodes.SUCCESS;
             }
             if (Arrays.asList(args).contains("--version") || "version".equals(args[0])) {
@@ -47,8 +48,22 @@ public final class Cli {
             }
 
             CliOptions options = CliOptions.parse(match.reordered(), match.words().size());
+            if (options.flag("--show-config")) {
+                Map<String, Object> out = EnvelopeMapper.local(CliStatus.SUCCESS, "ECOS-CLI-CONFIG",
+                        "生效配置（token 只显示是否已配置）", null, List.of(), options.traceId());
+                out.put("data", options.effectiveConfig());
+                out.put("error", null);
+                OutputRenderer.render(out, options.output());
+                return ExitCodes.SUCCESS;
+            }
             registry = OperationRegistry.load();
-            HttpTransport transport = new HttpTransport(options.baseUrl(), options.traceId(), options.timeoutMs());
+            HttpTransport transport = new HttpTransport(options.baseUrl(), options.traceId(),
+                    options.timeoutMs(), options.retryPolicy(), false);
+            long startedAt = System.nanoTime();
+            CliLog.event("command.start", Map.of(
+                    "command", match.name(),
+                    "traceId", options.traceId(),
+                    "baseUrl", options.baseUrl()));
 
             Map<String, Object> out = switch (match.name()) {
                 case "doctor" -> DoctorCommand.run(registry, options, transport);
@@ -57,9 +72,16 @@ public final class Cli {
                 default -> throw new CliException(ExitCodes.USAGE, "未实现的命令: " + match.name());
             };
 
+            CliLog.event("command.finish", Map.of(
+                    "command", match.name(),
+                    "traceId", String.valueOf(out.get("trace_id")),
+                    "status", String.valueOf(out.get("status")),
+                    "elapsedMs", (System.nanoTime() - startedAt) / 1_000_000L));
             OutputRenderer.render(out, options.output());
             return ExitCodes.forStatus(CliStatus.valueOf(String.valueOf(out.get("status"))));
         } catch (CliException e) {
+            CliLog.error("command.blocked", Map.of("exitCode", String.valueOf(e.exitCode()),
+                    "message", String.valueOf(e.getMessage())));
             if (e.exitCode() == ExitCodes.USAGE) {
                 Stdio.error(Redactor.redact(e.getMessage()));
                 Stdio.error(usage());
@@ -71,7 +93,10 @@ public final class Cli {
             OutputRenderer.render(out, "json");
             return e.exitCode();
         } catch (RuntimeException e) {
-            Map<String, Object> out = EnvelopeMapper.local(CliStatus.FAILED, "ECOS-CLI-INTERNAL",
+            CliLog.error("command.failed", Map.of(
+                    "type", e.getClass().getSimpleName(),
+                    "message", String.valueOf(e.getMessage())));
+            Map<String, Object> out = EnvelopeMapper.local(CliStatus.FAILED, CliErrorCodes.INTERNAL,
                     Redactor.redact(e.getClass().getSimpleName() + ": " + e.getMessage()), null, List.of(),
                     TraceIds.next());
             OutputRenderer.render(out, "json");
@@ -117,37 +142,51 @@ public final class Cli {
 
     private static String codeFor(int exitCode) {
         return switch (exitCode) {
-            case ExitCodes.BLOCKED -> "ECOS-CLI-BLOCKED";
-            case ExitCodes.UNAVAILABLE -> "ECOS-CLI-UNAVAILABLE";
-            case ExitCodes.PARTIAL -> "ECOS-CLI-PARTIAL";
-            default -> "ECOS-CLI-FAILED";
+            case ExitCodes.BLOCKED -> CliErrorCodes.BLOCKED;
+            case ExitCodes.UNAVAILABLE -> CliErrorCodes.UNAVAILABLE;
+            case ExitCodes.PARTIAL -> CliErrorCodes.PARTIAL;
+            default -> CliErrorCodes.FAILED;
         };
     }
 
     private static String version() {
         String v = Cli.class.getPackage().getImplementationVersion();
-        return v == null ? "1.0.0" : v;
+        String build = Cli.class.getPackage().getImplementationVersion() == null
+                ? null : manifestValue("Implementation-Build");
+        String base = v == null ? "1.0.0" : v;
+        return build == null ? base : base + " (" + build + ")";
     }
 
+    private static String manifestValue(String key) {
+        try (var in = Cli.class.getResourceAsStream("/META-INF/MANIFEST.MF")) {
+            if (in == null) {
+                return null;
+            }
+            var props = new java.util.jar.Manifest(in).getMainAttributes();
+            String val = props.getValue(key);
+            return val == null || val.isBlank() || val.contains("${") ? null : val;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 顶层帮助（概览）；带具体命令时输出命令详情。 */
     static String usage() {
-        return String.join(System.lineSeparator(),
-                "ecos — ECOS 统一 CLI（只读 MVP，只经 gateway）",
-                "",
-                "用法:",
-                "  ecos doctor [--output json|table] [--base-url URL] [--token T | --token-file F | --profile P]",
-                "  ecos cognition models list [--model-type T] [--registry-state S] [--model-kind K]",
-                "  ecos capabilities list",
-                "  ecos --version | --help",
-                "",
-                "统一参数:",
-                "  --output json|table   输出格式（默认 json，面向智能体）",
-                "  --base-url URL        网关地址（默认 http://localhost:8080；禁指向 service 端口）",
-                "  --token / --token-file / --profile   凭据来源（凭据永不回显）",
-                "  --trace-id ID         全链 trace 透传",
-                "  --timeout MS          超时（1~120000，默认 30000）",
-                "  --dry-run             只展示调用计划，不发请求",
-                "",
-                "退出码: 0 SUCCESS / 1 FAILED / 2 BLOCKED / 3 UNAVAILABLE / 4 PARTIAL / 64 用法错误");
+        return HelpRenderer.overview();
+    }
+
+    private static String usageFor(String commandName) {
+        CliCommand cmd = CliCommands.find(commandName);
+        if (cmd == null) {
+            return HelpRenderer.overview();
+        }
+        OperationRegistry registry;
+        try {
+            registry = OperationRegistry.load();
+        } catch (RuntimeException e) {
+            registry = null;
+        }
+        return HelpRenderer.detail(cmd, registry);
     }
 
     private record Match(String name, List<String> words, String[] reordered) {

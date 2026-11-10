@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.cli.commands;
 
+import com.chinacreator.gzcm.cli.CliErrorCodes;
 import com.chinacreator.gzcm.cli.CliOptions;
 import com.chinacreator.gzcm.cli.CliStatus;
 import com.chinacreator.gzcm.cli.EnvelopeMapper;
@@ -108,7 +109,7 @@ public final class DoctorCommand {
         data.put("baseUrl", transport.baseUrl());
         data.put("checks", rows);
 
-        Map<String, Object> out = EnvelopeMapper.local(overall, "ECOS-CLI-DOCTOR",
+        Map<String, Object> out = EnvelopeMapper.local(overall, CliErrorCodes.DOCTOR,
                 overall == CliStatus.SUCCESS ? "全部检查通过" : "存在未通过项（逐项见 data.checks）",
                 null, refs, transport.traceId());
         out.put("data", data);

@@ -15,15 +15,24 @@ import java.util.Properties;
  *
  * <p>凭据来源顺序：{@code --token} → 环境变量 {@code ECOS_TOKEN} → {@code --token-file} →
  * {@code --profile} 指向的配置文件。任何路径下凭据都不进入输出。</p>
+ *
+ * <p><b>配置分层</b>（高 → 低）：{@code --flag} → {@code ECOS_CLI_*} 环境变量 →
+ * {@code ~/.config/ecos/cli-<profile>.properties} → 内置默认。</p>
  */
 public final class CliOptions {
 
     static final String DEFAULT_BASE_URL = "http://localhost:8080";
     static final long DEFAULT_TIMEOUT_MS = 30_000L;
+    static final String DEFAULT_OUTPUT = "json";
+
+    private static final List<String> BOOLEAN_FLAGS = List.of(
+            "--help", "-h", "--version", "--dry-run", "--all", "--follow", "--show-config",
+            "--no-retry");
 
     private final List<String> commandWords = new ArrayList<>();
     private final Map<String, String> values = new LinkedHashMap<>();
     private final List<String> booleans = new ArrayList<>();
+    private Properties profileProps;
 
     private CliOptions() {
     }
@@ -36,7 +45,7 @@ public final class CliOptions {
                 o.commandWords.add(a);
                 continue;
             }
-            if (a.equals("--help") || a.equals("-h") || a.equals("--version") || a.equals("--dry-run")) {
+            if (BOOLEAN_FLAGS.contains(a)) {
                 o.booleans.add(a);
             } else if (a.startsWith("--")) {
                 int eq = a.indexOf('=');
@@ -68,8 +77,11 @@ public final class CliOptions {
         return values.get(name);
     }
 
+    /** 输出格式：flag → env → profile → 默认。 */
     public String output() {
-        String v = values.getOrDefault("--output", "json").toLowerCase(Locale.ROOT);
+        String v = firstNonBlank(values.get("--output"),
+                System.getenv("ECOS_CLI_OUTPUT"), profileSetting("output"), DEFAULT_OUTPUT)
+                .toLowerCase(Locale.ROOT);
         if (!v.equals("json") && !v.equals("table")) {
             throw new CliException(ExitCodes.USAGE, "--output 只支持 json|table，实得: " + v);
         }
@@ -77,11 +89,12 @@ public final class CliOptions {
     }
 
     public String traceId() {
-        return values.getOrDefault("--trace-id", TraceIds.next());
+        return firstNonBlank(values.get("--trace-id"), System.getenv("ECOS_CLI_TRACE_ID"), TraceIds.next());
     }
 
     public long timeoutMs() {
-        String raw = values.get("--timeout");
+        String raw = firstNonBlank(values.get("--timeout"),
+                System.getenv("ECOS_CLI_TIMEOUT_MS"), profileSetting("timeoutMs"), null);
         if (raw == null) {
             return DEFAULT_TIMEOUT_MS;
         }
@@ -98,16 +111,9 @@ public final class CliOptions {
     }
 
     public String baseUrl() {
-        String profileBase = profileSetting("baseUrl");
-        String explicit = values.get("--base-url");
-        if (explicit != null) {
-            return trimSlash(explicit);
-        }
-        String env = System.getenv("ECOS_CLI_BASE_URL");
-        if (env != null && !env.isBlank()) {
-            return trimSlash(env.trim());
-        }
-        return profileBase != null ? trimSlash(profileBase) : DEFAULT_BASE_URL;
+        String v = firstNonBlank(values.get("--base-url"),
+                System.getenv("ECOS_CLI_BASE_URL"), profileSetting("baseUrl"), DEFAULT_BASE_URL);
+        return trimSlash(v);
     }
 
     /** 返回凭据或 null；null 表示未配置（调用方记 BLOCKED，不得重试成假成功）。 */
@@ -136,26 +142,97 @@ public final class CliOptions {
         return profileToken == null || profileToken.isBlank() ? null : profileToken.trim();
     }
 
+    public String idempotencyKey() {
+        return IdempotencyKeys.resolve(values.get("--idempotency-key"));
+    }
+
+    public Integer pageSize(Integer fallback) {
+        String raw = firstNonBlank(values.get("--page-size"),
+                System.getenv("ECOS_CLI_PAGE_SIZE"), profileSetting("pageSize"), null);
+        if (raw == null) {
+            return fallback;
+        }
+        int v;
+        try {
+            v = Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            throw new CliException(ExitCodes.USAGE, "--page-size 必须是整数: " + raw);
+        }
+        return PageWalker.pageSize(v, fallback == null ? PageWalker.MAX_PAGE_SIZE : fallback);
+    }
+
+    public int maxPages() {
+        String raw = values.get("--max-pages");
+        if (raw == null) {
+            return PageWalker.MAX_PAGES;
+        }
+        int v;
+        try {
+            v = Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            throw new CliException(ExitCodes.USAGE, "--max-pages 必须是整数: " + raw);
+        }
+        if (v <= 0 || v > PageWalker.MAX_PAGES) {
+            throw new CliException(ExitCodes.USAGE,
+                    "--max-pages 取值须在 1~" + PageWalker.MAX_PAGES + "，实得: " + v);
+        }
+        return v;
+    }
+
+    /** 生效配置快照（供 {@code --show-config}；token 只显示是否已配置）。 */
+    public Map<String, Object> effectiveConfig() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("baseUrl", baseUrl());
+        m.put("output", output());
+        m.put("timeoutMs", timeoutMs());
+        m.put("profile", profileName());
+        m.put("tokenConfigured", token() != null);
+        m.put("logLevel", CliLog.level().name());
+        m.put("retry", flag("--no-retry") ? "disabled" : "max=" + RetryPolicy.DEFAULT_MAX_ATTEMPTS);
+        return m;
+    }
+
+    public RetryPolicy retryPolicy() {
+        int max = flag("--no-retry") ? 1 : RetryPolicy.DEFAULT_MAX_ATTEMPTS;
+        return new RetryPolicy(max);
+    }
+
+    private String profileName() {
+        return firstNonBlank(values.get("--profile"), System.getenv("ECOS_CLI_PROFILE"), null);
+    }
+
     private String profileSetting(String key) {
-        String profile = values.get("--profile");
+        String profile = profileName();
         if (profile == null) {
             return null;
         }
         if (profile.isBlank() || profile.contains("/") || profile.contains("\\") || profile.contains("..")) {
             throw new CliException(ExitCodes.USAGE, "--profile 只接受配置名（不含路径分隔符）: " + profile);
         }
-        Path file = Paths.get(System.getProperty("user.home"), ".config", "ecos", "cli-" + profile + ".properties");
-        if (!Files.isRegularFile(file)) {
-            throw new CliException(ExitCodes.BLOCKED,
-                    "profile 配置不存在: " + file + "（需含 baseUrl/token 两键；文件内容不会被回显）");
+        if (profileProps == null) {
+            Path file = Paths.get(System.getProperty("user.home"), ".config", "ecos", "cli-" + profile + ".properties");
+            if (!Files.isRegularFile(file)) {
+                throw new CliException(ExitCodes.BLOCKED,
+                        "profile 配置不存在: " + file + "（需含 baseUrl/token 两键；文件内容不会被回显）");
+            }
+            Properties props = new Properties();
+            try (var in = Files.newInputStream(file)) {
+                props.load(in);
+            } catch (Exception e) {
+                throw new CliException(ExitCodes.BLOCKED, "profile 配置不可读: " + file);
+            }
+            profileProps = props;
         }
-        Properties props = new Properties();
-        try (var in = Files.newInputStream(file)) {
-            props.load(in);
-        } catch (Exception e) {
-            throw new CliException(ExitCodes.BLOCKED, "profile 配置不可读: " + file);
+        return profileProps.getProperty(key);
+    }
+
+    private static String firstNonBlank(String... candidates) {
+        for (String c : candidates) {
+            if (c != null && !c.isBlank()) {
+                return c.trim();
+            }
         }
-        return props.getProperty(key);
+        return null;
     }
 
     private static String trimSlash(String url) {

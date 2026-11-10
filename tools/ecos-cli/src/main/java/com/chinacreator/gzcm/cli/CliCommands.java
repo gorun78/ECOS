@@ -37,6 +37,20 @@ public final class CliCommands {
                     List.of(),
                     List.of()));
 
+    public static List<CliCommand> all() {
+        return ALL;
+    }
+
+    /** 按命令全名查元数据；未知返回 null。 */
+    public static CliCommand find(String name) {
+        for (CliCommand c : ALL) {
+            if (c.name().equals(name)) {
+                return c;
+            }
+        }
+        return null;
+    }
+
     private CliCommands() {
     }
 }

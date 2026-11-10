@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.cli.commands;
 
 import com.chinacreator.gzcm.cli.CliCommands;
+import com.chinacreator.gzcm.cli.CliErrorCodes;
 import com.chinacreator.gzcm.cli.CliOptions;
 import com.chinacreator.gzcm.cli.CliStatus;
 import com.chinacreator.gzcm.cli.EnvelopeMapper;
@@ -43,7 +44,7 @@ public final class CognitionModelsListCommand {
         ref.put("path", op.path());
 
         if (options.flag("--dry-run")) {
-            Map<String, Object> out = EnvelopeMapper.local(CliStatus.SUCCESS, "ECOS-CLI-DRY-RUN",
+            Map<String, Object> out = EnvelopeMapper.local(CliStatus.SUCCESS, CliErrorCodes.DRY_RUN,
                     "dry-run：未发请求", null, List.of(ref), transport.traceId());
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("plannedCall", transport.plannedCall(op.method(), pathWithQuery));
@@ -53,7 +54,7 @@ public final class CognitionModelsListCommand {
         }
 
         if (token == null) {
-            return EnvelopeMapper.local(CliStatus.BLOCKED, "ECOS-CLI-AUTH",
+            return EnvelopeMapper.local(CliStatus.BLOCKED, CliErrorCodes.AUTH,
                     "未配置凭据（--token / ECOS_TOKEN / --token-file / --profile）",
                     "只读接口同样要求 JWT，禁匿名放行", List.of(ref), transport.traceId());
         }
