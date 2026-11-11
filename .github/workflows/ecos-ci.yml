@@ -5,12 +5,14 @@ on:
     branches: [main, develop]
     paths:
       - 'ecos_backend/**'
+      - 'tools/ecos-cli/**'
       - '.github/workflows/**'
   pull_request:
     branches: [main]
     paths:
       - 'ecos_backend/**'
       - 'ecos_frontend/**'
+      - 'tools/ecos-cli/**'
       - 'docs/**'
 
 jobs:

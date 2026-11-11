@@ -484,23 +484,19 @@ paths:
         "500": { $ref: "#/components/responses/E-INTERNAL" }
 
   # ─────────────────────────── Readiness（§5.2 #12~#13）─────────────────────────
-  /api/v1/wagent/readiness:
+  /api/v1/wagent/readiness/{questionId}:
     get:
       tags: [readiness]
       operationId: getReadiness
       summary: "#12 就绪度（等级 + 缺项 + 缺口，F10-08/09）"
-      x-implementation-status: planned       # WAgentApiPaths.READINESS_BY_QUESTION 常量在位；Controller 归 R2-B
-      x-correction-2026-10-12: |
-        复盘回写：按前端消费签名登记为 GET /api/v1/wagent/readiness?mission=
-        （前端位点 components/common/structured/ReadinessCard.tsx:2，注释级契约声明、组件只接 props 不发请求）。
-        WAgentApiPaths.READINESS_BY_QUESTION 现态仍为 /readiness/{questionId} 路径参数形态（WAgentApiPaths.java:70）；
-        两种签名收敛（常量改集合面 or 前端改路径参数）归 R2-B 落地批次，落地前本契约以消费侧签名为准。
+      x-implementation-status: implemented   # WAgentReadinessController:89（READINESS_BY_QUESTION）
+      x-correction-2026-11-10: |
+        签名收敛（CLI 生产化批 B）：原登记的 GET /readiness?mission= 属前端注释级声明，
+        后端实测单源为 WAgentApiPaths.READINESS_BY_QUESTION = /readiness/{questionId}
+        （WAgentReadinessController#getReadiness，租户双闸后取 pinned 评估）。契约改为路径参数形态，
+        与 Controller 逐字一致；前端 ReadinessCard 只接 props 不发请求，无消费侧破坏。
       parameters:
-        - name: mission
-          in: query
-          required: true
-          description: 任务/使命标识（前端消费签名；单源参数名待 R2-B 与 WAgentApiPaths 收敛）
-          schema: { type: string, maxLength: 36 }
+        - $ref: "#/components/parameters/QuestionId"
       responses:
         "200":
           description: 就绪快照（grade/status 由服务端阈值计算，LLM 不参与定级，F10-09）
@@ -518,7 +514,7 @@ paths:
       tags: [readiness]
       operationId: refillReadiness
       summary: "#13 缺口补齐（循环 ≤3，超限即止）"
-      x-implementation-status: planned       # WAgentApiPaths.READINESS_REFILL 常量在位；Controller 归 R2-B
+      x-implementation-status: implemented   # WAgentReadinessController:112（READINESS_REFILL）
       parameters:
         - $ref: "#/components/parameters/QuestionId"
       requestBody:
@@ -550,21 +546,39 @@ paths:
       tags: [tools]
       operationId: searchTools
       summary: "#14 工具检索（权限过滤后返回；渐进披露入口，F10-18）"
-      x-implementation-status: planned       # WAgentApiPaths.TOOLS_COLLECTION 常量在位；Controller 归 R2-B
+      x-implementation-status: implemented   # WAgentToolContractController:163（TOOLS_COLLECTION）
+      x-correction-2026-11-10: |
+        参数名按 Controller 实测单源订正（CLI 生产化批 B）：原登记 q，实测为
+        status/engine/toolset/disclosure/keyword（WAgentToolContractController#searchTools）。
       description: |
         渐进披露（F10-18）：always_loaded <10 且仅 active 可召回；
         seeded registered 工具（V266）在契约测试五关通过前对本面不可见为 active。
       parameters:
-        - name: q
+        - name: keyword
           in: query
           required: false
           description: 业务语义关键词
+          schema: { type: string }
+        - name: status
+          in: query
+          required: false
+          description: 工具状态（缺省取 active 地板，见 normalizeStatus）
+          schema: { type: string }
+        - name: engine
+          in: query
+          required: false
+          description: 属主引擎收窄
           schema: { type: string }
         - name: toolset
           in: query
           required: false
           description: 工具集（core|analytics|action，与 V265 组 4 / V266 toolset 列同字面量）
           schema: { type: string, enum: [core, analytics, action] }
+        - name: disclosure
+          in: query
+          required: false
+          description: 披露形态收窄
+          schema: { type: string }
       responses:
         "200":
           description: 工具摘要列表
@@ -581,9 +595,17 @@ paths:
       tags: [tools]
       operationId: describeTool
       summary: "#15 完整契约"
-      x-implementation-status: planned       # WAgentApiPaths.TOOL_BY_NAME 常量在位；Controller 归 R2-B
+      x-implementation-status: implemented   # WAgentToolContractController:195（TOOL_BY_NAME）
+      x-correction-2026-11-10: |
+        version 为**必填** query 参数（WAgentToolContractController#describeTool：缺失即 400
+        「契约按 name+version 闭合定位」，uniq(name,version)）。原契约漏登记，CLI 传参会被拒。
       parameters:
         - $ref: "#/components/parameters/ToolName"
+        - name: version
+          in: query
+          required: true
+          description: 工具契约版本（name+version 闭合定位；缺失即 400）
+          schema: { type: string }
       responses:
         "200":
           description: 工具契约全量（ecos_ai.ecos_wagent_tool_contract 行语义，V236 列口径）
@@ -625,19 +647,30 @@ paths:
       tags: [candidates]
       operationId: listCandidates
       summary: "#17 候选列表（筛选：类型/状态/批次）"
-      x-implementation-status: planned       # WAgentApiPaths.CANDIDATES_COLLECTION 常量在位；Controller 归 R3-A
+      x-implementation-status: implemented   # WAgentCandidateController:168（CANDIDATES_COLLECTION）
+      x-correction-2026-11-10: |
+        参数名按 Controller 实测单源订正（CLI 生产化批 B）：原登记 type/status/batch，
+        实测为 candidateType/status/batchId/runId（WAgentCandidateController#listCandidates:
+        @RequestParam candidateType|status|batchId|runId）。仅参数名对齐，路由结构不变。
       parameters:
-        - name: type
+        - name: candidateType
           in: query
           required: false
+          description: 候选类型（CandidateType 十二类单源；越界 400）
           schema: { type: string }
         - name: status
           in: query
           required: false
+          description: 候选状态（CandidateStatus 十值单源；越界 400）
           schema: { type: string }
-        - name: batch
+        - name: batchId
           in: query
           required: false
+          schema: { type: string }
+        - name: runId
+          in: query
+          required: false
+          description: 按生成该候选的 Run 过滤
           schema: { type: string }
       responses:
         "200":
@@ -649,13 +682,49 @@ paths:
         "401": { $ref: "#/components/responses/E-AUTH" }
         "403": { $ref: "#/components/responses/E-POLICY" }
         "500": { $ref: "#/components/responses/E-INTERNAL" }
+    post:
+      tags: [candidates]
+      operationId: createWagentCandidate
+      summary: 建候选（knowledge extract 落点；初始 GENERATED，不直写知识库）
+      x-implementation-status: implemented   # WAgentCandidateController#createCandidate（批 F）
+      x-design-ref: "详设-10 §10.3.5 ecos knowledge extract；§5.2 表外能力位（产出候选，不直写 KB）"
+      description: |
+        只落候选行（{@code ecos_ai.ecos_wagent_candidate}），初始状态 {@code generated}；
+        后续四元校验/评审/发布各自推进状态机。
+        {@code payload_hash} 由服务端按 payload_json 计算（SHA-256 hex），调用方不得自报。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [candidateType, payloadJson]
+              properties:
+                candidateType:
+                  type: string
+                  description: CandidateType 十二类单源（越界 400）
+                targetEngine: { type: string }
+                payloadJson: { type: string, description: 候选载荷（序列化，引用型） }
+                basisJson: { type: string, description: 生成依据（证据/口径引用集） }
+                generatedByRun: { type: string }
+                batchId: { type: string }
+                confidence: { type: number, description: 概率（0~1，NUMERIC(5,4)） }
+      responses:
+        "201":
+          description: 已建候选（data 为候选详情，status=generated）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
 
   /api/v1/wagent/candidates/{candidateId}:
     get:
       tags: [candidates]
       operationId: getCandidate
       summary: "#18 候选详情（含 basis/五段校验）"
-      x-implementation-status: planned       # WAgentApiPaths.CANDIDATE_BY_ID 常量在位；Controller 归 R3-A
+      x-implementation-status: implemented   # WAgentCandidateController:198（CANDIDATE_BY_ID）
       parameters:
         - $ref: "#/components/parameters/CandidateId"
       responses:
@@ -708,7 +777,16 @@ paths:
       tags: [candidates]
       operationId: publishCandidate
       summary: "#20 发布（approval_token 必填；pre-commit 裁决 + Git 归档，F10-23）"
-      x-implementation-status: planned       # WAgentApiPaths.CANDIDATE_PUBLISH 常量在位；Controller 归 R3-A
+      x-implementation-status: implemented   # WAgentCandidateController#publishCandidate（批 F 真闭环，2026-11-10）
+      x-note-2026-11-10: |
+        发布链路已接线：状态闸（仅 approved）→ 凭证 verifyAndConsume（CAS 一次性，重放 409）
+        → pre-commit 安全裁决（AiSecurityEngineClient，不可用即 DENY fail-closed，403）
+        → Git 归档（runtime DesignAssetArchiver 唯一出口；不可用/冻结 ⇒ 502 并带原因）
+        → 落库 published + published_git_ref（WHERE status='approved' 兜底防并发双发布）。
+        **未接线**：数字一致性校验（E-WA-NARRATIVE-NUM）；消费后失败需重新审批（单向凭证取舍）。
+        归档仓按候选类型显式映射（ENTITY/RELATIONSHIP/METRIC/DQ_RULE/DATA_MAPPING→ontology-model、
+        KNOWLEDGE_ITEM/ASSUMPTION→kb-asset-tree、COGNITIVE_MODEL_DEF/MODEL_ROUTING→cognitive-model、
+        SCENARIO→scenario-def、DECISION_OPTION/ACTION_DRAFT→agent-collab；未登记类型 400，禁猜默认仓）。
       description: |
         发布链路（F10-23）：approval_token 校验 → pre-commit 安全裁决（不可用即 DENY fail-closed）
         → 数字一致性校验（E-WA-NARRATIVE-NUM 阻断）→ Git 归档 → 落库。
@@ -753,7 +831,7 @@ paths:
       tags: [evidence]
       operationId: listClaims
       summary: "#21 Run 的 Claim 列表（Claim + Evidence + 等级，F10-24）"
-      x-implementation-status: planned       # WAgentApiPaths.CLAIMS_BY_RUN 常量在位；Controller 归 R3-A
+      x-implementation-status: implemented   # WAgentEvidenceTraceController:66（CLAIMS_BY_RUN）
       parameters:
         - $ref: "#/components/parameters/RunId"
       responses:
@@ -767,23 +845,19 @@ paths:
         "404": { $ref: "#/components/responses/E-NOT-FOUND" }
         "500": { $ref: "#/components/responses/E-INTERNAL" }
 
-  /api/v1/wagent/evidence:
+  /api/v1/wagent/evidence/{evidenceId}:
     get:
       tags: [evidence]
       operationId: traceEvidence
-      summary: "#22 引擎端追溯（Evidence → 属主 Engine 事实/快照）——前端消费为 claim 查询面"
-      x-implementation-status: planned       # WAgentApiPaths.EVIDENCE_BY_ID 常量在位（/{evidenceId} 形态）；Controller 归 R3-A
-      x-correction-2026-10-12: |
-        复盘回写：前端消费签名为 GET /api/v1/wagent/evidence?claim=
-        （位点 components/common/structured/EvidenceDrawer.tsx:4，注释级契约声明、组件只接 props 不发请求）。
-        WAgentApiPaths.EVIDENCE_BY_ID 现态为 /evidence/{evidenceId}（WAgentApiPaths.java:96）；
-        by-claim 集合面与 by-id 详情面的签名收敛归 R3-A 落地批次，落地前本契约以消费侧签名登记。
+      summary: "#22 引擎端追溯（Evidence → 属主 Engine 事实/快照）"
+      x-implementation-status: implemented   # WAgentEvidenceTraceController:93（EVIDENCE_BY_ID）
+      x-correction-2026-11-10: |
+        签名收敛（CLI 生产化批 B）：原登记的 GET /evidence?claim= 属前端注释级声明，
+        后端实测单源为 WAgentApiPaths.EVIDENCE_BY_ID = /evidence/{evidenceId}
+        （WAgentEvidenceTraceController#traceEvidence，租户闸后出引用型四元组 + 反向 Claim 索引）。
+        契约改为路径参数形态，与 Controller 逐字一致；前端 EvidenceDrawer 只接 props 不发请求，无消费侧破坏。
       parameters:
-        - name: claim
-          in: query
-          required: true
-          description: Claim 标识（前端消费签名；追溯链按 claim 定位 evidence 三要素 source/version/snapshot）
-          schema: { type: string, maxLength: 36 }
+        - $ref: "#/components/parameters/EvidenceId"
       responses:
         "200":
           description: 追溯链（引擎侧经 ServiceEndpointResolver 两态寻址，Agent 不直连库）
@@ -831,7 +905,12 @@ paths:
       tags: [actions]
       operationId: draftAction
       summary: "#24a 行动草稿（属主 ai-engine，REQ-WAG-02/R-32①）"
-      x-implementation-status: planned       # WAgentApiPaths.ACTIONS_COLLECTION 常量在位；Controller 归 R3-A
+      x-implementation-status: implemented   # WAgentDecisionActionController#draftAction（V283 表已在，2026-11-10）
+      x-note-2026-11-10: |
+        原登记「V241 待定、存储未落地」为过期口径：ecos_ai.ecos_wagent_action 已由 V283 建表（dev 库实测存在）。
+        本端点改为真实落库（status=DRAFT，零外部副作用）；status 值域待枚举单源后由 DDL CHECK 收紧。
+        **列宽约束（实测）**：publish_target 仅 VARCHAR(24) ⇒ 只存受控类别 `workspace|ontology|datanet`，
+        属主对象 ID 必须另传 `targetObjectId`（落 source_object_id 36），不得把复合串塞进 publish_target。
       description: 只产 draft（side_effect=draft），Agent 不写对方表；提交一律经 #24b → 属主 Engine 写端点。
       requestBody:
         required: true
@@ -856,7 +935,13 @@ paths:
       tags: [actions]
       operationId: commitAction
       summary: "#24b 行动提交（经属主 Engine 写端点，副作用=production）"
-      x-implementation-status: planned       # WAgentApiPaths.ACTION_COMMIT 常量在位；Controller 归 R3-A
+      x-implementation-status: implemented   # WAgentDecisionActionController#commitAction（2026-11-10 真链路）
+      x-note-2026-11-10: |
+        真链路：凭证校验（不消费）→ pre-commit 安全裁决（不可用即 DENY，403）→ publish_target 通道路由
+        （workspace:scenario:<id> | ontology:<id> | datanet:<id>，未登记即 400 禁猜）→ 凭证一次性消费（重放 409）
+        → 状态 CAS DRAFT→COMMITTING（并发只赢一条）→ 属主 Engine 派发 → COMMITTED。
+        派发失败保持 COMMITTING 并 502（可查可重试，绝不写「已提交」假成功）。
+        **前置**：预置审批凭证（scope=ACTION_COMMIT）与 OPA 对 `action:commit` 的策略规则。
       description: |
         commit 走属主 Engine 通道（V265 组 6 adapter 登记：
         POST /api/v1/workspace/scenarios/{id}/actions、POST /api/v1/ontology/actions/{id}/execute、
@@ -886,6 +971,55 @@ paths:
         "502": { $ref: "#/components/responses/E-WA-DEP" }
         "503": { $ref: "#/components/responses/E-WA-DEP" }
         "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ─────────────── L3 审批凭证（批 D 新增，§5.2 表外能力位）───────────────
+  /api/v1/wagent/approval-tokens:
+    post:
+      tags: [approval]
+      operationId: createApprovalToken
+      summary: L3 审批凭证签发（一次性 + 四眼；CLI --approval-token 的来源）
+      x-implementation-status: implemented   # WAgentApprovalController#createApprovalToken（V326 数据面）
+      x-design-ref: "详细设计-10 §5.2 #20/#24b 的 L3 凭证闸（批 D 闭环）；ecos_ai.agent_approval V326 补列"
+      description: |
+        签发一次性审批凭证：绑定 {@code scopeType + scopeId}，默认 30 分钟有效（上限 8 小时）。
+        服务端只存 SHA-256 摘要，**明文仅在本次响应出现一次**。
+        两道闸：① 仅 admin 角色可签发（fail-closed 403）；② 四眼——审批人（当前主体）
+        不得为 {@code requestedBy} 自己签发。
+        消费语义：凭证在 L3 动作真正执行时一次性消费（CAS），重放必拒（409 E-WA-STATE）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scopeType, scopeId]
+              properties:
+                scopeType:
+                  type: string
+                  enum: [CANDIDATE_PUBLISH, ACTION_COMMIT, RUN_APPROVAL]
+                  description: 凭证作用域类型（WAgentApprovalScope 单源）
+                scopeId:
+                  type: string
+                  maxLength: 64
+                  description: 作用域对象 ID（candidateId / actionId / runId），凭证不得跨对象复用
+                requestedBy:
+                  type: string
+                  maxLength: 100
+                  description: 发起该 L3 动作的人；等于审批人即 403（四眼）
+                ttlSeconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 28800
+                  description: 有效期（缺省 1800s，上限 28800s）
+      responses:
+        "200":
+          description: 签发成功（data.approvalId / data.token（仅此一次）/ scopeType / scopeId / expiredAt）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
 
 components:
   securitySchemes:

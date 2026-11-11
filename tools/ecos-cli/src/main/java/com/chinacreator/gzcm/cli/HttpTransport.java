@@ -73,8 +73,20 @@ public final class HttpTransport {
     /** 写命令：仅在带幂等键时才允许重试。 */
     public Result write(String method, String pathWithQuery, String token, String jsonBody,
                         String idempotencyKey) {
-        boolean idempotent = idempotencyKey != null && !idempotencyKey.isBlank();
-        return exchange(method, pathWithQuery, token, jsonBody, idempotencyKey, idempotent);
+        return write(method, pathWithQuery, token, jsonBody, idempotencyKey,
+                idempotencyKey != null && !idempotencyKey.isBlank());
+    }
+
+    /**
+     * 写命令（显式指定重试安全性）。
+     *
+     * <p>{@code retrySafe} 与「是否发 Idempotency-Key 头」解耦：缺省自动生成的键仍要发
+     * （便于人工重放与日志对账），但只有调用方显式提供的键才代表服务端保证去重，
+     * 才可授权自动重试。详见 {@code GenericCommandRunner#retrySafeKey}。</p>
+     */
+    public Result write(String method, String pathWithQuery, String token, String jsonBody,
+                        String idempotencyKey, boolean retrySafe) {
+        return exchange(method, pathWithQuery, token, jsonBody, idempotencyKey, retrySafe);
     }
 
     private Result exchange(String method, String pathWithQuery, String token, String jsonBody,

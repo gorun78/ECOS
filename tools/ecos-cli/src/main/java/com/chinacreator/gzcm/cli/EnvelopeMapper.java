@@ -23,6 +23,17 @@ public final class EnvelopeMapper {
 
     public static Map<String, Object> map(String operationId, OperationRegistry.Operation op,
                                    HttpTransport.Result result, String requestedTraceId) {
+        return map(operationId, op, result, requestedTraceId, false);
+    }
+
+    /**
+     * @param approvalBearing 该命令是否 L3（带审批凭证）。计划 §3.1 要求「越权/过期/自审批 ⇒
+     *                        FAILED(exit 1)」：此面 403 一律是凭证闸拒绝（已到达后端、业务判定失败），
+     *                        与「无 token 本地 BLOCKED(2)」区分；只读面的 403 仍按设计册 §16.4 归 BLOCKED。
+     */
+    public static Map<String, Object> map(String operationId, OperationRegistry.Operation op,
+                                   HttpTransport.Result result, String requestedTraceId,
+                                   boolean approvalBearing) {
         CliStatus status;
         Object data = null;
         Map<String, Object> error = null;
@@ -56,8 +67,24 @@ public final class EnvelopeMapper {
                 status = CliStatus.BLOCKED;
                 error = error(CliErrorCodes.AUTH, "未认证或 Token 已过期", "见 --token / ECOS_TOKEN / --profile");
             } else if (http == 403) {
-                status = CliStatus.BLOCKED;
-                error = error(CliErrorCodes.FORBIDDEN, "服务端准入/权限拒绝（ABAC）", "CLI 本地不得放行");
+                if (approvalBearing) {
+                    status = CliStatus.FAILED;
+                    error = error(isEnvelope ? body.path("errorCode").asText(CliErrorCodes.FORBIDDEN)
+                                    : CliErrorCodes.FORBIDDEN,
+                            isEnvelope ? body.path("message").asText("审批凭证被拒（越权/过期/自审批）")
+                                    : "审批凭证被拒（越权/过期/自审批）",
+                            "服务端凭证闸拒绝，CLI 不得本地放行");
+                } else {
+                    status = CliStatus.BLOCKED;
+                    error = error(CliErrorCodes.FORBIDDEN, "服务端准入/权限拒绝（ABAC）", "CLI 本地不得放行");
+                }
+            } else if (http == 409 && approvalBearing) {
+                status = CliStatus.FAILED;
+                error = error(isEnvelope ? body.path("errorCode").asText(CliErrorCodes.RESPONSE)
+                                : CliErrorCodes.http(http),
+                        isEnvelope ? body.path("message").asText("审批凭证已被消费（一次性语义）")
+                                : "审批凭证已被消费（一次性语义）",
+                        "重放同一凭证不得再次放行");
             } else if (http == 502 || http == 503 || http == 504) {
                 status = CliStatus.UNAVAILABLE;
                 error = error(CliErrorCodes.DEP_UNAVAILABLE, "依赖真实不可用", "HTTP " + http);
@@ -86,7 +113,13 @@ public final class EnvelopeMapper {
         out.put("status", status.name());
         out.put("data", data);
         out.put("error", error);
-        out.put("trace_id", result.responseTraceId() != null ? result.responseTraceId() : requestedTraceId);
+        // trace 优先级：响应头 > 响应体 traceId > 本地请求 trace。
+        // 空白值等同缺失 —— 否则输出 trace_id="   "，与审计表任何行都对不上。
+        String respTrace = result.responseTraceId();
+        if (respTrace != null && respTrace.isBlank()) {
+            respTrace = null;
+        }
+        out.put("trace_id", respTrace != null ? respTrace : requestedTraceId);
         List<Map<String, Object>> refs = new ArrayList<>();
         Map<String, Object> ref = new LinkedHashMap<>();
         ref.put("operationId", operationId);

@@ -45,6 +45,54 @@ public final class PageWalker {
                              Integer total) {
     }
 
+    /**
+     * 复用已取到的首页结果（命令主调用那一次），只在 {@code --all} 时续取后续页。
+     *
+     * <p>默认单页由此不发第二次请求；{@code all=false} 时 truncated 表示「还有下一页未取」。</p>
+     */
+    public static PageResult collectFromFirst(int pageSize, int maxPages, boolean all,
+                                              HttpTransport.Result first,
+                                              PageFetcher fetcher) {
+        if (first == null || first.transportFailed()
+                || first.status() < 200 || first.status() >= 300) {
+            throw new PageFetchException(first);
+        }
+        JsonNode body = parse(first.body());
+        List<Object> lastRows = rowsOf(body);
+        List<Object> merged = new ArrayList<>(lastRows);
+        Integer total = totalOf(body);
+        int pages = 1;
+        int offset = pageSize;
+        boolean truncated = false;
+
+        while (all) {
+            boolean shortPage = lastRows.size() < pageSize;
+            boolean reachedTotal = total != null && merged.size() >= total;
+            if (shortPage || reachedTotal) {
+                break;
+            }
+            if (pages >= maxPages) {
+                truncated = true;
+                break;
+            }
+            HttpTransport.Result result = fetcher.fetch(offset, pageSize);
+            pages++;
+            if (result.transportFailed() || result.status() < 200 || result.status() >= 300) {
+                truncated = true;
+                break;
+            }
+            JsonNode pageBody = parse(result.body());
+            lastRows = rowsOf(pageBody);
+            Integer pageTotal = totalOf(pageBody);
+            if (pageTotal != null) {
+                total = pageTotal;
+            }
+            merged.addAll(lastRows);
+            offset += pageSize;
+        }
+        return new PageResult(merged, pages, pageSize, truncated, total);
+    }
+
     /** 逐页拉取并合并；fetcher 接收 offset 返回 HTTP 结果。 */
     public static PageResult collect(int pageSize, int maxPages, boolean all,
                                      PageFetcher fetcher) {
@@ -108,10 +156,23 @@ public final class PageWalker {
             return List.of();
         }
         JsonNode data = body.has("data") ? body.get("data") : body;
-        if (data == null || !data.isArray()) {
+        if (data == null || data.isNull()) {
             return List.of();
         }
-        return MAPPER.convertValue(data, List.class);
+        // 设计册 §「分页体 {items,total,page,size}」：行在 items 里，不能只认裸数组。
+        // 双重信封（data.data.{items|[...]}）也会出现，仍按同一口径下钻一层。
+        JsonNode rows = data;
+        if (!rows.isArray()) {
+            rows = rows.get("items");
+        }
+        if ((rows == null || !rows.isArray()) && data.has("data")) {
+            JsonNode inner = data.get("data");
+            rows = inner.isArray() ? inner : inner.get("items");
+        }
+        if (rows == null || !rows.isArray()) {
+            return List.of();
+        }
+        return MAPPER.convertValue(rows, List.class);
     }
 
     private static Integer totalOf(JsonNode body) {
@@ -120,6 +181,10 @@ public final class PageWalker {
         }
         JsonNode candidate = body.has("total") ? body.get("total")
                 : body.has("data") && body.get("data").has("total") ? body.get("data").get("total") : null;
+        if (candidate == null && body.has("data") && body.get("data").has("data")
+                && body.get("data").get("data").has("total")) {
+            candidate = body.get("data").get("data").get("total");
+        }
         return candidate != null && candidate.isNumber() ? candidate.asInt() : null;
     }
 

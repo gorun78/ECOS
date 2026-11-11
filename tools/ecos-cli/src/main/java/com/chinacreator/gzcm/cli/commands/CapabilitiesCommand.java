@@ -25,6 +25,9 @@ public final class CapabilitiesCommand {
             row.put("name", command.name());
             row.put("description", command.description());
             row.put("accessMode", command.accessMode());
+            row.put("automationLevel", command.automationLevel());
+            row.put("requiresApproval", command.requiresApproval());
+            row.put("wired", command.wired());
             List<Map<String, Object>> ops = new ArrayList<>();
             for (String operationId : command.operationIds()) {
                 OperationRegistry.Operation op = registry.operation(operationId);

@@ -30,6 +30,8 @@ public final class CliErrorCodes {
     public static final String DRY_RUN = "ECOS-CLI-DRY-RUN";
     /** doctor 汇总态。 */
     public static final String DOCTOR = "ECOS-CLI-DOCTOR";
+    /** {@code --show-config} 快照（非错误，仅作 code 标识）。 */
+    public static final String CONFIG = "ECOS-CLI-CONFIG";
     /** 契约声明为 planned/未实现，CLI 拒绝真实调用（不得伪造空成功）。 */
     public static final String NOT_IMPLEMENTED = "ECOS-CLI-NOT-IMPLEMENTED";
     /** 凭据缺失导致的本地阻塞（不重试）。 */

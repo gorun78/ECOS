@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# 生成的 bash 补全若按 CRLF 检出，`case ... ;;` 会语法报错 ⇒ 固定 LF
+tools/ecos-cli/dist/completions/*.bash text eol=lf

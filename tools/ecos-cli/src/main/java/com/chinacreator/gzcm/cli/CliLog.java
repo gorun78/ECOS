@@ -65,7 +65,13 @@ public final class CliLog {
         row.put("level", level.name());
         row.put("event", event);
         if (fields != null) {
-            fields.forEach((k, v) -> row.put(k, v instanceof String s ? Redactor.redact(s) : v));
+            fields.forEach((k, v) -> {
+                if (isSensitiveKey(k)) {
+                    row.put(k, "***");
+                    return;
+                }
+                row.put(k, v instanceof String s ? Redactor.redact(s) : v);
+            });
         }
         try {
             String line = MAPPER.writeValueAsString(row) + System.lineSeparator();
@@ -75,6 +81,31 @@ public final class CliLog {
         } catch (IOException | RuntimeException ignored) {
             // 旁路失败不影响命令结果
         }
+    }
+
+    /**
+     * 敏感字段名一律不落盘（值直接打码）。
+     *
+     * <p>计划 §二 要求「默认不落 token/body」：仅靠调用方自觉不够——一次误传
+     * {@code Map.of("token", …)} 就会把凭据写进长期留存的 jsonl。</p>
+     */
+    static boolean isSensitiveKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        String k = key.toLowerCase(java.util.Locale.ROOT);
+        if ("tokenconfigured".equals(k)) {
+            return false;
+        }
+        return k.contains("token") || k.contains("password") || k.contains("passwd")
+                || k.contains("secret") || k.contains("authorization") || k.contains("apikey")
+                || k.contains("api_key") || k.equals("body") || k.endsWith("bodyjson")
+                || k.contains("credential")
+                // 业务载荷（--payload-json / --basis-json / situationSnapshotJson）属正文；
+                // jsonl 长期留存，原样落盘等同数据外洩。
+                || k.contains("payload") || k.contains("basisjson")
+                || k.endsWith("requestbody") || k.endsWith("responsebody")
+                || k.endsWith("snapshotjson");
     }
 
     static Path logDir() {

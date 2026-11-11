@@ -13,6 +13,11 @@ final class Stdio {
     private static final PrintStream ERR =
             new PrintStream(new FileOutputStream(FileDescriptor.err), true, StandardCharsets.UTF_8);
 
+    static void print(String text) {
+        OUT.print(text);
+        OUT.flush();
+    }
+
     static void println(String text) {
         OUT.println(text);
     }

@@ -42,6 +42,27 @@ class HardeningTest {
     }
 
     @Test
+    @DisplayName("重试：429 分两种语义 —— E-RATE 可退避重试，E-WA-BUDGET（预算耗尽）禁重试")
+    void budgetExhausted429IsNotRetried() {
+        RetryPolicy p = RetryPolicy.standard();
+        HttpTransport.Result rate = new HttpTransport.Result(429,
+                "{\"code\":429,\"errorCode\":\"E-RATE\",\"message\":\"配额超限\"}", null, null);
+        assertTrue(p.shouldRetry(1, rate, true), "E-RATE 应按退避重试（设计册 §10.3.4 重试=是）");
+
+        HttpTransport.Result budget = new HttpTransport.Result(429,
+                "{\"code\":429,\"errorCode\":\"E-WA-BUDGET\",\"message\":\"预算耗尽\"}", null, null);
+        assertFalse(p.shouldRetry(1, budget, true),
+                "E-WA-BUDGET 重试=s 否，预算已烧完，再打一次只会继续消耗配额");
+        assertFalse(p.shouldRetry(1, budget, false), "写命令本就不重试");
+
+        // 无信封/无 errorCode 的 429 仍按可恢复处理（不猜语义）
+        assertTrue(p.shouldRetry(1, new HttpTransport.Result(429, null, null, null), true));
+        // 其余码即使文本里出现 E-WA-BUDGET 也不影响判定（只看 errorCode 字段）
+        assertTrue(p.shouldRetry(1, new HttpTransport.Result(503,
+                "{\"code\":503,\"errorCode\":\"E-WA-DEP\",\"message\":\"依赖不可用\"}", null, null), true));
+    }
+
+    @Test
     @DisplayName("重试：退避有上限且带抖动（不产生大于上限+半区的等待）")
     void backoffBounded() {
         RetryPolicy p = RetryPolicy.standard();
@@ -134,6 +155,23 @@ class HardeningTest {
         var cfg = o.effectiveConfig();
         assertTrue(cfg.containsKey("tokenConfigured"));
         assertFalse(String.valueOf(cfg).contains("token="), "配置快照不得含 token 明文");
+    }
+
+    @Test
+    @DisplayName("trace/幂等键：同一实例反复取值必须相等，跨实例才应不同（禁每次调用重生成）")
+    void traceAndIdempotencyAreStablePerRun() {
+        CliOptions a = CliOptions.parse(new String[] {"doctor"}, 1);
+        assertEquals(a.traceId(), a.traceId(), "同一次运行内 trace 必须稳定");
+        assertEquals(a.idempotencyKey(), a.idempotencyKey(), "头与回显必须用同一幂等键");
+
+        CliOptions b = CliOptions.parse(new String[] {"doctor"}, 1);
+        assertFalse(a.traceId().equals(b.traceId()), "不同运行应各自生成 trace");
+        assertFalse(a.idempotencyKey().equals(b.idempotencyKey()), "不同运行应各自生成幂等键");
+
+        CliOptions pinned = CliOptions.parse(
+                new String[] {"doctor", "--trace-id", "cli-fixed", "--idempotency-key", "run-1"}, 1);
+        assertEquals("cli-fixed", pinned.traceId());
+        assertEquals("run-1", pinned.idempotencyKey());
     }
 
     private static HttpTransport.Result ok2(String body) {

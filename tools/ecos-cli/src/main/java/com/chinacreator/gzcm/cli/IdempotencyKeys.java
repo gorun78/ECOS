@@ -20,6 +20,16 @@ public final class IdempotencyKeys {
         if (explicit == null || explicit.isBlank()) {
             return generate();
         }
+        return normalize(explicit);
+    }
+
+    /** 是否为调用方显式指定（非本类自动生成）。 */
+    public static boolean isExplicit(String explicit) {
+        return explicit != null && !explicit.isBlank();
+    }
+
+    /** 校验并归一化一个显式传入的键（供 {@link #resolve} 与外部判定复用）。 */
+    static String normalize(String explicit) {
         String v = explicit.trim();
         if (v.length() > MAX_LENGTH) {
             throw new CliException(ExitCodes.USAGE, "--idempotency-key 长度不得超过 " + MAX_LENGTH);

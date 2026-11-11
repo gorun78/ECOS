@@ -18,7 +18,9 @@ function loadDotEnv(): void {
 }
 loadDotEnv();
 
-export const ECOS_API = process.env.ECOS_API ?? 'http://localhost:8080';
+// 默认用回环 IPv4：本机 localhost 解析为 ::1 时网关（监听 0.0.0.0）会 ECONNREFUSED，
+// 而 java 侧 CLI 默认解析 IPv4 —— 两侧口径必须一致，否则同一用例一半过一半红。
+export const ECOS_API = process.env.ECOS_API ?? 'http://127.0.0.1:8080';
 export const ECOS_BASE = process.env.ECOS_BASE ?? 'http://localhost:3000';
 
 export default defineConfig({

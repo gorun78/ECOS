@@ -71,6 +71,13 @@ public final class SseReader {
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             return -1;
         }
+        // 状态码 2xx 不等于「是 SSE 流」：属主端点降级时可能直接回 200 + application/json
+        // （能力位 channel=polling 的正常形态）。此时按行解析得到 0 个事件，调用方会把它
+        // 当 SUCCESS 输出空 events —— 正是计划 §一 禁止的「空集合伪装成功」。
+        String contentType = response.headers().firstValue("Content-Type").orElse("");
+        if (!contentType.toLowerCase(java.util.Locale.ROOT).contains("text/event-stream")) {
+            return -1;
+        }
         int count = 0;
         String event = null;
         String id = null;

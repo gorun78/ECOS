@@ -49,6 +49,13 @@ class ContractManifestTest {
             Set.of("implemented", "partial", "planned", "framework");
     private static final String MANIFEST_REL = "tools/ecos-cli/src/main/resources/contract/ops.json";
     private static final String CONTRACT_VERSION = "1.0.0";
+    /**
+     * 契约 operation 下限。87（MVP 首批）→ 91（CLI 生产化批 B：readiness/evidence 签名收敛后
+     * 新增 validateCognitiveModel、startCognitiveModelRun、listLlmModels、resolveModelRoute 四条）
+     * → 92（批 D：新增 createApprovalToken）。契约增减须与 gateway
+     * {@code CliContractParityTest.MIN_OPERATIONS} 同批同值。
+     */
+    private static final int MIN_OPERATIONS = 94;
 
     @Test
     @DisplayName("契约 → command manifest 生成/校验：operationId 与命令映射一致，且清单与契约 sha 绑定")
@@ -95,6 +102,8 @@ class ContractManifestTest {
         List<Map<String, Object>> operationRows = new ArrayList<>();
         Map<String, String> idToStatus = new LinkedHashMap<>();
         Map<String, Set<String>> idToParams = new LinkedHashMap<>();
+        Map<String, Set<String>> idToPathParams = new LinkedHashMap<>();
+        Map<String, Boolean> hasRequestBody = new LinkedHashMap<>();
         Set<String> ids = new HashSet<>();
         Set<String> methodPaths = new HashSet<>();
 
@@ -130,7 +139,9 @@ class ContractManifestTest {
                     assertTrue(methodPaths.add(method + " " + apiPath),
                             "(method,path) 跨契约重复: " + method + " " + apiPath);
                     idToStatus.put(operationId, status);
-                    idToParams.put(operationId, paramNames(op));
+                    idToParams.put(operationId, paramNames(op, "query", root));
+                    idToPathParams.put(operationId, paramNames(op, "path", root));
+                    hasRequestBody.put(operationId, op.containsKey("requestBody"));
 
                     Map<String, Object> row = new LinkedHashMap<>();
                     row.put("operationId", operationId);
@@ -159,8 +170,14 @@ class ContractManifestTest {
         for (CliCommand command : CliCommands.ALL) {
             assertTrue(Set.of(CliCommands.ACCESS_READ, CliCommands.ACCESS_WRITE).contains(command.accessMode()),
                     "accessMode 非法: " + command.name());
-            assertEquals(CliCommands.ACCESS_READ, command.accessMode(),
-                    "MVP 只允许只读命令；写命令须先具备 --approval-token + 服务端 ABAC 复核: " + command.name());
+            assertTrue(Set.of("L0", "L1", "L2", "L3").contains(command.automationLevel()),
+                    "automationLevel 非法: " + command.name() + " -> " + command.automationLevel());
+            if (command.requiresApproval()) {
+                assertEquals("L3", command.automationLevel(),
+                        "requiresApproval 只允许出现在 L3 命令: " + command.name());
+                assertEquals(CliCommands.ACCESS_WRITE, command.accessMode(),
+                        "requiresApproval 命令必须是 WRITE: " + command.name());
+            }
             for (String operationId : command.operationIds()) {
                 assertTrue(ids.contains(operationId),
                         "命令 " + command.name() + " 映射到契约中不存在的 operationId: " + operationId);
@@ -179,17 +196,59 @@ class ContractManifestTest {
                 flagRow.put("description", flag.description());
                 flagRows.add(flagRow);
             }
+            List<Map<String, Object>> pathParamRows = new ArrayList<>();
+            for (CliCommand.PathParam p : command.pathParams()) {
+                assertTrue(ids.contains(p.operationId()),
+                        "pathParam " + p.flag() + " 指向不存在的 operationId: " + p.operationId());
+                assertTrue(idToPathParams.get(p.operationId()).contains(p.parameter()),
+                        "pathParam " + p.flag() + " 的参数名不在契约 " + p.operationId() + " 的 path 参数中: "
+                                + p.parameter() + "（契约实有 " + idToPathParams.get(p.operationId()) + "）");
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("flag", p.flag());
+                row.put("operationId", p.operationId());
+                row.put("parameter", p.parameter());
+                row.put("description", p.description());
+                pathParamRows.add(row);
+            }
+            List<Map<String, Object>> bodyParamRows = new ArrayList<>();
+            for (CliCommand.BodyParam b : command.bodyParams()) {
+                assertTrue(ids.contains(b.operationId()),
+                        "bodyParam " + b.flag() + " 指向不存在的 operationId: " + b.operationId());
+                assertTrue(hasRequestBody.getOrDefault(b.operationId(), false),
+                        "bodyParam " + b.flag() + " 指向的 " + b.operationId()
+                                + " 在契约中没有 requestBody（CLI 不得凭空造请求体）");
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("flag", b.flag());
+                row.put("operationId", b.operationId());
+                row.put("parameter", b.parameter());
+                row.put("description", b.description());
+                bodyParamRows.add(row);
+            }
             Map<String, Object> commandRow = new LinkedHashMap<>();
             commandRow.put("name", command.name());
             commandRow.put("description", command.description());
             commandRow.put("accessMode", command.accessMode());
+            commandRow.put("automationLevel", command.automationLevel());
+            commandRow.put("requiresApproval", command.requiresApproval());
+            commandRow.put("wired", command.wired());
             commandRow.put("operationIds", command.operationIds());
             commandRow.put("flags", flagRows);
+            commandRow.put("pathParams", pathParamRows);
+            commandRow.put("bodyParams", bodyParamRows);
             commandRows.add(commandRow);
         }
 
+        // 未接入的命令必须自证"已登记但不可用"：不得带可调用的 operationId 却不解释原因
+        for (CliCommand command : CliCommands.ALL) {
+            if (!command.wired()) {
+                assertTrue(!command.description().isBlank(),
+                        "未接入命令 " + command.name() + " 必须有说明（为何 UNAVAILABLE）");
+            }
+        }
+
         // 非空下限：防止"契约全删光 ⇒ 门禁空转通过"。新增契约时上调并在登记册留凭证。
-        assertTrue(ids.size() >= 87, "契约 operation 数低于下限 87（实得 " + ids.size() + "）");
+        assertTrue(ids.size() >= MIN_OPERATIONS,
+                "契约 operation 数低于下限 " + MIN_OPERATIONS + "（实得 " + ids.size() + "）");
 
         Map<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("contractVersion", CONTRACT_VERSION);
@@ -218,19 +277,53 @@ class ContractManifestTest {
         return (Map<String, Object>) value;
     }
 
+    /**
+     * 契约参数名（含 {@code $ref} 到 components.parameters 的形态——
+     * 不展开会把 runId 这类路径参数读成空集，门禁变成"永远没有参数"的假绿）。
+     */
     @SuppressWarnings("unchecked")
-    private static Set<String> paramNames(Map<String, Object> op) {
+    private static Set<String> paramNames(Map<String, Object> op, String in, Map<String, Object> root) {
         Object raw = op.get("parameters");
         if (!(raw instanceof List<?> list)) {
             return Set.of();
         }
+        Map<String, Object> componentParams = componentParameters(root);
         Set<String> names = new HashSet<>();
         for (Object item : list) {
-            if (item instanceof Map<?, ?> m && "query".equals(String.valueOf(m.get("in")))) {
-                names.add(String.valueOf(m.get("name")));
+            if (!(item instanceof Map<?, ?> m)) {
+                continue;
+            }
+            Map<?, ?> p = m;
+            Object ref = m.get("$ref");
+            if (ref != null) {
+                String key = String.valueOf(ref);
+                int slash = key.lastIndexOf('/');
+                Object resolved = slash >= 0 ? componentParams.get(key.substring(slash + 1)) : null;
+                if (!(resolved instanceof Map<?, ?> rm)) {
+                    continue;
+                }
+                p = rm;
+            }
+            if (in.equals(String.valueOf(p.get("in")))) {
+                names.add(String.valueOf(p.get("name")));
             }
         }
         return names;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> componentParameters(Map<String, Object> root) {
+        Object components = root.get("components");
+        if (!(components instanceof Map<?, ?> c)) {
+            return Map.of();
+        }
+        Object params = c.get("parameters");
+        if (!(params instanceof Map<?, ?> p)) {
+            return Map.of();
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        p.forEach((k, v) -> out.put(String.valueOf(k), v));
+        return out;
     }
 
     private static String str(Object value) {

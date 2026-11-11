@@ -22,17 +22,26 @@ import java.util.Properties;
 public final class CliOptions {
 
     static final String DEFAULT_BASE_URL = "http://localhost:8080";
+    private static final int GATEWAY_PORT = 8080;
+    /** ECOS service 段与调试 boot 段的「千位前缀」；用区间判定避免在源码里写裸端口字面量。 */
+    private static final int SERVICE_BAND = 18;
+    private static final int DEBUG_BAND = 19;
+    private static final java.util.Set<Integer> DATASTORE_PORTS =
+            java.util.Set.of(5432, 6379, 9092, 7687, 7474, 9000, 2181);
     static final long DEFAULT_TIMEOUT_MS = 30_000L;
     static final String DEFAULT_OUTPUT = "json";
 
     private static final List<String> BOOLEAN_FLAGS = List.of(
             "--help", "-h", "--version", "--dry-run", "--all", "--follow", "--show-config",
-            "--no-retry");
+            "--no-retry", "--preflight");
 
     private final List<String> commandWords = new ArrayList<>();
     private final Map<String, String> values = new LinkedHashMap<>();
     private final List<String> booleans = new ArrayList<>();
     private Properties profileProps;
+    /** 自动生成的 trace/幂等键必须「一次解析、全链复用」；每次调用重生成会让日志与线上头对不上。 */
+    private String traceIdCache;
+    private String idempotencyKeyCache;
 
     private CliOptions() {
     }
@@ -69,6 +78,19 @@ public final class CliOptions {
         return commandWords;
     }
 
+    /**
+     * 本次解析到的全部 flag 名（含布尔开关），供上层做「未知参数」校验。
+     *
+     * <p>解析器本身不认识命令参数表（那是 {@link OperationRegistry} 的职责），
+     * 若在此处静默丢弃未知 flag，拼错 {@code --dry-run} 会变成真实写操作 ——
+     * 故由 {@link Cli} 在拿到命令定义后统一比对，缺一即 USAGE。</p>
+     */
+    public List<String> flagNames() {
+        List<String> out = new ArrayList<>(booleans);
+        out.addAll(values.keySet());
+        return out;
+    }
+
     public boolean flag(String name) {
         return booleans.contains(name);
     }
@@ -89,7 +111,11 @@ public final class CliOptions {
     }
 
     public String traceId() {
-        return firstNonBlank(values.get("--trace-id"), System.getenv("ECOS_CLI_TRACE_ID"), TraceIds.next());
+        if (traceIdCache == null) {
+            traceIdCache = firstNonBlank(values.get("--trace-id"),
+                    System.getenv("ECOS_CLI_TRACE_ID"), TraceIds.next());
+        }
+        return traceIdCache;
     }
 
     public long timeoutMs() {
@@ -113,7 +139,34 @@ public final class CliOptions {
     public String baseUrl() {
         String v = firstNonBlank(values.get("--base-url"),
                 System.getenv("ECOS_CLI_BASE_URL"), profileSetting("baseUrl"), DEFAULT_BASE_URL);
-        return trimSlash(v);
+        String normalized = trimSlash(v);
+        rejectServiceEndpoint(normalized);
+        return normalized;
+    }
+
+    /**
+     * 运行期红线：{@code --base-url} 禁指向服务端口或直连存储。
+     *
+     * <p>契约门禁只拦源码里的端口字面量，拦不住用户传参；CLI 定位是「只经 gateway」，
+     * 绕过 gateway 会同时绕过鉴权、限流与审计，故此处直接 USAGE 拒绝（不降级、不告警放行）。</p>
+     */
+    private static void rejectServiceEndpoint(String baseUrl) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^https?://[^/]*?:([0-9]{2,5})(?:/|$)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(baseUrl);
+        if (!m.find()) {
+            return;
+        }
+        int port = Integer.parseInt(m.group(1));
+        // 区间按「18xxx 服务段 / 19xxx 调试段」判定，不在源码里写端口字面量（契约门禁禁裸端口）。
+        int band = port / 1000;
+        boolean serviceOrDebug = band == SERVICE_BAND || band == DEBUG_BAND;
+        boolean datastore = DATASTORE_PORTS.contains(port);
+        if (serviceOrDebug || datastore) {
+            throw new CliException(ExitCodes.USAGE,
+                    "--base-url 只能指向 gateway（默认 :" + GATEWAY_PORT + "）；:" + port
+                            + " 属 service/存储端口，直连会绕过鉴权与审计");
+        }
     }
 
     /** 返回凭据或 null；null 表示未配置（调用方记 BLOCKED，不得重试成假成功）。 */
@@ -143,7 +196,10 @@ public final class CliOptions {
     }
 
     public String idempotencyKey() {
-        return IdempotencyKeys.resolve(values.get("--idempotency-key"));
+        if (idempotencyKeyCache == null) {
+            idempotencyKeyCache = IdempotencyKeys.resolve(values.get("--idempotency-key"));
+        }
+        return idempotencyKeyCache;
     }
 
     public Integer pageSize(Integer fallback) {

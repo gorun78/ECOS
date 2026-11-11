@@ -22,8 +22,15 @@ public final class OperationRegistry {
     public record Flag(String flag, String operationId, String parameter, String description) {
     }
 
-    public record Command(String name, String description, String accessMode,
-                   List<String> operationIds, List<Flag> flags) {
+    public record PathParam(String flag, String operationId, String parameter, String description) {
+    }
+
+    public record BodyParam(String flag, String operationId, String parameter, String description) {
+    }
+
+    public record Command(String name, String description, String accessMode, String automationLevel,
+                          List<String> operationIds, List<Flag> flags, List<PathParam> pathParams,
+                          List<BodyParam> bodyParams, boolean requiresApproval, boolean wired) {
     }
 
     private final Map<String, Operation> operations;
@@ -64,12 +71,33 @@ public final class OperationRegistry {
                             f.path("parameter").asText(),
                             f.path("description").asText()));
                 }
+                List<PathParam> pathParams = new ArrayList<>();
+                for (JsonNode p : n.path("pathParams")) {
+                    pathParams.add(new PathParam(
+                            p.path("flag").asText(),
+                            p.path("operationId").asText(),
+                            p.path("parameter").asText(),
+                            p.path("description").asText()));
+                }
+                List<BodyParam> bodyParams = new ArrayList<>();
+                for (JsonNode b : n.path("bodyParams")) {
+                    bodyParams.add(new BodyParam(
+                            b.path("flag").asText(),
+                            b.path("operationId").asText(),
+                            b.path("parameter").asText(),
+                            b.path("description").asText()));
+                }
                 cmds.add(new Command(
                         n.path("name").asText(),
                         n.path("description").asText(),
                         n.path("accessMode").asText(),
+                        n.path("automationLevel").asText("L0"),
                         ids,
-                        flags));
+                        flags,
+                        pathParams,
+                        bodyParams,
+                        n.path("requiresApproval").asBoolean(false),
+                        n.path("wired").asBoolean(true)));
             }
             return new OperationRegistry(ops, cmds);
         } catch (CliException e) {
@@ -106,5 +134,33 @@ public final class OperationRegistry {
             }
         }
         throw new CliException(ExitCodes.USAGE, "未知命令: " + commandName);
+    }
+
+    /** 命令的 path 参数映射（flag → 契约路径参数名）。 */
+    public Map<String, PathParam> pathParamsOf(String commandName) {
+        for (Command c : commands) {
+            if (c.name().equals(commandName)) {
+                Map<String, PathParam> map = new LinkedHashMap<>();
+                c.pathParams().forEach(p -> map.put(p.flag(), p));
+                return map;
+            }
+        }
+        throw new CliException(ExitCodes.USAGE, "未知命令: " + commandName);
+    }
+
+    /** 命令的请求体参数映射（flag → 契约 body 字段名）。 */
+    public Map<String, BodyParam> bodyParamsOf(String commandName) {
+        for (Command c : commands) {
+            if (c.name().equals(commandName)) {
+                Map<String, BodyParam> map = new LinkedHashMap<>();
+                c.bodyParams().forEach(b -> map.put(b.flag(), b));
+                return map;
+            }
+        }
+        throw new CliException(ExitCodes.USAGE, "未知命令: " + commandName);
+    }
+
+    public boolean has(String operationId) {
+        return operations.containsKey(operationId);
     }
 }
