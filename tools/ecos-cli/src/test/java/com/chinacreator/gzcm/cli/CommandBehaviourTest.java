@@ -62,7 +62,7 @@ class CommandBehaviourTest {
 
         assertEquals("SUCCESS", out.get("status"));
         List<?> commands = (List<?>) ((Map<?, ?>) out.get("data")).get("commands");
-        assertEquals(16, commands.size(), "14 条设计命令 + doctor/capabilities list 两条 MVP 命令");
+        assertEquals(17, commands.size(), "14 条设计命令 + doctor/capabilities list 两条 MVP 命令 + knowledge validate（D-WC-1）");
         // 计划 §一 完成判定：设计册 §10.3.5 的 14 条必须逐条在列（数量相等挡不住「删一条加一条」）
         List<String> design14 = List.of(
                 "agent run", "agent inspect", "agent stop", "agent readiness",

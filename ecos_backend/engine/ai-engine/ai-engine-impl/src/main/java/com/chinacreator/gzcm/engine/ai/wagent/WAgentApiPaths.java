@@ -92,6 +92,15 @@ public final class WAgentApiPaths {
     public static final String CANDIDATE_BY_ID = BASE_PREFIX + "/candidates/{" + P_CANDIDATE_ID + "}";
     /** #19 POST；四眼；语义/口径/知识禁批量（reviewCandidate）。 */
     public static final String CANDIDATE_REVIEW = CANDIDATE_BY_ID + "/review";
+    /**
+     * POST；候选五段自检（{@code validateWagentCandidate}，D-WC-1 补断档）。
+     *
+     * <p>状态机 {@code generated|validated → validating → validated}：五段校验各落 V238 的
+     * {@code validation_*} 一列；任何一段 fail 停在 {@code validating}（可重试），
+     * 全非 fail 推进 {@code validated} 并允许进入 #19 评审。§5.2 表外能力位
+     * （F10-20 四元校验的执行位；原文只声明"由四元校验推进状态机"未列端点形态）。</p>
+     */
+    public static final String CANDIDATE_VALIDATE = CANDIDATE_BY_ID + "/validate";
     /** #20 POST；approval_token 必填；pre-commit 裁决 + Git 归档（publishCandidate，F10-23）。 */
     public static final String CANDIDATE_PUBLISH = CANDIDATE_BY_ID + "/publish";
 

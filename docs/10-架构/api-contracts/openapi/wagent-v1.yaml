@@ -692,6 +692,9 @@ paths:
         只落候选行（{@code ecos_ai.ecos_wagent_candidate}），初始状态 {@code generated}；
         后续四元校验/评审/发布各自推进状态机。
         {@code payload_hash} 由服务端按 payload_json 计算（SHA-256 hex），调用方不得自报。
+        {@code targetObjectRefJson} 为候选所作用的目标对象引用，服务端按 key 字典序规范化后落库
+        （validate 的 conflict 段按该列逐字比对同类型未终结候选；键序不同不算冲突）。
+        非法 JSON ⇒ 400。不传则该列为空，conflict 段走 skipped。
       requestBody:
         required: true
         content:
@@ -709,6 +712,12 @@ paths:
                 generatedByRun: { type: string }
                 batchId: { type: string }
                 confidence: { type: number, description: 概率（0~1，NUMERIC(5,4)） }
+                targetObjectRefJson:
+                  type: string
+                  description: |
+                    目标对象引用（JSON 串，如 {"engine":"ontology","objectId":"obj-1","objectType":"ENTITY"}）。
+                    服务端规范化（key 字典序）后落 target_object_ref_json；非法 JSON ⇒ 400。
+                    该列是 validate conflict 段的比对键，缺失时该段 skipped。
       responses:
         "201":
           description: 已建候选（data 为候选详情，status=generated）
@@ -770,6 +779,44 @@ paths:
         "403": { $ref: "#/components/responses/E-POLICY" }
         "404": { $ref: "#/components/responses/E-NOT-FOUND" }
         "409": { $ref: "#/components/responses/E-WA-STATE" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/candidates/{candidateId}/validate:
+    post:
+      tags: [candidates]
+      operationId: validateWagentCandidate
+      summary: 候选五段自检（generated/validating/validated → validated，D-WC-1）
+      x-implementation-status: implemented   # WAgentCandidateController#validateCandidate（D-WC-1，2026-11-11）
+      x-design-ref: "详设-10 F10-20 四元校验的执行位；§5.2 表外能力位（原文只声明『由四元校验推进状态机』未列端点形态）"
+      x-note-2026-11-11: |
+        补 D-WC-1 断档：建候选恒 generated，而 #19 评审只接受 validated/review_pending，
+        此前全仓无任何写 validated 的通道 ⇒ 候选无法进入评审。
+        本端点执行五段确定性自检（structure/reference/conflict/impact/regression，
+        词表单源 WAgentEnums.CandidateValidationStatus = pass|warn|fail|skipped）：
+        任一段 fail ⇒ 停 validating（返回 200 + 五段明细，可修复后重跑）；
+        全非 fail ⇒ validated，此后可评审。过期候选 409；已进评审链/旁路终态 409。
+        五段结果与状态同一次 CAS 写入（WHERE status=进入时状态，0 行即 409）。
+      description: |
+        五段语义：①structure=payload_json 为合法 JSON 对象；②reference=basis_json 非空且可解析；
+        ③conflict=同类型同目标对象无并存未终结候选（无目标对象引用时 skipped）；
+        ④impact=target_engine 属登记六代号（未指定 warn 不阻断，未登记 fail）；
+        ⑤regression=无回归基线时 skipped。
+      parameters:
+        - $ref: "#/components/parameters/CandidateId"
+      responses:
+        "200":
+          description: 校验完成（data 含 status 与五段 validation 明细）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409":
+          description: "过期或状态不符（仅 generated/validating/validated 可校验），errorCode = E-WA-STATE"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
         "500": { $ref: "#/components/responses/E-INTERNAL" }
 
   /api/v1/wagent/candidates/{candidateId}/publish:

@@ -26,6 +26,7 @@ Register-ArgumentCompleter -Native -CommandName ecos -ScriptBlock {
         'validate',
         'publish',
         'extract',
+        'validate',
         'publish',
         'commit',
         'list',

@@ -55,7 +55,7 @@ class ContractManifestTest {
      * → 92（批 D：新增 createApprovalToken）。契约增减须与 gateway
      * {@code CliContractParityTest.MIN_OPERATIONS} 同批同值。
      */
-    private static final int MIN_OPERATIONS = 94;
+    private static final int MIN_OPERATIONS = 95;
 
     @Test
     @DisplayName("契约 → command manifest 生成/校验：operationId 与命令映射一致，且清单与契约 sha 绑定")

@@ -180,9 +180,11 @@ class WAgentForbiddenDependencyArchTest {
      * {@code ApprovalTokenService} 与 {@code wagent.controller.WAgentApprovalController}。
      * <p>2026-11-10 +2（295→297）＝ action 面真实现：新增 {@code wagent.dataobject.WAgentActionDO}
      * 与 {@code wagent.dao.WAgentActionDao}（V283 表已在，原「表未落地」口径订正）。</p>
+     * <p>2026-11-11 +1（297→298）＝ D-WC-1 候选 validate 通道：新增
+     * {@code wagent.validate.WAgentCandidateValidationService}（五段自检执行器，零外部引擎依赖）。</p>
      * </p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 297;
+    private static final int AI_SOURCE_FILE_FLOOR = 298;
 
     /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
      *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */

@@ -688,4 +688,69 @@ public final class WAgentEnums {
 
         public static final Set<String> ALL = wordSet(values());
     }
+
+    /**
+     * 候选五段校验结果词表（V238 {@code validation_structure/reference/conflict/impact/regression}
+     * 各 {@code VARCHAR(12)}；词表原挂 R3-A 定版，本批随 validate 通道落地冻结）。
+     *
+     * <p><b>语义</b>：{@code pass} 通过；{@code warn} 可继续但需人工注意（不阻断推进）；
+     * {@code fail} 阻断（候选停在 {@code validating}）；{@code skipped} 该段未适用（如无回归基线）。</p>
+     *
+     * <p><b>推进口径（单源）</b>：任何一段 {@code fail} ⇒ 不推进（保持 {@code validating}）；
+     * 全部非 fail ⇒ {@code validated}。此判定只在 {@code WAgentCandidateValidationService} 实现一次。</p>
+     */
+    public enum CandidateValidationStatus implements WAgentValue {
+        PASS("pass"),
+        WARN("warn"),
+        FAIL("fail"),
+        SKIPPED("skipped");
+
+        private final String value;
+
+        CandidateValidationStatus(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String value() {
+            return value;
+        }
+
+        public static final Set<String> ALL = wordSet(values());
+
+        /** 该段结果是否阻断状态机推进（只有 fail 阻断，warn 不阻断）。 */
+        public boolean blocksAdvance() {
+            return this == FAIL;
+        }
+    }
+
+    /**
+     * 五段校验的段名（V238 五列一列一段；键面 = 候选详情的 {@code validation} 对象五键）。
+     * 段序即 {@code validation_structure→reference→conflict→impact→regression}，禁乱序。
+     */
+    public enum CandidateValidationSegment implements WAgentValue {
+        /** ① 结构：payload_json 可解析 + 必填键齐 + 类型自洽 */
+        STRUCTURE("structure"),
+        /** ② 引用闭合：basis_json 引用的对象/版本存在（缺依据即 fail） */
+        REFERENCE("reference"),
+        /** ③ 冲突：同类型同目标对象无并存未终结候选 */
+        CONFLICT("conflict"),
+        /** ④ 影响：目标引擎可解析（属主可定位），未登记引擎即 fail */
+        IMPACT("impact"),
+        /** ⑤ 回归：无回归基线时 skipped（第五道，若启用） */
+        REGRESSION("regression");
+
+        private final String value;
+
+        CandidateValidationSegment(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String value() {
+            return value;
+        }
+
+        public static final Set<String> ALL = wordSet(values());
+    }
 }

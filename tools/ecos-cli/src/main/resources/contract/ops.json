@@ -15,9 +15,9 @@
     },
     {
       "file" : "wagent-v1.yaml",
-      "sha256" : "cc9559eba018772ac3449b24a384c90b7723e96734196ad04367ec3443337ba7",
-      "paths" : 27,
-      "operations" : 28
+      "sha256" : "b91d6b41719ec694b943e33cec27edaed2e0a0310f607388a7bf7402fa650cdb",
+      "paths" : 28,
+      "operations" : 29
     }
   ],
   "operations" : [
@@ -540,6 +540,13 @@
       "contract" : "wagent-v1.yaml"
     },
     {
+      "operationId" : "validateWagentCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/candidates/{candidateId}/validate",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
       "operationId" : "listClaims",
       "method" : "GET",
       "path" : "/api/v1/wagent/claims/{runId}",
@@ -933,12 +940,39 @@
           "description" : "生成依据（证据/口径引用）"
         },
         {
+          "flag" : "--target-object-ref",
+          "operationId" : "createWagentCandidate",
+          "parameter" : "targetObjectRefJson",
+          "description" : "目标对象引用 JSON 串（validate conflict 段的比对键；键序由服务端规范化）"
+        },
+        {
           "flag" : "--run-id",
           "operationId" : "createWagentCandidate",
           "parameter" : "generatedByRun",
           "description" : "生成该候选的 Run"
         }
       ]
+    },
+    {
+      "name" : "knowledge validate",
+      "description" : "知识候选五段自检（structure/reference/conflict/impact/regression；任一段 fail 停 validating）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L1",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "validateWagentCandidate"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--candidate-id",
+          "operationId" : "validateWagentCandidate",
+          "parameter" : "candidateId",
+          "description" : "候选 ID"
+        }
+      ],
+      "bodyParams" : [ ]
     },
     {
       "name" : "knowledge publish",

@@ -50,6 +50,10 @@ class WAgentDecisionActionControllerTest {
         securityClient = mock(AiSecurityEngineClient.class);
         WAgentIdentityResolver identityResolver = mock(WAgentIdentityResolver.class);
         when(identityResolver.require()).thenReturn(new Identity("t1", "u1", "o1"));
+        // 批 A（2026-11-11）：提交面改调 requireWithRoles() 取真实角色集（授权墙双修之一）
+        when(identityResolver.requireWithRoles()).thenReturn(
+                new WAgentIdentityResolver.IdentityWithRoles(
+                        "t1", "u1", "o1", java.util.List.of("admin")));
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new WAgentDecisionActionController(identityResolver, tokenService,
                         securityClient, actionDao, "http://127.0.0.1:1", 800L))
@@ -117,7 +121,7 @@ class WAgentDecisionActionControllerTest {
     @DisplayName("#24b 裁决 DENY ⇒ 403 且不消费凭证、不推进状态（fail-closed 不烧审批）")
     void commitDeniedByAdjudication() throws Exception {
         when(actionDao.findById("a1")).thenReturn(Optional.of(draft("a1", "workspace")));
-        when(securityClient.evaluate(any(), any(), any(), any())).thenReturn(false);
+        when(securityClient.evaluate(any(), any(), any(), any(), any())).thenReturn(false);
 
         assertEquals(403, postJson("/api/v1/wagent/actions/a1/commit",
                 "{\"approvalToken\":\"tok\"}").getResponse().getStatus());
@@ -129,7 +133,7 @@ class WAgentDecisionActionControllerTest {
     @DisplayName("#24b 裁决通过但属主派发不可达 ⇒ 502，且状态停在 COMMITTING（绝不伪 COMMITTED）")
     void commitDispatchFailureKeepsCommitting() throws Exception {
         when(actionDao.findById("a1")).thenReturn(Optional.of(draft("a1", "workspace")));
-        when(securityClient.evaluate(any(), any(), any(), any())).thenReturn(true);
+        when(securityClient.evaluate(any(), any(), any(), any(), any())).thenReturn(true);
         when(actionDao.transitionStatus(eq("a1"), eq("DRAFT"), eq("COMMITTING"), any(), any()))
                 .thenReturn(1);
 
@@ -143,7 +147,7 @@ class WAgentDecisionActionControllerTest {
     @DisplayName("#24b publish_target 未登记通道 ⇒ 400（禁猜属主端点），且不消费凭证")
     void commitRejectsUnknownTarget() throws Exception {
         when(actionDao.findById("a1")).thenReturn(Optional.of(draft("a1", "unknown")));
-        when(securityClient.evaluate(any(), any(), any(), any())).thenReturn(true);
+        when(securityClient.evaluate(any(), any(), any(), any(), any())).thenReturn(true);
 
         assertEquals(400, postJson("/api/v1/wagent/actions/a1/commit",
                 "{\"approvalToken\":\"tok\"}").getResponse().getStatus());

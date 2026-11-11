@@ -15,7 +15,7 @@ _ecos_completion() {
         capabilities) COMPREPLY=( $(compgen -W "list" -- "${cur}") ); return 0 ;;
         agent) COMPREPLY=( $(compgen -W "run inspect stop readiness" -- "${cur}") ); return 0 ;;
         ontology) COMPREPLY=( $(compgen -W "validate publish" -- "${cur}") ); return 0 ;;
-        knowledge) COMPREPLY=( $(compgen -W "extract publish" -- "${cur}") ); return 0 ;;
+        knowledge) COMPREPLY=( $(compgen -W "extract validate publish" -- "${cur}") ); return 0 ;;
         action) COMPREPLY=( $(compgen -W "commit" -- "${cur}") ); return 0 ;;
         model) COMPREPLY=( $(compgen -W "list route" -- "${cur}") ); return 0 ;;
         runtime) COMPREPLY=( $(compgen -W "doctor" -- "${cur}") ); return 0 ;;

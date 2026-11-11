@@ -4,6 +4,8 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentApiPaths;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateStatus;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateType;
+import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateValidationSegment;
+import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateValidationStatus;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.ReviewDecision;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentErrorCodes.WAgentErrorCode;
 import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
@@ -18,6 +20,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentCandidateReviewDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentCandidateDO;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentCandidateReviewDO;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrationException;
+import com.chinacreator.gzcm.engine.ai.wagent.validate.WAgentCandidateValidationService;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.Identity;
 import com.fasterxml.jackson.annotation.JsonAlias;
@@ -56,6 +59,10 @@ import java.util.UUID;
 @RestController
 public class WAgentCandidateController {
 
+    /** 允许发起五段校验的状态（generated 首验 / validating 修复后重跑 / validated 复核）。 */
+    private static final java.util.Set<CandidateStatus> VALIDATABLE = java.util.Set.of(
+            CandidateStatus.GENERATED, CandidateStatus.VALIDATING, CandidateStatus.VALIDATED);
+
     private final WAgentCandidateDao candidateDao;
     private final WAgentCandidateReviewDao reviewDao;
     private final WAgentIdentityResolver identityResolver;
@@ -63,6 +70,7 @@ public class WAgentCandidateController {
     private final AiSecurityEngineClient securityClient;
     private final GitRepositoryService gitRepositoryService;
     private final DesignAssetArchiver designAssetArchiver;
+    private final WAgentCandidateValidationService validationService;
 
     public WAgentCandidateController(WAgentCandidateDao candidateDao,
                                      WAgentCandidateReviewDao reviewDao,
@@ -70,7 +78,8 @@ public class WAgentCandidateController {
                                      ApprovalTokenService approvalTokenService,
                                      AiSecurityEngineClient securityClient,
                                      GitRepositoryService gitRepositoryService,
-                                     DesignAssetArchiver designAssetArchiver) {
+                                     DesignAssetArchiver designAssetArchiver,
+                                     WAgentCandidateValidationService validationService) {
         this.candidateDao = candidateDao;
         this.reviewDao = reviewDao;
         this.identityResolver = identityResolver;
@@ -78,6 +87,7 @@ public class WAgentCandidateController {
         this.securityClient = securityClient;
         this.gitRepositoryService = gitRepositoryService;
         this.designAssetArchiver = designAssetArchiver;
+        this.validationService = validationService;
     }
 
     /** #19 评审请求体（decision 取 ReviewDecision 三值；operator 一律服务端身份，禁自报）。 */
@@ -137,6 +147,21 @@ public class WAgentCandidateController {
                     newStatus, batchId, engineDraftRefText, publishedRefText, publishedGitRef,
                     expireTime, expired, versionNo, createTime);
         }
+
+        /** validate 回显：状态与五段校验结果同一次写入（避免"已 validated 但校验列还空着"）。 */
+        CandidateViewVO withValidation(String newStatus,
+                                       Map<CandidateValidationSegment, CandidateValidationStatus> results) {
+            CandidateValidationVO fresh = new CandidateValidationVO(
+                    results.get(CandidateValidationSegment.STRUCTURE).value(),
+                    results.get(CandidateValidationSegment.REFERENCE).value(),
+                    results.get(CandidateValidationSegment.CONFLICT).value(),
+                    results.get(CandidateValidationSegment.IMPACT).value(),
+                    results.get(CandidateValidationSegment.REGRESSION).value());
+            return new CandidateViewVO(candidateId, candidateType, targetEngine, targetObjectRefJson,
+                    payloadHash, generatedByRun, generatedByStep, confidence, basisJson, fresh,
+                    newStatus, batchId, engineDraftRefText, publishedRefText, publishedGitRef,
+                    expireTime, expired, versionNo, createTime);
+        }
     }
 
     /** 评审视图（7 键；approval_token 只出存在位，凭证不外泄）。 */
@@ -188,7 +213,9 @@ public class WAgentCandidateController {
     /** 建候选请求体（knowledge extract 的落点；只落候选，不直写知识库）。 */
     public record CandidateCreateRequest(String candidateType, String targetEngine, String payloadJson,
                                          String basisJson, String generatedByRun, String batchId,
-                                         BigDecimal confidence) {
+                                         BigDecimal confidence,
+                                         @JsonProperty("targetObjectRefJson")
+                                         @JsonAlias("target_object_ref_json") String targetObjectRefJson) {
     }
 
     /**
@@ -196,6 +223,12 @@ public class WAgentCandidateController {
      *
      * <p>初始状态固定 {@code GENERATED}（四元校验与评审各自推进状态机，禁直接置 approved）；
      * 载荷哈希由服务端计算，调用方不得自报（防「哈希与载荷不一致」）。</p>
+     *
+     * <p><b>target_object_ref_json</b>（可选）：候选所作用的目标对象引用（如
+     * {@code {"engine":"ontology","objectId":"obj-1","objectType":"ENTITY"}}）。
+     * 服务端按 key 字典序规范化后落库 —— 冲突段（同类型同目标并存未终结候选）依赖它做**逐字**
+     * 比对，若保留调用方原始键序，同语义的两条候选会因序列化差异漏判冲突。
+     * 非法 JSON 一律 400（禁把不可解析的引用写进冲突判定面）。</p>
      */
     @PostMapping(WAgentApiPaths.CANDIDATES_COLLECTION)
     public ResponseEntity<ApiResponse<CandidateDetailVO>> createCandidate(
@@ -213,11 +246,18 @@ public class WAgentCandidateController {
         if (req.payloadJson() == null || req.payloadJson().isBlank()) {
             throw WAgentOrchestrationException.validation("payload_json 必填（候选载荷不得为空）");
         }
+        String targetObjectRef;
+        try {
+            targetObjectRef = WAgentCandidateValidationService.canonicalTargetRef(req.targetObjectRefJson());
+        } catch (IllegalArgumentException e) {
+            throw WAgentOrchestrationException.validation(e.getMessage());
+        }
 
         WAgentCandidateDO candidate = new WAgentCandidateDO();
         candidate.setId(UUID.randomUUID().toString());
         candidate.setCandidateType(type);
         candidate.setTargetEngine(req.targetEngine());
+        candidate.setTargetObjectRefJson(targetObjectRef);
         candidate.setPayloadJson(req.payloadJson());
         candidate.setPayloadHash(sha256(req.payloadJson()));
         candidate.setBasisJson(req.basisJson());
@@ -278,9 +318,65 @@ public class WAgentCandidateController {
                 reviewView(reviewDao.findByCandidateId(candidate.getId()))));
     }
 
+    /**
+     * 五段自检（D-WC-1：补 {@code generated → validating → validated} 断档）。
+     *
+     * <p><b>状态闸</b>：只接受 {@code generated / validating / validated} —— 已进入评审链
+     * （review_pending 及以后）或旁路终态（rejected/expired/rolled_back）一律 409，
+     * 过期候选同样 409（TTL 口径与评审一致）。</p>
+     *
+     * <p><b>推进语义</b>：五段结果先落库（与状态同一次 CAS 写），任一段 fail ⇒ 停
+     * {@code validating}（可修复 payload/basis 后重跑，返回 200 与五段明细，不是错误）；
+     * 全非 fail ⇒ {@code validated}，此后 #19 评审方可受理。</p>
+     *
+     * <p><b>并发</b>：CAS {@code WHERE status = 进入时状态}，落库 0 行即 409（两路同时校验）。</p>
+     */
+    @PostMapping(WAgentApiPaths.CANDIDATE_VALIDATE)
+    public ApiResponse<CandidateDetailVO> validateCandidate(
+            @PathVariable(WAgentApiPaths.P_CANDIDATE_ID) String candidateId) {
+        Identity identity = identityResolver.require();
+        WAgentCandidateDO candidate = loadForTenant(candidateId, identity.tenantId());
+
+        if (isExpired(candidate)) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_STATE,
+                    "候选已过期（TTL，F10-20），不得校验: status=" + candidate.getStatus(),
+                    Map.of("candidateId", candidate.getId(), "status", candidate.getStatus()));
+        }
+        CandidateStatus current = toStatus(candidate.getStatus());
+        if (current == null || !VALIDATABLE.contains(current)) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_STATE,
+                    "当前状态不允许校验（仅 generated/validating/validated）: status=" + candidate.getStatus(),
+                    Map.of("candidateId", candidate.getId(), "status", String.valueOf(candidate.getStatus())));
+        }
+
+        // 冲突段数据面：同租户候选（DAO 已按租户收口；类型/目标对象在服务内比对）
+        java.util.List<WAgentCandidateDO> peers = candidateDao.findByTenant(identity.tenantId());
+        Map<CandidateValidationSegment, CandidateValidationStatus> results =
+                validationService.validate(candidate, peers);
+        boolean blocked = validationService.blocksAdvance(results);
+
+        String from = current.value();
+        String next = blocked ? CandidateStatus.VALIDATING.value() : CandidateStatus.VALIDATED.value();
+        int updated = candidateDao.updateValidation(candidate.getId(), from, next,
+                results.get(CandidateValidationSegment.STRUCTURE).value(),
+                results.get(CandidateValidationSegment.REFERENCE).value(),
+                results.get(CandidateValidationSegment.CONFLICT).value(),
+                results.get(CandidateValidationSegment.IMPACT).value(),
+                results.get(CandidateValidationSegment.REGRESSION).value(),
+                identity.operator());
+        if (updated != 1) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_STATE,
+                    "校验落库未生效（并发状态变化），请重查候选状态",
+                    Map.of("candidateId", candidate.getId()));
+        }
+
+        return WAgentRunController.ok(CandidateDetailVO.of(
+                CandidateViewVO.of(candidate).withValidation(next, results),
+                reviewView(reviewDao.findByCandidateId(candidate.getId()))));
+    }
+
     /** #19 四眼评审（在位实装，见类注释）。 */
-    @PostMapping(WAgentApiPaths.CANDIDATE_REVIEW)
-    public ApiResponse<CandidateDetailVO> reviewCandidate(
+    @PostMapping(WAgentApiPaths.CANDIDATE_REVIEW)    public ApiResponse<CandidateDetailVO> reviewCandidate(
             @PathVariable(WAgentApiPaths.P_CANDIDATE_ID) String candidateId,
             @RequestBody CandidateReviewRequest req) {
         Identity identity = identityResolver.require();

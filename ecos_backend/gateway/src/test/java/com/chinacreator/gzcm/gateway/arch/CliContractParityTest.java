@@ -55,7 +55,7 @@ class CliContractParityTest {
      * 签名收敛只改路径不改条数）→ 92（批 D：新增 createApprovalToken）。与 CLI 侧
      * {@code ContractManifestTest.MIN_OPERATIONS} 必须同值。
      */
-    private static final int MIN_OPERATIONS = 94;
+    private static final int MIN_OPERATIONS = 95;
     private static final int MIN_CONTROLLER_ROUTES = 200;
 
     private static final Set<String> HTTP_METHODS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");

@@ -78,10 +78,15 @@ class WAgentCandidateWireShapeTest {
         gitRepositoryService = mock(com.chinacreator.gzcm.runtime.access.git.GitRepositoryService.class);
         WAgentIdentityResolver identityResolver = mock(WAgentIdentityResolver.class);
         when(identityResolver.require()).thenReturn(new Identity("t1", "u1", "o1"));
+        // 批 A（2026-11-11）：发布面改调 requireWithRoles() 取真实角色集（授权墙双修之一）
+        when(identityResolver.requireWithRoles()).thenReturn(
+                new WAgentIdentityResolver.IdentityWithRoles(
+                        "t1", "u1", "o1", java.util.List.of("admin")));
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new WAgentCandidateController(candidateDao, reviewDao, identityResolver,
                         mock(com.chinacreator.gzcm.engine.ai.wagent.approval.ApprovalTokenService.class),
-                        securityClient, gitRepositoryService, designAssetArchiver))
+                        securityClient, gitRepositoryService, designAssetArchiver,
+                        new com.chinacreator.gzcm.engine.ai.wagent.validate.WAgentCandidateValidationService()))
                 .setControllerAdvice(new WAgentOrchestrationAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
@@ -196,7 +201,7 @@ class WAgentCandidateWireShapeTest {
     @DisplayName("#20 归档不可用 ⇒ 502 且不落 published（原 501 降级形态已被真闭环取代）")
     void publishArchiveUnavailableShape() throws Exception {
         fullCandidate("c4", CandidateStatus.APPROVED.value());
-        when(securityClient.evaluate(any(), any(), any(), any())).thenReturn(true);
+        when(securityClient.evaluate(any(), any(), any(), any(), any())).thenReturn(true);
         when(gitRepositoryService.getDefaultRepository())
                 .thenReturn(new com.chinacreator.gzcm.runtime.access.git.entity.GitRepository());
         when(designAssetArchiver.archive(any(), any(), any(), any(), any(), any(), any()))

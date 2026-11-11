@@ -99,6 +99,26 @@ public class WAgentCandidateDao extends JdbcTemplateDaoSupport {
     }
 
     /**
+     * 五段校验结果 + 状态一次回写（D-WC-1 validate 通道）。
+     *
+     * <p><b>CAS 兜底</b>：{@code WHERE status = expectedFrom} 防两路并发 validate 同时推进
+     * （返回 0 即调用方判 409，禁把并发竞争写成已推进）。五段列同时落库，
+     * 保证「详情可见的校验结论」与「状态」出自同一次写入，不会出现"状态已 validated 但校验列还是空的"。</p>
+     *
+     * @return 影响行数（0 = 状态已被并发改变）
+     */
+    public int updateValidation(String id, String expectedFrom, String status,
+                                String structure, String reference, String conflict,
+                                String impact, String regression, String updateBy) {
+        return update("UPDATE " + TABLE + " SET validation_structure = ?, validation_reference = ?, "
+                + "validation_conflict = ?, validation_impact = ?, validation_regression = ?, "
+                + "status = ?, update_by = ?, update_time = CURRENT_TIMESTAMP "
+                + "WHERE id = ? AND status = ? AND is_deleted = 0",
+                structure, reference, conflict, impact, regression,
+                status, updateBy, id, expectedFrom);
+    }
+
+    /**
      * 发布落库（#20）：状态 + 发布产物引用 + Git 归档引用一次写入。
      * <p>只在 {@code status='approved'} 时生效（WHERE 兜底防并发双发布）。</p>
      */

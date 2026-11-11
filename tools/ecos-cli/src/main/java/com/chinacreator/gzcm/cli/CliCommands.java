@@ -28,6 +28,7 @@ public final class CliCommands {
     public static final String ONTOLOGY_VALIDATE = "ontology validate";
     public static final String ONTOLOGY_PUBLISH = "ontology publish";
     public static final String KNOWLEDGE_EXTRACT = "knowledge extract";
+    public static final String KNOWLEDGE_VALIDATE = "knowledge validate";
     public static final String KNOWLEDGE_PUBLISH = "knowledge publish";
     public static final String COGNITION_MODEL_VALIDATE = "cognition model validate";
     public static final String COGNITION_MODEL_RUN = "cognition model run";
@@ -147,9 +148,21 @@ public final class CliCommands {
                                     "targetEngine", "属主引擎"),
                             new CliCommand.BodyParam("--basis-json", "createWagentCandidate",
                                     "basisJson", "生成依据（证据/口径引用）"),
+                            new CliCommand.BodyParam("--target-object-ref", "createWagentCandidate",
+                                    "targetObjectRefJson",
+                                    "目标对象引用 JSON 串（validate conflict 段的比对键；键序由服务端规范化）"),
                             new CliCommand.BodyParam("--run-id", "createWagentCandidate",
                                     "generatedByRun", "生成该候选的 Run")),
                     false, true),
+            new CliCommand(
+                    KNOWLEDGE_VALIDATE,
+                    "知识候选五段自检（structure/reference/conflict/impact/regression；任一段 fail 停 validating）",
+                    ACCESS_WRITE, "L1",
+                    List.of("validateWagentCandidate"),
+                    List.of(),
+                    List.of(new CliCommand.PathParam("--candidate-id", "validateWagentCandidate",
+                            "candidateId", "候选 ID")),
+                    List.of(), false, true),
             new CliCommand(
                     KNOWLEDGE_PUBLISH,
                     "知识候选发布（L3：凭证消费 + 安全裁决 + Git 归档 + 落库）",
