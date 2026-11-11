@@ -269,7 +269,13 @@ public class AuditAspect {
                 changesJson = "{\"action\":\"" + actionType + "\"}";
             }
 
-            // 写入 ecos_audit_log，获取自增 id（bigint）
+            // 写入 ecos_audit_log，获取自增 id（bigint）；trace_id 取 MDC（RequestContextFilter 注入，
+            // 与响应头 X-Trace-Id 同源，供「CLI trace_id == 审计表 trace_id」核对）
+            String traceId = currentTraceId();
+            if (traceId == null) {
+                // 留空即「审计链断」：不阻断业务，但必须留痕，否则事后无从发现该行无法与 CLI 输出对账
+                log.warn("审计行缺少 trace_id（MDC 与 X-Trace-Id/X-Request-Id 均无）：operation={}", actionType);
+            }
             Long auditId = auditLogDao.insertHashChainAudit(
                     userId,
                     actionType,
@@ -277,7 +283,8 @@ public class AuditAspect {
                     targetId,
                     changesJson,
                     ipAddress,
-                    "audit");
+                    "audit",
+                    traceId);
 
             if (auditId == null || auditId <= 0) {
                 log.warn("R1.2 full 模式: ecos_audit_log 写入未返回 id");
@@ -291,9 +298,29 @@ public class AuditAspect {
         }
     }
 
+    /** 当前链路 traceId：MDC（gateway RequestContextFilter 注入）→ 请求头 → null。 */
+    static String currentTraceId() {
+        String mdc = org.slf4j.MDC.get("traceId");
+        if (mdc != null && !mdc.isBlank()) {
+            return mdc;
+        }
+        try {
+            var attrs = RequestContextHolder.getRequestAttributes();
+            if (attrs instanceof ServletRequestAttributes sra) {
+                String v = sra.getRequest().getHeader("X-Trace-Id");
+                if (v == null || v.isBlank()) {
+                    v = sra.getRequest().getHeader("X-Request-Id");
+                }
+                return v == null || v.isBlank() ? null : v;
+            }
+        } catch (RuntimeException e) {
+            // 非请求线程（异步/定时）无上下文：留空即可，不制造假 trace
+        }
+        return null;
+    }
+
     /**
-     * R1.2: 通过反射调用 AuditHashChainService.stampHashChain(long auditLogId)。
-     * <p>该 Service 位于 security-engine-impl（上层模块），sysman-impl 编译期不可见，
+     * R1.2: 通过反射调用 AuditHashChainService.stampHashChain(long auditLogId)。     * <p>该 Service 位于 security-engine-impl（上层模块），sysman-impl 编译期不可见，
      * 故运行时从 ApplicationContext 查找 bean 并反射调用；bean 不存在时降级为不戳记。
      */
     private void invokeStampHashChain(long auditLogId) {

@@ -267,8 +267,16 @@ public class ModelRegistryService {
         return requireRow(rowId);
     }
 
+    /** 门禁裁决报告（强类型；字段名与旧 Map 键逐字一致，键序不变）。 */
+    public record GateReport(String rowId, Map<String, GateView> gates, boolean allPassed) {
+    }
+
+    /** 单门裁决：outcome = {@link GateOutcome} 名，reason = 裁决说明或不可评测原因。 */
+    public record GateView(String outcome, String reason) {
+    }
+
     /** 真实裁决四类发布门禁并落列（仅 DRAFT 行；返回各门 outcome+reason）。 */
-    public Map<String, Object> evaluateAndRecordGates(String rowId) {
+    public GateReport evaluateAndRecordGates(String rowId) {
         Map<String, Object> row = requireRow(rowId);
         requireDraft(row, rowId);
         Map<String, ModelPublishGateEvaluator.GateResult> results = gateEvaluator.evaluate(row);
@@ -280,19 +288,10 @@ public class ModelRegistryService {
         if (updated == 0) {
             throw immutable(rowId);
         }
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("rowId", rowId);
-        Map<String, Object> gates = new LinkedHashMap<>();
-        results.forEach((gate, r) -> {
-            Map<String, Object> one = new LinkedHashMap<>();
-            one.put("outcome", r.outcome().name());
-            one.put("reason", r.reason());
-            gates.put(gate, one);
-        });
-        payload.put("gates", gates);
-        payload.put("allPassed", ModelPublishGateEvaluator.allPassed(results));
+        Map<String, GateView> gates = new LinkedHashMap<>();
+        results.forEach((gate, r) -> gates.put(gate, new GateView(r.outcome().name(), r.reason())));
         evictModelCaches();
-        return payload;
+        return new GateReport(rowId, gates, ModelPublishGateEvaluator.allPassed(results));
     }
 
     /**

@@ -47,31 +47,35 @@ public class AuditLogDaoImpl implements AuditLogDao {
     @Override
     public List<AuditLog> query(AuditLog condition, int offset, int limit) throws Exception {
         try {
-            // 直接构建SQL，使用td_audit_log实际列名
             StringBuilder sqlBuilder = new StringBuilder("SELECT * FROM td_audit_log WHERE 1=1");
             List<Object> paramList = new java.util.ArrayList<>();
             if (condition != null) {
-                if (condition.getUserId() != null) { sqlBuilder.append(" AND \"USER_ID\" = ?"); paramList.add(condition.getUserId()); }
-                if (condition.getEventType() != null) { sqlBuilder.append(" AND \"ACTION\" = ?"); paramList.add(condition.getEventType()); }
-                if (condition.getResource() != null) { sqlBuilder.append(" AND \"RESOURCE_TYPE\" LIKE ?"); paramList.add("%" + condition.getResource() + "%"); }
-                if (condition.getResult() != null) { sqlBuilder.append(" AND \"OPERATION_RESULT\" = ?"); paramList.add(condition.getResult()); }
+                if (condition.getUserId() != null) { sqlBuilder.append(" AND user_id = ?"); paramList.add(condition.getUserId()); }
+                if (condition.getTenantId() != null) { sqlBuilder.append(" AND tenant_id = ?"); paramList.add(condition.getTenantId()); }
+                if (condition.getEventType() != null) { sqlBuilder.append(" AND event_type = ?"); paramList.add(condition.getEventType()); }
+                if (condition.getResource() != null) { sqlBuilder.append(" AND resource LIKE ?"); paramList.add("%" + condition.getResource() + "%"); }
+                if (condition.getResult() != null) { sqlBuilder.append(" AND result = ?"); paramList.add(condition.getResult()); }
             }
-            sqlBuilder.append(" ORDER BY \"CREATED_TIME\" DESC");
+            sqlBuilder.append(" ORDER BY timestamp DESC");
             
             List<Map<String, Object>> rows = databaseAccess.executeQuery(sqlBuilder.toString(), paramList.toArray());
             List<AuditLog> all = new java.util.ArrayList<>();
             for (Map<String, Object> row : rows) {
                 AuditLog log = new AuditLog();
-                log.setLogId((String) row.get("LOG_ID"));
-                log.setUserId((String) row.get("USER_ID"));
-                log.setAction((String) row.get("ACTION"));
-                log.setEventType((String) row.get("ACTION"));  // 复用ACTION作为eventType
-                log.setResource((String) row.get("RESOURCE_TYPE"));
-                log.setResult((String) row.get("OPERATION_RESULT"));
-                log.setIpAddress((String) row.get("IP_ADDRESS"));
-                log.setUserAgent((String) row.get("USER_AGENT"));
-                log.setDetails((String) row.get("REQUEST_DATA"));
-                Object ts = row.get("CREATED_TIME");
+                log.setLogId((String) row.get("log_id"));
+                log.setUserId((String) row.get("user_id"));
+                log.setTenantId((String) row.get("tenant_id"));
+                log.setAction((String) row.get("action"));
+                log.setEventType((String) row.get("event_type"));
+                log.setResource((String) row.get("resource"));
+                log.setResult((String) row.get("result"));
+                log.setIpAddress((String) row.get("ip_address"));
+                log.setUserAgent((String) row.get("user_agent"));
+                log.setRequestId((String) row.get("request_id"));
+                log.setDetails((String) row.get("details"));
+                Object dur = row.get("duration");
+                if (dur instanceof Number) log.setDuration(((Number) dur).intValue());
+                Object ts = row.get("timestamp");
                 if (ts instanceof java.sql.Timestamp) log.setTimestamp(((java.sql.Timestamp) ts).toLocalDateTime());
                 else if (ts instanceof java.time.LocalDateTime) log.setTimestamp((java.time.LocalDateTime) ts);
                 all.add(log);

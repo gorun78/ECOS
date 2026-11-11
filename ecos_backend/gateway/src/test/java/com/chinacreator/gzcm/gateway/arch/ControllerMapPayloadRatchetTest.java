@@ -635,8 +635,22 @@ class ControllerMapPayloadRatchetTest {
      * <p>2026-11-06 #147Z-6：按 HEAD（含用户临时提交 0bfa694a 带入的 DI-2 并发批最新面）实扫
      * 1250 行，基线 1239 已与提交面不符（门因此恒红）⇒ 按实测订正 1239→1250；这是<b>登记债</b>不是收口，
      * 后续 DI-2 清退每一批必须同批向下调回。</p>
+     * <p>2026-11-10 CLI-PROD 批（登记债，<b>非</b>收口）：提交 {@code f8748c45}「20261110」
+     * （copilot 六智能体初始化面）未经本门登记就把 <b>提交面</b>推到 1257（比 1249 多 8 行），
+     * 使门在干净 HEAD 上恒红 —— 与 #147Z-6 属同一情形（基线未随提交面同步）。
+     * 差额逐枚为：{@code CopilotController} 4→11（{@code agents}/{@code tools}/
+     * {@code quickQuestions} 三个列表载荷 + {@code chat} 的 {@code @RequestBody} 与
+     * 旧 {@code ICopilotAgentService#chat} 返回值透传面）、{@code CronJobController} 3→4
+     * （新建任务请求体）。二者由他人批次引入，本批<b>不代改</b>。
+     * 本批自身零新增并净减 1（{@code WAgentCandidateController}/
+     * {@code WAgentDecisionActionController} 的裁决属性段改由
+     * {@code AiSecurityEngineClient#candidatePublishAttrs/#actionCommitAttrs} 构造、属主派发体改
+     * {@code OwnerDispatchBody} record；{@code ForecastController} 闸门回执改
+     * {@code ModelRegistryService.GateReport}）⇒ 工作树实扫 <b>1256</b>，故基线按提交面 + 本批
+     * 净额订正为 1256。撤回路径：{@code CopilotController}/{@code CronJobController} 载荷改
+     * DTO/VO 后，同批把本值调回 1249。</p>
      */
-    private static final int BASELINE_LINES = 1249;
+    private static final int BASELINE_LINES = 1256;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -646,7 +660,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1239（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1256（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

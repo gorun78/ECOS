@@ -29,12 +29,14 @@ import java.util.UUID;
  * 早于 {@code EcosTrustHeaderFilter(+20)} 与 {@code SecurityHeadersFilter(+30)}——
  * 这样 trust 头剥离阶段 MDC 已经就绪，任何异常日志都能挂上 traceId。</p>
  */
-@Component
+@Component("ecosTraceContextFilter")
 @Order(Ordered.HIGHEST_PRECEDENCE + 11)
 public class RequestContextFilter extends OncePerRequestFilter {
 
     public static final String MDC_KEY_TRACE = "traceId";
     public static final String HEADER_TRACE  = HeaderAuthInterceptor.H_TRACE;
+    /** 新头名（详设-16 §16.4 / CLI 侧统一用 X-Trace-Id）；旧名继续兼容。 */
+    public static final String HEADER_TRACE_CANONICAL = "X-Trace-Id";
     public static final String RESPONSE_HEADER_TRACE = "X-Request-Id";
 
     @Override
@@ -42,17 +44,29 @@ public class RequestContextFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain)
             throws ServletException, IOException {
-        String inbound = request.getHeader(HEADER_TRACE);
+        String inbound = firstNonBlank(request.getHeader(HEADER_TRACE_CANONICAL),
+                request.getHeader(HEADER_TRACE));
         String traceId = (inbound == null || inbound.isBlank())
                 ? UUID.randomUUID().toString().replace("-", "")
                 : inbound.trim();
 
         MDC.put(MDC_KEY_TRACE, traceId);
+        // 双写：新头名供 CLI/新调用方读取，旧头名保证既有调用方（读 X-Request-Id）不破
+        response.setHeader(HEADER_TRACE_CANONICAL, traceId);
         response.setHeader(RESPONSE_HEADER_TRACE, traceId);
         try {
             chain.doFilter(request, response);
         } finally {
             MDC.remove(MDC_KEY_TRACE);
         }
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                return v;
+            }
+        }
+        return null;
     }
 }

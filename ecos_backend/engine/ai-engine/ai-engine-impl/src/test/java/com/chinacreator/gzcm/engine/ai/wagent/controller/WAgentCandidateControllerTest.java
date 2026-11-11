@@ -1,6 +1,10 @@
 package com.chinacreator.gzcm.engine.ai.wagent.controller;
 
+import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateStatus;
+import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
+import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
+import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentCandidateDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentCandidateReviewDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentCandidateDO;
@@ -24,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -38,17 +43,26 @@ class WAgentCandidateControllerTest {
 
     private WAgentCandidateDao candidateDao;
     private WAgentCandidateReviewDao reviewDao;
+    private AiSecurityEngineClient securityClient;
+    private GitRepositoryService gitRepositoryService;
+    private DesignAssetArchiver designAssetArchiver;
+    private com.chinacreator.gzcm.engine.ai.wagent.approval.ApprovalTokenService approvalTokenService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         candidateDao = mock(WAgentCandidateDao.class);
         reviewDao = mock(WAgentCandidateReviewDao.class);
+        securityClient = mock(AiSecurityEngineClient.class);
+        gitRepositoryService = mock(GitRepositoryService.class);
+        designAssetArchiver = mock(DesignAssetArchiver.class);
+        approvalTokenService = mock(com.chinacreator.gzcm.engine.ai.wagent.approval.ApprovalTokenService.class);
         WAgentIdentityResolver identityResolver = mock(WAgentIdentityResolver.class);
         when(identityResolver.require()).thenReturn(new Identity("t1", "u1", "o1"));
 
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new WAgentCandidateController(candidateDao, reviewDao, identityResolver))
+                .standaloneSetup(new WAgentCandidateController(candidateDao, reviewDao, identityResolver,
+                        approvalTokenService, securityClient, gitRepositoryService, designAssetArchiver))
                 .setControllerAdvice(new WAgentOrchestrationAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
@@ -146,17 +160,58 @@ class WAgentCandidateControllerTest {
     }
 
     @Test
-    @DisplayName("#20 approved + token ⇒ pre-commit 裁决/Git 归档未接线，如实 501（禁伪 published）")
-    void publishHonest501() throws Exception {
+    @DisplayName("#20 approved + token：归档不可用 ⇒ 502 且绝不落 published（禁伪成功）")
+    void publishHonest503WhenArchiveUnavailable() throws Exception {
         candidate("c6", CandidateStatus.APPROVED.value(), "gen");
+        when(securityClient.evaluate(any(), any(), any(), any())).thenReturn(true);
+        when(gitRepositoryService.getDefaultRepository())
+                .thenReturn(new com.chinacreator.gzcm.runtime.access.git.entity.GitRepository());
+        when(designAssetArchiver.archive(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(ArchiveOutcome.notAvailable("仓未注册"));
         MvcResult r = mockMvc.perform(post("/api/v1/wagent/candidates/c6/publish")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"approvalToken\":\"tok-2\"}"))
                 .andReturn();
-        assertEquals(501, r.getResponse().getStatus());
-        ArgumentCaptor<String> status = ArgumentCaptor.forClass(String.class);
-        verify(candidateDao, never()).updateStatus(any(), status.capture(), any());
+        assertEquals(502, r.getResponse().getStatus());
+        verify(candidateDao, never()).updatePublished(any(), any(), any(), any(), any());
         verify(reviewDao, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("#20 pre-commit 裁决 DENY ⇒ 403（fail-closed），不触发归档")
+    void publishDeniedByAdjudication() throws Exception {
+        candidate("c8", CandidateStatus.APPROVED.value(), "gen");
+        when(securityClient.evaluate(any(), any(), any(), any())).thenReturn(false);
+        assertEquals(403, mockMvc.perform(post("/api/v1/wagent/candidates/c8/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approvalToken\":\"tok-4\"}"))
+                .andReturn().getResponse().getStatus());
+        verify(designAssetArchiver, never()).archive(any(), any(), any(), any(), any(), any(), any());
+        verify(candidateDao, never()).updatePublished(any(), any(), any(), any(), any());
+        // 关键不变量：裁决/仓库不可用时不得消耗凭证（否则「没发布却烧掉审批」）
+        verify(approvalTokenService, never())
+                .verifyAndConsume(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("#20 归档成功 ⇒ 200 + 落库 PUBLISHED + 写 gitRef")
+    void publishHappyPath() throws Exception {
+        candidate("c9", CandidateStatus.APPROVED.value(), "gen");
+        when(securityClient.evaluate(any(), any(), any(), any())).thenReturn(true);
+        when(gitRepositoryService.getDefaultRepository())
+                .thenReturn(new com.chinacreator.gzcm.runtime.access.git.entity.GitRepository());
+        when(designAssetArchiver.archive(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(ArchiveOutcome.archived("abc123sha", null));
+        when(candidateDao.updatePublished(any(), any(), any(), any(), any())).thenReturn(1);
+
+        MvcResult r = mockMvc.perform(post("/api/v1/wagent/candidates/c9/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approvalToken\":\"tok-5\"}"))
+                .andReturn();
+        assertEquals(200, r.getResponse().getStatus());
+        assertTrue(r.getResponse().getContentAsString(StandardCharsets.UTF_8).contains("abc123sha"));
+        verify(candidateDao).updatePublished(eq("c9"), eq(CandidateStatus.PUBLISHED.value()),
+                eq("abc123sha"), eq("abc123sha"), any());
     }
 
     @Test

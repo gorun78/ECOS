@@ -29,7 +29,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -49,6 +53,7 @@ class WAgentRunWireShapeTest {
             "start_time", "end_time");
 
     private WAgentOrchestrator orchestrator;
+    private com.chinacreator.gzcm.engine.ai.wagent.approval.ApprovalTokenService approvalTokenService;
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -56,8 +61,11 @@ class WAgentRunWireShapeTest {
         orchestrator = mock(WAgentOrchestrator.class);
         WAgentIdentityResolver identityResolver = mock(WAgentIdentityResolver.class);
         when(identityResolver.require()).thenReturn(new Identity("t1", "u1", "o1"));
+        approvalTokenService = mock(
+                com.chinacreator.gzcm.engine.ai.wagent.approval.ApprovalTokenService.class);
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new WAgentRunController(orchestrator, identityResolver))
+                .standaloneSetup(new WAgentRunController(orchestrator, identityResolver,
+                        approvalTokenService))
                 .setControllerAdvice(new WAgentOrchestrationAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
@@ -159,6 +167,42 @@ class WAgentRunWireShapeTest {
         assertEquals(List.of("channel", "degrade_code", "poll_path", "fallback"), keys(data));
         assertEquals("polling", data.path("channel").asText());
         assertEquals("DG-M1", data.path("degrade_code").asText());
+    }
+
+    @Test
+    @DisplayName("#9 审批：凭证校验失败 ⇒ 非 2xx 且绝不清闸（approveGate 零调用）")
+    void approveGateIsNeverClearedWhenTokenRejected() throws Exception {
+        doThrow(com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrationException
+                .validation("凭证无效（越权/过期/自审批）"))
+                .when(approvalTokenService)
+                .verifyAndConsume(any(), any(), any(), any(), any());
+
+        int status = mockMvc.perform(post("/api/v1/wagent/runs/r1/approval")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approvalToken\":\"forged\"}"))
+                .andReturn().getResponse().getStatus();
+
+        assertTrue(status >= 400, "凭证被拒时不得返回 2xx，实得 " + status);
+        verify(orchestrator, never()).approveGate(any(), any(), any());
+        verify(orchestrator, never()).runPipeline(any(), any());
+    }
+
+    @Test
+    @DisplayName("#9 审批：凭证通过后才清闸，且先校验后清闸（顺序不可倒）")
+    void verificationHappensBeforeGateClearance() throws Exception {
+        WAgentRunDO run = runFixture();
+        when(orchestrator.approveGate(any(), any(), any())).thenReturn(run);
+
+        int status = mockMvc.perform(post("/api/v1/wagent/runs/r1/approval")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approvalToken\":\"valid\"}")
+                        .header("Prefer", "respond-async"))
+                .andReturn().getResponse().getStatus();
+
+        org.mockito.InOrder order = inOrder(approvalTokenService, orchestrator);
+        order.verify(approvalTokenService).verifyAndConsume(any(), any(), any(), any(), any());
+        order.verify(orchestrator).approveGate(any(), any(), any());
+        assertEquals(200, status);
     }
 
     @Test

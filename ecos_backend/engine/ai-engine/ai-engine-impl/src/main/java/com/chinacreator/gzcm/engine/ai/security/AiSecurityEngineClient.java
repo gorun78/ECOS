@@ -116,6 +116,28 @@ public class AiSecurityEngineClient {
         }
     }
 
+    /**
+     * 带真实角色集的裁决重载（2026-11-11 WAgent 批 A，授权墙双修之一）。
+     *
+     * <p>此前 {@link #buildEvaluateBody} 硬编码 {@code role="user"} 且只发 {@code input.subject.role}，
+     * 而 rbac.rego 读 {@code input.role} ⇒ 任何特权动作（candidate:publish / action:commit）恒 DENY。
+     * 本重载把 {@link com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.IdentityWithRoles}
+     * 解析出的真实角色集传入：{@code input.role} 取首角色（rbac 单值形态）、
+     * {@code input.subject.roles} 发全集（data_access 集合形态），两个策略面同一次应答可读。
+     * roles 为空集时 fail-closed 语义不变（OPA 侧无匹配规则即 deny）。</p>
+     */
+    public boolean evaluate(String userId, String tenantId, java.util.Collection<String> roles,
+                            String action, Map<String, Object> attrs) {
+        try {
+            return V_ALLOW.equals(verdictOf(evaluateData(
+                    buildEvaluateBody(userId, tenantId, roles, action, attrs))));
+        } catch (Exception e) {
+            log.warn("AiSecurityEngineClient.evaluate DENY (security 不可用/裁决失败): action={} reason={}",
+                    action, e.getMessage());
+            return false;
+        }
+    }
+
     // ═══════════════ 三态判定解析（§4.2 决策树的唯一实现点） ═══════════════
 
     /** 裁决三态字面量（与 {@code ToolDecision.Verdict} 名一致）。 */
@@ -291,17 +313,60 @@ public class AiSecurityEngineClient {
         return body;
     }
 
+    /**
+     * {@code candidate:publish} 的裁决属性段（键面固定：{@code candidateType}/{@code targetEngine}/
+     * {@code action}，按 {@link #evaluate} 的 {@code input} 扩展位拼装）。
+     *
+     * <p>放在本类是为了让 wagent Controller 不内联弱类型载荷（DI-2 棘轮判据）；键序与
+     * 原内联 {@code LinkedHashMap} 逐字一致，{@code null} 值照旧写键。</p>
+     */
+    public static Map<String, Object> candidatePublishAttrs(String candidateType, String targetEngine) {
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("candidateType", candidateType);
+        attrs.put("targetEngine", targetEngine);
+        attrs.put("action", "candidate:publish");
+        return attrs;
+    }
+
+    /**
+     * {@code action:commit} 的裁决属性段（键面固定：{@code actionId}/{@code publishTarget}/
+     * {@code action}）。{@code publishTarget} 在 V283 列上可空，故用可容纳 null 的容器。
+     */
+    public static Map<String, Object> actionCommitAttrs(String actionId, String publishTarget) {
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put("actionId", actionId);
+        attrs.put("publishTarget", publishTarget);
+        attrs.put("action", "action:commit");
+        return attrs;
+    }
+
     private Map<String, Object> buildEvaluateBody(String userId, String tenantId, String action,
                                                   Map<String, Object> attrs) {
+        return buildEvaluateBody(userId, tenantId, List.of("user"), action, attrs);
+    }
+
+    /**
+     * 角色真传形态（批 A 双修）：{@code input.role} = 首角色（rbac.rego 单值读法）、
+     * {@code input.subject.roles} = 全集（data_access.rego 集合读法）。
+     * 旧签名委托本形态并保留 {@code List.of("user")} 缺省（旧消费方行为不变）。
+     */
+    private Map<String, Object> buildEvaluateBody(String userId, String tenantId,
+                                                  java.util.Collection<String> roles,
+                                                  String action, Map<String, Object> attrs) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("policy", "rbac");
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("action", action);
         if (attrs != null) input.putAll(attrs);
-        input.put("subject", Map.of(
-                "userId", userId == null ? "anonymous" : userId,
-                "tenantId", tenantId == null ? "default" : tenantId,
-                "role", "user"));
+        java.util.List<String> safeRoles = roles == null ? List.of()
+                : roles.stream().filter(r -> r != null && !r.isBlank()).toList();
+        input.put("role", safeRoles.isEmpty() ? "" : safeRoles.get(0));
+        Map<String, Object> subject = new LinkedHashMap<>();
+        subject.put("userId", userId == null ? "anonymous" : userId);
+        subject.put("tenantId", tenantId == null ? "default" : tenantId);
+        subject.put("role", safeRoles.isEmpty() ? "" : safeRoles.get(0));
+        subject.put("roles", safeRoles);
+        input.put("subject", subject);
         body.put("input", input);
         return body;
     }

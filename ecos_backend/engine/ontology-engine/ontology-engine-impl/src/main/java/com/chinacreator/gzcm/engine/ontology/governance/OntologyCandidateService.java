@@ -93,7 +93,43 @@ public class OntologyCandidateService {
     public static final String CONF_UNCALIBRATED_MODEL_ESTIMATE = "UNCALIBRATED_MODEL_ESTIMATE";
     public static final String CONF_STATISTICAL = "STATISTICAL";
 
-    /** §7.5 evidenceRequired:三类结构候选必须携带非空证据。 */
+    /**
+     * 自检后的状态推进（§7.4 白名单内）。
+     *
+     * <p><b>为什么不是单跳</b>：白名单里 {@code GENERATED}/{@code NEEDS_EVIDENCE} 只能先到
+     * {@code EVIDENCE_CHECKED}，没有直达 {@code VALIDATED} 的边；自检通过时必须走两步 CAS，
+     * 否则「校验通过」会被状态机拒绝（2026-11-10 活体实测：单跳生成
+     * {@code 非法候选状态迁移 GENERATED → VALIDATED}）。</p>
+     */
+    private void advanceForValidate(String candidateId, String from, String to) {
+        List<String> direct = ALLOWED_TRANSITIONS.getOrDefault(from, List.of());
+        if (direct.contains(to)) {
+            validateTransition(from, to);
+            casTransition(candidateId, from, to);
+            return;
+        }
+        if (STATUS_VALIDATED.equals(to)
+                && (STATUS_GENERATED.equals(from) || STATUS_NEEDS_EVIDENCE.equals(from))) {
+            validateTransition(from, STATUS_EVIDENCE_CHECKED);
+            casTransition(candidateId, from, STATUS_EVIDENCE_CHECKED);
+            validateTransition(STATUS_EVIDENCE_CHECKED, to);
+            casTransition(candidateId, STATUS_EVIDENCE_CHECKED, to);
+            return;
+        }
+        validateTransition(from, to); // 非法迁移在此抛出标准异常
+    }
+
+    private void casTransition(String candidateId, String from, String to) {
+        int affected = dao.transitionStatus(candidateId, from, to, null, resolveActor(null));
+        if (affected == 0) {
+            throw new IllegalStateException("OPTIMISTIC_CONFLICT: 候选 " + candidateId
+                    + " 状态已由 " + from + " 漂移,自检推进 " + to + " 失败");
+        }
+    }
+
+    /**
+     * §7.5 evidenceRequired:三类结构候选必须携带非空证据。
+     */
     private static final List<String> EVIDENCE_REQUIRED_TYPES =
             List.of(TYPE_ENTITY, TYPE_PROPERTY, TYPE_RELATION);
 
@@ -497,13 +533,7 @@ public class OntologyCandidateService {
             toStatus = STATUS_NEEDS_EVIDENCE;
         }
         if (!from.equals(toStatus)) {
-            validateTransition(from, toStatus);
-            int affected = dao.transitionStatus(candidateId.trim(), from, toStatus, null,
-                    resolveActor(null));
-            if (affected == 0) {
-                throw new IllegalStateException("OPTIMISTIC_CONFLICT: 候选 " + candidateId
-                        + " 状态已由 " + from + " 漂移,自检推进 " + toStatus + " 失败");
-            }
+            advanceForValidate(candidateId.trim(), from, toStatus);
         }
 
         audit("ontology.candidate.validate",

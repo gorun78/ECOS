@@ -120,6 +120,7 @@ public class AuditKafkaConsumer {
                 log.debug("AuditKafkaConsumer: 落库 id={} action={}", id, action);
             }
             fillGovernance(id, evt);
+            fillTraceId(id, evt);
         } catch (org.springframework.dao.DataAccessException e) {
             // 非 PG 或 ON CONFLICT 不支持时退化路径：先查后插（幂等语义等价，性能略降）
             try {
@@ -130,9 +131,26 @@ public class AuditKafkaConsumer {
                     auditDao.insertAuditLog(id, userId, username, action, resource, result, detail, ip);
                 }
                 fillGovernance(id, evt);
+                fillTraceId(id, evt);
             } catch (Exception inner) {
                 log.error("AuditKafkaConsumer 落库失败(退化) id={}: {}", id, inner.getMessage());
             }
+        }
+    }
+
+    /**
+     * 链路标识回填：优先取发布端随事件带的 {@code traceId}（异步消费线程没有请求 MDC），
+     * 缺失即留空——禁在消费端编造链路标识。
+     */
+    private void fillTraceId(String id, Map<String, Object> evt) {
+        String traceId = asStr(evt.get("traceId"));
+        if (traceId == null || traceId.isBlank()) {
+            return;
+        }
+        try {
+            auditDao.updateTraceId(id, traceId);
+        } catch (RuntimeException e) {
+            log.warn("AuditKafkaConsumer: trace_id 回填失败 id={} traceId={}: {}", id, traceId, e.getMessage());
         }
     }
 

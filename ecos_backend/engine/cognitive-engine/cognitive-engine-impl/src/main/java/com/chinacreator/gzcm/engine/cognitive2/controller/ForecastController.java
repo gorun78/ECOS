@@ -111,8 +111,20 @@ public class ForecastController {
 
     /** 真实裁决四类发布门禁（contract/regression/backtest/calibration）并落列。 */
     @PostMapping(CognitiveApiPaths.MODELS_GATES_REL)
-    public ApiResponse<Map<String, Object>> runGates(@PathVariable("id") String id) {
+    public ApiResponse<ModelRegistryService.GateReport> runGates(@PathVariable("id") String id) {
         return ApiResponse.success(modelRegistryService.evaluateAndRecordGates(id));
+    }
+
+    /**
+     * 模型校验（CLI {@code cognition model validate} 的属主端点，CLI 生产化批 F）。
+     *
+     * <p><b>语义单一</b>：校验 = 四类发布门禁的真实裁决与落列（与 {@link #runGates} 同源实现，
+     * 另开路径只为 CLI 契约 operationId 与设计册命令名对齐）。裁决不通过即如实返回 FAIL 明细，
+     * 不做「看起来通过」的包装。</p>
+     */
+    @PostMapping("/models/{modelId}/validate")
+    public ApiResponse<ModelRegistryService.GateReport> validateCognitiveModel(@PathVariable("modelId") String modelId) {
+        return ApiResponse.success(modelRegistryService.evaluateAndRecordGates(modelId));
     }
 
     /** DRAFT→PUBLISHED 升格：四门禁全 PASS ∧ 哈希已冻结，否则显式 4xx（禁静默成功）。 */

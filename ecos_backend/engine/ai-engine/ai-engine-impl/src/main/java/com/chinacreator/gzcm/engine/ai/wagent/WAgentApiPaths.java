@@ -109,6 +109,14 @@ public final class WAgentApiPaths {
     /** #24b POST；提交（commitAction，经属主 Engine 写端点，Agent 不写对方表）。 */
     public static final String ACTION_COMMIT = BASE_PREFIX + "/actions/{" + P_ACTION_ID + "}/commit";
 
+    // ── L3 审批凭证（批 D 新增，只增不改；§5.2 表外能力位）────────────────
+    /**
+     * POST；签发一次性审批凭证（{@code createApprovalToken}）。
+     * 数据面 = {@code ecos_ai.agent_approval}（V326 补 token_digest/scope/expired_at/consumed_at/
+     * requested_by 列）；<b>admin 角色闸 fail-closed</b>，四眼（审批人 ≠ 申请人）在服务层强制。
+     */
+    public static final String APPROVAL_TOKENS = BASE_PREFIX + "/approval-tokens";
+
     // ── 能力探测（F10-16 附属端点，RunProgressFacade；随 #7 同族登记）──
     /** GET .../progress-capability → sse|polling（F10-16；§5.2 表外能力位，SSE 未就绪即回 polling）。 */
     public static final String RUN_PROGRESS_CAPABILITY = BASE_PREFIX + "/runs/{" + P_RUN_ID + "}/progress-capability";
