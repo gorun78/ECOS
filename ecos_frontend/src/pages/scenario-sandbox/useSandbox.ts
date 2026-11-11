@@ -49,12 +49,13 @@ const DEFAULT_VIEWPORT: SdViewport = { x: 0, y: 0, zoom: 0.8 };
 /** 默认 hub 位置（画布中央） */
 const HUB_POSITION = { x: 480, y: 280 };
 
-/** 6 类资源默认位置（围绕 hub，左右各 3，等距 y 分布）— palette 加入时按类别取初始坐标 */
+/** 7 类资源默认位置（围绕 hub；批 B 增 WAGENT 置 agent 下方）— palette 加入时按类别取初始坐标 */
 const RESOURCE_DEFAULT_POSITIONS: Record<ResourceCategory, { x: number; y: number }> = {
   DATASOURCE: { x: 80, y: 60 },
   ONTOLOGY_ENTITY: { x: 80, y: 220 },
   KNOWLEDGE_ARTICLE: { x: 80, y: 380 },
   AGENT_PROFILE: { x: 880, y: 60 },
+  WAGENT: { x: 880, y: 130 },
   SECURITY_POLICY: { x: 880, y: 220 },
   INTERFACE_REF: { x: 880, y: 380 },
 };

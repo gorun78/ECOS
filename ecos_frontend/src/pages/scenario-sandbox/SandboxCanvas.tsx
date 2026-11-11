@@ -46,6 +46,7 @@ import {
   Network,
   BookOpen,
   Cpu,
+  Bot,
   ShieldCheck,
   Plug,
   Sparkles,
@@ -93,6 +94,7 @@ const CATEGORIES: Array<{
   { category: "ONTOLOGY_ENTITY", endpoint: "objects", icon: Network, i18nKey: "scenario.sandbox.palette.ont" },
   { category: "KNOWLEDGE_ARTICLE", endpoint: "knowledge", icon: BookOpen, i18nKey: "scenario.sandbox.palette.kno" },
   { category: "AGENT_PROFILE", endpoint: "agents", icon: Cpu, i18nKey: "scenario.sandbox.palette.agent" },
+  { category: "WAGENT", endpoint: "wagents", icon: Bot, i18nKey: "scenario.sandbox.palette.wagent" },
   { category: "SECURITY_POLICY", endpoint: "security", icon: ShieldCheck, i18nKey: "scenario.sandbox.palette.sec" },
   { category: "INTERFACE_REF", endpoint: "interfaces", icon: Plug, i18nKey: "scenario.sandbox.palette.iface" },
 ];

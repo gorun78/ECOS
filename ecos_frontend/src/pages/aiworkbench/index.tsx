@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AIPLogicPipeline, AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from '../../types/aiworkbench';
 import {
   fetchAIPAgentsFromMesh,
@@ -18,14 +18,15 @@ import LogicView from './LogicView';
 import ModelCatalogView from './ModelCatalogView';
 import AgentPlayground from './AgentPlayground';
 import EvalsView from './EvalsView';
+import WagentStudioView from './WagentStudioView';
 import {
   LayoutDashboard, FlaskConical, Cpu, BarChart3, Layers,
-  CloudOff, RefreshCw, MessageSquare,
+  CloudOff, RefreshCw, MessageSquare, Bot,
 } from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
-type TabId = 'overview' | 'playground' | 'orchestration' | 'evals' | 'models';
+type TabId = 'overview' | 'playground' | 'orchestration' | 'wagentStudio' | 'evals' | 'models';
 
 const NAV_TABS: Array<{
   id: TabId | 'chatbotStudio';
@@ -38,6 +39,7 @@ const NAV_TABS: Array<{
   { id: 'overview', icon: LayoutDashboard, labelKey: 'aiworkbench.tab.overview', descKey: 'aiworkbench.tabdesc.overview' },
   { id: 'chatbotStudio', icon: MessageSquare, labelKey: 'aiworkbench.tab.chatbotStudio', descKey: 'aiworkbench.tabdesc.chatbotStudio', route: '/chatbot_studio' },
   { id: 'orchestration', icon: Cpu, labelKey: 'aiworkbench.tab.orchestration', descKey: 'aiworkbench.tabdesc.orchestration' },
+  { id: 'wagentStudio', icon: Bot, labelKey: 'aiworkbench.tab.wagentStudio', descKey: 'aiworkbench.tabdesc.wagentStudio' },
   { id: 'playground', icon: FlaskConical, labelKey: 'aiworkbench.tab.playground', descKey: 'aiworkbench.tabdesc.playground' },
   { id: 'evals', icon: BarChart3, labelKey: 'aiworkbench.tab.evals', descKey: 'aiworkbench.tabdesc.evals' },
   { id: 'models', icon: Layers, labelKey: 'aiworkbench.tab.models', descKey: 'aiworkbench.tabdesc.models' },
@@ -47,6 +49,7 @@ const VIEW_TITLES: Record<TabId, string> = {
   overview: 'aiworkbench.viewTitle.overview',
   playground: 'aiworkbench.viewTitle.playground',
   orchestration: 'aiworkbench.viewTitle.orchestration',
+  wagentStudio: 'aiworkbench.viewTitle.wagentStudio',
   evals: 'aiworkbench.viewTitle.evals',
   models: 'aiworkbench.viewTitle.models',
 };
@@ -59,7 +62,14 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
   const { styles } = useTheme();
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = useState<TabId>('overview');
+  const [searchParams] = useSearchParams();
+  // 深链：#/ai-workbench?tab=wagent_studio（密钥面复用既有路由，不新增路由根）
+  const [currentTab, setCurrentTab] = useState<TabId>(() => {
+    const raw = searchParams.get('tab');
+    const ids: TabId[] = ['overview', 'playground', 'orchestration', 'wagentStudio', 'evals', 'models'];
+    if (raw === 'wagent_studio') return 'wagentStudio';
+    return raw && (ids as string[]).includes(raw) ? (raw as TabId) : 'overview';
+  });
 
   // Master AIP States (loaded from backend API, PMO-43 T3: errors are
   // re-thrown rather than swallowed — the affected tab shows an inline
@@ -149,6 +159,9 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
             onUpdatePipelines={setPipelines}
             showToast={showToast}
           />
+      )}
+      {currentTab === 'wagentStudio' && (
+        <WagentStudioView />
       )}
       {currentTab === 'evals' && (
         <EvalsView agents={agents} models={models} />

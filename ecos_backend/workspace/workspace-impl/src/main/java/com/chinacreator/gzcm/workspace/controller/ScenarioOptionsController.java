@@ -101,6 +101,20 @@ public class ScenarioOptionsController {
         return callRemote(sysmanRest, "/interfaces", "sysman", "id", "name");
     }
 
+    /**
+     * 可用 WAgent（aiming 已发布候选 — 批 B 场景侧接线，2026-11-11 WAgent 三块差距计划）。
+     *
+     * <p>探测目标 = {@code GET /api/v1/wagent/candidates?status=PUBLISHED}（wagent-v1 契约
+     * listCandidates，响 应 {@code data.candidates[]}）。只探 PUBLISHED——未发布候选不得
+     * 进入场景绑定选项池（F10-23 发布即 Git 归档 + published_ref 回写，场景只能绑定已归档态）。
+     * 投影：{@code candidate_id} → id、{@code candidate_type} → name（候选无 name 字段，
+     * 以类型 + 发布引用拼接作展示名）。aiming 不可达返 503（同族铁律 §2.4-6）。</p>
+     */
+    @GetMapping("/available/wagents")
+    public ApiResponse<?> availableWagents() {
+        return callRemoteWagentCandidates();
+    }
+
     // ═══════════════ 私有辅助 ═══════════════
 
     /**
@@ -113,6 +127,54 @@ public class ScenarioOptionsController {
         HttpHeaders headers = new HttpHeaders();
         CallerCredentialSource.applyTo(headers);
         return new HttpEntity<>(headers);
+    }
+
+    /**
+     * WAgent 已发布候选探测（批 B）：wagent 列表响应为 {@code data.candidates[]} 包装形态
+     * （CandidateListVO），与 {@link #callRemote} 的裸 List 解析不同，故专用解析。
+     * 委托面要求认证（identityResolver.require），场景侧经 {@link CallerCredentialSource}
+     * 中继调用方凭证；aiming 未中继凭证时按 503 如实降级（禁发明空列表）。
+     */
+    private ApiResponse<?> callRemoteWagentCandidates() {
+        // rootUri 单源（workspaceAimingRest = resolveBase + /api/v1），故相对路径省前缀
+        String path = "/wagent/candidates?status=PUBLISHED";
+        try {
+            ResponseEntity<Map> resp = aimingRest.exchange(path, HttpMethod.GET,
+                    credentialedEntity(), Map.class);
+            Map<String, Object> body = resp.getBody();
+            if (body == null) {
+                return unavailable("aiming", "empty response");
+            }
+            Object code = body.get("code");
+            if (code instanceof Number n && n.intValue() != 0) {
+                log.warn("aiming 业务错误 code={} msg={}", n.intValue(), body.get("message"));
+                return ApiResponse.error(n.intValue(), "remote_error",
+                        "upstream aiming: " + body.get("message"));
+            }
+            Object data = body.get("data");
+            List<AvailableItemVO> items = new ArrayList<>();
+            if (data instanceof Map<?, ?> dm && dm.get("candidates") instanceof List<?> list) {
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m) {
+                        String id = asString(m.get("candidate_id"));
+                        if (id == null) continue;
+                        // 候选无 name 字段：type 作基础展示名，发布引用并入 extra 供前端详情
+                        AvailableItemVO item = toItem(m, "candidate_id", "candidate_type");
+                        if (item.getName() == null) item.setName(id);
+                        if (item.getExtra() == null) item.setExtra(new LinkedHashMap<>());
+                        item.getExtra().put("candidateType", asString(m.get("candidate_type")));
+                        item.getExtra().put("status", asString(m.get("status")));
+                        String publishedRef = asString(m.get("published_ref_text"));
+                        if (publishedRef != null) item.getExtra().put("publishedRef", publishedRef);
+                        items.add(item);
+                    }
+                }
+            }
+            return ApiResponse.success(items);
+        } catch (Exception ex) {
+            log.warn("aiming 不可达 {}: {}", path, ex.getMessage());
+            return unavailable("aiming", ex.getMessage());
+        }
     }
 
     /**
