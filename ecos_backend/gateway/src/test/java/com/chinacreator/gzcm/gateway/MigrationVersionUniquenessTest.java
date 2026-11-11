@@ -96,8 +96,14 @@ class MigrationVersionUniquenessTest {
      *  + 6 枚 repositoryId 种子，dev PG 实跑）落地 ⇒ 按实测订正 249→250（四枚同批锚）。
      *  2026-11-02 #147V：V301~V305 五枚陆续落地（七分类/清退守卫/审计契约列/注册表名录列/
      *  sys_rule_version.git_ref），本锚前四枚已随各自批次订正至 254，V305 落地未改本锚
-     *  ⇒ 按实测订正 254→255（四枚同批锚）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 255;
+     *  ⇒ 按实测订正 254→255（四枚同批锚）。
+     * 2026-11-10 CLI 生产化批 D：V326 落地后单源实测 276 个 {@code V*.sql} ⇒ 下限随批上调 255→276
+     * 2026-11-11 前端巡检批（任务 #34）：V327（本体/认知 stale 镜像列补齐）落地 ⇒ 单源实测 277
+     * （只升不降：防单源目录被搬空后门禁空转）。
+     * 2026-11-11 CLI 生产化批 C：V328（{@code ecos_audit_log} 补 {@code changes}/{@code category}
+     * 两列——V295 锚表遗漏，致 AuditAspect/AuthDao/ToolDao 三条写入路径在从零建库上恒失败，
+     * 审计恒 0 行）落地 ⇒ 单源实测 278。 */
+    private static final int SCRIPT_COUNT_FLOOR = 278;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -137,9 +143,17 @@ class MigrationVersionUniquenessTest {
      * 2026-11-06 #147Z-6：V312~V314（场景 run-mode 血缘 / kb 本体版本宽度 / kb 图谱可追溯回填）已入库，
      * 且 V315（DD-4 DDL↔代码 schema 对齐：补建 5 处代码读端 schema 表 + 清退 public 孤儿副本）落地
      * ⇒ 按实测订正 314→315 / 下一号 315→316。
+     * 2026-11-10 CLI 生产化批 D：V316~V325 已入库后，本批新增 V326（ecos_ai.agent_approval
+     * 审批凭证列组 token_digest/scope_type/scope_id/requested_by/expired_at/consumed_at/trace_id，
+     * 只加不删 + 四索引；L3 一次性消费与四眼的数据面）⇒ 按实测订正 325→326 / 下一号 326→327。
+     * 2026-11-11 前端巡检批（任务 #34）：V327（本体 ecos_control.ecos_ontology_{property,relationship,
+     * entity,action} + 认知 ecos_control.ecos_cognitive_hypothesis 五处 stale 镜像补列至读端口径，
+     * dev PG 实跑）落地 ⇒ 按实测订正 326→327 / 下一号 327→328。
+     * 2026-11-11 CLI 生产化批 C：V328（{@code ecos_audit_log} 补 {@code changes} jsonb /
+     * {@code category} varchar 两列；只加不删、幂等）落地 ⇒ 按实测订正 327→328 / 下一号 328→329。
      */
-    private static final int MAX_BASELINE_VERSION = 325;
-    private static final int NEXT_FREE_VERSION = 326;
+    private static final int MAX_BASELINE_VERSION = 328;
+    private static final int NEXT_FREE_VERSION = 329;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
