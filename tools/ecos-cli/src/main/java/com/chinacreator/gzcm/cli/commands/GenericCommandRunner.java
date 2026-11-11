@@ -64,6 +64,13 @@ public final class GenericCommandRunner {
         Map<String, String> query = collectQuery(registry, options, command, op);
         String pathWithQuery = path + toQuery(query);
 
+        // 参数前置校验：分页参数非法必须在**发请求之前**判死。
+        // 否则 --page-size 501 会先打一次网关再报错（实测会退化成 UNAVAILABLE，
+        // 把用户的用法错误伪装成「网关不可达」）。
+        if (options.flag("--all") || options.value("--page-size") != null) {
+            options.pageSize(PageWalker.MAX_PAGE_SIZE);
+        }
+
         // --follow：对 getRun 走 streamRunEvents（SSE）真流；服务端降级（502 JSON）即如实 UNAVAILABLE
         if (options.flag("--follow") && "getRun".equals(op.operationId())
                 && registry.has("streamRunEvents")) {
