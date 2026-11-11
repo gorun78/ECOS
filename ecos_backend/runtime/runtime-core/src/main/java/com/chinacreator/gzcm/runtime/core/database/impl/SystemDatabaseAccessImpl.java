@@ -749,6 +749,13 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
         }
     }
 
+    /**
+     * 解析 iBATIS 形态的 SQL Map（包内可见，供单测直接覆盖 CDATA 取值）。
+     */
+    static Map<String, String> parseIbatisForTest(InputStream in) throws Exception {
+        return new SystemDatabaseAccessImpl().parseIbatisSqlMap(in, "test");
+    }
+
     private Map<String, String> parseIbatisSqlMap(InputStream inputStream, String sqlConfigPath) throws Exception {        Map<String, String> sqlMap = new HashMap<>();
         
         try {
@@ -798,7 +805,10 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
         
         for (int i = 0; i < children.getLength(); i++) {
             Node node = children.item(i);
-            if (node.getNodeType() == Node.TEXT_NODE) {
+            // CDATA 与 TEXT 同为「SQL 正文」：iBATIS 惯例把整段 SQL 包在 <![CDATA[ ]]> 里
+            // （本仓 AuditLog-sql.xml 即如此）。只认 TEXT_NODE 会把 SQL 取成空串，
+            // 表现为运行期 "SQL cannot be null or empty"，而不是解析期报错。
+            if (node.getNodeType() == Node.TEXT_NODE || node.getNodeType() == Node.CDATA_SECTION_NODE) {
                 sql.append(node.getNodeValue());
             } else if (node.getNodeType() == Node.ELEMENT_NODE) {
                 Element childElement = (Element) node;

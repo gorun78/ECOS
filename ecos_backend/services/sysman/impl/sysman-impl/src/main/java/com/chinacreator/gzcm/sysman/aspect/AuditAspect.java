@@ -148,7 +148,13 @@ public class AuditAspect {
             event.setDetails(details);
 
             // 7. 持久化 — 使用已有的 AuditLogServiceImpl（内部使用 AuditLogDao）
-            auditLogService.log(event);
+            // td_audit_log 通道失败不得连带吞掉 ecos_audit_log 通道：后者是
+            // 「CLI trace_id == 审计表 trace_id」的唯一对账依据，两条通道互相独立。
+            try {
+                auditLogService.log(event);
+            } catch (Exception e) {
+                log.warn("td_audit_log 通道写入失败（不影响哈希链通道）: {}", e.getMessage());
+            }
 
             // R1.2: full 模式 — 联动 AuditHashChainService 哈希链双写
             if ("full".equals(auditMode)) {
