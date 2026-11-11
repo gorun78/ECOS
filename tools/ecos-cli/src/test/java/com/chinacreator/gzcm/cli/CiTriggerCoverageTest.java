@@ -89,11 +89,16 @@ class CiTriggerCoverageTest {
     }
 
     @Test
-    @DisplayName("三个 job 齐全（build / contract / e2e）")
-    void allThreeJobsExist() throws Exception {
+    @DisplayName("CI 内两个 job 齐全（build / contract），活体 e2e 明确不在 CI 中")
+    void ciJobsMatchRuling() throws Exception {
         String wf = workflow();
-        for (String job : List.of("cli-build:", "cli-contract:", "cli-e2e:")) {
+        for (String job : List.of("cli-build:", "cli-contract:")) {
             assertTrue(wf.contains(job), "工作流缺 job: " + job);
         }
+        // 2026-11-11 裁决：本仓无可复现的从零建库基线，活体 E2E 不纳入 CI。
+        // 若日后有人把它加回来而不修基线，会得到一个常红 job（比没有更糟）——
+        // 因此这里反向钉死，恢复时必须先解决建库路径并同步本断言。
+        assertFalse(wf.contains("cli-e2e:"),
+                "cli-e2e 不应存在于 CI：仓内无从零建库基线（见 docs/40-实现/从零建库审计报告-2026-11-11.md）");
     }
 }
