@@ -82,116 +82,24 @@ jobs:
           path: ecos_backend/gateway/target/surefire-reports/**
           retention-days: 5
 
-  # ③ 活体 E2E（仅 main push；起 PG + 网关后跑 API 用例）
-  #
-  # ⚠ 已知阻塞（2026-11-11 实测）：本仓没有可复现的「从零建库」基线，本 job 在补上之前必然红。
-  #   形态：docs/50-db_script/02-flyway-migration/gateway 的 277 枚迁移是一条「增量补丁链」，
-  #   它假设库里已存在一份**仓外**建立的 schema 基线 —— 不是「最后一枚对不上」，而是**从链头就对不上**。
-  #   实测（空库 + 按版本序全量跑）：OK=148 / FAIL=129；且先建 ecos_identity 并灌
-  #   06-docker-infra/iam_pg_seed.sql（13 张 ecos_identity 表，EXIT=0 全过）后结果**一模一样**。
-  #   首个失败 = V4.4__ecos_ontology_rls.sql:15 `ALTER TABLE ecos_ontology ADD COLUMN …`，
-  #   而全仓无 `CREATE TABLE ecos_ontology`；V14/V16 `UPDATE users …`、V25 `ecos_pipeline_execution`、
-  #   V28 `ecos_biz_department` 同理。01-ddl-多方言/postgresql/01~08（ST07 权威 DDL）建的是
-  #   V200 之前的旧 schema 集（ecos_sysman/ecos_security），与 V200 后的 ecos_control/ecos_dw 不对齐。
-  #   `ecos-docker/initdb/` 为空；`apply-migrations.sh` 读仓外 /tmp/migrations；Testcontainers 仅声明未使用。
-  #   按铁律 §3.1「DDL 单源」，不得把 pg_dump 基线提交为第二源 ⇒ 需架构裁决
-  #   （a. 以 ST07 为唯一基线重写迁移链 / b. 豁免单源并入基线 dump / c. 明确活体 E2E 不纳入本仓 CI）。
-  #   本机等价实跑（既有 dev 库，已引导）：--project=api → 20 passed / 2 skipped。
-  cli-e2e:
-    runs-on: ubuntu-latest
-    needs: cli-build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    timeout-minutes: 45
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: sys_man
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # 快速失败闸：postgres 服务只起空实例，仓内无引导脚本（见本 job 头注释）。
-      # 缺失时立刻红并点名缺口，避免白等 30 分钟 backend 构建后才在登录处含糊失败。
-      - name: Assert DB bootstrap available
-        run: |
-          missing=$(psql "postgresql://postgres:postgres@localhost:5432/sys_man" -tAc "
-            select string_agg(t, ',') from (values
-              ('ecos_control.users'), ('ecos_control.td_user'), ('ecos_ai.ecos_wagent_candidate')
-            ) v(t) where to_regclass(t) is null;")
-          if [ -n "$missing" ]; then
-            echo "::error::数据库未引导，缺表: $missing"
-            echo "本仓无可复现的从零建库路径（详见本 job 头注释）；需先裁决补引导脚本或修 V200 前迁移链。"
-            exit 1
-          fi
-          echo "DB 就绪"
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: ecos-tests/package-lock.json
-
-      - name: Download CLI jar
-        uses: actions/download-artifact@v4
-        with:
-          name: ecos-cli-jar
-          path: tools/ecos-cli/target/
-
-      - name: Build backend
-        working-directory: ecos_backend
-        # 网关活体 E2E 需要完整依赖链；跳过测试以控制时长（测试由 cli-build/cli-contract 覆盖）
-        run: mvn clean install -DskipTests -B
-
-      - name: Start gateway
-        run: |
-          nohup java -jar ecos_backend/gateway/target/gateway-*.jar > /tmp/gateway.log 2>&1 &
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:8080/actuator/health > /dev/null; then
-              echo "gateway up"; exit 0
-            fi
-            sleep 2
-          done
-          echo "gateway 未在 120s 内就绪"; tail -60 /tmp/gateway.log; exit 1
-
-      - name: Install Playwright deps
-        working-directory: ecos-tests
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Run CLI API specs
-        working-directory: ecos-tests
-        env:
-          ECOS_USER: ${{ secrets.ECOS_USER }}
-          ECOS_PASS: ${{ secrets.ECOS_PASS }}
-        run: npx playwright test --project=api
-
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-cli-report
-          path: ecos-tests/playwright-report/**
-          retention-days: 5
-
-      - name: Gateway log on failure
-        if: failure()
-        run: tail -200 /tmp/gateway.log || true
+# ③ 活体 E2E —— 不纳入本仓 CI（2026-11-11 用户裁决）
+#
+# 本 job 曾以「起 PG + 起网关 + 跑 ecos-tests --project=api」的形式存在，但仓内没有可复现的
+# 「从零建库」基线，它在此之前必然红，故移除而非留一个常红 job 污染信号。
+#
+# 为什么建不起来（实测，非推断）：
+#   docs/50-db_script/02-flyway-migration/gateway 的 278 枚迁移是一条**增量补丁链**，假设库里
+#   已存在一份**仓外**建立的 schema 基线。空库按版本序全量跑（生产同款 search_path）：
+#     · 裸跑链                  → OK=143 / FAIL=136
+#     · 仅先建 10 个 schema     → OK=213 / FAIL=66   （90 个失败纯因 schema 未创建）
+#     · ST07 基线 + 链          → OK=222 / FAIL=56
+#     · ST07 + public 锚表 + 链 → OK=214 / FAIL=56   （互为干扰，混合路线已证伪）
+#   首批失败自链头即出现：V4.4 要 `ALTER TABLE ecos_ontology`，而全链无 `CREATE TABLE ecos_ontology`。
+#   `ecos-docker/initdb/` 为空、`apply-migrations.sh` 读仓外 /tmp/migrations、Testcontainers 仅声明未用。
+#   按铁律 §3.1「DDL 单源」，不得把 pg_dump 基线提为第二源 ⇒ 修复需先改铁律口径，属独立立项。
+#   根因与四组实测数据见 docs/40-实现/从零建库审计报告-2026-11-11.md。
+#
+# 替代覆盖（CI 内）：cli-build 的 CLI 单测 + cli-contract 的跨模块契约门禁，二者不依赖数据库。
+# 需要活体回归时在已引导的开发机上手动执行：
+#   cd ecos-tests && npx playwright test --project=api    # 需网关 :8080 + 前端 :3000
+# 本机实测口径（既有 dev 库，已引导）：20 passed / 2 skipped。
