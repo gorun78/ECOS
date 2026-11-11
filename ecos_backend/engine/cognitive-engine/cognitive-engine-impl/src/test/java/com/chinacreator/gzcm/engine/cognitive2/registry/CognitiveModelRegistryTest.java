@@ -321,8 +321,8 @@ class CognitiveModelRegistryTest {
         when(dao.updateGatesIfDraft(eq("r1"), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(1);
 
-        Map<String, Object> gates = service.evaluateAndRecordGates("r1");
-        assertEquals(Boolean.FALSE, gates.get("allPassed"),
+        ModelRegistryService.GateReport gates = service.evaluateAndRecordGates("r1");
+        assertEquals(Boolean.FALSE, gates.allPassed(),
                 "regression 不可评测 ⇒ allPassed 必为 false（禁假绿）");
 
         // 即使操作者强推发布：库内留痕 regression=PENDING ⇒ 422，升格 SQL 不发

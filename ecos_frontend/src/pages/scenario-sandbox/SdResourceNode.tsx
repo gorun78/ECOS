@@ -17,6 +17,7 @@ import {
   Network,
   BookOpen,
   Cpu,
+  Bot,
   ShieldCheck,
   Plug,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const RESOURCE_CONFIG: Record<
   ONTOLOGY_ENTITY: { icon: Network, i18nKey: "scenario.sandbox.resource.ONTOLOGY_ENTITY" },
   KNOWLEDGE_ARTICLE: { icon: BookOpen, i18nKey: "scenario.sandbox.resource.KNOWLEDGE_ARTICLE" },
   AGENT_PROFILE: { icon: Cpu, i18nKey: "scenario.sandbox.resource.AGENT_PROFILE" },
+  WAGENT: { icon: Bot, i18nKey: "scenario.sandbox.resource.WAGENT" },
   SECURITY_POLICY: { icon: ShieldCheck, i18nKey: "scenario.sandbox.resource.SECURITY_POLICY" },
   INTERFACE_REF: { icon: Plug, i18nKey: "scenario.sandbox.resource.INTERFACE_REF" },
 };

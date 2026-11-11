@@ -1,0 +1,4 @@
+# CLI 镜像构建上下文裁剪：只带源码、契约清单与契约 YAML（ContractManifestTest 需要）
+target
+dist/completions
+*.md

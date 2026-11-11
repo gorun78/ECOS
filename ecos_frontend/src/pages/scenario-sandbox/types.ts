@@ -21,6 +21,7 @@ export type ResourceCategory =
   | "ONTOLOGY_ENTITY"
   | "KNOWLEDGE_ARTICLE"
   | "AGENT_PROFILE"
+  | "WAGENT"
   | "SECURITY_POLICY"
   | "INTERFACE_REF";
 

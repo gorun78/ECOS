@@ -26,21 +26,23 @@ import type {
 
 // ── 资源可用 6 类 ────────────────────────────────────────
 
-/** 资源类别可用端点分类（§2.7 后端 rule-based 路由到各引擎） */
+/** 资源类别可用端点分类（§2.7 后端 rule-based 路由到各引擎；批 B 增 wagents） */
 export type SandboxAvailableCategory =
   | "datasets"
   | "objects"
   | "knowledge"
   | "agents"
+  | "wagents"
   | "security"
   | "interfaces";
 
-/** 资源 cat（UI 选用后保存时的原始 category 枚举） */
+/** 资源 cat（UI 选用后保存时的原始 category 枚举；WAGENT = 已发布 WAgent 候选，批 B） */
 export const CATEGORY_TO_ENDPOINT: Record<ResourceCategory, SandboxAvailableCategory> = {
   DATASOURCE: "datasets",
   ONTOLOGY_ENTITY: "objects",
   KNOWLEDGE_ARTICLE: "knowledge",
   AGENT_PROFILE: "agents",
+  WAGENT: "wagents",
   SECURITY_POLICY: "security",
   INTERFACE_REF: "interfaces",
 };

@@ -112,9 +112,16 @@ class WAgentForbiddenDependencyArchTest {
      * {@code Thread.sleep}/{@code currentThread().interrupt()}（方法调用），不建线程、不调度。
      * 豁免面 = 属主集合等值 + 访问类型等值，两侧任一变化都必须先改本名录。
      */
+    /**
+     * Thread 方法调用属主名录（只允许 interrupt/sleep 这类方法调用，禁裸 new Thread）。
+     *
+     * <p>2026-11-10 +1：{@code WAgentDecisionActionController} —— 属主派发用同步 HTTP，
+     * 超时/中断时 {@code Thread.currentThread().interrupt()} 还原中断位（非自建调度、非 sleep 轮询）。</p>
+     */
     private static final Set<String> THREAD_METHOD_CALL_OWNERS = Set.of(
             WAGENT_ROOT + ".controller.WAgentRunEventStreamController",
-            WAGENT_ROOT + ".readiness.EngineProbeClient");
+            WAGENT_ROOT + ".readiness.EngineProbeClient",
+            WAGENT_ROOT + ".controller.WAgentDecisionActionController");
 
     /** 反空集锁④（扫描面基线）：2026-10-15 实测 ai 模块 main 源码 252 个 .java（其中 wagent 92）；
      *  2026-10-16 +1（252→253）= 收口 gateway 聚合面 {@code TaskExecutor} 注入歧义新增的
@@ -168,8 +175,16 @@ class WAgentForbiddenDependencyArchTest {
      * <p>2026-11-09 +3（286→289）＝ Copilot 全生命周期工具批：新增
      * {@code ai.copilot.CopilotToolCatalog}／{@code CopilotToolRegistrar}／{@code CopilotToolSupport}／
      * {@code CopilotSeedCatalog}（+4），删 {@code CopilotEngineTools}（-1，被工具总表取代）。</p>
+     * <p>2026-11-10 +5（290→295）＝ CLI 生产化批 D：新增 L3 审批凭证门面
+     * {@code wagent.approval.WAgentApprovalScope}／{@code WAgentApprovalDO}／{@code WAgentApprovalDao}／
+     * {@code ApprovalTokenService} 与 {@code wagent.controller.WAgentApprovalController}。
+     * <p>2026-11-10 +2（295→297）＝ action 面真实现：新增 {@code wagent.dataobject.WAgentActionDO}
+     * 与 {@code wagent.dao.WAgentActionDao}（V283 表已在，原「表未落地」口径订正）。</p>
+     * <p>2026-11-11 +1（297→298）＝ D-WC-1 候选 validate 通道：新增
+     * {@code wagent.validate.WAgentCandidateValidationService}（五段自检执行器，零外部引擎依赖）。</p>
+     * </p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 290;
+    private static final int AI_SOURCE_FILE_FLOOR = 298;
 
     /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
      *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */

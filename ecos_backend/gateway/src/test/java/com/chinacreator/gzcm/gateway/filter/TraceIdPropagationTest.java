@@ -106,6 +106,46 @@ class TraceIdPropagationTest {
                 "pattern 需以 traceId 为键");
     }
 
+    @Test
+    @DisplayName("6. X-Trace-Id 优先于 X-Request-Id，且两个响应头同值（CLI 侧读新头名）")
+    void canonicalTraceHeaderWins() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.addHeader("X-Trace-Id", "canonical-999");
+        req.addHeader("X-Request-Id", "legacy-111");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+
+        new RequestContextFilter().doFilter(req, resp, noopChain);
+
+        assertEquals("canonical-999", resp.getHeader("X-Trace-Id"));
+        assertEquals("canonical-999", resp.getHeader("X-Request-Id"),
+                "旧头名必须与新头名同值（既有调用方不破）");
+    }
+
+    @Test
+    @DisplayName("7. 只给旧头名 X-Request-Id 时，新头名 X-Trace-Id 也回写同值（向后兼容）")
+    void legacyHeaderStillMirroredToCanonical() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.addHeader("X-Request-Id", "legacy-222");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+
+        new RequestContextFilter().doFilter(req, resp, noopChain);
+
+        assertEquals("legacy-222", resp.getHeader("X-Trace-Id"));
+        assertEquals("legacy-222", resp.getHeader("X-Request-Id"));
+    }
+
+    @Test
+    @DisplayName("8. bean 名不得用默认 simple name（否则与 Spring Boot 内置 requestContextFilter 撞名，过滤器静默不执行）")
+    void beanNameAvoidsBootBuiltinCollision() {
+        org.springframework.stereotype.Component ann = RequestContextFilter.class
+                .getAnnotation(org.springframework.stereotype.Component.class);
+        assertNotNull(ann, "过滤器必须是 @Component");
+        assertEquals("ecosTraceContextFilter", ann.value(),
+                "bean 名必须显式指定：Spring Boot 自带 OrderedRequestContextFilter 的 bean 名就是 "
+                        + "requestContextFilter，同名会导致本过滤器不被执行（2026-11-10 活体实测："
+                        + "响应头与 MDC 全空，body traceId 退化为随机 UUID）");
+    }
+
     private static String readLogbackSpringXml() {
         try (InputStream in = TraceIdPropagationTest.class.getClassLoader()
                 .getResourceAsStream("logback-spring.xml")) {

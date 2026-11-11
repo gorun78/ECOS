@@ -21,21 +21,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Schema 归属守卫（详细设计-10 F10-03 / ST07 五引擎 schema 枚举；验收名
  * {@code agentControlTablesOnlyInFiveEngineSchemas}）。
  *
- * <p>R-33① 裁定：W 编排域 16 张控制表全部落 {@code ecos_ai.ecos_wagent_*}，
+ * <p>R-33① 裁定：W 编排域控制表全部落 {@code ecos_ai.ecos_wagent_*}，
  * <b>不建 ecos_agent schema、不建 agt_/aim_/cog_ 前缀、不建审计表</b>（ST06 走 Kafka ecos.audit）。
- * 本守卫把「表名单源」钉在 DAO 的 {@code TABLE} 常量上：DAO 数量 = 表数量 = V227~V240 名录，
+ * 本守卫把「表名单源」钉在 DAO 的 {@code TABLE} 常量上：DAO 数量 = 表数量 = 名录，
  * 且无一处越出 ecos_ai 限定形态。</p>
  */
 class SchemaOwnershipArchTest {
 
-    /** V227~V240 名录单源（16 表；新增表必须先改本名录，即"只加需登记"）。 */
+    /** 名录单源（V227~V240 十六表 + V283 决策/行动四表中的 action；新增表必须先改本名录，即"只加需登记"）。 */
     private static final List<String> WAGENT_TABLES = List.of(
             "ecos_ai.ecos_wagent_goal", "ecos_ai.ecos_wagent_mission", "ecos_ai.ecos_wagent_question",
             "ecos_ai.ecos_wagent_readiness", "ecos_ai.ecos_wagent_readiness_item",
             "ecos_ai.ecos_wagent_readiness_gap", "ecos_ai.ecos_wagent_run", "ecos_ai.ecos_wagent_run_step",
             "ecos_ai.ecos_wagent_run_event", "ecos_ai.ecos_wagent_tool_contract", "ecos_ai.ecos_wagent_skill",
             "ecos_ai.ecos_wagent_candidate", "ecos_ai.ecos_wagent_candidate_review",
-            "ecos_ai.ecos_wagent_evidence", "ecos_ai.ecos_wagent_claim", "ecos_ai.ecos_wagent_claim_evidence");
+            "ecos_ai.ecos_wagent_evidence", "ecos_ai.ecos_wagent_claim", "ecos_ai.ecos_wagent_claim_evidence",
+            "ecos_ai.ecos_wagent_action");
 
     /** 他域 schema 限定形态（出现即违 ST09/§6.3 禁直连 Engine 表红线）。 */
     private static final Pattern FOREIGN_SCHEMA =

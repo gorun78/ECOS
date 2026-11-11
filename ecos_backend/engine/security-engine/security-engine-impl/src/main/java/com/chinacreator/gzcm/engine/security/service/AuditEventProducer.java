@@ -95,6 +95,12 @@ public class AuditEventProducer {
         m.put("detail", e.detail());
         m.put("ipAddress", e.ipAddress());
         m.put("timestamp", e.timestamp());
+        // 链路标识随事件传递：异步落库线程读不到请求 MDC，发布端是唯一能取到 traceId 的位置；
+        // 缺失（非请求线程）就保持 null，禁自造
+        String traceId = org.slf4j.MDC.get("traceId");
+        if (traceId != null && !traceId.isBlank()) {
+            m.put("traceId", traceId);
+        }
         return m;
     }
 

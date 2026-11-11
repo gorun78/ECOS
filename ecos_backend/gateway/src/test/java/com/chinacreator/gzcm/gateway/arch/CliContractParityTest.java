@@ -49,7 +49,13 @@ class CliContractParityTest {
     private static final String CONTRACT_DIR = "docs/10-架构/api-contracts/openapi";
     private static final String MANIFEST_REL = "tools/ecos-cli/src/main/resources/contract/ops.json";
     private static final String CLI_SRC_REL = "tools/ecos-cli/src/main/java";
-    private static final int MIN_OPERATIONS = 87;
+    /**
+     * 契约 operation 下限。87 → 91（CLI 生产化批 B：新增 validateCognitiveModel、
+     * startCognitiveModelRun、listLlmModels、resolveModelRoute 四条；readiness/evidence
+     * 签名收敛只改路径不改条数）→ 92（批 D：新增 createApprovalToken）。与 CLI 侧
+     * {@code ContractManifestTest.MIN_OPERATIONS} 必须同值。
+     */
+    private static final int MIN_OPERATIONS = 95;
     private static final int MIN_CONTROLLER_ROUTES = 200;
 
     private static final Set<String> HTTP_METHODS = Set.of("GET", "POST", "PUT", "PATCH", "DELETE");
@@ -183,6 +189,17 @@ class CliContractParityTest {
         assertTrue(operations >= MIN_OPERATIONS,
                 "契约 operation 数 " + operations + " 低于下限 " + MIN_OPERATIONS
                         + "（防契约被删空后门禁空转；契约增减须在 CLI-MVP 落地登记册留凭证）");
+
+        // 两处阈值是「同批同值」的口头约定，此处改为机器校验：改一处忘另一处即红。
+        Path manifestTest = root.resolve("tools/ecos-cli/src/test/java/com/chinacreator/gzcm/cli/"
+                + "ContractManifestTest.java");
+        assertTrue(Files.isRegularFile(manifestTest), "CLI 侧契约门禁缺失: " + manifestTest);
+        Matcher cliMin = Pattern.compile("MIN_OPERATIONS\\s*=\\s*(\\d+)")
+                .matcher(Files.readString(manifestTest, StandardCharsets.UTF_8));
+        assertTrue(cliMin.find(), "CLI 侧 ContractManifestTest 未见 MIN_OPERATIONS 常量");
+        assertEquals(MIN_OPERATIONS, Integer.parseInt(cliMin.group(1)),
+                "两处 MIN_OPERATIONS 必须同值（gateway=" + MIN_OPERATIONS
+                        + " / cli=" + cliMin.group(1) + "）");
 
         for (JsonNode contract : manifest.path("contracts")) {
             String file = contract.path("file").asText();

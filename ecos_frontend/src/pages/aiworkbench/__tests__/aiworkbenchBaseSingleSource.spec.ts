@@ -75,7 +75,7 @@ const SRC_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /** 本域生产文件数（实跑读出，防扫描根漂移成零命中）。 */
 const DOMAIN_DIR = 'pages/aiworkbench';
-const DOMAIN_PROD_FILES = 29;
+const DOMAIN_PROD_FILES = 30; // 2026-11-11 WAgent 批 C：WagentStudioView.tsx 入库，实跑 29→30
 
 const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
   { rel: 'pages/aiworkbench/api.ts', importPath: '../../services/httpClient' },

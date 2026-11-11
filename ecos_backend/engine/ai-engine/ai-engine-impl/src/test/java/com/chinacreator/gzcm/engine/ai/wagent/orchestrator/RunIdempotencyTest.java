@@ -75,4 +75,38 @@ class RunIdempotencyTest {
         verify(runDao, never()).insert(any());
         verify(questionService, never()).markRunning(anyString(), anyString());
     }
+
+    @Test
+    @DisplayName("F10-11/§4.4：Question 已被首次建 Run 推离 open（资格闸本会拒）时，同键重放仍返回既有 run_id")
+    void replayPrecedesEligibilityGate() {
+        WAgentRunDao runDao = mock(WAgentRunDao.class);
+        WAgentQuestionService questionService = mock(WAgentQuestionService.class);
+
+        String hashed = WAgentHashSupport.idempotencyHash("t1", "u1", "key-2");
+        WAgentRunDO existing = new WAgentRunDO();
+        existing.setId("r-existing-2");
+        existing.setTenantId("t1");
+        existing.setInitiatedBy("u1");
+        existing.setStatus(RunStatus.FAILED.value());
+        when(runDao.findByIdempotencyKey("t1", "u1", hashed)).thenReturn(Optional.of(existing));
+
+        WAgentOrchestrator orchestrator = new WAgentOrchestrator(runDao,
+                mock(WAgentRunStepDao.class), mock(WAgentRunEventDao.class), questionService,
+                mock(WAgentBudgetService.class), mock(WAgentRunStateMachine.class),
+                mock(PlanBuilder.class), mock(PlanValidator.class), mock(StepExecutor.class),
+                mock(StepWriter.class), mock(WAgentEventPublisher.class),
+                WAgentTestSupport.noReadinessService());
+
+        WAgentOrchestrator.RunStartOutcome outcome = orchestrator.startRun(
+                new WAgentOrchestrator.RunStartCommand("t1", "o1", "u1", "q1", "m1",
+                        "key-2", null, null, null, null));
+
+        assertTrue(outcome.idempotentReplay(), "重放必须先于资格闸命中（否则 running 态问题重放被误判 400）");
+        assertEquals("r-existing-2", outcome.run().getId());
+        // 顺序本身即契约：重放路径根本不查 Question（首次建 Run 已把它改成 running，
+        // 若先查资格，同键重放会被「澄清未决」拒掉）
+        verify(questionService, never()).get(anyString(), anyString());
+        verify(questionService, never()).assertRunEligible(any());
+        verify(runDao, never()).insert(any());
+    }
 }

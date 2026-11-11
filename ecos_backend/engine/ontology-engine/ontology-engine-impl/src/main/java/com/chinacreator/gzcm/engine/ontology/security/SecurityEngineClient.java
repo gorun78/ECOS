@@ -470,6 +470,12 @@ public class SecurityEngineClient {
             event.put("action", action);
             event.put("resource", "ontology");
             event.put("result", result == null ? "OK" : result);
+            // 链路标识随事件走：消费端是异步线程，读不到请求 MDC，只有发布端能取到。
+            // 缺失即不带（非请求线程），消费端保持 null——禁编造。
+            String traceId = org.slf4j.MDC.get("traceId");
+            if (traceId != null && !traceId.isBlank()) {
+                event.put("traceId", traceId);
+            }
             if (governanceColumns != null) {
                 event.putAll(governanceColumns);
                 event.put("domain", governanceColumns.getOrDefault("domain", "ontology"));

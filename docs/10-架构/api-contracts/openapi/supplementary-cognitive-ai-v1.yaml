@@ -188,6 +188,45 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ApiResponse" }
+
+  /api/v1/cognitive/models/{modelId}/validate:
+    post:
+      tags: [cognitive-models]
+      operationId: validateCognitiveModel
+      summary: 认知模型校验（CLI cognition model validate，L1）
+      x-implementation-status: implemented   # ForecastController#validateCognitiveModel（批 F，2026-11-10）
+      x-cli-mapping: "ecos cognition model validate（详设-10 §10.3.5）"
+      description: |
+        校验 = 四类发布门禁（contract/regression/backtest/calibration）的**真实裁决与落列**，
+        与 `POST /models/{id}/gates` 同源实现（另开路径只为 CLI operationId 与设计册命令名对齐）。
+        不通过即返回 FAIL 明细，禁「看起来通过」的包装。
+      parameters:
+        - { name: modelId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: "门禁逐项结果（PASS/FAIL/PENDING + 证据）" }
+        "404": { description: 模型不存在 }
+
+  /api/v1/cognitive/models/{modelId}/run:
+    post:
+      tags: [cognitive-models]
+      operationId: startCognitiveModelRun
+      summary: 认知模型确定性运行（CLI cognition model run，L1）
+      x-implementation-status: planned       # 设计 §8.4.2：执行权归外部计算/预测服务；CLI 输出 UNAVAILABLE，禁造假
+      x-cli-mapping: "ecos cognition model run（详设-10 §10.3.5；产物走 data 通道）"
+      description: |
+        目标语义：触发确定性计算（非 LLM 推理），产物经 data-engine 写通道落业务域（铁律 §0.6/ADR-14）。
+        未实装依据：设计 §8.4.2 规定 `compute_owner` NOT NULL「执行权归属外部计算/预测服务」，
+        「模型实例与运行结果不得入本表」⇒ cognitive-engine 是资产登记表而非执行器；本 op 无 requestBody
+        （无输入契约可算），且 dev 库 `ecos_cognitive_model` 零活跃行、零 compute_owner，无运行结果承载表。
+        接入需外部计算服务承接或另立运行端点（待裁决）；在此之前保持 planned，CLI 不得伪造 run。
+      parameters:
+        - { name: modelId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "202": { description: 已受理（taskId/runId 经 runtime-task） }
+        "404": { description: 模型不存在 }
+        "409": { description: 模型未 PUBLISHED 或口径锁定 }
         "403":
           $ref: "#/components/responses/E403"
 
@@ -362,6 +401,30 @@ paths:
         "201": { description: 提案已创建（复用既有 OntologyProposal 创建方法） }
         "409": { description: 候选非 VALIDATED / 冲突未解 }
 
+  /api/v1/cli/preflight:
+    post:
+      tags: [cli]
+      operationId: runPreflight
+      summary: CLI 预检 11 步（只报告，不创建 Run）
+      x-implementation-status: implemented   # CliPreflightController#run（gateway，批 E）
+      x-design-ref: "详设-10 §10.3.5 ecos runtime doctor；详设-16 §16.7 报告字段"
+      description: |
+        11 步预检：网关健康 / 凭据身份 / 监控聚合 / 认知模型 / 工具契约 / 候选读面 /
+        本体候选 / 治理候选 / LLM 模型目录 / 能力目录 / 审批凭证存储。
+        每步以属主读端点自探测（不直连对方表），凭证存储做一次只读连通检查。
+        **只报告不建 Run**（data.createsRun=false）；缺依赖 → BLOCKED，不可判定 → NOT_VERIFIED，
+        禁把「不知道」写 PASS。汇总：有 FAIL → 500，有 BLOCKED → 503，否则 200。
+      responses:
+        "200":
+          description: 全部 PASS（或仅含 NOT_VERIFIED，逐项可见）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { description: 未认证（本端点要求 JWT，禁匿名） }
+        "403": { description: 权限拒绝 }
+        "500": { description: "E-CLI-PREFLIGHT-FAIL：存在失败项" }
+        "503": { description: "E-CLI-PREFLIGHT-BLOCKED：依赖不可用" }
+
   /api/v1/ai/capabilities:
     get:
       tags: [capabilities]
@@ -372,6 +435,51 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         "200": { description: 能力清单（模型未接入 → supported=false，禁伪 available） }
+
+  /api/v1/ai/models:
+    get:
+      tags: [ai-models]
+      operationId: listLlmModels
+      summary: LLM 模型目录只读视图（CLI model list，L0）
+      x-implementation-status: implemented
+      x-implementation-ref: "AiModelCatalogController.java:115（类级 @RequestMapping /api/v1/ai + @GetMapping /models）"
+      x-design-ref: "详设-09 能力中心；详设-10 §10.3.5 ecos model list"
+      description: |
+        目录真值腿 = LLMGateway.modelCatalog()。读数不可得（网关未装配 / 目录空）⇒ 501 + stub=true，
+        **禁回落 200 + 空 items**。capability / dataClassification 两个过滤在本面无载体，
+        给定非空值即 400（禁静默忽略后给出"看似已过滤"的结果）。
+      parameters:
+        - { name: capability, in: query, required: false, schema: { type: string } }
+        - { name: dataClassification, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 模型目录（items/total/stub=false + 各列 Applicable 标志） }
+        "400": { description: 无载体的过滤参数被显式给定（ECOS-AI-400） }
+        "501": { description: 读数不可得（stub=true，禁空集合伪成功） }
+
+  /api/v1/ai/route/resolve:
+    post:
+      tags: [ai-models]
+      operationId: resolveModelRoute
+      summary: 四判据路由与回退链解析（CLI model route，L0）
+      x-implementation-status: planned       # 无路由解析端点（现有 AgentMeshController /route-intent 语义不同）；CLI 输出 UNAVAILABLE
+      x-design-ref: "详设-09 能力中心；详设-10 §10.3.5 ecos model route"
+      description: |
+        目标语义：按质量/成本/密级/预算四判据解析目标模型与回退链（§10.6 未过质量阈值的备用模型不得自动选中）。
+        当前 ai-engine 无此端点（AgentMeshController#routeIntent 是意图路由，语义不同，不可顶替）。
+        本条目保持 planned；CLI 收到 planned 即输出 UNAVAILABLE + source_refs，禁伪造路由结果。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 路由请求（capability/密级/预算/质量阈值；字段随属主实现收敛）
+              additionalProperties: true
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 目标模型 + 回退链 + 逐判据评分 }
+        "409": { description: 无满足判据的模型（禁兜底默认模型） }
 
   /api/v1/ai/capabilities/{id}/execute:
     post:

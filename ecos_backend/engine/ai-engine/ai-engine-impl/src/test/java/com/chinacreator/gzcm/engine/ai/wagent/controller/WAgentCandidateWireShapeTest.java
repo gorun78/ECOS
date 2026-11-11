@@ -1,6 +1,9 @@
 package com.chinacreator.gzcm.engine.ai.wagent.controller;
 
+import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateStatus;
+import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
+import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentCandidateDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentCandidateReviewDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentCandidateDO;
@@ -27,7 +30,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -58,16 +64,29 @@ class WAgentCandidateWireShapeTest {
 
     private WAgentCandidateDao candidateDao;
     private WAgentCandidateReviewDao reviewDao;
+    private AiSecurityEngineClient securityClient;
+    private DesignAssetArchiver designAssetArchiver;
+    private com.chinacreator.gzcm.runtime.access.git.GitRepositoryService gitRepositoryService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         candidateDao = mock(WAgentCandidateDao.class);
         reviewDao = mock(WAgentCandidateReviewDao.class);
+        securityClient = mock(AiSecurityEngineClient.class);
+        designAssetArchiver = mock(DesignAssetArchiver.class);
+        gitRepositoryService = mock(com.chinacreator.gzcm.runtime.access.git.GitRepositoryService.class);
         WAgentIdentityResolver identityResolver = mock(WAgentIdentityResolver.class);
         when(identityResolver.require()).thenReturn(new Identity("t1", "u1", "o1"));
+        // 批 A（2026-11-11）：发布面改调 requireWithRoles() 取真实角色集（授权墙双修之一）
+        when(identityResolver.requireWithRoles()).thenReturn(
+                new WAgentIdentityResolver.IdentityWithRoles(
+                        "t1", "u1", "o1", java.util.List.of("admin")));
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new WAgentCandidateController(candidateDao, reviewDao, identityResolver))
+                .standaloneSetup(new WAgentCandidateController(candidateDao, reviewDao, identityResolver,
+                        mock(com.chinacreator.gzcm.engine.ai.wagent.approval.ApprovalTokenService.class),
+                        securityClient, gitRepositoryService, designAssetArchiver,
+                        new com.chinacreator.gzcm.engine.ai.wagent.validate.WAgentCandidateValidationService()))
                 .setControllerAdvice(new WAgentOrchestrationAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
@@ -179,18 +198,21 @@ class WAgentCandidateWireShapeTest {
     }
 
     @Test
-    @DisplayName("#20 501 降级载荷两键（implemented/pending），键名不随 record 改名")
-    void publishNotImplementedShape() throws Exception {
+    @DisplayName("#20 归档不可用 ⇒ 502 且不落 published（原 501 降级形态已被真闭环取代）")
+    void publishArchiveUnavailableShape() throws Exception {
         fullCandidate("c4", CandidateStatus.APPROVED.value());
+        when(securityClient.evaluate(any(), any(), any(), any(), any())).thenReturn(true);
+        when(gitRepositoryService.getDefaultRepository())
+                .thenReturn(new com.chinacreator.gzcm.runtime.access.git.entity.GitRepository());
+        when(designAssetArchiver.archive(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(ArchiveOutcome.notAvailable("仓未注册"));
 
         MvcResult r = mockMvc.perform(post("/api/v1/wagent/candidates/c4/publish")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"approvalToken\":\"tok-2\"}"))
                 .andReturn();
 
-        assertEquals(501, r.getResponse().getStatus());
-        JsonNode data = dataOf(r);
-        assertEquals(List.of("implemented", "pending"), keys(data));
-        assertEquals(false, data.path("implemented").asBoolean());
+        assertEquals(502, r.getResponse().getStatus());
+        verify(candidateDao, never()).updatePublished(any(), any(), any(), any(), any());
     }
 }

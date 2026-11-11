@@ -445,7 +445,10 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // Copilot 六智能体批（2026-11-09）：282 → **284** = 增 2 枚消费点（`services/copilotApi.ts` 的
     // `${API_BASE}/v1/agent/copilot/agents` 与 `/chat` 两条身份腿；同文件另两枚 `quick-questions`/匿名 `chat`
     // 腿属既有匿名面，不在本批新增）。全部复用单源 `API_BASE`，未新造族根 ⇒ 债面无新增，族面 +1 见下条。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(284); // 2026-11-09：Copilot 目录/对话腿按实跑重设（原 282）
+    // WAgent 批 C（2026-11-11）：284 → **285** = 增 1 枚派生态站点（`services/wagentClient.ts` 的
+    // `` `${API_BASE}/v1/wagent` `` 族根声明，六腿共用）；同文件另有 5 条消费腿为裸引用不算站点。
+    // 属主单源 = wagentClient.ts，全仓无第二生产方 ⇒ dupBoth 不动；族面 +1 见下条。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(285); // 2026-11-11：WAgent 批 C 新增属主族根，按实跑重设（原 284）
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     // 三个数 = 本批实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）。
@@ -698,7 +701,9 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 两向实跑：改前 HEAD 读 253 且旧锚通过、改后首跑在 252 变红 ⇒ 判据活性成立。
     // Copilot 六智能体批（2026-11-09）：255 → **256** = 族面 +1（`/v1/agent/copilot/quick-questions` 这条
     // 既有匿名腿此前无族可见性登记，随本批同文件改动进入扫描面）；属主仍为单源 `copilotApi.ts`，无重复族。
-    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(256); // 2026-11-09：按实跑重设（原 255）
+    // WAgent 批 C（2026-11-11）：256 → **257** = 族面 +1（`/v1/wagent` 族随 `services/wagentClient.ts`
+    // 族根声明进入扫描面）；属主单源，无重复族。
+    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(257); // 2026-11-11：WAgent 批 C 新增族，实跑重设（原 256）
     for (const owners of snapshot.idx.values()) expect(owners.has(CANONICAL)).toBe(false);
     // 名字变体面归零（#145/B6-11）：prod 面不得再有 `import { API_BASE as X }` 形态的基址别名——
     // 它虽然已被 derivedRe 计入族面，但这个形状本身就是 D-B5-40 在名字轴上的成因，出现即红。

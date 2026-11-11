@@ -125,9 +125,8 @@ public class WAgentOrchestrator {
             throw WAgentOrchestrationException.validation("automation_ceiling 越界（仅 0~3）: " + ceiling);
         }
 
-        WAgentQuestionDO question = questionService.get(cmd.questionId(), cmd.tenantId());
-        questionService.assertRunEligible(question);
-
+        // 幂等查询必须先于资格闸：首次成功建 Run 会把 Question 推离 open，
+        // 若先判资格，同键重放会被「澄清未决」挡成 400，§4.4 的「重放返回同一 run_id」即不成立。
         String hashedKey = cmd.idempotencyKey() == null || cmd.idempotencyKey().isBlank()
                 ? null : WAgentHashSupport.idempotencyHash(cmd.tenantId(), cmd.operator(), cmd.idempotencyKey());
         if (hashedKey != null) {
@@ -138,6 +137,9 @@ public class WAgentOrchestrator {
                 return new RunStartOutcome(existing, true);
             }
         }
+
+        WAgentQuestionDO question = questionService.get(cmd.questionId(), cmd.tenantId());
+        questionService.assertRunEligible(question);
 
         BudgetSnapshot snapshot = budgetService.capture();
         WAgentRunDO run = new WAgentRunDO();
@@ -284,10 +286,18 @@ public class WAgentOrchestrator {
 
     // ══════════════════════════ 外部入口（§5.2 #8/#9/#10） ══════════════════════════
 
-    /** 审批闸门（awaiting_approval + 凭证校验；EXPLORED human_gate 在此清闸并写 succeeded 闸行）。 */
+    /**
+     * 审批闸门（EXPLORED human_gate 在此清闸并写 succeeded 闸行）。
+     *
+     * <p><b>调用前置条件</b>：凭证必须已由 {@code ApprovalTokenService.verifyAndConsume} 完成
+     * 校验 + 一次性消费，本方法<b>不再校验</b>（此处非空判断只是防呆，不能当作安全边界）。
+     * 清闸是不可回退动作，唯一合法调用方是 {@code WAgentRunController#approveRunGate}；
+     * 门禁 {@code ApprovalGateChokepointTest} 钉死这一点。</p>
+     */
     public WAgentRunDO approveGate(String runId, String approvalToken, String operator) {
         if (approvalToken == null || approvalToken.isBlank()) {
-            throw WAgentOrchestrationException.validation("approval_token 不得为空（§5.2 #9 凭证校验）");
+            throw WAgentOrchestrationException.validation(
+                    "approval_token 不得为空（此处仅防呆；真正的校验在 ApprovalTokenService.verifyAndConsume）");
         }
         WAgentRunDO run = requireRun(runId);
         WAgentRunStateMachine.parseStatus(run.getStatus());

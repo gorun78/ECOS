@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.audit;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -17,16 +18,23 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
  * H10-T2 — ai-engine 高危写操作审计锚点（N15 Top20: AgentConfigController 等）。
  *
- * <p>覆盖 {@code com.chinacreator.gzcm.engine.ai.controller} 包全部
- * POST/PUT/DELETE 端点，afterCompletion 经 runtime 横切通道发
- * Kafka {@link KafkaTopics#AUDIT} 审计事件（EventBusService 类名反射优先，
+ * <p>覆盖 ai-engine 两个 controller 包（{@code engine.ai.controller} 与
+ * {@code engine.ai.wagent.controller}）全部 POST/PUT/PATCH/DELETE 端点，afterCompletion 经
+ * runtime 横切通道发 Kafka {@link KafkaTopics#AUDIT} 审计事件（EventBusService 类名反射优先，
  * kafkaTemplate 兜底，均不可用时 WARN 留痕）。不自建审计存储、不封装新 REST 通道。</p>
+ *
+ * <p><b>wagent 写面为何必须在内</b>：L3 发布/提交（{@code publishCandidate}、
+ * {@code commitAction}、审批凭证签发）全在 {@code engine.ai.wagent.controller} 包，
+ * 只扫 {@code engine.ai.controller} 时这些拒单与成功一律零审计行（缺陷已实测：审计表
+ * {@code resource LIKE 'WAgent%'} 计数为 0）。批D「越权/过期/自审批须审计留痕」的成立
+ * 完全依赖这条范围。</p>
  *
  * <p>自注册（实现 WebMvcConfigurer），不依赖 pom 变更（模块无 aop starter 时的
  * HandlerInterceptor 方案，参照 sysman HeaderAuthInterceptor 先例）。</p>
@@ -36,8 +44,10 @@ public class AiSecurityEngineAuditInterceptor implements HandlerInterceptor, Web
 
     private static final Logger log = LoggerFactory.getLogger(AiSecurityEngineAuditInterceptor.class);
 
-    /** 审计锚点覆盖的 controller 包前缀 */
-    private static final String SCOPE_PACKAGE = "com.chinacreator.gzcm.engine.ai.controller";
+    /** 审计锚点覆盖的 controller 包前缀（wagent 为其子包但非 `controller` 子路径，故并列登记）。 */
+    private static final List<String> SCOPE_PACKAGES = List.of(
+            "com.chinacreator.gzcm.engine.ai.controller",
+            "com.chinacreator.gzcm.engine.ai.wagent.controller");
 
     private static final String EVENTBUS_IMPL_FQN = "com.chinacreator.gzcm.runtime.eventbus.EventBusService";
 
@@ -62,24 +72,40 @@ public class AiSecurityEngineAuditInterceptor implements HandlerInterceptor, Web
         try {
             if (!(handler instanceof HandlerMethod hm)) return;
             String pkg = hm.getBeanType().getPackageName();
-            if (!pkg.startsWith(SCOPE_PACKAGE)) return;
+            if (SCOPE_PACKAGES.stream().noneMatch(pkg::startsWith)) return;
             String httpMethod = request.getMethod();
-            if (!"POST".equals(httpMethod) && !"PUT".equals(httpMethod) && !"DELETE".equals(httpMethod)) {
+            if (!"POST".equals(httpMethod) && !"PUT".equals(httpMethod)
+                    && !"PATCH".equals(httpMethod) && !"DELETE".equals(httpMethod)) {
                 return;
             }
-            Map<String, Object> event = new LinkedHashMap<>();
-            event.put("eventId", UUID.randomUUID().toString());
-            event.put("timestamp", Instant.now().toString());
-            event.put("module", "ai-engine");
-            event.put("userId", resolveUserId(request));
-            event.put("action", httpMethod + " " + request.getRequestURI());
-            event.put("resource", hm.getBeanType().getSimpleName() + "#" + hm.getMethod().getName());
-            event.put("result", response.getStatus() < 400 && ex == null ? "OK" : "FAIL");
-            event.put("statusCode", response.getStatus());
+            Map<String, Object> event = buildAuditEvent(request, response.getStatus(), ex,
+                    hm.getBeanType().getSimpleName() + "#" + hm.getMethod().getName());
             publishAuditEvent(event);
         } catch (Exception e) {
             log.warn("AiSecurityEngineAuditInterceptor: 审计锚点事件失败(不阻塞主流程): {}", e.getMessage());
         }
+    }
+
+    /** 审计载荷（键集固定为 {@link #auditPayloadKeyWhitelist()}，只带 ID 与摘要，禁请求/响应原文）。 */
+    public Map<String, Object> buildAuditEvent(HttpServletRequest request, int statusCode,
+                                               Exception ex, String resource) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("eventId", UUID.randomUUID().toString());
+        event.put("timestamp", Instant.now().toString());
+        event.put("module", "ai-engine");
+        event.put("traceId", AiTraceSupport.currentTraceId());
+        event.put("userId", resolveUserId(request));
+        event.put("action", request.getMethod() + " " + request.getRequestURI());
+        event.put("resource", resource);
+        event.put("result", statusCode < 400 && ex == null ? "OK" : "FAIL");
+        event.put("statusCode", statusCode);
+        return event;
+    }
+
+    /** 载荷键白名单（traceId 必在：批D 三类拒单需与 CLI 输出同源可对账）。 */
+    public static List<String> auditPayloadKeyWhitelist() {
+        return List.of("eventId", "timestamp", "module", "traceId", "userId",
+                "action", "resource", "result", "statusCode");
     }
 
     private void publishAuditEvent(Map<String, Object> event) {

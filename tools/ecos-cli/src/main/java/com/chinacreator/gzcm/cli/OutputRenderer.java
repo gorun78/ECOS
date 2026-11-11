@@ -15,15 +15,23 @@ public final class OutputRenderer {
     }
 
     public static void render(Map<String, Object> out, String format) {
+        Stdio.println(renderToString(out, format));
+    }
+
+    /**
+     * 渲染为字符串（唯一出口，<b>出串即脱敏</b>）。
+     *
+     * <p>后端把凭据回显在 data/error 里时，json 与 table 两种形态都不得带出明文；
+     * 脱敏放在序列化之后，才能覆盖 URL query、嵌套字段等任意位置。</p>
+     */
+    static String renderToString(Map<String, Object> out, String format) {
+        String text;
         try {
-            if ("table".equals(format)) {
-                Stdio.println(toTable(out));
-            } else {
-                Stdio.println(MAPPER.writeValueAsString(out));
-            }
+            text = "table".equals(format) ? toTable(out) : MAPPER.writeValueAsString(out);
         } catch (Exception e) {
             throw new CliException(ExitCodes.FAILED, "输出序列化失败: " + e.getClass().getSimpleName());
         }
+        return Redactor.redact(text);
     }
 
     @SuppressWarnings("unchecked")
@@ -54,8 +62,31 @@ public final class OutputRenderer {
                             .append("]").append(System.lineSeparator());
                 }
             }
+        } else if (data instanceof Map<?, ?> m && m.get("steps") instanceof List<?> steps) {
+            sb.append("preflight : ").append(m.get("pass")).append(" pass / ")
+                    .append(m.get("fail")).append(" fail / ").append(m.get("blocked")).append(" blocked / ")
+                    .append(m.get("notVerified")).append(" not_verified；createsRun=")
+                    .append(m.get("createsRun")).append(System.lineSeparator());
+            for (Object c : steps) {
+                if (c instanceof Map<?, ?> row) {
+                    sb.append("  - ").append(row.get("step")).append(": ").append(row.get("status"))
+                            .append(" (").append(row.get("source")).append(")").append(System.lineSeparator());
+                }
+            }
         } else if (data instanceof List<?> rows) {
             sb.append("rows   : ").append(rows.size()).append(System.lineSeparator());
+            // 只报行数等于把数据丢了 —— table 的用途就是让人看内容。
+            // 逐行输出各键值；超宽不截断（截断会误导），交由终端折行。
+            for (Object row : rows) {
+                if (row instanceof Map<?, ?> m) {
+                    String cells = m.entrySet().stream()
+                            .map(e -> e.getKey() + "=" + e.getValue())
+                            .collect(java.util.stream.Collectors.joining(", "));
+                    sb.append("  - ").append(cells).append(System.lineSeparator());
+                } else {
+                    sb.append("  - ").append(row).append(System.lineSeparator());
+                }
+            }
         } else if (data != null) {
             sb.append("data   : ").append(data).append(System.lineSeparator());
         }

@@ -9,15 +9,15 @@
     },
     {
       "file" : "supplementary-cognitive-ai-v1.yaml",
-      "sha256" : "e3d063865f4a971df8d7ac84ee7a0f343232622421e6163c6f649e17d4bbc9f9",
-      "paths" : 54,
-      "operations" : 57
+      "sha256" : "8626a21f9019245b1b29481d1ffa6a2ee48c1cc2bc15d264d33fadb10f328b72",
+      "paths" : 59,
+      "operations" : 62
     },
     {
       "file" : "wagent-v1.yaml",
-      "sha256" : "0d8a70bcfdd9e4bba78510941537fd4909abaf04650680b04d01b796099d654b",
-      "paths" : 26,
-      "operations" : 26
+      "sha256" : "b91d6b41719ec694b943e33cec27edaed2e0a0310f607388a7bf7402fa650cdb",
+      "paths" : 28,
+      "operations" : 29
     }
   ],
   "operations" : [
@@ -61,6 +61,20 @@
       "method" : "POST",
       "path" : "/api/v1/ai/capabilities/{id}/tasks",
       "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "listLlmModels",
+      "method" : "GET",
+      "path" : "/api/v1/ai/models",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "resolveModelRoute",
+      "method" : "POST",
+      "path" : "/api/v1/ai/route/resolve",
+      "status" : "planned",
       "contract" : "supplementary-cognitive-ai-v1.yaml"
     },
     {
@@ -141,6 +155,13 @@
       "contract" : "supplementary-cognitive-ai-v1.yaml"
     },
     {
+      "operationId" : "runPreflight",
+      "method" : "POST",
+      "path" : "/api/v1/cli/preflight",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
       "operationId" : "listCognitiveAssetCatalog",
       "method" : "GET",
       "path" : "/api/v1/cognitive/assets/catalog",
@@ -186,6 +207,20 @@
       "operationId" : "listCognitiveModels",
       "method" : "GET",
       "path" : "/api/v1/cognitive/models",
+      "status" : "implemented",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "startCognitiveModelRun",
+      "method" : "POST",
+      "path" : "/api/v1/cognitive/models/{modelId}/run",
+      "status" : "planned",
+      "contract" : "supplementary-cognitive-ai-v1.yaml"
+    },
+    {
+      "operationId" : "validateCognitiveModel",
+      "method" : "POST",
+      "path" : "/api/v1/cognitive/models/{modelId}/validate",
       "status" : "implemented",
       "contract" : "supplementary-cognitive-ai-v1.yaml"
     },
@@ -452,28 +487,42 @@
       "operationId" : "draftAction",
       "method" : "POST",
       "path" : "/api/v1/wagent/actions",
-      "status" : "planned",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
       "operationId" : "commitAction",
       "method" : "POST",
       "path" : "/api/v1/wagent/actions/{actionId}/commit",
-      "status" : "planned",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "createApprovalToken",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/approval-tokens",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
       "operationId" : "listCandidates",
       "method" : "GET",
       "path" : "/api/v1/wagent/candidates",
-      "status" : "planned",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "createWagentCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/candidates",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
       "operationId" : "getCandidate",
       "method" : "GET",
       "path" : "/api/v1/wagent/candidates/{candidateId}",
-      "status" : "planned",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
@@ -487,14 +536,21 @@
       "operationId" : "publishCandidate",
       "method" : "POST",
       "path" : "/api/v1/wagent/candidates/{candidateId}/publish",
-      "status" : "planned",
+      "status" : "implemented",
+      "contract" : "wagent-v1.yaml"
+    },
+    {
+      "operationId" : "validateWagentCandidate",
+      "method" : "POST",
+      "path" : "/api/v1/wagent/candidates/{candidateId}/validate",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
       "operationId" : "listClaims",
       "method" : "GET",
       "path" : "/api/v1/wagent/claims/{runId}",
-      "status" : "planned",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
@@ -507,8 +563,8 @@
     {
       "operationId" : "traceEvidence",
       "method" : "GET",
-      "path" : "/api/v1/wagent/evidence",
-      "status" : "planned",
+      "path" : "/api/v1/wagent/evidence/{evidenceId}",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
@@ -549,15 +605,15 @@
     {
       "operationId" : "getReadiness",
       "method" : "GET",
-      "path" : "/api/v1/wagent/readiness",
-      "status" : "planned",
+      "path" : "/api/v1/wagent/readiness/{questionId}",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
       "operationId" : "refillReadiness",
       "method" : "POST",
       "path" : "/api/v1/wagent/readiness/{questionId}/refill",
-      "status" : "planned",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
@@ -613,14 +669,14 @@
       "operationId" : "searchTools",
       "method" : "GET",
       "path" : "/api/v1/wagent/tools",
-      "status" : "planned",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
       "operationId" : "describeTool",
       "method" : "GET",
       "path" : "/api/v1/wagent/tools/{name}",
-      "status" : "planned",
+      "status" : "implemented",
       "contract" : "wagent-v1.yaml"
     },
     {
@@ -634,20 +690,29 @@
   "commands" : [
     {
       "name" : "doctor",
-      "description" : "环境与连通性自检（网关可达 / 认知读面 / 监控 / 凭据有效性）；只读",
+      "description" : "环境与连通性自检（网关可达 / 认知读面 / 监控 / 凭据有效性）；加 --preflight 走服务端 11 步预检（只报告，不建 Run）；只读",
       "accessMode" : "READ",
+      "automationLevel" : "L0",
+      "requiresApproval" : false,
+      "wired" : true,
       "operationIds" : [
         "getGatewayHealth",
         "listCognitiveModels",
         "getMonitorHealth",
-        "getCurrentUserProfile"
+        "getCurrentUserProfile",
+        "runPreflight"
       ],
-      "flags" : [ ]
+      "flags" : [ ],
+      "pathParams" : [ ],
+      "bodyParams" : [ ]
     },
     {
       "name" : "cognition models list",
       "description" : "认知模型注册表只读列表；参数名取自契约 listCognitiveModels",
       "accessMode" : "READ",
+      "automationLevel" : "L0",
+      "requiresApproval" : false,
+      "wired" : true,
       "operationIds" : [
         "listCognitiveModels"
       ],
@@ -670,14 +735,383 @@
           "parameter" : "cognitiveModelType",
           "description" : "认知模型类型（CM-01~CM-xx）"
         }
-      ]
+      ],
+      "pathParams" : [ ],
+      "bodyParams" : [ ]
     },
     {
       "name" : "capabilities list",
       "description" : "命令发现与自描述（含每个命令的操作映射与实现状态）；只读",
       "accessMode" : "READ",
+      "automationLevel" : "L0",
+      "requiresApproval" : false,
+      "wired" : true,
       "operationIds" : [ ],
-      "flags" : [ ]
+      "flags" : [ ],
+      "pathParams" : [ ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "agent run",
+      "description" : "启动 Run（--question-id 必填；L1 生成候选，不自动执行副作用）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L1",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "startRun"
+      ],
+      "flags" : [ ],
+      "pathParams" : [ ],
+      "bodyParams" : [
+        {
+          "flag" : "--question-id",
+          "operationId" : "startRun",
+          "parameter" : "questionId",
+          "description" : "问题 ID（RunStartRequest.questionId，必填）"
+        },
+        {
+          "flag" : "--automation-ceiling",
+          "operationId" : "startRun",
+          "parameter" : "automationCeiling",
+          "description" : "自动化上界（L0~L3）"
+        },
+        {
+          "flag" : "--parent-run-id",
+          "operationId" : "startRun",
+          "parameter" : "parentRunId",
+          "description" : "父 Run（重跑/续跑）"
+        },
+        {
+          "flag" : "--previous-run-id",
+          "operationId" : "startRun",
+          "parameter" : "previousRunId",
+          "description" : "前序 Run"
+        }
+      ]
+    },
+    {
+      "name" : "agent inspect",
+      "description" : "Run 详情（状态 + 时间线 + Step 引用与哈希）；只读",
+      "accessMode" : "READ",
+      "automationLevel" : "L0",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "getRun"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--run-id",
+          "operationId" : "getRun",
+          "parameter" : "runId",
+          "description" : "Run ID"
+        }
+      ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "agent stop",
+      "description" : "取消 Run（幂等：终态再取消不报错）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L1",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "cancelRun"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--run-id",
+          "operationId" : "cancelRun",
+          "parameter" : "runId",
+          "description" : "Run ID"
+        }
+      ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "agent readiness",
+      "description" : "就绪度（等级 + 缺项 + 缺口）；只读",
+      "accessMode" : "READ",
+      "automationLevel" : "L0",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "getReadiness"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--question-id",
+          "operationId" : "getReadiness",
+          "parameter" : "questionId",
+          "description" : "问题 ID"
+        }
+      ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "ontology validate",
+      "description" : "本体候选校验（命名/端点/冲突/兼容四段，回写 validation 并 CAS 推进）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L1",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "validateOntologyCandidate"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--candidate-id",
+          "operationId" : "validateOntologyCandidate",
+          "parameter" : "candidateId",
+          "description" : "候选 ID"
+        }
+      ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "ontology publish",
+      "description" : "本体候选发布（L3：凭证消费 + 安全裁决 + Git 归档 + 落库）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L3",
+      "requiresApproval" : true,
+      "wired" : true,
+      "operationIds" : [
+        "publishCandidate"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--candidate-id",
+          "operationId" : "publishCandidate",
+          "parameter" : "candidateId",
+          "description" : "候选 ID"
+        }
+      ],
+      "bodyParams" : [
+        {
+          "flag" : "--approval-token",
+          "operationId" : "publishCandidate",
+          "parameter" : "approval_token",
+          "description" : "服务端审批凭证（必填）"
+        }
+      ]
+    },
+    {
+      "name" : "knowledge extract",
+      "description" : "知识抽取（产出候选，不直写知识库；初始状态 generated）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L2",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "createWagentCandidate"
+      ],
+      "flags" : [ ],
+      "pathParams" : [ ],
+      "bodyParams" : [
+        {
+          "flag" : "--candidate-type",
+          "operationId" : "createWagentCandidate",
+          "parameter" : "candidateType",
+          "description" : "CandidateType 十二类之一（必填）"
+        },
+        {
+          "flag" : "--payload-json",
+          "operationId" : "createWagentCandidate",
+          "parameter" : "payloadJson",
+          "description" : "候选载荷 JSON 串（必填）"
+        },
+        {
+          "flag" : "--target-engine",
+          "operationId" : "createWagentCandidate",
+          "parameter" : "targetEngine",
+          "description" : "属主引擎"
+        },
+        {
+          "flag" : "--basis-json",
+          "operationId" : "createWagentCandidate",
+          "parameter" : "basisJson",
+          "description" : "生成依据（证据/口径引用）"
+        },
+        {
+          "flag" : "--target-object-ref",
+          "operationId" : "createWagentCandidate",
+          "parameter" : "targetObjectRefJson",
+          "description" : "目标对象引用 JSON 串（validate conflict 段的比对键；键序由服务端规范化）"
+        },
+        {
+          "flag" : "--run-id",
+          "operationId" : "createWagentCandidate",
+          "parameter" : "generatedByRun",
+          "description" : "生成该候选的 Run"
+        }
+      ]
+    },
+    {
+      "name" : "knowledge validate",
+      "description" : "知识候选五段自检（structure/reference/conflict/impact/regression；任一段 fail 停 validating）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L1",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "validateWagentCandidate"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--candidate-id",
+          "operationId" : "validateWagentCandidate",
+          "parameter" : "candidateId",
+          "description" : "候选 ID"
+        }
+      ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "knowledge publish",
+      "description" : "知识候选发布（L3：凭证消费 + 安全裁决 + Git 归档 + 落库）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L3",
+      "requiresApproval" : true,
+      "wired" : true,
+      "operationIds" : [
+        "publishCandidate"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--candidate-id",
+          "operationId" : "publishCandidate",
+          "parameter" : "candidateId",
+          "description" : "候选 ID"
+        }
+      ],
+      "bodyParams" : [
+        {
+          "flag" : "--approval-token",
+          "operationId" : "publishCandidate",
+          "parameter" : "approval_token",
+          "description" : "服务端审批凭证（必填）"
+        }
+      ]
+    },
+    {
+      "name" : "cognition model validate",
+      "description" : "认知模型校验（四类发布门禁真实裁决；属主 cognitive-engine）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L1",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "validateCognitiveModel"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--model-id",
+          "operationId" : "validateCognitiveModel",
+          "parameter" : "modelId",
+          "description" : "模型 ID"
+        }
+      ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "cognition model run",
+      "description" : "认知模型确定性运行（L1；产物走 data 通道）。执行权按设计 §8.4.2 属外部计算/预测服务，cognitive-engine 仅登记资产且运行结果不入注册表；startCognitiveModelRun status=planned 且无输入体 ⇒ UNAVAILABLE",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L1",
+      "requiresApproval" : false,
+      "wired" : false,
+      "operationIds" : [
+        "startCognitiveModelRun"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--model-id",
+          "operationId" : "startCognitiveModelRun",
+          "parameter" : "modelId",
+          "description" : "模型 ID"
+        }
+      ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "action commit",
+      "description" : "行动提交（L3：凭证消费 + 安全裁决 + 属主 Engine 派发 + 落库）",
+      "accessMode" : "WRITE",
+      "automationLevel" : "L3",
+      "requiresApproval" : true,
+      "wired" : true,
+      "operationIds" : [
+        "commitAction"
+      ],
+      "flags" : [ ],
+      "pathParams" : [
+        {
+          "flag" : "--action-id",
+          "operationId" : "commitAction",
+          "parameter" : "actionId",
+          "description" : "行动 ID"
+        }
+      ],
+      "bodyParams" : [
+        {
+          "flag" : "--approval-token",
+          "operationId" : "commitAction",
+          "parameter" : "approval_token",
+          "description" : "服务端审批凭证（必填）"
+        }
+      ]
+    },
+    {
+      "name" : "model list",
+      "description" : "LLM 模型目录只读视图；读数不可得时服务端 501，CLI 如实透传",
+      "accessMode" : "READ",
+      "automationLevel" : "L0",
+      "requiresApproval" : false,
+      "wired" : true,
+      "operationIds" : [
+        "listLlmModels"
+      ],
+      "flags" : [
+        {
+          "flag" : "--capability",
+          "operationId" : "listLlmModels",
+          "parameter" : "capability",
+          "description" : "能力过滤（本面无载体，给定即 400）"
+        },
+        {
+          "flag" : "--data-classification",
+          "operationId" : "listLlmModels",
+          "parameter" : "dataClassification",
+          "description" : "数据密级过滤（本面无载体，给定即 400）"
+        }
+      ],
+      "pathParams" : [ ],
+      "bodyParams" : [ ]
+    },
+    {
+      "name" : "model route",
+      "description" : "四判据路由与回退链解析（L0；路由端点未实装 ⇒ UNAVAILABLE，禁伪造路由）",
+      "accessMode" : "READ",
+      "automationLevel" : "L0",
+      "requiresApproval" : false,
+      "wired" : false,
+      "operationIds" : [
+        "resolveModelRoute"
+      ],
+      "flags" : [ ],
+      "pathParams" : [ ],
+      "bodyParams" : [ ]
     }
   ]
 }

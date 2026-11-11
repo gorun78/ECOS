@@ -43,12 +43,17 @@ public class AuditLogDao extends com.chinacreator.gzcm.runtime.core.database.sup
 
     /**
      * R1.2 full 模式: 向 ecos_audit_log 哈希链表写入行，返回自增 id（bigint）。
+     *
+     * <p>{@code trace_id} 列由 V303（R7 §2.9.4③）建立，本版起随行落库，供
+     * 「CLI 输出 trace_id == 审计表 trace_id」的链路核对；哈希链 6 字段输入不变
+     * （V303 头注：改输入会让历史链验签失效）。</p>
      */
     public Long insertHashChainAudit(String username, String operation, String entityType,
-                                     String entityId, String changesJson, String ipAddress, String category) {
+                                     String entityId, String changesJson, String ipAddress, String category,
+                                     String traceId) {
         return jdbcTemplate.queryForObject(
-                "INSERT INTO ecos_audit_log (username, operation, entity_type, entity_id, changes, ip_address, created_at, category) " +
-                "VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, NOW(), ?) RETURNING id",
+                "INSERT INTO ecos_audit_log (username, operation, entity_type, entity_id, changes, ip_address, created_at, category, trace_id) " +
+                "VALUES (?, ?, ?, ?, CAST(? AS jsonb), ?, NOW(), ?, ?) RETURNING id",
                 Long.class,
                 username,
                 operation,
@@ -56,6 +61,14 @@ public class AuditLogDao extends com.chinacreator.gzcm.runtime.core.database.sup
                 entityId,
                 changesJson,
                 ipAddress,
-                category);
+                category,
+                traceId);
+    }
+
+    /** 兼容旧调用面（trace_id 留空）：仅保留给尚未接 MDC 的调用点。 */
+    public Long insertHashChainAudit(String username, String operation, String entityType,
+                                     String entityId, String changesJson, String ipAddress, String category) {
+        return insertHashChainAudit(username, operation, entityType, entityId, changesJson,
+                ipAddress, category, null);
     }
 }

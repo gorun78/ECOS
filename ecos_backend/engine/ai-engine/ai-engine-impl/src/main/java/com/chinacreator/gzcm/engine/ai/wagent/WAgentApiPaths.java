@@ -92,6 +92,15 @@ public final class WAgentApiPaths {
     public static final String CANDIDATE_BY_ID = BASE_PREFIX + "/candidates/{" + P_CANDIDATE_ID + "}";
     /** #19 POST；四眼；语义/口径/知识禁批量（reviewCandidate）。 */
     public static final String CANDIDATE_REVIEW = CANDIDATE_BY_ID + "/review";
+    /**
+     * POST；候选五段自检（{@code validateWagentCandidate}，D-WC-1 补断档）。
+     *
+     * <p>状态机 {@code generated|validated → validating → validated}：五段校验各落 V238 的
+     * {@code validation_*} 一列；任何一段 fail 停在 {@code validating}（可重试），
+     * 全非 fail 推进 {@code validated} 并允许进入 #19 评审。§5.2 表外能力位
+     * （F10-20 四元校验的执行位；原文只声明"由四元校验推进状态机"未列端点形态）。</p>
+     */
+    public static final String CANDIDATE_VALIDATE = CANDIDATE_BY_ID + "/validate";
     /** #20 POST；approval_token 必填；pre-commit 裁决 + Git 归档（publishCandidate，F10-23）。 */
     public static final String CANDIDATE_PUBLISH = CANDIDATE_BY_ID + "/publish";
 
@@ -108,6 +117,14 @@ public final class WAgentApiPaths {
     public static final String ACTIONS_COLLECTION = BASE_PREFIX + "/actions";
     /** #24b POST；提交（commitAction，经属主 Engine 写端点，Agent 不写对方表）。 */
     public static final String ACTION_COMMIT = BASE_PREFIX + "/actions/{" + P_ACTION_ID + "}/commit";
+
+    // ── L3 审批凭证（批 D 新增，只增不改；§5.2 表外能力位）────────────────
+    /**
+     * POST；签发一次性审批凭证（{@code createApprovalToken}）。
+     * 数据面 = {@code ecos_ai.agent_approval}（V326 补 token_digest/scope/expired_at/consumed_at/
+     * requested_by 列）；<b>admin 角色闸 fail-closed</b>，四眼（审批人 ≠ 申请人）在服务层强制。
+     */
+    public static final String APPROVAL_TOKENS = BASE_PREFIX + "/approval-tokens";
 
     // ── 能力探测（F10-16 附属端点，RunProgressFacade；随 #7 同族登记）──
     /** GET .../progress-capability → sse|polling（F10-16；§5.2 表外能力位，SSE 未就绪即回 polling）。 */

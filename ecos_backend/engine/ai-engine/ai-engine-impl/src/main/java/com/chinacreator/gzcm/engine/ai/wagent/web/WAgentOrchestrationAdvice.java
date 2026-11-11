@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.wagent.web;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentApprovalController;
 import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentCandidateController;
 import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentDecisionActionController;
 import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentEvidenceTraceController;
@@ -43,7 +44,11 @@ import java.util.Map;
         WAgentRunEventStreamController.class, WAgentKillSwitchController.class,
         WAgentReadinessController.class, WAgentToolContractController.class,
         WAgentCandidateController.class, WAgentEvidenceTraceController.class,
-        WAgentDecisionActionController.class})
+        WAgentDecisionActionController.class, WAgentApprovalController.class})
+// 2026-11-10 活体实测：gateway 的 GlobalExceptionHandler 有 Exception 兜底且无 @Order，
+// 与本源同序时抢在前 ⇒ 所有 W 域业务异常退化成 500。本源已用 assignableTypes 收窄，
+// 提到最高优先级不会影响其它控制器。
+@org.springframework.core.annotation.Order(org.springframework.core.Ordered.HIGHEST_PRECEDENCE)
 public class WAgentOrchestrationAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(WAgentOrchestrationAdvice.class);

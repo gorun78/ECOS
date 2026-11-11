@@ -4,12 +4,15 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentApiPaths;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentErrorCodes.WAgentErrorCode;
+import com.chinacreator.gzcm.engine.ai.wagent.approval.ApprovalTokenService;
+import com.chinacreator.gzcm.engine.ai.wagent.approval.WAgentApprovalScope;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentRunDO;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrator;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrator.RunTimelineVO;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.Identity;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -48,10 +51,13 @@ public class WAgentRunController {
 
     private final WAgentOrchestrator orchestrator;
     private final WAgentIdentityResolver identityResolver;
+    private final ApprovalTokenService approvalTokenService;
 
-    public WAgentRunController(WAgentOrchestrator orchestrator, WAgentIdentityResolver identityResolver) {
+    public WAgentRunController(WAgentOrchestrator orchestrator, WAgentIdentityResolver identityResolver,
+                               ApprovalTokenService approvalTokenService) {
         this.orchestrator = orchestrator;
         this.identityResolver = identityResolver;
+        this.approvalTokenService = approvalTokenService;
     }
 
     /** #5 建 Run 请求体（automationCeiling 0~3，缺省 L1 fail-closed 默认）。 */
@@ -64,7 +70,8 @@ public class WAgentRunController {
     }
 
     /** #9 审批体（approval_token 必填，凭证校验在编排面）。 */
-    public record RunApprovalRequest(String approvalToken) {
+    public record RunApprovalRequest(
+            @JsonProperty("approvalToken") @JsonAlias("approval_token") String approvalToken) {
     }
 
     /** Run 基视图（8 键；旧 Map 逐键同名同序）。 */
@@ -231,7 +238,7 @@ public class WAgentRunController {
         return ResponseEntity.ok(ok(RunVO.of(run)));
     }
 
-    /** #9 审批闸门（凭证非空校验在编排面；清闸后同步通道续跑）。 */
+    /** #9 审批闸门（凭证校验在编排面；清闸后同步通道续跑）。 */
     @PostMapping(WAgentApiPaths.RUN_APPROVAL)
     public ResponseEntity<ApiResponse<RunVO>> approveRunGate(
             @PathVariable(WAgentApiPaths.P_RUN_ID) String runId,
@@ -239,6 +246,10 @@ public class WAgentRunController {
             @RequestHeader(value = HEADER_PREFER, required = false) String prefer) {
         Identity identity = identityResolver.require();
         orchestrator.requireRunForTenant(runId, identity.tenantId());
+        // 严格凭证校验 + 一次性消费（V326 数据面）：清闸是不可回退动作，消费必须与执行同批
+        approvalTokenService.verifyAndConsume(req == null ? null : req.approvalToken(),
+                WAgentApprovalScope.RUN_APPROVAL.name(), runId, identity.operator(),
+                AiTraceSupport.currentTraceId());
         WAgentRunDO run = orchestrator.approveGate(runId,
                 req == null ? null : req.approvalToken(), identity.operator());
         if (!isAsyncPrefer(prefer)) {

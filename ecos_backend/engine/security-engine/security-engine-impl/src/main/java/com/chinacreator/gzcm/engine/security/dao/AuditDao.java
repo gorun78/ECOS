@@ -97,6 +97,21 @@ public class AuditDao extends JdbcTemplateDaoSupport {
     }
 
     /**
+     * 回填链路标识（CLI 生产化批 C 的贯通腿）。
+     *
+     * <p>幂等落库语句只写固定 8 列（ON CONFLICT DO NOTHING 语义不允许随意扩列），
+     * 这里用「只在为空时补」的 UPDATE 补齐 {@code trace_id}：重放不覆盖既有值，缺失不编造。</p>
+     */
+    public int updateTraceId(String id, String traceId) {
+        if (id == null || id.isBlank() || traceId == null || traceId.isBlank()) {
+            return 0;
+        }
+        return jdbcTemplate.update(
+            "UPDATE " + AUDIT_LOG + " SET trace_id = ? WHERE id = ? AND (trace_id IS NULL OR trace_id = '')",
+            traceId, id);
+    }
+
+    /**
      * 补写治理审计列（R7 §2.9.4③；#147M）。
      *
      * <p><b>列名单固定</b>（与 V303 的 20 列逐一同名），仅接受

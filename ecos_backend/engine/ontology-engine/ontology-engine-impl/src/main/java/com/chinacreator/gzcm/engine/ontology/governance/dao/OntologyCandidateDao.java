@@ -73,7 +73,7 @@ public class OntologyCandidateDao extends JdbcTemplateDaoSupport {
                         + "  proposal_ref, tool_contract_ref, approval_ref, source_run_id,"
                         + "  trace_id, idempotency_key, domain, version_no,"
                         + "  create_time, update_time, create_by, update_by, is_deleted)"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
                         + "NOW(), NOW(), ?, ?, 0)",
                 id, tenantId, orgId, candidateType, subjectType, predicate, objectType,
                 targetRef, proposalText, evidenceRefsText, confidenceValue, confidenceKind,

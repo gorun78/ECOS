@@ -4,15 +4,26 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentApiPaths;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateStatus;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateType;
+import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateValidationSegment;
+import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.CandidateValidationStatus;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.ReviewDecision;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentErrorCodes.WAgentErrorCode;
+import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
+import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
+import com.chinacreator.gzcm.engine.ai.wagent.approval.ApprovalTokenService;
+import com.chinacreator.gzcm.engine.ai.wagent.approval.WAgentApprovalScope;
+import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
+import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
+import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentCandidateDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentCandidateReviewDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentCandidateDO;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentCandidateReviewDO;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrationException;
+import com.chinacreator.gzcm.engine.ai.wagent.validate.WAgentCandidateValidationService;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.Identity;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,16 +59,35 @@ import java.util.UUID;
 @RestController
 public class WAgentCandidateController {
 
+    /** 允许发起五段校验的状态（generated 首验 / validating 修复后重跑 / validated 复核）。 */
+    private static final java.util.Set<CandidateStatus> VALIDATABLE = java.util.Set.of(
+            CandidateStatus.GENERATED, CandidateStatus.VALIDATING, CandidateStatus.VALIDATED);
+
     private final WAgentCandidateDao candidateDao;
     private final WAgentCandidateReviewDao reviewDao;
     private final WAgentIdentityResolver identityResolver;
+    private final ApprovalTokenService approvalTokenService;
+    private final AiSecurityEngineClient securityClient;
+    private final GitRepositoryService gitRepositoryService;
+    private final DesignAssetArchiver designAssetArchiver;
+    private final WAgentCandidateValidationService validationService;
 
     public WAgentCandidateController(WAgentCandidateDao candidateDao,
                                      WAgentCandidateReviewDao reviewDao,
-                                     WAgentIdentityResolver identityResolver) {
+                                     WAgentIdentityResolver identityResolver,
+                                     ApprovalTokenService approvalTokenService,
+                                     AiSecurityEngineClient securityClient,
+                                     GitRepositoryService gitRepositoryService,
+                                     DesignAssetArchiver designAssetArchiver,
+                                     WAgentCandidateValidationService validationService) {
         this.candidateDao = candidateDao;
         this.reviewDao = reviewDao;
         this.identityResolver = identityResolver;
+        this.approvalTokenService = approvalTokenService;
+        this.securityClient = securityClient;
+        this.gitRepositoryService = gitRepositoryService;
+        this.designAssetArchiver = designAssetArchiver;
+        this.validationService = validationService;
     }
 
     /** #19 评审请求体（decision 取 ReviewDecision 三值；operator 一律服务端身份，禁自报）。 */
@@ -66,7 +96,8 @@ public class WAgentCandidateController {
     }
 
     /** #20 发布请求体（approval_token 必填，§5.2 表）。 */
-    public record CandidatePublishRequest(String approvalToken) {
+    public record CandidatePublishRequest(
+            @JsonProperty("approvalToken") @JsonAlias("approval_token") String approvalToken) {
     }
 
     /** 五段校验视图（旧 Map 内嵌 {@code validation}，键序不变）。 */
@@ -113,6 +144,21 @@ public class WAgentCandidateController {
         CandidateViewVO withStatus(String newStatus) {
             return new CandidateViewVO(candidateId, candidateType, targetEngine, targetObjectRefJson,
                     payloadHash, generatedByRun, generatedByStep, confidence, basisJson, validation,
+                    newStatus, batchId, engineDraftRefText, publishedRefText, publishedGitRef,
+                    expireTime, expired, versionNo, createTime);
+        }
+
+        /** validate 回显：状态与五段校验结果同一次写入（避免"已 validated 但校验列还空着"）。 */
+        CandidateViewVO withValidation(String newStatus,
+                                       Map<CandidateValidationSegment, CandidateValidationStatus> results) {
+            CandidateValidationVO fresh = new CandidateValidationVO(
+                    results.get(CandidateValidationSegment.STRUCTURE).value(),
+                    results.get(CandidateValidationSegment.REFERENCE).value(),
+                    results.get(CandidateValidationSegment.CONFLICT).value(),
+                    results.get(CandidateValidationSegment.IMPACT).value(),
+                    results.get(CandidateValidationSegment.REGRESSION).value());
+            return new CandidateViewVO(candidateId, candidateType, targetEngine, targetObjectRefJson,
+                    payloadHash, generatedByRun, generatedByStep, confidence, basisJson, fresh,
                     newStatus, batchId, engineDraftRefText, publishedRefText, publishedGitRef,
                     expireTime, expired, versionNo, createTime);
         }
@@ -164,6 +210,74 @@ public class WAgentCandidateController {
         }
     }
 
+    /** 建候选请求体（knowledge extract 的落点；只落候选，不直写知识库）。 */
+    public record CandidateCreateRequest(String candidateType, String targetEngine, String payloadJson,
+                                         String basisJson, String generatedByRun, String batchId,
+                                         BigDecimal confidence,
+                                         @JsonProperty("targetObjectRefJson")
+                                         @JsonAlias("target_object_ref_json") String targetObjectRefJson) {
+    }
+
+    /**
+     * 建候选（#17 前置面，详设-10 §5.2 表外能力位）：knowledge extract 的产出落点。
+     *
+     * <p>初始状态固定 {@code GENERATED}（四元校验与评审各自推进状态机，禁直接置 approved）；
+     * 载荷哈希由服务端计算，调用方不得自报（防「哈希与载荷不一致」）。</p>
+     *
+     * <p><b>target_object_ref_json</b>（可选）：候选所作用的目标对象引用（如
+     * {@code {"engine":"ontology","objectId":"obj-1","objectType":"ENTITY"}}）。
+     * 服务端按 key 字典序规范化后落库 —— 冲突段（同类型同目标并存未终结候选）依赖它做**逐字**
+     * 比对，若保留调用方原始键序，同语义的两条候选会因序列化差异漏判冲突。
+     * 非法 JSON 一律 400（禁把不可解析的引用写进冲突判定面）。</p>
+     */
+    @PostMapping(WAgentApiPaths.CANDIDATES_COLLECTION)
+    public ResponseEntity<ApiResponse<CandidateDetailVO>> createCandidate(
+            @RequestBody(required = false) CandidateCreateRequest req) {
+        Identity identity = identityResolver.require();
+        if (req == null) {
+            throw WAgentOrchestrationException.validation(
+                    "请求体必填：candidateType + payloadJson（knowledge extract 产物）");
+        }
+        String type = validateEnum(req.candidateType(), CandidateType.ALL::contains,
+                "candidate_type 越界（CandidateType 十二类单源）");
+        if (type == null) {
+            throw WAgentOrchestrationException.validation("candidate_type 必填（CandidateType 十二类单源）");
+        }
+        if (req.payloadJson() == null || req.payloadJson().isBlank()) {
+            throw WAgentOrchestrationException.validation("payload_json 必填（候选载荷不得为空）");
+        }
+        String targetObjectRef;
+        try {
+            targetObjectRef = WAgentCandidateValidationService.canonicalTargetRef(req.targetObjectRefJson());
+        } catch (IllegalArgumentException e) {
+            throw WAgentOrchestrationException.validation(e.getMessage());
+        }
+
+        WAgentCandidateDO candidate = new WAgentCandidateDO();
+        candidate.setId(UUID.randomUUID().toString());
+        candidate.setCandidateType(type);
+        candidate.setTargetEngine(req.targetEngine());
+        candidate.setTargetObjectRefJson(targetObjectRef);
+        candidate.setPayloadJson(req.payloadJson());
+        candidate.setPayloadHash(sha256(req.payloadJson()));
+        candidate.setBasisJson(req.basisJson());
+        candidate.setGeneratedByRun(req.generatedByRun());
+        candidate.setBatchId(req.batchId());
+        candidate.setConfidence(req.confidence());
+        candidate.setStatus(CandidateStatus.GENERATED.value());
+        candidate.setTenantId(identity.tenantId());
+        candidate.setOrgId(identity.orgId());
+        candidate.setDomain("default");
+        candidate.setVersionNo("1");
+        candidate.setCreateBy(identity.operator());
+        candidate.setUpdateBy(identity.operator());
+        candidate.setIsDeleted(0);
+        candidateDao.insert(candidate);
+
+        return ResponseEntity.status(201).body(WAgentRunController.ok(
+                CandidateDetailVO.of(CandidateViewVO.of(candidate), List.of())));
+    }
+
     /** #17 列表：租户隔离 DAO 收口，类型/状态/批次/Run 为受控内存过滤（词表越界 400）。 */
     @GetMapping(WAgentApiPaths.CANDIDATES_COLLECTION)
     public ApiResponse<CandidateListVO> listCandidates(
@@ -204,9 +318,65 @@ public class WAgentCandidateController {
                 reviewView(reviewDao.findByCandidateId(candidate.getId()))));
     }
 
+    /**
+     * 五段自检（D-WC-1：补 {@code generated → validating → validated} 断档）。
+     *
+     * <p><b>状态闸</b>：只接受 {@code generated / validating / validated} —— 已进入评审链
+     * （review_pending 及以后）或旁路终态（rejected/expired/rolled_back）一律 409，
+     * 过期候选同样 409（TTL 口径与评审一致）。</p>
+     *
+     * <p><b>推进语义</b>：五段结果先落库（与状态同一次 CAS 写），任一段 fail ⇒ 停
+     * {@code validating}（可修复 payload/basis 后重跑，返回 200 与五段明细，不是错误）；
+     * 全非 fail ⇒ {@code validated}，此后 #19 评审方可受理。</p>
+     *
+     * <p><b>并发</b>：CAS {@code WHERE status = 进入时状态}，落库 0 行即 409（两路同时校验）。</p>
+     */
+    @PostMapping(WAgentApiPaths.CANDIDATE_VALIDATE)
+    public ApiResponse<CandidateDetailVO> validateCandidate(
+            @PathVariable(WAgentApiPaths.P_CANDIDATE_ID) String candidateId) {
+        Identity identity = identityResolver.require();
+        WAgentCandidateDO candidate = loadForTenant(candidateId, identity.tenantId());
+
+        if (isExpired(candidate)) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_STATE,
+                    "候选已过期（TTL，F10-20），不得校验: status=" + candidate.getStatus(),
+                    Map.of("candidateId", candidate.getId(), "status", candidate.getStatus()));
+        }
+        CandidateStatus current = toStatus(candidate.getStatus());
+        if (current == null || !VALIDATABLE.contains(current)) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_STATE,
+                    "当前状态不允许校验（仅 generated/validating/validated）: status=" + candidate.getStatus(),
+                    Map.of("candidateId", candidate.getId(), "status", String.valueOf(candidate.getStatus())));
+        }
+
+        // 冲突段数据面：同租户候选（DAO 已按租户收口；类型/目标对象在服务内比对）
+        java.util.List<WAgentCandidateDO> peers = candidateDao.findByTenant(identity.tenantId());
+        Map<CandidateValidationSegment, CandidateValidationStatus> results =
+                validationService.validate(candidate, peers);
+        boolean blocked = validationService.blocksAdvance(results);
+
+        String from = current.value();
+        String next = blocked ? CandidateStatus.VALIDATING.value() : CandidateStatus.VALIDATED.value();
+        int updated = candidateDao.updateValidation(candidate.getId(), from, next,
+                results.get(CandidateValidationSegment.STRUCTURE).value(),
+                results.get(CandidateValidationSegment.REFERENCE).value(),
+                results.get(CandidateValidationSegment.CONFLICT).value(),
+                results.get(CandidateValidationSegment.IMPACT).value(),
+                results.get(CandidateValidationSegment.REGRESSION).value(),
+                identity.operator());
+        if (updated != 1) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_STATE,
+                    "校验落库未生效（并发状态变化），请重查候选状态",
+                    Map.of("candidateId", candidate.getId()));
+        }
+
+        return WAgentRunController.ok(CandidateDetailVO.of(
+                CandidateViewVO.of(candidate).withValidation(next, results),
+                reviewView(reviewDao.findByCandidateId(candidate.getId()))));
+    }
+
     /** #19 四眼评审（在位实装，见类注释）。 */
-    @PostMapping(WAgentApiPaths.CANDIDATE_REVIEW)
-    public ApiResponse<CandidateDetailVO> reviewCandidate(
+    @PostMapping(WAgentApiPaths.CANDIDATE_REVIEW)    public ApiResponse<CandidateDetailVO> reviewCandidate(
             @PathVariable(WAgentApiPaths.P_CANDIDATE_ID) String candidateId,
             @RequestBody CandidateReviewRequest req) {
         Identity identity = identityResolver.require();
@@ -272,26 +442,133 @@ public class WAgentCandidateController {
                 reviewView(reviewDao.findByCandidateId(candidate.getId()))));
     }
 
-    /** #20 发布（L3）：凭证/状态闸在位；pre-commit 裁决 + Git 归档未接线 ⇒ 如实 501。 */
+    /** 发布结果（强类型载荷；controller 不产出无类型 Map）。 */
+    public record CandidatePublishResult(@JsonProperty("candidateId") String candidateId,
+                                         @JsonProperty("status") String status,
+                                         @JsonProperty("publishedRef") String publishedRef,
+                                         @JsonProperty("gitRef") String gitRef,
+                                         @JsonProperty("gitTag") String gitTag,
+                                         @JsonProperty("repositoryId") String repositoryId,
+                                         @JsonProperty("traceId") String traceId) {
+    }
+
+    /**
+     * #20 发布（L3 真闭环，批 F）：凭证一次性消费 → pre-commit 裁决（fail-closed）→
+     * Git 归档（runtime 单源）→ 落库 PUBLISHED。
+     *
+     * <p><b>顺序与代价</b>：状态闸先行（非 approved 直接 409，不烧凭证）→ 凭证 CAS 消费
+     * （重放 409）→ 安全裁决 DENY 即 403 → 归档 → 落库。任一步在消费之后失败，
+     * 凭证已作废需重新审批（单向凭证的保守取舍，审计留痕）。</p>
+     *
+     * <p><b>禁伪成功</b>：归档不可用（仓未注册/冻结/path 越界）一律 503 或 409 并带原因，
+     * 绝不把「没归档成功」写成 published。</p>
+     */
     @PostMapping(WAgentApiPaths.CANDIDATE_PUBLISH)
-    public ResponseEntity<ApiResponse<WAgentDegradation.NotImplementedVO>> publishCandidate(
+    public ResponseEntity<ApiResponse<CandidatePublishResult>> publishCandidate(
             @PathVariable(WAgentApiPaths.P_CANDIDATE_ID) String candidateId,
             @RequestBody(required = false) CandidatePublishRequest req) {
         Identity identity = identityResolver.require();
         WAgentCandidateDO candidate = loadForTenant(candidateId, identity.tenantId());
-        if (req == null || req.approvalToken() == null || req.approvalToken().isBlank()) {
-            throw WAgentOrchestrationException.validation("approval_token 必填（§5.2 #20 L3 发布凭证）");
-        }
+        // 凭证先校验（不消费）：无效凭证一律 403，避免用状态码暴露对象状态
+        approvalTokenService.verify(req == null ? null : req.approvalToken(),
+                WAgentApprovalScope.CANDIDATE_PUBLISH.name(), candidate.getId(), identity.operator());
         if (!CandidateStatus.APPROVED.value().equals(candidate.getStatus())) {
             throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_STATE,
                     "仅 approved 候选可发布：当前 status=" + candidate.getStatus(),
                     Map.of("candidateId", candidate.getId(), "status", String.valueOf(candidate.getStatus())));
         }
-        return WAgentDegradation.notImplemented(
-                "F10-23 pre-commit 裁决(security-engine OPA)与 Git 归档(runtime 单源)未接线");
+        String traceId = AiTraceSupport.currentTraceId();
+
+        // ① pre-commit 安全裁决（security-engine 不可用即 DENY，fail-closed）。
+        // 批 A 授权墙双修：真传 identityResolver 解析的角色集（admin/ROLE_SUPER_ADMIN），
+        // 不再让 AiSecurityEngineClient 落硬编码 role="user" ⇒ rbac.rego admin 规则可达。
+        var rolesIdentity = identityResolver.requireWithRoles();
+        var attrs = AiSecurityEngineClient.candidatePublishAttrs(
+                candidate.getCandidateType(), candidate.getTargetEngine());
+        if (!securityClient.evaluate(identity.operator(), identity.tenantId(),
+                rolesIdentity.roles(), "candidate:publish", attrs)) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_POLICY,
+                    "pre-commit 安全裁决未通过（含 security-engine 不可用的 fail-closed 情形）",
+                    Map.of("candidateId", candidate.getId(), "traceId", traceId));
+        }
+
+        // ② Git 仓库定位（按候选类型映射到已注册仓；先于凭证消费，仓库不可用不该烧掉审批凭证）
+        String repositoryId;
+        try {
+            repositoryId = repositoryIdFor(candidate.getCandidateType());
+            gitRepositoryService.getRepositoryById(repositoryId); // 存在性/启用态校验（不猜默认仓）
+        } catch (WAgentOrchestrationException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_DEP,
+                    "Git 仓库不可用（ecos_control.ecos_git_repo 未登记或已停用）: " + repositoryIdFor(candidate.getCandidateType()),
+                    Map.of("service", "runtime-access/git", "traceId", traceId));
+        }
+
+        // ③ 凭证校验 + 一次性消费（CAS；并发/重放 ⇒ 409）
+        approvalTokenService.verifyAndConsume(req == null ? null : req.approvalToken(),
+                WAgentApprovalScope.CANDIDATE_PUBLISH.name(), candidate.getId(), identity.operator(), traceId);
+
+        // ④ Git 归档（唯一出口 = runtime DesignAssetArchiver）
+        String content = candidate.getPayloadJson() == null ? "{}" : candidate.getPayloadJson();
+        ArchiveOutcome outcome = designAssetArchiver.archive(repositoryId, "candidates", candidate.getId(),
+                null, content, "publish candidate " + candidate.getId(), identity.operator());
+        if (!outcome.isArchived()) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_DEP,
+                    "Git 归档未完成: " + outcome.reason(),
+                    Map.of("service", "runtime-access/git", "candidateId", candidate.getId()));
+        }
+
+        // ⑤ 落库（WHERE status='approved' 兜底，防并发双发布）
+        int updated = candidateDao.updatePublished(candidate.getId(),
+                CandidateStatus.PUBLISHED.value(), outcome.commitId(), outcome.commitId(), identity.operator());
+        if (updated != 1) {
+            throw new WAgentOrchestrationException(WAgentErrorCode.E_WA_STATE,
+                    "发布落库未生效（并发状态变化），请重查候选状态",
+                    Map.of("candidateId", candidate.getId()));
+        }
+
+        return ResponseEntity.ok(WAgentRunController.ok(new CandidatePublishResult(
+                candidate.getId(), CandidateStatus.PUBLISHED.value(), outcome.commitId(),
+                outcome.commitId(), outcome.tag(), repositoryId, traceId)));
     }
 
     // ── 小件 ────────────────────────────────────────────────────────
+
+    /**
+     * 候选类型 → 归档仓（§2.9.5① 六枚注册仓的语义归属）。
+     *
+     * <p>不取「默认仓」：注册表允许并存多仓时取默认等于猜测（runtime 侧明确拒绝猜）。
+     * 未登记的类型一律 400，禁落到某个仓冒充归档成功。</p>
+     */
+    static String repositoryIdFor(String candidateType) {
+        if (candidateType == null || candidateType.isBlank()) {
+            throw WAgentOrchestrationException.validation("候选缺 candidate_type，无法确定归档仓");
+        }
+        return switch (candidateType.trim().toUpperCase(Locale.ROOT)) {
+            case "ENTITY", "RELATIONSHIP", "METRIC", "DQ_RULE", "DATA_MAPPING" -> "ontology-model";
+            case "KNOWLEDGE_ITEM", "ASSUMPTION" -> "kb-asset-tree";
+            case "COGNITIVE_MODEL_DEF", "MODEL_ROUTING" -> "cognitive-model";
+            case "SCENARIO" -> "scenario-def";
+            case "DECISION_OPTION", "ACTION_DRAFT" -> "agent-collab";
+            default -> throw WAgentOrchestrationException.validation(
+                    "未登记的候选类型，无法确定归档仓: " + candidateType);
+        };
+    }
+
+    private static String sha256(String text) {
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(64);
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
+    }
 
     private WAgentCandidateDO loadForTenant(String candidateId, String tenantId) {
         return candidateDao.findById(candidateId)
