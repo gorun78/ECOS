@@ -1,14 +1,16 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,15 +21,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ai.dao.AipPipelineDao;
+import com.chinacreator.gzcm.engine.ai.dataobject.AipPipelineDO;
 import com.chinacreator.gzcm.engine.ai.dto.AipDeleteResultVO;
 import com.chinacreator.gzcm.engine.ai.dto.AipPipelineExecResultVO;
 import com.chinacreator.gzcm.engine.ai.dto.AipPipelineSummaryVO;
+import com.chinacreator.gzcm.engine.ai.dto.AipPipelineUpsertRequest;
 import com.chinacreator.gzcm.engine.ai.dto.AipPipelineVO;
+import com.chinacreator.gzcm.engine.ai.dto.AipTemplateInstantiateRequest;
+import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
+import com.chinacreator.gzcm.engine.ai.template.AipPipelineTemplateService;
+import com.chinacreator.gzcm.engine.ai.template.DefinitionJsonCodec;
 
 /**
- * AIP Pipeline CRUD REST API — AI Pipeline 的创建、编辑、执行管理。
+ * AIP Pipeline CRUD REST API — AI 工作台逻辑编排定义的创建、编辑、执行管理。
  *
- * <h3>端点：</h3>
+ * <h3>端点（路径与响应键序自 DI-2 #147EC 起冻结，本批只换持久化介质）：</h3>
  * <ul>
  *   <li>GET    /api/v1/aip/pipelines          — 列出所有 Pipeline</li>
  *   <li>POST   /api/v1/aip/pipelines          — 创建 Pipeline</li>
@@ -37,8 +46,13 @@ import com.chinacreator.gzcm.engine.ai.dto.AipPipelineVO;
  *   <li>POST   /api/v1/aip/pipelines/{id}/execute — 执行 Pipeline</li>
  * </ul>
  *
- * <p>DI-2 #147EC：内存行为 {@link AipPipelineVO}（{@code steps} 自由结构透传，
- * {@code lastExecutedAt} 条件键）；列表摘要 6 键、执行回执 4 键、删除复用 2 键回执。</p>
+ * <p><b>持久化（V329）</b>：经 {@link AipPipelineDao} 落 {@code ecos_ai.ecos_aip_pipeline}
+ * （原 {@code ConcurrentHashMap} 内存 store 刷新即丢 = P0 缺陷修复）；{@code definition_json}
+ * 保存画布 nodes/edges/steps 完整定义。</p>
+ *
+ * <p>身份：tenant/operator 取自 {@link ToolSubjectResolver}（token 上下文单源，禁请求体自报；
+ * 与 wagent 域 {@code WAgentIdentityResolver} 同通道）。租户缺失时以 {@code default} 兜底，
+ * 保持既有单租户前端行为不变。</p>
  */
 @RestController
 @RequestMapping("/api/v1/aip/pipelines")
@@ -46,16 +60,27 @@ public class AIPPipelineController {
 
     private static final Logger log = LoggerFactory.getLogger(AIPPipelineController.class);
 
-    private final Map<String, AipPipelineVO> store = new ConcurrentHashMap<>();
+    private static final String DEFAULT_TENANT = "default";
+
+    private final AipPipelineDao pipelineDao;
+    private final ToolSubjectResolver subjectResolver;
+    private final AipPipelineTemplateService templateService;
+
+    public AIPPipelineController(ObjectProvider<AipPipelineDao> pipelineDaoProvider,
+                                 ObjectProvider<ToolSubjectResolver> subjectResolverProvider,
+                                 ObjectProvider<AipPipelineTemplateService> templateServiceProvider) {
+        this.pipelineDao = pipelineDaoProvider.getIfAvailable();
+        this.subjectResolver = subjectResolverProvider.getIfAvailable();
+        this.templateService = templateServiceProvider.getIfAvailable();
+    }
 
     // ═══════════════ 列表 ═══════════════
 
     @GetMapping
     public ApiResponse<List<AipPipelineSummaryVO>> listPipelines() {
-        List<AipPipelineSummaryVO> result = store.values().stream()
-            .map(p -> new AipPipelineSummaryVO(p.id(), p.name(), p.description(), p.status(),
-                    p.createdAt(), p.updatedAt()))
-            .collect(Collectors.toList());
+        List<AipPipelineSummaryVO> result = pipelineDao.findAll(currentTenant()).stream()
+                .map(AIPPipelineController::toSummary)
+                .collect(Collectors.toList());
         return ApiResponse.success(result);
     }
 
@@ -63,33 +88,38 @@ public class AIPPipelineController {
 
     @GetMapping("/{id}")
     public ApiResponse<AipPipelineVO> getPipeline(@PathVariable String id) {
-        AipPipelineVO p = store.get(id);
-        if (p == null) return ApiResponse.notFound("Pipeline " + id + " 不存在");
-        return ApiResponse.success(p);
+        AipPipelineDO row = pipelineDao.findById(currentTenant(), id).orElse(null);
+        if (row == null) return ApiResponse.notFound("Pipeline " + id + " 不存在");
+        return ApiResponse.success(toVO(row));
     }
 
     // ═══════════════ 创建 ═══════════════
 
     @PostMapping
-    public ApiResponse<AipPipelineVO> createPipeline(@RequestBody Map<String, Object> body) {
-        String name = String.valueOf(body.getOrDefault("name", "")).trim();
+    public ApiResponse<AipPipelineVO> createPipeline(@RequestBody AipPipelineUpsertRequest body) {
+        String name = body.name() == null ? "" : body.name().trim();
         if (name.isEmpty()) {
             return ApiResponse.badRequest("AIP-001: 'name' is required");
         }
-        String id = "pip_" + UUID.randomUUID().toString().substring(0, 8);
-        String now = Instant.now().toString();
-        AipPipelineVO p = new AipPipelineVO(
-                id,
-                name,
-                String.valueOf(body.getOrDefault("description", "")),
-                body.getOrDefault("steps", List.of()),
-                "draft",
-                now,
-                now,
-                null);
-        store.put(id, p);
+        String id = UUID.randomUUID().toString();
+        String description = body.description() == null ? "" : body.description();
+        Object steps = body.steps() == null ? List.of() : body.steps();
+
+        AipPipelineDO row = new AipPipelineDO();
+        row.setId(id);
+        row.setTenantId(currentTenant());
+        row.setName(name);
+        row.setDescription(description);
+        row.setDefinitionJson(DefinitionJsonCodec.build(body.steps(), body.nodes(), body.edges()));
+        row.setStatus("draft");
+        row.setTemplateRef(body.templateRef());
+        row.setVersionNo("1");
+        row.setCreateBy(currentOperator());
+        row.setUpdateBy(currentOperator());
+        pipelineDao.insert(row);
         log.info("AIP Pipeline created: {} [{}]", id, name);
-        return ApiResponse.success(p);
+        AipPipelineDO saved = pipelineDao.findById(currentTenant(), id).orElse(row);
+        return ApiResponse.success(toVO(saved));
     }
 
     // ═══════════════ 更新 ═══════════════
@@ -97,26 +127,28 @@ public class AIPPipelineController {
     @PutMapping("/{id}")
     public ApiResponse<AipPipelineVO> updatePipeline(
             @PathVariable String id,
-            @RequestBody Map<String, Object> body) {
-        AipPipelineVO existing = store.get(id);
+            @RequestBody AipPipelineUpsertRequest body) {
+        AipPipelineDO existing = pipelineDao.findById(currentTenant(), id).orElse(null);
         if (existing == null) return ApiResponse.notFound("Pipeline " + id + " 不存在");
-
-        AipPipelineVO updated = existing.withUpdated(
-                body.containsKey("name") ? String.valueOf(body.get("name")) : null,
-                body.containsKey("description") ? String.valueOf(body.get("description")) : null,
-                body.get("steps"),
-                body.containsKey("status") ? String.valueOf(body.get("status")) : null,
-                Instant.now().toString());
-        store.put(id, updated);
+        if (body.name() != null) existing.setName(body.name());
+        if (body.description() != null) existing.setDescription(body.description());
+        if (body.status() != null) existing.setStatus(body.status());
+        if (body.steps() != null || body.nodes() != null || body.edges() != null) {
+            existing.setDefinitionJson(DefinitionJsonCodec.merge(
+                    existing.getDefinitionJson(), body.steps(), body.nodes(), body.edges()));
+        }
+        existing.setUpdateBy(currentOperator());
+        pipelineDao.update(existing);
         log.info("AIP Pipeline updated: {}", id);
-        return ApiResponse.success(updated);
+        return ApiResponse.success(toVO(pipelineDao.findById(currentTenant(), id).orElse(existing)));
     }
 
     // ═══════════════ 删除 ═══════════════
 
     @DeleteMapping("/{id}")
     public ApiResponse<AipDeleteResultVO> deletePipeline(@PathVariable String id) {
-        if (store.remove(id) != null) {
+        int affected = pipelineDao.softDelete(currentTenant(), id, currentOperator());
+        if (affected > 0) {
             log.info("AIP Pipeline deleted: {}", id);
             return ApiResponse.success(new AipDeleteResultVO(true, id));
         }
@@ -127,17 +159,92 @@ public class AIPPipelineController {
 
     @PostMapping("/{id}/execute")
     public ApiResponse<AipPipelineExecResultVO> executePipeline(@PathVariable String id) {
-        AipPipelineVO existing = store.get(id);
+        AipPipelineDO existing = pipelineDao.findById(currentTenant(), id).orElse(null);
         if (existing == null) return ApiResponse.notFound("Pipeline " + id + " 不存在");
-
-        store.put(id, existing.withStatusAndExecution("running", existing.lastExecutedAt()));
-
         String executedAt = Instant.now().toString();
-        AipPipelineExecResultVO result = new AipPipelineExecResultVO(
-                id, "executed", "Pipeline executed successfully", executedAt);
+        pipelineDao.markExecuted(currentTenant(), id, "completed", currentOperator());
         log.info("AIP Pipeline executed: {}", id);
+        return ApiResponse.success(new AipPipelineExecResultVO(
+                id, "executed", "Pipeline executed successfully", executedAt));
+    }
 
-        store.put(id, existing.withStatusAndExecution("completed", executedAt));
-        return ApiResponse.success(result);
+    // ═══════════════ 模板（Wagent Playbook → 逻辑流骨架，批 2） ═══════════════
+
+    /**
+     * 模板目录 — GET /api/v1/aip/pipelines/template-sources。
+     *
+     * <p>段名刻意不用单数 {@code /templates} 之外的歧义形态：{@code /{id}} 通配会先吃到
+     * 字面段（实测 404「Pipeline templates 不存在」），故用复合段避开与 {@code /{id}} 竞争。</p>
+     * 空目录是合法结果（本租户无 Playbook 引用 / 内容源未装配），不报错。
+     */
+    @GetMapping("/template-sources")
+    public ApiResponse<List<AipPipelineTemplateService.TemplateItem>> listTemplates() {
+        if (templateService == null) {
+            return ApiResponse.success(List.of());
+        }
+        return ApiResponse.success(templateService.listTemplates(currentTenant()));
+    }
+
+    /**
+     * 模板实例化 — POST /api/v1/aip/pipelines/template-sources/{ref}/instantiate。
+     */
+    @PostMapping("/template-sources/{ref}/instantiate")
+    public ApiResponse<AipTemplateInstantiateRequest.Result> instantiateTemplate(
+            @PathVariable String ref,
+            @RequestBody(required = false) AipTemplateInstantiateRequest body) {
+        if (templateService == null) {
+            return ApiResponse.error(503, "AIP-T01: 模板服务未装配");
+        }
+        String name = body == null || body.name() == null ? null : body.name().trim();
+        // 失败一律上浮（AiErrorAdvice 渲染），控制器禁自 catch + 禁回显异常原文（F06-15 / X-49）
+        AipPipelineTemplateService.InstantiateResult result = templateService.instantiate(
+                currentTenant(), currentOperator(), ref, name,
+                body == null || body.slots() == null ? Map.of() : body.slots());
+        return ApiResponse.success(new AipTemplateInstantiateRequest.Result(
+                result.pipelineId(),
+                new AipTemplateInstantiateRequest.Report(result.mapped(), result.unmapped())));
+    }
+
+    // ═══════════════ 转换 ═══════════════
+
+    private static AipPipelineSummaryVO toSummary(AipPipelineDO row) {
+        return new AipPipelineSummaryVO(row.getId(), row.getName(), row.getDescription(), row.getStatus(),
+                toInstantText(row.getCreateTime()), toInstantText(row.getUpdateTime()));
+    }
+
+    private static AipPipelineVO toVO(AipPipelineDO row) {
+        Object steps = DefinitionJsonCodec.stepsOf(row.getDefinitionJson());
+        String lastExecutedAt = row.getLastExecutedAt() == null
+                ? null : toInstantText(row.getLastExecutedAt());
+        return new AipPipelineVO(row.getId(), row.getName(), row.getDescription(), steps, row.getStatus(),
+                toInstantText(row.getCreateTime()), toInstantText(row.getUpdateTime()), lastExecutedAt);
+    }
+
+    private static String toInstantText(LocalDateTime time) {
+        return time == null ? Instant.now().toString() : time.toInstant(ZoneOffset.UTC).toString();
+    }
+
+    private String currentTenant() {
+        String tenantId = subjectTenant();
+        return tenantId == null ? DEFAULT_TENANT : tenantId;
+    }
+
+    private String currentOperator() {
+        String userId = subjectUserId();
+        return userId == null ? "system" : userId;
+    }
+
+    private String subjectTenant() {
+        if (subjectResolver == null) return null;
+        var subject = subjectResolver.resolve();
+        if (subject == null || subject.tenantId() == null || subject.tenantId().isBlank()) return null;
+        return subject.tenantId().trim();
+    }
+
+    private String subjectUserId() {
+        if (subjectResolver == null) return null;
+        var subject = subjectResolver.resolve();
+        if (subject == null || subject.userId() == null || subject.userId().isBlank()) return null;
+        return subject.userId().trim();
     }
 }

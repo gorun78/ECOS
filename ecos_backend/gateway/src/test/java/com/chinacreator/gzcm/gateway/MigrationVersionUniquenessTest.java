@@ -151,9 +151,12 @@ class MigrationVersionUniquenessTest {
      * dev PG 实跑）落地 ⇒ 按实测订正 326→327 / 下一号 327→328。
      * 2026-11-11 CLI 生产化批 C：V328（{@code ecos_audit_log} 补 {@code changes} jsonb /
      * {@code category} varchar 两列；只加不删、幂等）落地 ⇒ 按实测订正 327→328 / 下一号 328→329。
+     * 2026-11-12 AI 工作台逻辑编排融合批：V329（新建 {@code ecos_ai.ecos_aip_pipeline}
+     * 逻辑编排定义表 + 三索引；dev PG 实跑 CREATE TABLE/INDEX/COMMENT 全成功）落地
+     * ⇒ 按实测订正 328→329 / 下一号 329→330。
      */
-    private static final int MAX_BASELINE_VERSION = 328;
-    private static final int NEXT_FREE_VERSION = 329;
+    private static final int MAX_BASELINE_VERSION = 329;
+    private static final int NEXT_FREE_VERSION = 330;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

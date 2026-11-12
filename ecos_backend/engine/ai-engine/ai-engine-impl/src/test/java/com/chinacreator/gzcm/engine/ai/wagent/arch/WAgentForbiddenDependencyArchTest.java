@@ -182,9 +182,15 @@ class WAgentForbiddenDependencyArchTest {
      * 与 {@code wagent.dao.WAgentActionDao}（V283 表已在，原「表未落地」口径订正）。</p>
      * <p>2026-11-11 +1（297→298）＝ D-WC-1 候选 validate 通道：新增
      * {@code wagent.validate.WAgentCandidateValidationService}（五段自检执行器，零外部引擎依赖）。</p>
-     * </p>
+     * <p>2026-11-12 +7（298→305）＝ AI 工作台逻辑编排融合批：新增
+     * {@code dao.AipPipelineDao}、{@code dataobject.AipPipelineDO}、
+     * {@code template.PlaybookToGraphConverter}、{@code template.AipPipelineTemplateService}、
+     * {@code template.DefinitionJsonCodec}、
+     * {@code dto.AipPipelineUpsertRequest}（DI-2 强类型收口）、
+     * {@code dto.AipTemplateInstantiateRequest}（含 Result/Report 嵌套 record）
+     * 七个生产文件（dto 三件 AipPipelineVO/SummaryVO/ExecResultVO 在本批前已入库，不计新增）。实扫 305。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 298;
+    private static final int AI_SOURCE_FILE_FLOOR = 305;
 
     /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
      *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */

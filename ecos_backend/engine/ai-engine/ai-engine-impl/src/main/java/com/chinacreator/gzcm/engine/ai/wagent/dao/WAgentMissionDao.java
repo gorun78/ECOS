@@ -58,6 +58,16 @@ public class WAgentMissionDao extends JdbcTemplateDaoSupport {
                 WAgentMissionDO.class, tenantId, stage);
     }
 
+    /**
+     * 有在用 Playbook 引用的 mission 行（AI 工作台「从模板新建」的模板目录来源）。
+     * 双列齐备才算可用模板（缺任一列即 PlanBuilder 会落 EXPLORED，不作模板）。
+     */
+    public List<WAgentMissionDO> findWithPlaybookRef(String tenantId) {
+        return queryList("SELECT " + COLUMNS + " FROM " + TABLE
+                + " WHERE tenant_id = ? AND playbook_git_ref IS NOT NULL AND playbook_version IS NOT NULL "
+                + "AND is_deleted = 0 ORDER BY update_time DESC", WAgentMissionDO.class, tenantId);
+    }
+
     public int update(WAgentMissionDO mission) {
         return updateByBean(UPDATE_SQL, mission);
     }
