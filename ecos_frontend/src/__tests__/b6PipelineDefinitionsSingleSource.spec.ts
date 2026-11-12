@@ -53,15 +53,15 @@ const OWNER_NAME = 'PIPELINE_DEFINITIONS_BASE';
 const ALIAS_NAME = 'PIPELINE_DEFS';
 const ID_REF = '${id}';
 
-/** 本族四个生产文件。 */
-const FILES: readonly string[] = [OWNER, ALIAS_FILE, CONSUMER, AI_FILE];
+/** 本族三个生产文件（V329 起 AI 台退出消费图，仍保留在下方「零腿」反断言面）。 */
+const FILES: readonly string[] = [OWNER, ALIAS_FILE, CONSUMER];
 
-/** 工作树每文件应还原出的族腿条数（实跑读出）：属主 7 + 门面 0 + 域消费者 6 + AI 台 1 = 14。 */
+/** 工作树每文件应还原出的族腿条数（实跑读出）：属主 7 + 门面 0（重导出行被 stripImports 剥除）+ 域消费者 6 = 13；AI 台 0。 */
 const WT_SITES_PER_FILE: Readonly<Record<string, number>> = {
   [OWNER]: 7,
   [ALIAS_FILE]: 0,
   [CONSUMER]: 6,
-  [AI_FILE]: 1,
+  [AI_FILE]: 0,
 };
 
 const HARDCODED_RE = /["'`]\/api\b/;
@@ -139,6 +139,12 @@ function familyFaces(src: string): string[] {
  * _base 声明 1；pipeline 裸引用 2 + `${encodeURIComponent(id)}` 1 + `${id}` 2 + `${id}/execute` 1；
  * aiworkbench 内联派生 1。`${…}` 一律按字面保留（求值会把转义差异洗掉）。
  */
+/**
+ * V329（2026-11-12）：`pages/aiworkbench/api.ts` <b>已退出本族消费图</b>——逻辑编排定义改由
+ * ai-engine `/api/v1/aip/pipelines` 承载（原借用 data-engine 的 `/v1/pipeline/definitions`
+ * 存在 blocks/graph 模型不对齐、靠 `(p as any)` 强转兜底的双形态债）。故本门把
+ * AI 台腿数由 1 → 0、族面总数 15 → 14，并把「AI 台恰 1 条属主导入」反转为「零条」。
+ */
 const HEAD_FACES: Readonly<Record<string, readonly string[]>> = {
   [OWNER]: [
     FAMILY,
@@ -158,12 +164,13 @@ const HEAD_FACES: Readonly<Record<string, readonly string[]>> = {
     `${FAMILY}/${ID_REF}`,
     `${FAMILY}/${ID_REF}/execute`,
   ],
-  [AI_FILE]: [FAMILY],
+  [AI_FILE]: [],
 };
 
-const HEAD_TOTAL = 15;
-/** 改前族基址裸值腿数（含 3 枚属主声明位）——实跑读出，防快照被手抄改形。 */
-const HEAD_BASE_LEGS = 6;
+/** V329 后族面：属主 7 + 门面 1（HEAD 快照口径）+ 域消费者 6 + AI 台 0（已退出）= 14。 */
+const HEAD_TOTAL = 14;
+/** V329 后族基址裸值腿数（属主声明 1 + 属主裸引用 1 + 门面 1 + pipeline 裸引用 2；AI 台已退出）——实跑 5。 */
+const HEAD_BASE_LEGS = 5;
 
 describe('pipeline 定义族基址单源 — 面值守恒 (#145/B6-5)', () => {
   it('前提：API_BASE = "/api" 且属主常量面值 = 改前族基址（派生即取值不变的根据）', () => {
@@ -190,7 +197,7 @@ describe('pipeline 定义族基址单源 — 面值守恒 (#145/B6-5)', () => {
     }
   });
 
-  it('面值逐字不变：工作树 14 条 = 改前 15 条按文件整条扣掉 _base 那 1 项，且逐文件条数吻合', () => {
+  it('面值逐字不变：工作树 13 条 = 属主 7 + 域消费者 6（V329：AI 台退出本族）', () => {
     const wtAll: string[] = [];
     for (const rel of FILES) {
       const vals = familyFaces(read(rel));
@@ -201,11 +208,11 @@ describe('pipeline 定义族基址单源 — 面值守恒 (#145/B6-5)', () => {
     for (const rel of FILES) if (rel !== ALIAS_FILE) expectWt.push(...HEAD_FACES[rel]);
     expect(Object.values(HEAD_FACES).reduce((a, v) => a + v.length, 0)).toBe(HEAD_TOTAL);
     expect(HEAD_FACES[ALIAS_FILE]).toEqual([FAMILY]);
-    expect(expectWt.length).toBe(14);
-    expect(wtAll.length).toBe(14);
+    expect(expectWt.length).toBe(13);
+    expect(wtAll.length).toBe(13);
     expect([...wtAll].sort()).toEqual([...expectWt].sort());
-    // 剩余面里族基址裸值恰 5 条（属主声明 1 + 属主裸引用 1 + pipeline 裸引用 2 + AI 台裸引用 1）
-    expect(wtAll.filter((v) => v === FAMILY).length).toBe(5);
+    // 剩余面里族基址裸值恰 4 条（属主声明 1 + 属主裸引用 1 + pipeline 裸引用 2；V329 起 AI 台裸引用 0）
+    expect(wtAll.filter((v) => v === FAMILY).length).toBe(4);
   });
 
   it('别名腿：_base.ts 恰一条「旧名 → 属主」重导出行、不含 URL 体，域内消费者仍只经旧名拿值', () => {
@@ -224,13 +231,13 @@ describe('pipeline 定义族基址单源 — 面值守恒 (#145/B6-5)', () => {
     ).toBe(1);
   });
 
-  it('来源唯一：属主声明恰 1 行、AI 台恰 1 条显式属主导入腿、src/api.ts 门面不含族体', () => {
+  it('来源唯一：属主声明恰 1 行、AI 台零条属主导入腿（V329 已退出本族）、src/api.ts 门面不含族体', () => {
     expect(codeLines(read(OWNER)).filter((l) => OWNER_DECL_RE.test(l)).length).toBe(1);
     const aiImports = codeLines(read(AI_FILE)).filter(
       (l) => l.trimStart().startsWith('import ') && l.includes(OWNER_NAME),
     );
-    expect(aiImports.length, 'AI 台只能有一条属主导入腿').toBe(1);
-    expect(aiImports[0]).toMatch(/from '\.\.\/\.\.\/api\/dataClient'/);
+    // V329 反转：逻辑编排改指 /api/v1/aip/pipelines，AI 台不得再回引本族属主
+    expect(aiImports.length, 'AI 台不得再导入 PIPELINE_DEFINITIONS_BASE（已迁 aip 域）').toBe(0);
     const shim = codeLines(read('api.ts'));
     expect(shim.some((l) => l.includes('v1/pipeline/definitions')), '门面重复声明族体即第二个属主').toBe(false);
   });
@@ -267,14 +274,14 @@ describe('pipeline 定义族基址单源 — 面值守恒 (#145/B6-5)', () => {
     expect(codeLines('  await fetch("/api/v1/pipeline/definitions");').filter((l) => HARDCODED_RE.test(l)).length).toBe(1);
   });
 
-  it('快照自身可校验：15 条按 7／1／6／1 分布、族基址裸值 6 条且全部以族基址开头（防快照清空成恒真）', () => {
+  it('快照自身可校验：14 条按 7／1／6／0 分布、族基址裸值 5 条且全部以族基址开头（防快照清空成恒真）', () => {
     expect(
       Object.entries(HEAD_FACES)
         .map(([k, v]) => `${k}:${v.length}`)
         .sort(),
     ).toEqual([
       'api/dataClient.ts:7',
-      'pages/aiworkbench/api.ts:1',
+      'pages/aiworkbench/api.ts:0',
       'pages/data-workbench/api/_base.ts:1',
       'pages/data-workbench/api/pipeline.ts:6',
     ]);
@@ -282,6 +289,6 @@ describe('pipeline 定义族基址单源 — 面值守恒 (#145/B6-5)', () => {
     expect(all.length).toBe(HEAD_TOTAL);
     for (const v of all) expect(v.startsWith(FAMILY)).toBe(true);
     expect(all.filter((v) => v === FAMILY).length).toBe(HEAD_BASE_LEGS);
-    expect(Object.values(WT_SITES_PER_FILE).reduce((a, b) => a + b, 0)).toBe(14);
+    expect(Object.values(WT_SITES_PER_FILE).reduce((a, b) => a + b, 0)).toBe(13);
   });
 });

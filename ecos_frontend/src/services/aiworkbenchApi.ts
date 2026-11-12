@@ -14,6 +14,9 @@ import {
   fetchManagedAgents,
   fetchAgentModels,
   fetchGuardrailPolicies,
+  createLogicPipeline,
+  updateLogicPipeline,
+  deleteLogicPipeline,
   AIP_AGENTS_BASE,
   AIP_AUDIT_LOGS_BASE,
 } from "../pages/aiworkbench/api";
@@ -85,27 +88,28 @@ export async function fetchPipelines(): Promise<AIPLogicPipeline[]> {
   return fetchPipelineDefinitions();
 }
 
-/** Create a new AIP logic pipeline — immutable primary entry, fetched via main entry not here. */
+/** Create a new AIP logic pipeline — 转调主入口 `pages/aiworkbench/api`（V329 单源收口：本文件不再自持 URL 体）。 */
 export async function createPipeline(body: Partial<AIPLogicPipeline>): Promise<AIPLogicPipeline> {
-  return apiFetchData<AIPLogicPipeline>(`${API_BASE}/v1/aip/pipelines`, {
-    method: "POST",
-    body: JSON.stringify(body),
+  return createLogicPipeline({
+    name: body.name ?? "",
+    description: body.description,
+    steps: { blocks: body.blocks ?? [], ...(body.graph ? { graph: body.graph } : {}) },
   });
 }
 
-/** Update an existing AIP logic pipeline */
+/** Update an existing AIP logic pipeline — 转调主入口（同上）。 */
 export async function updatePipeline(id: string, body: Partial<AIPLogicPipeline>): Promise<AIPLogicPipeline> {
-  return apiFetchData<AIPLogicPipeline>(`${API_BASE}/v1/aip/pipelines/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
+  return updateLogicPipeline(id, {
+    name: body.name,
+    description: body.description,
+    status: body.status,
+    steps: { blocks: body.blocks ?? [], ...(body.graph ? { graph: body.graph } : {}) },
   });
 }
 
-/** Delete an AIP logic pipeline */
+/** Delete an AIP logic pipeline — 转调主入口（同上）。 */
 export async function deletePipeline(id: string): Promise<void> {
-  return apiFetchData<void>(`${API_BASE}/v1/aip/pipelines/${id}`, {
-    method: "DELETE",
-  });
+  return deleteLogicPipeline(id);
 }
 
 // ── Agents ─────────────────────────────────────────────────────

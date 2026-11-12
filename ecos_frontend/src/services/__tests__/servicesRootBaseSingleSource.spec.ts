@@ -235,9 +235,8 @@ const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
   '"/api/v1/business/scenarios"',
   '"/api/v1/engine/cognitive"',
   '"/api/v1/world-model"',
-  '"/api/v1/aip/pipelines"',
-  '`/api/v1/aip/pipelines/${id}`',
-  '`/api/v1/aip/pipelines/${id}`',
+  // V329：aiworkbenchApi.ts 的 pipeline create/update/delete 三条直连腿已转调主入口，
+  // 本域不再出现 `/v1/aip/pipelines` 族体（快照同步摘除 3 条）。
   '"/api/v1/aip/agents"',
   '"/api/v1/aip/agents"',
   '`/api/v1/aip/agents/${id}`',
@@ -248,12 +247,16 @@ const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
 
 const PRE_BATCH_URL_LITERALS: readonly string[] = RAW_PRE_BATCH_URL_LITERALS.map((s) => s.slice(1, -1));
 
-/** 快照规模与三形态拆分（HEAD 实扫读出；#145/B6-8 起本域快照由 48 条订正为 50 条，见文件头）。 */
-const TOTAL = 50;
-const FORM_COUNTS = { dq: 15, sq: 7, bt: 28 } as const;
+/**
+ * 快照规模与三形态拆分（HEAD 实扫读出）。
+ * V329（2026-11-12）：50 → **47** = `aiworkbenchApi.ts` 的 pipeline create/update/delete 三条
+ * 直连腿改为转调主入口 `pages/aiworkbench/api`（族体归零），该文件 9 → 6，其余文件不动。
+ */
+const TOTAL = 47;
+const FORM_COUNTS = { dq: 14, sq: 7, bt: 26 } as const;
 /** 每文件处数（HEAD 实扫读出，供「漏文件」自检）。 */
 const PER_FILE = {
-  'aiworkbenchApi.ts': 9,
+  'aiworkbenchApi.ts': 6,
   'cognitiveClient.ts': 4,
   'cognitiveEngineApi.ts': 11,
   'dataCatalogClient.ts': 3,

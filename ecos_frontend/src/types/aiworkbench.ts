@@ -32,6 +32,8 @@ export interface AIPLogicPipeline {
   inputs: Array<{ name: string; type: string; placeholder?: string }>;
   blocks: AIPLogicBlock[];
   testInputs?: Record<string, string>;
+  /** V329：画布快照（存在即优先用于还原画布；缺省时回落 blocks → 旧形态） */
+  graph?: AipPipelineGraph;
 }
 
 export interface AIPAgent {
@@ -279,6 +281,63 @@ export interface LogicNodeData {
 export interface LogicEdgeData {
   condition?: string;
 }
+
+// ── AIP Pipeline Persistence (V329) ───────────────────────────
+
+/**
+ * 画布持久化定义（V329 `ecos_aip_pipeline.definition_json` 的前端形态）。
+ * 与 `AIPLogicPipeline.blocks`（legacy 块模型）并存：blocks 保持旧语义透传，
+ * graph 为画布真身（nodes/edges 完整快照，含坐标）。
+ */
+export interface AipPipelineGraphNode {
+  id: string;
+  type: LogicNodeType;
+  position: { x: number; y: number };
+  data: LogicNodeData;
+}
+
+export interface AipPipelineGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  data?: LogicEdgeData;
+}
+
+export interface AipPipelineGraph {
+  nodes: AipPipelineGraphNode[];
+  edges: AipPipelineGraphEdge[];
+}
+
+/** 后端 AipPipelineVO（snake→camel 由后端出参完成；键序 id/name/description/steps/status/createAt/updatedAt[/lastExecutedAt]） */
+export interface AipPipelineRow {
+  id: string;
+  name: string;
+  description: string;
+  steps: unknown;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  lastExecutedAt?: string;
+}
+
+/** 模板来源（批 2：Wagent Playbook 目录项） */
+export interface AipPipelineTemplate {
+  /** 模板引用键 = playbookGitRef（instantiate 路径参数） */
+  ref: string;
+  name: string;
+  version: string;
+  summary?: string;
+  domain?: string;
+  /** 来源种类：PLAYBOOK（Playbook 目录）/ CANDIDATE（已发布候选，批 3） */
+  source: 'PLAYBOOK' | 'CANDIDATE';
+}
+
+/** 模板实例化回执 */
+export interface AipPipelineInstantiateResult {
+  pipelineId: string;
+  conversionReport: { mapped: number; unmapped: string[] };
+}
+
 
 // ── OAG Playground (SSE) Types (2026-09-12) ───────────────────
 

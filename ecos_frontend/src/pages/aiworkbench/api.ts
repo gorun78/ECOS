@@ -13,10 +13,8 @@ import { API_BASE, rawStreamUrlFetch } from '../../services/httpClient';
 // #145/B6-4：本体提案族基址单源（services/ontology/ontologyProposalApi 导出）；execute 子路径腿仍走 ${API_BASE} 保可见
 import { ONTOLOGY_PROPOSALS_BASE } from '../../services/ontology/ontologyProposalApi';
 import { GUARDRAILS_POLICIES_BASE } from '../../services/cognitiveEngineApi';
-// #145/B6-5：pipeline 定义族基址单源（属主 = api/dataClient 的导出常量）；走显式属主路径而非 src/api 门面，供守恒门钉来源
-import { PIPELINE_DEFINITIONS_BASE } from '../../api/dataClient';
 import { createSseParser, decodeFrameData, type SseRawEvent } from '../../services/sseParser';
-import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog } from '../../types/aiworkbench';
+import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog, AipPipelineTemplate, AipPipelineInstantiateResult } from '../../types/aiworkbench';
 
 /**
  * AIP 域基址单源：`/api/v1/aip/agents` 与 `/api/v1/aip/audit-logs`（#145/B6-3）。
@@ -215,27 +213,111 @@ function convertPolicyToGuardrail(raw: GuardrailPolicyRaw): AIPGuardrail {
 }
 
 // ── Pipelines ──────────────────────────────────────────────────
+//
+// V329：逻辑编排定义改由 ai-engine `/api/v1/aip/pipelines`（ecos_ai.ecos_aip_pipeline）承载。
+// 改前借用 data-engine `/api/v1/pipeline/definitions`（数据管道定义，nodes/edges 模型与前端
+// blocks/graph 不对齐，靠 `(p as any)` 强转兜底）——该强转已随本批删除。
 
-interface PipelineDefinitionRaw {
-  id?: string;
+/** 逻辑编排族基址单源（本文件即属主；templates 子族同为 aip 前缀同源）。 */
+export const AIP_PIPELINES_BASE = `${API_BASE}/v1/aip/pipelines`;
+export const AIP_PIPELINE_TEMPLATES_BASE = `${AIP_PIPELINES_BASE}/template-sources`;
+
+/** `/api/v1/aip/pipelines` 行形态（后端 AipPipelineVO 键序） */
+interface AipPipelineRowRaw {
+  id: string;
   name: string;
   description?: string;
+  steps?: unknown;
   status?: string;
-  [key: string]: unknown;
+  createdAt?: string;
+  updatedAt?: string;
+  lastExecutedAt?: string;
+}
+
+/**
+ * 后端行 → 前端 AIPLogicPipeline。
+ * `definition_json.steps` 形态约定：数组（legacy blocks 原样透传）或
+ * `{ blocks: [], graph: { nodes, edges } }`（V329 画布形态）。两形态并存不猜测：
+ * 数组即 blocks，对象取 blocks/graph 各自出现者。
+ */
+function convertPipelineRow(p: AipPipelineRowRaw): AIPLogicPipeline {
+  const steps = p.steps;
+  let blocks: AIPLogicPipeline['blocks'] = [];
+  let graph: AIPLogicPipeline['graph'];
+  if (Array.isArray(steps)) {
+    blocks = steps as AIPLogicPipeline['blocks'];
+  } else if (steps && typeof steps === 'object') {
+    const obj = steps as { blocks?: unknown; graph?: unknown };
+    if (Array.isArray(obj.blocks)) blocks = obj.blocks as AIPLogicPipeline['blocks'];
+    if (obj.graph && typeof obj.graph === 'object'
+      && Array.isArray((obj.graph as { nodes?: unknown }).nodes)) {
+      graph = obj.graph as AIPLogicPipeline['graph'];
+    }
+  }
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description ?? '',
+    status: (p.status as AIPLogicPipeline['status']) ?? 'draft',
+    // 后端未存 creator：留空串表示「未上报」，禁合成假人名
+    creator: '',
+    lastUpdated: p.updatedAt ?? p.createdAt ?? '',
+    inputs: [],
+    blocks,
+    ...(graph ? { graph } : {}),
+  };
 }
 
 export async function fetchPipelineDefinitions(): Promise<AIPLogicPipeline[]> {
-  const data = await apiFetchData<PipelineDefinitionRaw[]>(PIPELINE_DEFINITIONS_BASE);
-  return (Array.isArray(data) ? data : []).map((p: PipelineDefinitionRaw) => ({
-    id: p.id || p.name,
-    name: p.name,
-    description: p.description || '',
-    status: (p.status as AIPLogicPipeline['status']) || 'draft',
-    creator: (p as any).creator || 'system',
-    lastUpdated: (p as any).lastUpdated || new Date().toISOString(),
-    inputs: Array.isArray((p as any).inputs) ? (p as any).inputs : [],
-    blocks: (Array.isArray((p as any).blocks) ? (p as any).blocks : []) as AIPLogicPipeline['blocks'],
-  }));
+  const data = await apiFetchData<AipPipelineRowRaw[]>(AIP_PIPELINES_BASE);
+  return (Array.isArray(data) ? data : []).map(convertPipelineRow);
+}
+
+/** 创建逻辑编排（POST；body 携带 name/description/steps{blocks,graph}） */
+export async function createLogicPipeline(body: {
+  name: string;
+  description?: string;
+  steps?: unknown;
+}): Promise<AIPLogicPipeline> {
+  const created = await apiFetchData<AipPipelineRowRaw>(AIP_PIPELINES_BASE, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return convertPipelineRow(created);
+}
+
+/** 更新逻辑编排（PUT；只提交出现的键，后端按「未出现的键保持原值」合并） */
+export async function updateLogicPipeline(
+  id: string,
+  body: { name?: string; description?: string; status?: string; steps?: unknown },
+): Promise<AIPLogicPipeline> {
+  const updated = await apiFetchData<AipPipelineRowRaw>(
+    `${AIP_PIPELINES_BASE}/${encodeURIComponent(id)}`,
+    { method: 'PUT', body: JSON.stringify(body) },
+  );
+  return convertPipelineRow(updated);
+}
+
+/** 删除逻辑编排（DELETE；后端软删） */
+export async function deleteLogicPipeline(id: string): Promise<void> {
+  await apiFetchData<void>(`${AIP_PIPELINES_BASE}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/** 模板来源列表（批 2：Wagent Playbook 目录） */
+export async function fetchPipelineTemplates(): Promise<AipPipelineTemplate[]> {
+  const data = await apiFetchData<AipPipelineTemplate[]>(AIP_PIPELINE_TEMPLATES_BASE);
+  return Array.isArray(data) ? data : [];
+}
+
+/** 模板实例化：Playbook → 逻辑流骨架并落库，返回新 pipeline id + 转换报告 */
+export async function instantiatePipelineTemplate(
+  ref: string,
+  body: { name: string; slots?: Record<string, string> },
+): Promise<AipPipelineInstantiateResult> {
+  return apiFetchData<AipPipelineInstantiateResult>(
+    `${AIP_PIPELINE_TEMPLATES_BASE}/${encodeURIComponent(ref)}/instantiate`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
 }
 
 // ── ActionTypes (Ontology) ─────────────────────────────────────

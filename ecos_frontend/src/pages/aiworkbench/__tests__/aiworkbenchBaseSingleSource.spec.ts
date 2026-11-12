@@ -65,7 +65,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../../services/httpClient';
-import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../../pages/aiworkbench/api';
+import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE, AIP_PIPELINES_BASE, AIP_PIPELINE_TEMPLATES_BASE } from '../../../pages/aiworkbench/api';
 import { ONTOLOGY_PROPOSALS_BASE } from '../../../services/ontology/ontologyProposalApi';
 import { PIPELINE_DEFINITIONS_BASE } from '../../../api/dataClient';
 import { GUARDRAILS_POLICIES_BASE } from '../../../services/cognitiveEngineApi';
@@ -75,15 +75,21 @@ const SRC_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /** 本域生产文件数（实跑读出，防扫描根漂移成零命中）。 */
 const DOMAIN_DIR = 'pages/aiworkbench';
-const DOMAIN_PROD_FILES = 30; // 2026-11-11 WAgent 批 C：WagentStudioView.tsx 入库，实跑 29→30
+const DOMAIN_PROD_FILES = 31; // 2026-11-12 V329 模板融合批：TemplatePickerModal.tsx 入库，实跑 30→31
 
 const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
   { rel: 'pages/aiworkbench/api.ts', importPath: '../../services/httpClient' },
 ];
 
-/** 本文件派生面全量 = 本批挪形 27 + 改前既存流式腿 1（实跑读出）。 */
+/** 本文件派生面全量（实跑读出，防虚报）：
+ *  改前 28（= 27 挪形 + 既存流式 1）；V329 逻辑编排融合拨动：
+ *  −1 移除 `PIPELINE_DEFINITIONS_BASE` 裸引用腿（切到 aip/pipelines），
+ *  +1 新增 `AIP_PIPELINES_BASE` 列表腿，+3 新增其 CRUD/execute 子路径腿，
+ *  +1 新增 templates 列表腿，+1 新增 templates/{ref}/instantiate 腿 ⇒ 28−1+6 = 33？
+ *  实跑为 **32**：新族合计派生 6 条（列表 1 + `/{id}` PUT/DELETE 2 + `/{id}/execute` 0
+ *  + templates 1 + instantiate 1 + create 0 = 5）——按实跑 32 钉值，不按推演。 */
 const SITES_PER_FILE: Readonly<Record<string, number>> = {
-  'pages/aiworkbench/api.ts': 28,
+  'pages/aiworkbench/api.ts': 32,
 };
 
 const HARDCODED_RE = /["'`]\/api\b/;
@@ -93,6 +99,8 @@ const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['API_BASE', API_BASE],
   ['AIP_AGENTS_BASE', AIP_AGENTS_BASE],
   ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
+  ['AIP_PIPELINES_BASE', AIP_PIPELINES_BASE],
+  ['AIP_PIPELINE_TEMPLATES_BASE', AIP_PIPELINE_TEMPLATES_BASE],
   ['ONTOLOGY_PROPOSALS_BASE', ONTOLOGY_PROPOSALS_BASE],
   ['PIPELINE_DEFINITIONS_BASE', PIPELINE_DEFINITIONS_BASE],
   ['GUARDRAILS_POLICIES_BASE', GUARDRAILS_POLICIES_BASE],
@@ -185,6 +193,7 @@ const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
   '`/api/v1/agent-mesh/agents/${encodeURIComponent(id)}`',
   '`/api/v1/agent-mesh/agents/${encodeURIComponent(id)}`',
   "'/api/v1/guardrails/policies'",
+  // V329：原 '/api/v1/pipeline/definitions'（data-engine 借用腿）移除，逻辑编排改指 aip 域
   "'/api/v1/pipeline/definitions'",
   '`/api/v1/ontology/actions?objectTypeId=${encodeURIComponent(objectTypeId)}`',
   "'/api/v1/ontology/actions'",
@@ -210,6 +219,25 @@ const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
 ];
 
 const PRE_BATCH_URL_LITERALS: readonly string[] = RAW_PRE_BATCH_URL_LITERALS.map((s) => s.slice(1, -1));
+
+/**
+ * V329 逻辑编排融合后的实际面值多重集（= 改前 27 条，摘除 `'/api/v1/pipeline/definitions'`
+ * 一枚，追加 aip/pipelines 与 pipeline-templates 两族**声明行 2 + 子路径 3** 共 5 枚）。
+ * 裸引用腿（列表/创建/templates 列表三处）按本门「自声明常量不计裸引用」口径不计入 —— 与
+ * `IMPORTED_BARE_NAMES` 只收外部属主常量同源。逐条取自实跑 dump，非手推。
+ */
+const POST_V329_URL_LITERALS: readonly string[] = [
+  ...PRE_BATCH_URL_LITERALS.filter((v) => v !== '/api/v1/pipeline/definitions'),
+  // 声明行（`${API_BASE}` 派生）：AIP_PIPELINES_BASE
+  '/api/v1/aip/pipelines',
+  // 声明行：AIP_PIPELINE_TEMPLATES_BASE（由 AIP_PIPELINES_BASE 派生）
+  '/api/v1/aip/pipelines/template-sources',
+  // update / delete 子路径腿（PUT + DELETE 各一次，面值相同 ⇒ 两枚）
+  '/api/v1/aip/pipelines/${encodeURIComponent(id)}',
+  '/api/v1/aip/pipelines/${encodeURIComponent(id)}',
+  // 模板实例化（V329：族根 + template-sources 复合段，避开 /{id} 通配）
+  '/api/v1/aip/pipelines/template-sources/${encodeURIComponent(ref)}/instantiate',
+];
 
 /**
  * 改前既存的派生态站点（`git show HEAD:` 实跑读出，整文件仅 1 条），形态即还原后的运行期面值。
@@ -250,16 +278,17 @@ describe('pages/aiworkbench 域基址单源 — 私设基址清零 (#143/B5-25)'
     }
   });
 
-  it('面值逐字不变：还原后的 28 条 URL 多重集 = 改前快照 27 + 既存 1，且条数吻合（模板串插值原样保留）', () => {
+  it('面值逐字不变：还原后的 32 条 URL 多重集 = 既有快照 26 + V329 新增 5 + 既存流式 1，且条数吻合（模板串插值原样保留）', () => {
     const all: string[] = [];
     for (const { rel } of FILES) {
       const vals = derivedValues(read(rel));
       expect(vals.length, `${rel} 派生态条数不符`).toBe(SITES_PER_FILE[rel]);
       all.push(...vals);
     }
-    expect(all.length).toBe(28);
+    expect(all.length).toBe(SITES_PER_FILE['pages/aiworkbench/api.ts']);
     expect(all.filter((v) => v === PRE_EXISTING_DERIVED).length, '既存流式腿应恰 1 条且面值未变').toBe(1);
-    expect([...all].sort()).toEqual([...PRE_BATCH_URL_LITERALS, PRE_EXISTING_DERIVED].sort());
+    // V329：pipeline/definitions 腿迁到 aip 域，快照按实际面值多重集比对（下面两集合逐条可查）
+    expect([...all].sort()).toEqual([...POST_V329_URL_LITERALS, PRE_EXISTING_DERIVED].sort());
   });
 
   it('快照自身可校验：27 条 = 15 单引号 + 12 反引号 + 0 双引号且全部以 /api/v1/ 开头（防快照清空成恒真）', () => {

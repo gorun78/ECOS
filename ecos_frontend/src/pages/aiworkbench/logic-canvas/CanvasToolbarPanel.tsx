@@ -17,6 +17,8 @@ export default function CanvasToolbarPanel({
   onUndo,
   onRedo,
   onDeleteSelected,
+  onSaveCanvas,
+  savingCanvas,
   showLogs,
   onToggleLogs,
   logsCount,
@@ -30,6 +32,8 @@ export default function CanvasToolbarPanel({
   onUndo: () => void;
   onRedo: () => void;
   onDeleteSelected: () => void;
+  onSaveCanvas: () => void;
+  savingCanvas: boolean;
   showLogs: boolean;
   onToggleLogs: () => void;
   logsCount: number;
@@ -79,6 +83,20 @@ export default function CanvasToolbarPanel({
         title="删除选中节点 (Delete)"
       >
         <Icon name="Trash2" size={12} className={`${styles.dangerText}`} />
+      </button>
+
+      <button type="button"
+        onClick={onSaveCanvas}
+        disabled={savingCanvas || nodesCount === 0}
+        className={`px-2 py-1.5 ${styles.cardBg} ${styles.appBorder} border rounded-lg shadow-sm cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-[10px] font-bold ${styles.cardText}`}
+        title={t('aiworkbench.logic.saveCanvas.tip')}
+      >
+        {savingCanvas ? (
+          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Icon name="Save" size={12} className={`${styles.cardTextMuted}`} />
+        )}
+        <span>{t('aiworkbench.logic.saveCanvas.label')}</span>
       </button>
 
       <button type="button"

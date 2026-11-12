@@ -13,11 +13,13 @@ export default function PipelineListPanel({
   selectedPipelineId,
   onSelect,
   onCreate,
+  onCreateFromTemplate,
 }: {
   pipelines: AIPLogicPipeline[];
   selectedPipelineId: string;
   onSelect: (id: string) => void;
   onCreate: () => void;
+  onCreateFromTemplate: () => void;
 }) {
   const { styles } = useTheme();
   const { t } = useLanguage();
@@ -26,13 +28,22 @@ export default function PipelineListPanel({
     <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
       <div className={`p-3 border-b ${styles.cardBorder} flex items-center justify-between ${styles.inputBg}`}>
         <span className={`font-bold ${styles.cardText}`}>{t('aiworkbench.logic.list.title', { count: pipelines.length })}</span>
-        <button type="button"
-          onClick={onCreate}
-          className={`p-1 ${styles.accentBg} ${styles.accentHover} ${styles.accentText} border ${styles.accentBorder} rounded-md transition-colors cursor-pointer`}
-          title={t('aiworkbench.logic.list.add')}
-        >
-          <Icon name="Plus" size={12} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button type="button"
+            onClick={onCreateFromTemplate}
+            className={`p-1 ${styles.cardBg} ${styles.cardBorder} border rounded-md transition-opacity hover:opacity-80 cursor-pointer`}
+            title={t('aiworkbench.logic.template.entryTip')}
+          >
+            <Icon name="LayoutTemplate" size={12} className={styles.cardTextMuted} />
+          </button>
+          <button type="button"
+            onClick={onCreate}
+            className={`p-1 ${styles.accentBg} ${styles.accentHover} ${styles.accentText} border ${styles.accentBorder} rounded-md transition-colors cursor-pointer`}
+            title={t('aiworkbench.logic.list.add')}
+          >
+            <Icon name="Plus" size={12} />
+          </button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
         {pipelines.map(p => {

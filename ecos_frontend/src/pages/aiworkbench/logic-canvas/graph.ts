@@ -7,6 +7,7 @@
 import type { Node, Edge } from '@xyflow/react';
 import type {
   AIPLogicPipeline,
+  AipPipelineGraph,
   LogicNodeData,
   LogicEdgeData,
   LogicNodeType,
@@ -127,6 +128,76 @@ export function pipelineToGraph(pipeline: AIPLogicPipeline | undefined): { nodes
   });
 
   return { nodes, edges };
+}
+
+// ── Canvas persistence (V329: definition_json 的 graph 快照) ──
+
+/**
+ * 画布 → 持久化快照：只保留重放必需的字段（id/type/position/data、边的
+ * id/source/target/data），禁写 React Flow 运行时字段（selected/dragging 等）。
+ */
+export function graphToSnapshot(
+  nodes: Node<LogicNodeData>[],
+  edges: Edge<LogicEdgeData>[],
+): AipPipelineGraph {
+  return {
+    nodes: nodes.map(n => ({
+      id: n.id,
+      type: (n.data?.type ?? n.type ?? 'tool') as LogicNodeType,
+      position: { x: n.position.x, y: n.position.y },
+      data: n.data,
+    })),
+    edges: edges.map(e => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      ...(e.data ? { data: e.data } : {}),
+    })),
+  };
+}
+
+/** 持久化快照 → 画布（配 node 计数器复位，保证后续新增节点 ID 不撞车）。 */
+export function snapshotToGraph(snapshot: AipPipelineGraph | null | undefined): {
+  nodes: Node<LogicNodeData>[];
+  edges: Edge<LogicEdgeData>[];
+} {
+  if (!snapshot || !Array.isArray(snapshot.nodes) || snapshot.nodes.length === 0) {
+    return { nodes: [], edges: [] };
+  }
+  resetNodeCounts();
+  const nodes: Node<LogicNodeData>[] = snapshot.nodes.map(n => ({
+    id: n.id,
+    type: n.data?.type ?? n.type,
+    position: n.position,
+    data: { ...n.data, status: 'idle' },
+  }));
+  // 计数器对齐到已有最大序号，避免 nextNodeId 生成重复 ID
+  for (const n of nodes) {
+    const m = /^([a-z]+)-(\d+)$/.exec(n.id);
+    if (m && m[1] in NODE_COUNTS) {
+      const t = m[1] as LogicNodeType;
+      NODE_COUNTS[t] = Math.max(NODE_COUNTS[t], Number(m[2]));
+    }
+  }
+  const edges: Edge<LogicEdgeData>[] = (snapshot.edges ?? []).map(e => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    animated: false,
+    data: e.data ?? {},
+  }));
+  return { nodes, edges };
+}
+
+/** 从 pipeline 行还原画布：graph 快照优先（V329 新形态），blocks 兜底（legacy 行）。 */
+export function pipelineToCanvas(pipeline: AIPLogicPipeline | undefined): {
+  nodes: Node<LogicNodeData>[];
+  edges: Edge<LogicEdgeData>[];
+} {
+  if (pipeline?.graph && pipeline.graph.nodes.length > 0) {
+    return snapshotToGraph(pipeline.graph);
+  }
+  return pipelineToGraph(pipeline);
 }
 
 // ── Helpers ────────────────────────────────────────────────

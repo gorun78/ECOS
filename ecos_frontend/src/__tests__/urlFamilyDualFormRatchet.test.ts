@@ -448,7 +448,11 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // WAgent 批 C（2026-11-11）：284 → **285** = 增 1 枚派生态站点（`services/wagentClient.ts` 的
     // `` `${API_BASE}/v1/wagent` `` 族根声明，六腿共用）；同文件另有 5 条消费腿为裸引用不算站点。
     // 属主单源 = wagentClient.ts，全仓无第二生产方 ⇒ dupBoth 不动；族面 +1 见下条。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(285); // 2026-11-11：WAgent 批 C 新增属主族根，按实跑重设（原 284）
+    // V329（2026-11-12 AI 工作台逻辑编排融合批）：285 → **283** = `services/aiworkbenchApi.ts` 的
+    // create/update/delete 三条迟迟未收口的直连腿改为转调主入口 `pages/aiworkbench/api`（族体归零），
+    // 同批主入口新增 `/v1/aip/pipelines` 声明 1 枚（`AIP_PIPELINES_BASE`）与 templates 派生腿 1 枚；
+    // 净增减 = 删 3 + 增 1（templates 腿由族根派生，不与 pipelines 族根重复计）= −2，按实跑重设。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(283); // 2026-11-12：V329 收口，按实跑重设（原 285）
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     // 三个数 = 本批实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）。
@@ -703,7 +707,10 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 既有匿名腿此前无族可见性登记，随本批同文件改动进入扫描面）；属主仍为单源 `copilotApi.ts`，无重复族。
     // WAgent 批 C（2026-11-11）：256 → **257** = 族面 +1（`/v1/wagent` 族随 `services/wagentClient.ts`
     // 族根声明进入扫描面）；属主单源，无重复族。
-    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(257); // 2026-11-11：WAgent 批 C 新增族，实跑重设（原 256）
+    // V329（2026-11-12）：257 → **256** = 族从索引整体消失 1 族；被收口的是
+    // `/v1/pipeline/definitions`（data-engine 管道定义族）在 AI 台的**最后一个消费腿**——
+    // 逻辑编排改指 `/v1/aip/pipelines` 后，AI 台不再引用该族，族面按「有生产方才算族」口径 −1。
+    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(256); // 2026-11-12：V329 收口，实跑重设（原 257）
     for (const owners of snapshot.idx.values()) expect(owners.has(CANONICAL)).toBe(false);
     // 名字变体面归零（#145/B6-11）：prod 面不得再有 `import { API_BASE as X }` 形态的基址别名——
     // 它虽然已被 derivedRe 计入族面，但这个形状本身就是 D-B5-40 在名字轴上的成因，出现即红。

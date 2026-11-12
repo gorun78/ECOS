@@ -40,6 +40,7 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import type {
   AIPLogicPipeline,
   AIPModel,
+  AipPipelineInstantiateResult,
   LogicNodeData,
   LogicEdgeData,
   LogicNodeType,
@@ -53,7 +54,7 @@ import ApprovalNode from '../../components/aiworkbench/logic/ApprovalNode';
 import ConditionNode from '../../components/aiworkbench/logic/ConditionNode';
 import TriggerNode from '../../components/aiworkbench/logic/TriggerNode';
 import { Icon } from './logic-canvas/LogicIcon';
-import { pipelineToGraph, makeNode, typeLabel } from './logic-canvas/graph';
+import { pipelineToCanvas, graphToSnapshot, makeNode, typeLabel } from './logic-canvas/graph';
 import type { HistoryEntry } from './logic-canvas/types';
 import useLogicPipelineRun from './logic-canvas/useLogicPipelineRun';
 import PipelineListPanel from './logic-canvas/PipelineListPanel';
@@ -62,6 +63,13 @@ import CanvasToolbarPanel from './logic-canvas/CanvasToolbarPanel';
 import NodeConfigDrawer from './logic-canvas/NodeConfigDrawer';
 import ExecutionLogPanel from './logic-canvas/ExecutionLogPanel';
 import PipelineFormModal from './logic-canvas/PipelineFormModal';
+import TemplatePickerModal from './logic-canvas/TemplatePickerModal';
+import {
+  createLogicPipeline,
+  updateLogicPipeline,
+  deleteLogicPipeline,
+  fetchPipelineDefinitions,
+} from './api';
 
 const nodeTypes: NodeTypes = {
   llm: LLMNode,
@@ -107,13 +115,13 @@ export default function LogicView({
   // ── Flow state ──
   // initialGraph 只作 useNodesState/useEdgesState 的 mount-期 initialValues；
   // 切换 pipeline 时的实际同步走下方 useEffect([selectedPipelineId, selectedPipeline])。
-  const initialGraph = useMemo(() => pipelineToGraph(selectedPipeline), [selectedPipeline]);
+  const initialGraph = useMemo(() => pipelineToCanvas(selectedPipeline), [selectedPipeline]);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<LogicNodeData>>(initialGraph.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<LogicEdgeData>>(initialGraph.edges);
 
   // Rebuild graph when pipeline changes
   useEffect(() => {
-    const graph = pipelineToGraph(selectedPipeline);
+    const graph = pipelineToCanvas(selectedPipeline);
     setNodes(graph.nodes);
     setEdges(graph.edges);
     setHistory([]);
@@ -216,7 +224,8 @@ export default function LogicView({
 
   // ── Add node to canvas ──
   const addCanvasNode = (type: LogicNodeType) => {
-    const node = makeNode(type, typeLabel(type), { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 });
+    // 确定性落位（同类型按序号错开，禁 Math.random —— 前端铁律「无假真理」）
+    const node = makeNode(type, typeLabel(type), { x: 120 + nodes.length * 40, y: 120 + nodes.length * 40 });
     setNodes(prev => {
       const next = [...prev, node];
       pushHistory(next, edges);
@@ -293,56 +302,114 @@ export default function LogicView({
 
   const handleDelete = (id: string) => setPendingDeleteId(id);
 
-  const runDelete = () => {
+  /** 删除（V329）：真 DELETE 后从本地列表剔除；失败保持原状并报错，禁本地假删。 */
+  const runDelete = async () => {
     const id = pendingDeleteId;
     setPendingDeleteId(null);
     if (!id) return;
+    try {
+      await deleteLogicPipeline(id);
+    } catch (e) {
+      showToast?.('error', e instanceof Error ? e.message : String(e));
+      return;
+    }
     const updated = pipelines.filter(p => p.id !== id);
     onUpdatePipelines(updated);
-    if (selectedPipelineId === id && updated.length > 0) {
-      setSelectedPipelineId(updated[0].id);
+    if (selectedPipelineId === id) {
+      setSelectedPipelineId(updated[0]?.id || '');
     }
     showToast?.('success', t('aiworkbench.logic.delete.done'));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  /** 画布快照：steps 同时携带 blocks（legacy 透传）与 graph（V329 画布真身）。 */
+  const buildSteps = (pipeline: AIPLogicPipeline | null | undefined, graph: AIPLogicPipeline['graph']) => ({
+    blocks: pipeline?.blocks ?? [],
+    ...(graph ? { graph } : {}),
+  });
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return;
 
     if (editingPipeline) {
-      const updated = pipelines.map(p => {
-        if (p.id === editingPipeline.id) {
-          return {
-            ...p,
-            name: formName.trim(),
-            description: formDesc.trim(),
-            inputs: [{ name: formInputName, type: formInputType }],
-            lastUpdated: new Date().toISOString().replace('T', ' ').slice(0, 16),
-          };
-        }
-        return p;
-      });
-      onUpdatePipelines(updated);
-      showToast?.('success', t('aiworkbench.logic.save.done'));
-    } else {
-      const newId = `pipe-${Date.now().toString().slice(-4)}`;
-      const newPipe: AIPLogicPipeline = {
-        id: newId,
+      const graph = editingPipeline.id === selectedPipelineId
+        ? graphToSnapshot(nodes, edges)
+        : editingPipeline.graph;
+      try {
+        const saved = await updateLogicPipeline(editingPipeline.id, {
+          name: formName.trim(),
+          description: formDesc.trim(),
+          steps: buildSteps(editingPipeline, graph),
+        });
+        onUpdatePipelines(pipelines.map(p => (p.id === saved.id
+          ? { ...saved, inputs: [{ name: formInputName, type: formInputType }] }
+          : p)));
+        setShowCreateModal(false);
+        showToast?.('success', t('aiworkbench.logic.save.done'));
+      } catch (err) {
+        showToast?.('error', err instanceof Error ? err.message : String(err));
+      }
+      return;
+    }
+
+    try {
+      const created = await createLogicPipeline({
         name: formName.trim(),
         description: formDesc.trim(),
-        status: 'active',
-        creator: t('aiworkbench.logic.modal.creator'),
-        lastUpdated: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        steps: buildSteps(null, undefined),
+      });
+      const withInputs: AIPLogicPipeline = {
+        ...created,
         inputs: [{ name: formInputName, type: formInputType }],
-        testInputs: { [formInputName]: 'UA102' },
-        blocks: [],
       };
-      onUpdatePipelines([...pipelines, newPipe]);
-      setSelectedPipelineId(newId);
+      onUpdatePipelines([...pipelines, withInputs]);
+      setSelectedPipelineId(created.id);
+      setShowCreateModal(false);
       showToast?.('success', t('aiworkbench.logic.save.created'));
+    } catch (err) {
+      showToast?.('error', err instanceof Error ? err.message : String(err));
     }
-    setShowCreateModal(false);
   };
+
+  /** 保存画布（V329）：把当前 nodes/edges 快照写入 definition，刷新后不丢。 */
+  const [savingCanvas, setSavingCanvas] = useState(false);
+  const handleSaveCanvas = useCallback(async () => {
+    if (!selectedPipeline) return;
+    setSavingCanvas(true);
+    try {
+      const saved = await updateLogicPipeline(selectedPipeline.id, {
+        steps: buildSteps(selectedPipeline, graphToSnapshot(nodes, edges)),
+      });
+      onUpdatePipelines(pipelines.map(p => (p.id === saved.id ? { ...saved, inputs: p.inputs } : p)));
+      showToast?.('success', t('aiworkbench.logic.canvasSaved'));
+    } catch (err) {
+      showToast?.('error', err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingCanvas(false);
+    }
+  }, [selectedPipeline, nodes, edges, pipelines, onUpdatePipelines, showToast, t]);
+
+  // ── 从 Wagent 模板新建（批 2）──
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const handleTemplateInstantiated = useCallback(async (result: AipPipelineInstantiateResult, name: string) => {
+    setShowTemplatePicker(false);
+    try {
+      // 实例化已在后端落库；拉全量以取回含画布快照的行（禁本地拼装假定义）
+      const rows = await fetchPipelineDefinitions();
+      onUpdatePipelines(rows);
+      setSelectedPipelineId(result.pipelineId);
+      const unmapped = result.conversionReport?.unmapped ?? [];
+      if (unmapped.length > 0) {
+        showToast?.('info', t('aiworkbench.logic.template.partial', {
+          name, count: unmapped.length, items: unmapped.join(', '),
+        }));
+      } else {
+        showToast?.('success', t('aiworkbench.logic.template.done', { name }));
+      }
+    } catch (err) {
+      showToast?.('error', err instanceof Error ? err.message : String(err));
+    }
+  }, [onUpdatePipelines, showToast, t]);
 
   // ── Render ────────────────────────────────────────────────
 
@@ -359,6 +426,7 @@ export default function LogicView({
           setShowLogs(false);
         }}
         onCreate={handleStartCreate}
+        onCreateFromTemplate={() => setShowTemplatePicker(true)}
       />
 
       {/* Center: Canvas */}
@@ -403,6 +471,8 @@ export default function LogicView({
                   onUndo={handleUndo}
                   onRedo={handleRedo}
                   onDeleteSelected={deleteSelectedNodes}
+                  onSaveCanvas={handleSaveCanvas}
+                  savingCanvas={savingCanvas}
                   showLogs={showLogs}
                   onToggleLogs={() => setShowLogs(!showLogs)}
                   logsCount={logs.length}
@@ -466,6 +536,14 @@ export default function LogicView({
         onConfirm={runDelete}
         onCancel={() => setPendingDeleteId(null)}
       />
+
+      {/* 从 Wagent 模板新建（批 2） */}
+      {showTemplatePicker && (
+        <TemplatePickerModal
+          onInstantiated={handleTemplateInstantiated}
+          onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
     </div>
   );
 }
