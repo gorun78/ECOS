@@ -87,9 +87,12 @@ const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
  *  +1 新增 `AIP_PIPELINES_BASE` 列表腿，+3 新增其 CRUD/execute 子路径腿，
  *  +1 新增 templates 列表腿，+1 新增 templates/{ref}/instantiate 腿 ⇒ 28−1+6 = 33？
  *  实跑为 **32**：新族合计派生 6 条（列表 1 + `/{id}` PUT/DELETE 2 + `/{id}/execute` 0
- *  + templates 1 + instantiate 1 + create 0 = 5）——按实跑 32 钉值，不按推演。 */
+ *  + templates 1 + instantiate 1 + create 0 = 5）——按实跑 32 钉值，不按推演。
+ *  2026-11-12 内置模板批 **32→34**：列表端点是摘要形态（不含 steps），画布必须逐行取
+ *  详情 ⇒ {@code fetchPipelineDefinitions} 批量详情腿 1 + {@code fetchPipelineDefinition}
+ *  单条详情腿 1（同面值 `/{id}` GET 两枚）。实跑 34。 */
 const SITES_PER_FILE: Readonly<Record<string, number>> = {
-  'pages/aiworkbench/api.ts': 32,
+  'pages/aiworkbench/api.ts': 34,
 };
 
 const HARDCODED_RE = /["'`]\/api\b/;
@@ -235,8 +238,12 @@ const POST_V329_URL_LITERALS: readonly string[] = [
   // update / delete 子路径腿（PUT + DELETE 各一次，面值相同 ⇒ 两枚）
   '/api/v1/aip/pipelines/${encodeURIComponent(id)}',
   '/api/v1/aip/pipelines/${encodeURIComponent(id)}',
-  // 模板实例化（V329：族根 + template-sources 复合段，避开 /{id} 通配）
-  '/api/v1/aip/pipelines/template-sources/${encodeURIComponent(ref)}/instantiate',
+  // 详情腿（2026-11-12 内置模板批：列表是摘要形态不含 steps，画布逐行取详情）⇒ 同面值两枚
+  '/api/v1/aip/pipelines/${encodeURIComponent(row.id)}',
+  '/api/v1/aip/pipelines/${encodeURIComponent(id)}',
+  // 模板实例化（V329：族根 + template-sources 复合段，避开 /{id} 通配；
+  // 2026-11-12 内置模板批：ref 移入请求体——模板引用含 `/`，路径段编码 %2F 被 Tomcat 400 拒收）
+  '/api/v1/aip/pipelines/template-sources/instantiate',
 ];
 
 /**

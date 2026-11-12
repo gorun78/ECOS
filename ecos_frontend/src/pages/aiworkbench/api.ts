@@ -268,9 +268,32 @@ function convertPipelineRow(p: AipPipelineRowRaw): AIPLogicPipeline {
   };
 }
 
+/**
+ * 拉全量编排定义。列表端点是**摘要形态（不含 steps）**，画布数据必须逐行取详情——
+ * 直接用列表结果建画布会得到永远空白的图（V329 实测踩过）。并发取详情，单行失败不连坐：
+ * 失败行按空画布呈现（列表仍可见、可点开重试），不伪造节点。
+ */
 export async function fetchPipelineDefinitions(): Promise<AIPLogicPipeline[]> {
   const data = await apiFetchData<AipPipelineRowRaw[]>(AIP_PIPELINES_BASE);
-  return (Array.isArray(data) ? data : []).map(convertPipelineRow);
+  const rows = (Array.isArray(data) ? data : []).map(convertPipelineRow);
+  return Promise.all(rows.map(async (row) => {
+    try {
+      const detail = await apiFetchData<AipPipelineRowRaw>(
+        `${AIP_PIPELINES_BASE}/${encodeURIComponent(row.id)}`,
+      );
+      return convertPipelineRow({ ...detail, name: detail.name || row.name });
+    } catch {
+      return row;
+    }
+  }));
+}
+
+/** 单条编排详情（含 steps 画布快照）。 */
+export async function fetchPipelineDefinition(id: string): Promise<AIPLogicPipeline> {
+  const detail = await apiFetchData<AipPipelineRowRaw>(
+    `${AIP_PIPELINES_BASE}/${encodeURIComponent(id)}`,
+  );
+  return convertPipelineRow(detail);
 }
 
 /** 创建逻辑编排（POST；body 携带 name/description/steps{blocks,graph}） */
@@ -309,14 +332,15 @@ export async function fetchPipelineTemplates(): Promise<AipPipelineTemplate[]> {
   return Array.isArray(data) ? data : [];
 }
 
-/** 模板实例化：Playbook → 逻辑流骨架并落库，返回新 pipeline id + 转换报告 */
+/** 模板实例化：模板 → 逻辑流骨架并落库，返回新 pipeline id + 转换报告。
+ *  ref 走请求体（模板引用含 `/`，路径段编码 %2F 会被服务端拒绝）。 */
 export async function instantiatePipelineTemplate(
   ref: string,
   body: { name: string; slots?: Record<string, string> },
 ): Promise<AipPipelineInstantiateResult> {
   return apiFetchData<AipPipelineInstantiateResult>(
-    `${AIP_PIPELINE_TEMPLATES_BASE}/${encodeURIComponent(ref)}/instantiate`,
-    { method: 'POST', body: JSON.stringify(body) },
+    `${AIP_PIPELINE_TEMPLATES_BASE}/instantiate`,
+    { method: 'POST', body: JSON.stringify({ ref, ...body }) },
   );
 }
 

@@ -328,9 +328,16 @@ export interface AipPipelineTemplate {
   version: string;
   summary?: string;
   domain?: string;
-  /** 来源种类：PLAYBOOK（Playbook 目录）/ CANDIDATE（已发布候选，批 3） */
-  source: 'PLAYBOOK' | 'CANDIDATE';
+  /** 来源种类：BUILTIN（内置典型模板，八意图确定性骨架）/ PLAYBOOK（Playbook 目录）/ CANDIDATE（已发布候选，批 3） */
+  source: 'BUILTIN' | 'PLAYBOOK' | 'CANDIDATE';
 }
+
+/** 模板来源徽标文案键（三值单源，禁在组件内拼字面量） */
+export const TEMPLATE_SOURCE_LABEL_KEYS: Record<AipPipelineTemplate['source'], string> = {
+  BUILTIN: 'aiworkbench.logic.template.source.builtin',
+  PLAYBOOK: 'aiworkbench.logic.template.source.playbook',
+  CANDIDATE: 'aiworkbench.logic.template.source.candidate',
+};
 
 /** 模板实例化回执 */
 export interface AipPipelineInstantiateResult {

@@ -1,7 +1,10 @@
 /**
  * TemplatePickerModal — 「从 Wagent 模板新建」弹窗（模板融合批 2）。
  *
- * 交互：模板列表（Playbook / 已发布候选）→ 填名称与槽位 → 实例化 → 画布加载生成的骨架。
+ * 交互：模板列表（内置典型模板 / Playbook / 已发布候选）→ 填名称与槽位 → 实例化 →
+ * 画布加载生成的骨架。
+ * 内置来源由后端按意图确定性生成（human_gate → tool×n → aggregate），无 {{slot}} 占位，
+ * 故选中内置模板时槽位框折叠为说明文案，避免误导用户填了不生效的参数。
  * 六态：加载 / 空目录（无模板或内容源未装配）/ 错误 + 重试 / 权限失败（错误文案）/ 离线
  * （apiFetchData 全局横幅接管）/ 正常。
  * @license Apache-2.0
@@ -9,7 +12,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
-import type { AipPipelineTemplate, AipPipelineInstantiateResult } from '../../../types/aiworkbench';
+import {
+  TEMPLATE_SOURCE_LABEL_KEYS,
+  type AipPipelineTemplate,
+  type AipPipelineInstantiateResult,
+} from '../../../types/aiworkbench';
 import { fetchPipelineTemplates, instantiatePipelineTemplate } from '../api';
 import { Icon } from './LogicIcon';
 
@@ -52,6 +59,8 @@ export default function TemplatePickerModal({
     setName(item.name);
   };
 
+  const selectedIsBuiltin = selected?.source === 'BUILTIN';
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected || !name.trim()) return;
@@ -73,7 +82,11 @@ export default function TemplatePickerModal({
     }
     setSubmitting(true);
     try {
-      const result = await instantiatePipelineTemplate(selected.ref, { name: name.trim(), slots });
+      const result = await instantiatePipelineTemplate(selected.ref, {
+        name: name.trim(),
+        // 内置模板骨架无占位，不把残留的槽位文本当参数发送（避免"填了不生效"的假象）
+        ...(selectedIsBuiltin ? {} : { slots }),
+      });
       onInstantiated(result, name.trim());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -134,10 +147,13 @@ export default function TemplatePickerModal({
                       <div className="flex items-center justify-between gap-2">
                         <span className={`text-[11px] font-bold ${styles.cardText}`}>{item.name}</span>
                         <span className={`text-[9px] px-1.5 py-0.5 rounded ${styles.inputBg} ${styles.cardTextMuted} font-mono`}>
-                          {item.source} · v{item.version}
+                          {t(TEMPLATE_SOURCE_LABEL_KEYS[item.source])} · v{item.version}
                         </span>
                       </div>
                       <div className={`text-[10px] ${styles.cardTextMuted} font-mono truncate`}>{item.ref}</div>
+                      {item.summary && (
+                        <div className={`text-[10px] ${styles.cardTextMuted} truncate`}>{item.summary}</div>
+                      )}
                     </button>
                   );
                 })}
@@ -152,17 +168,25 @@ export default function TemplatePickerModal({
                 className={`w-full px-2.5 py-1.5 border ${styles.cardBorder} rounded-lg text-xs`} />
             </div>
 
-            <div className="space-y-1">
-              <label className={`block ${styles.cardTextMuted} font-semibold`}>
-                {t('aiworkbench.logic.template.slots')}
-              </label>
-              <textarea value={slotsText} onChange={e => { setSlotsText(e.target.value); setSlotsError(null); }}
-                rows={3}
-                className={`w-full px-2.5 py-1.5 border ${slotsError ? styles.dangerBorder : styles.cardBorder} rounded-lg text-xs font-mono resize-none`} />
-              <p className={`text-[10px] ${slotsError ? styles.dangerText : styles.cardTextMuted}`}>
-                {slotsError ?? t('aiworkbench.logic.template.slotsHint')}
-              </p>
-            </div>
+            {selectedIsBuiltin ? (
+              <div className={`px-2.5 py-2 rounded-lg border ${styles.cardBorder} ${styles.inputBg}`}>
+                <p className={`text-[10px] ${styles.cardTextMuted}`}>
+                  {t('aiworkbench.logic.template.builtinSlotsHint')}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <label className={`block ${styles.cardTextMuted} font-semibold`}>
+                  {t('aiworkbench.logic.template.slots')}
+                </label>
+                <textarea value={slotsText} onChange={e => { setSlotsText(e.target.value); setSlotsError(null); }}
+                  rows={3}
+                  className={`w-full px-2.5 py-1.5 border ${slotsError ? styles.dangerBorder : styles.cardBorder} rounded-lg text-xs font-mono resize-none`} />
+                <p className={`text-[10px] ${slotsError ? styles.dangerText : styles.cardTextMuted}`}>
+                  {slotsError ?? t('aiworkbench.logic.template.slotsHint')}
+                </p>
+              </div>
+            )}
 
             {error && (
               <p className={`text-[11px] ${styles.dangerText} break-words`}>{error}</p>
