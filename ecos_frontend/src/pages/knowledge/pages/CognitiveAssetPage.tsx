@@ -29,9 +29,13 @@ import CognitiveAssetCard from '../components/CognitiveAssetCard';
 import CognitiveAssetResolveDrawer from '../components/CognitiveAssetResolveDrawer';
 import CandidateReviewPanel from '../components/CandidateReviewPanel';
 
-/** governed-class → 实例列表端点（服务端 catalog 之外的类不猜测、不调用）。 */
-const LIST_DISPATCH: Record<string, (domain?: string) => Promise<unknown>> = {
-  BELIEF: (d) => fetchBeliefs(d ? { domain: d } : undefined),
+/**
+ * governed-class → 实例列表端点（服务端 catalog 之外的类不猜测、不调用）。
+ * BELIEF 的 `domain` 是后端强制隔离键（缺省即 400），未选择 domain 时不发请求、
+ * 如实按空态呈现，避免制造必然失败的 4xx。
+ */
+const LIST_DISPATCH: Record<string, (domain?: string) => Promise<unknown> | null> = {
+  BELIEF: (d) => (d ? fetchBeliefs({ domain: d }) : null),
   HYPOTHESIS: (d) => fetchHypotheses(d ? { domain: d } : undefined),
   MODEL: () => fetchModels(),
 };
@@ -95,8 +99,9 @@ export default function CognitiveAssetPage() {
         classesToLoad
           .filter(c => LIST_DISPATCH[c])
           .map(async c => {
-            const raw = await LIST_DISPATCH[c](d);
-            return normalizeAssetRows(raw, c);
+            const pending = LIST_DISPATCH[c](d);
+            if (pending === null) return [] as CognitiveAssetRow[];
+            return normalizeAssetRows(await pending, c);
           }),
       );
       setRows(settled.flat());

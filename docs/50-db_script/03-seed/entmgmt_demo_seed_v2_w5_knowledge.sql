@@ -189,7 +189,7 @@ SELECT md5('seed:entmgmt-v2:gn:ds:'||r.resource_id), r.resource_name,
                           'fieldCount', r.field_count, 'recordCount', r.record_count),
        'entmgmt', now(), 'CURATED_DATASET', r.description, now(), NULL,
        now(), now(), 'seed-entmgmt','seed-entmgmt', 'v1', 0, 'seed-entmgmt'
-  FROM ecos_data.td_data_resource r
+  FROM ecos_control.td_data_resource r
  WHERE r.resource_id LIKE 'res_entmgmt_cur%';
 
 -- ---------- 7. 图谱边（关系 10 + 映射 4 + 文档描述对象若干；端点全部 JOIN 已存在节点） ----------
@@ -378,7 +378,7 @@ UNION ALL SELECT 'DANGLING_hypo_evidence', count(*) FROM ecos_cognitive.ecos_cog
   WHERE h.create_by='seed-entmgmt' AND NOT EXISTS (SELECT 1 FROM ecos_cognitive.ecos_cognitive_evidence ev WHERE ev.id = eid)
 UNION ALL SELECT 'DANGLING_ev_source', count(*) FROM ecos_cognitive.ecos_cognitive_evidence ev
   WHERE ev.create_by='seed-entmgmt' AND (
-       (ev.source_type='DATASET' AND NOT EXISTS (SELECT 1 FROM ecos_data.td_data_resource r WHERE r.resource_id=ev.source_ref))
+       (ev.source_type='DATASET' AND NOT EXISTS (SELECT 1 FROM ecos_control.td_data_resource r WHERE r.resource_id=ev.source_ref))
     OR (ev.source_type='KB_DOC'   AND NOT EXISTS (SELECT 1 FROM ecos_knowledge.ecos_kb_document d WHERE d.id=ev.source_ref))
     OR (ev.source_type='METRIC'   AND NOT EXISTS (SELECT 1 FROM ecos_ontology.ecos_metric_definition m WHERE m.id=ev.source_ref)))
 UNION ALL SELECT 'DANGLING_bl_calib_metric', count(*) FROM ecos_cognitive.ecos_cognitive_belief b

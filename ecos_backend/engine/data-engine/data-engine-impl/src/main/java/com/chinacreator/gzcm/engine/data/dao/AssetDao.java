@@ -200,7 +200,13 @@ public class AssetDao extends JdbcTemplateDaoSupport {
             "  NULL::text AS last_tagged_by, NULL::timestamp AS last_tagged_at, " +
             "  'default'::text AS domain, r.description, " +
             "  COALESCE(r.field_count, 0) AS field_count, COALESCE(r.record_count, -1) AS record_count, " +
-            "  COALESCE(NULLIF(r.layer, ''), 'CURATED')::text AS layer, r.zone, r.last_sync_time, 0 AS confirmed_field_count " +
+            // 字面量 0 是 int4，而 assetRowMapper 统一按 Long 取该列（其余分支是 COUNT(*) 的 int8）
+            // ⇒ 不显式转 bigint 会抛「conversion to class java.lang.Long from int4 not supported」，
+            // 物理层兜底列表整体 409。
+            "  COALESCE(NULLIF(r.layer, ''), 'CURATED')::text AS layer, r.zone, r.last_sync_time, 0::bigint AS confirmed_field_count, " +
+            // 兜底分支与主分支共用 assetRowMapper，后者无条件读 version_no；td_data_resource
+            // 无该列，补字面量占位（物理层资源不参与乐观锁版本语义）。
+            "  '1'::text AS version_no " +
             "FROM td_data_resource r WHERE TRUE");
         List<Object> params = new ArrayList<>();
         if (q.getZone() != null && !q.getZone().isBlank())   { sql.append(" AND r.zone = ?");  params.add(q.getZone()); }

@@ -68,8 +68,8 @@ SELECT 'A1 逐表行数对账（17 表）= 467 行', count(*) FROM (
         ('ecos_dw.ecos_biz_resource_fact',             96),
         ('ecos_knowledge.ecos_kb_profile',              4),
         ('ecos_knowledge.ecos_kb_assumption',           4),
-        ('ecos_ai.ecos_business_scenario',              1),
-        ('ecos_ai.ecos_scenario_binding',               4),
+        ('ecos_control.ecos_business_scenario',              1),
+        ('ecos_control.ecos_scenario_binding',               4),
         ('ecos_control.ecos_scenario_binding_link',     3)
     ) AS w(tbl, want)
     LEFT JOIN (
@@ -101,10 +101,10 @@ SELECT 'A1 逐表行数对账（17 表）= 467 行', count(*) FROM (
           FROM ecos_knowledge.ecos_kb_profile WHERE source_query_ref = 'seed:entmgmt-v1' AND is_deleted = 0
         UNION ALL SELECT 'ecos_knowledge.ecos_kb_assumption', count(*)
           FROM ecos_knowledge.ecos_kb_assumption WHERE domain = 'entmgmt' AND create_by = 'seed-entmgmt' AND is_deleted = 0
-        UNION ALL SELECT 'ecos_ai.ecos_business_scenario', count(*)
-          FROM ecos_ai.ecos_business_scenario WHERE id = 'sc_entmgmt' AND is_deleted = 0
-        UNION ALL SELECT 'ecos_ai.ecos_scenario_binding', count(*)
-          FROM ecos_ai.ecos_scenario_binding WHERE scenario_id = 'sc_entmgmt' AND is_deleted = 0
+        UNION ALL SELECT 'ecos_control.ecos_business_scenario', count(*)
+          FROM ecos_control.ecos_business_scenario WHERE id = 'sc_entmgmt' AND is_deleted = 0
+        UNION ALL SELECT 'ecos_control.ecos_scenario_binding', count(*)
+          FROM ecos_control.ecos_scenario_binding WHERE scenario_id = 'sc_entmgmt' AND is_deleted = 0
         UNION ALL SELECT 'ecos_control.ecos_scenario_binding_link', count(*)
           FROM ecos_control.ecos_scenario_binding_link WHERE scenario_id = 'sc_entmgmt' AND is_deleted = 0
     ) g ON g.tbl = w.tbl
@@ -855,7 +855,7 @@ SELECT 'K2 ACTUAL 事实只落在 ≤2026-10，PLAN 只落在 07..12（第 12 �
 -- ── L 场景装配（六类词表 = BindingType.java:14-19；连边类型 = EdgeType.java:8-12）
 INSERT INTO chk_result(name, viol)
 SELECT 'L1 场景行：ACTIVE/HIGH、department 为真实组织行、budget 文本形态、metrics 为 JSON 对象且三值等于锚点', count(*)
-FROM ecos_ai.ecos_business_scenario s
+FROM ecos_control.ecos_business_scenario s
 WHERE s.id='sc_entmgmt' AND s.is_deleted=0
   AND (s.status <> 'ACTIVE' OR s.priority NOT IN ('CRITICAL','HIGH','MEDIUM','LOW')
     OR NOT EXISTS (SELECT 1 FROM ecos_control.td_organization o
@@ -868,7 +868,7 @@ WHERE s.id='sc_entmgmt' AND s.is_deleted=0
 
 INSERT INTO chk_result(name, viol)
 SELECT 'L2 绑定四类：binding_type ∈ 六值词表 且 target_ref=target_id 双写一致（DAO 新旧列并存）', count(*)
-FROM ecos_ai.ecos_scenario_binding b
+FROM ecos_control.ecos_scenario_binding b
 WHERE b.scenario_id='sc_entmgmt' AND b.is_deleted=0
   AND (b.binding_type NOT IN ('DATASET','OBJECT_TYPE','KNOWLEDGE_BASE','AI_AGENT','SECURITY_POLICY','INTERFACE')
     OR b.binding_type IN ('SECURITY_POLICY','INTERFACE')
@@ -877,11 +877,11 @@ WHERE b.scenario_id='sc_entmgmt' AND b.is_deleted=0
 
 INSERT INTO chk_result(name, viol)
 SELECT 'L3 零悬空 target_ref：四类绑定各指向真实存在的载体行（铁律：不许造悬空引用）', count(*)
-FROM ecos_ai.ecos_scenario_binding b
+FROM ecos_control.ecos_scenario_binding b
 WHERE b.scenario_id='sc_entmgmt' AND b.is_deleted=0
   AND NOT (
         CASE b.binding_type
-          WHEN 'DATASET'        THEN EXISTS (SELECT 1 FROM ecos_data.td_datasource d
+          WHEN 'DATASET'        THEN EXISTS (SELECT 1 FROM ecos_control.td_datasource d
                                               WHERE d.datasource_id = b.target_ref)
           WHEN 'OBJECT_TYPE'    THEN EXISTS (SELECT 1 FROM ecos_ontology.ecos_ontology_entity e
                                               WHERE e.id = b.target_ref AND e.is_deleted = 0)
@@ -897,8 +897,8 @@ SELECT 'L4 连边三枚：类型 ⊂ EdgeType、两端绑定同场景且存在�
     SELECT l.id, l.link_type,
            bs.binding_type AS src_type, bt.binding_type AS dst_type
       FROM ecos_control.ecos_scenario_binding_link l
-      JOIN ecos_ai.ecos_scenario_binding bs ON bs.id = l.source_binding_id AND bs.is_deleted=0
-      JOIN ecos_ai.ecos_scenario_binding bt ON bt.id = l.target_binding_id AND bt.is_deleted=0
+      JOIN ecos_control.ecos_scenario_binding bs ON bs.id = l.source_binding_id AND bs.is_deleted=0
+      JOIN ecos_control.ecos_scenario_binding bt ON bt.id = l.target_binding_id AND bt.is_deleted=0
      WHERE l.scenario_id='sc_entmgmt' AND l.is_deleted=0
 ) q
 WHERE q.link_type NOT IN ('MAPPING','EXTRACTION','COGNITION','GOVERN','EXPOSE')
@@ -916,7 +916,7 @@ WHERE q.n <> 3 OR q.null_contract <> 3;
 
 INSERT INTO chk_result(name, viol)
 SELECT 'L5 孤岛复现（IslandBindingGuard.findIslands）：四枚绑定全部有入边或出边 ⇒ 孤岛数 = 0', count(*)
-FROM ecos_ai.ecos_scenario_binding b
+FROM ecos_control.ecos_scenario_binding b
 WHERE b.scenario_id='sc_entmgmt' AND b.is_deleted=0
   AND NOT EXISTS (SELECT 1 FROM ecos_control.ecos_scenario_binding_link l
                    WHERE l.scenario_id = b.scenario_id AND l.is_deleted = 0
@@ -963,7 +963,7 @@ SELECT 'N1 保留面白名单行数未变（2026-10-14 T2 后实测基线）', c
            ('ecos_data.ecos_pipeline_function', 120), ('ecos_infra.schema_changes', 191),
            ('ecos_infra.schema_snapshots', 191), ('ecos_data.dq_rule', 10),
            ('ecos_data.ecos_dq_rule', 5), ('ecos_control.td_user', 1),
-           ('ecos_control.td_audit_log', 5), ('ecos_data.td_datasource', 1)
+           ('ecos_control.td_audit_log', 5), ('ecos_control.td_datasource', 1)
 ) AS w(tbl, want)
 LEFT JOIN (
     SELECT 'ecos_control.sys_config' tbl, count(*) got FROM ecos_control.sys_config
@@ -975,7 +975,7 @@ LEFT JOIN (
     UNION ALL SELECT 'ecos_data.ecos_dq_rule', count(*) FROM ecos_data.ecos_dq_rule
     UNION ALL SELECT 'ecos_control.td_user', count(*) FROM ecos_control.td_user
     UNION ALL SELECT 'ecos_control.td_audit_log', count(*) FROM ecos_control.td_audit_log
-    UNION ALL SELECT 'ecos_data.td_datasource', count(*) FROM ecos_data.td_datasource
+    UNION ALL SELECT 'ecos_control.td_datasource', count(*) FROM ecos_control.td_datasource
 ) g ON g.tbl = w.tbl WHERE coalesce(g.got,-1) <> w.want;
 
 INSERT INTO chk_result(name, viol)
@@ -1001,13 +1001,13 @@ SELECT 'N2 登录/治理/配置面零写入（seed-entmgmt 句柄不得出现在
      WHERE dict_type LIKE '%entmgmt%' OR dict_code LIKE '%entmgmt%'
         OR coalesce(ext_value,'') LIKE '%seed-entmgmt%'
         OR coalesce(dict_label,'') LIKE '%SEED-ENTMGMT-V1%'
-    UNION ALL SELECT 'td_datasource', count(*) FROM ecos_data.td_datasource
+    UNION ALL SELECT 'td_datasource', count(*) FROM ecos_control.td_datasource
      WHERE coalesce(create_by,'')='seed-entmgmt'
 ) q WHERE q.n <> 0;
 
 INSERT INTO chk_result(name, viol)
 SELECT 'N3 航空 AOC 遗留场景已清空（G1=B 裁决落地：sc001/sc002/sc003 不得残留）', count(*)
-FROM ecos_ai.ecos_business_scenario WHERE id IN ('sc001','sc002','sc003');
+FROM ecos_control.ecos_business_scenario WHERE id IN ('sc001','sc002','sc003');
 
 -- ── O 演示句柄一致性（G3=甲 零 DDL 约定句柄，可整批反查/删除）
 INSERT INTO chk_result(name, viol)
@@ -1046,7 +1046,7 @@ SELECT 'O2 主键形态 MC01：全批 id 均为 32 位 hex 或语义前缀（sb_
     UNION ALL SELECT 'ent', id FROM ecos_ontology.ecos_ontology_entity WHERE domain='entmgmt'
     UNION ALL SELECT 'ka', id FROM ecos_knowledge.knowledge_article WHERE create_by='seed-entmgmt'
     UNION ALL SELECT 'agt', id FROM ecos_ai.ecos_agent WHERE id = md5('seed:entmgmt-v1:agent:entmgmt-operating-copilot')
-    UNION ALL SELECT 'bnd', id FROM ecos_ai.ecos_scenario_binding WHERE scenario_id='sc_entmgmt'
+    UNION ALL SELECT 'bnd', id FROM ecos_control.ecos_scenario_binding WHERE scenario_id='sc_entmgmt'
     UNION ALL SELECT 'lnk', id FROM ecos_control.ecos_scenario_binding_link WHERE scenario_id='sc_entmgmt'
 ) q WHERE length(q.id) > 36
    OR (q.id !~ '^[0-9a-f]{32}$' AND q.id !~ '^(sb|bsl)_[0-9a-f]{12}$');
@@ -1199,7 +1199,7 @@ ORDER BY p.metric_code;
 SELECT b.binding_type, left(b.target_ref, 24) AS target_ref,
        CASE WHEN (
               CASE b.binding_type
-                WHEN 'DATASET'        THEN EXISTS (SELECT 1 FROM ecos_data.td_datasource d
+                WHEN 'DATASET'        THEN EXISTS (SELECT 1 FROM ecos_control.td_datasource d
                                                     WHERE d.datasource_id = b.target_ref)
                 WHEN 'OBJECT_TYPE'    THEN EXISTS (SELECT 1 FROM ecos_ontology.ecos_ontology_entity e
                                                     WHERE e.id = b.target_ref AND e.is_deleted = 0)
@@ -1213,7 +1213,7 @@ SELECT b.binding_type, left(b.target_ref, 24) AS target_ref,
                    FROM ecos_control.ecos_scenario_binding_link l
                   WHERE l.is_deleted = 0
                     AND (l.source_binding_id = b.id OR l.target_binding_id = b.id)), '无连边') AS edges
-FROM ecos_ai.ecos_scenario_binding b
+FROM ecos_control.ecos_scenario_binding b
 WHERE b.scenario_id = 'sc_entmgmt' AND b.is_deleted = 0
 ORDER BY b.binding_type;
 

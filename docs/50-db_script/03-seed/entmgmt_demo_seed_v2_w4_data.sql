@@ -28,6 +28,13 @@
 --       -v ledger_root="$LEDGER" -f - < 本文件
 --
 -- 幂等：按 entmgmt 命名空间先删后插，可重复执行。
+--
+-- 【2026-11-11 schema 对齐批（前端巡检任务 #36）】重建库后 td_* 四表实况 = ecos_control
+--   （data-engine 全部裸表名，search_path 首位 ecos_control；原脚本 ecos_data. 前缀指向
+--   V200 治理前旧落点）⇒ 已改 ecos_control.td_{datasource,data_resource,catalog_item,data_field}。
+--   ecos_data.{dq_rule,dq_schedule,ecos_pipeline_*,ecos_data_asset} 与代码显式前缀一致，保持不变。
+--   ⚠ 部分表在 ecos_control 侧缺 ecos_data 侧新列（如审计五列），重放若 BadSqlGrammar
+--   须按 V327 同法补列后再跑。
 -- =============================================================================
 
 \set ON_ERROR_STOP on
@@ -35,20 +42,20 @@
 BEGIN;
 
 -- ─── 0. 清理本命名空间（幂等重跑） ──────────────────────────────────────────
-DELETE FROM ecos_data.td_data_field      WHERE field_id     LIKE 'fd_entmgmt_%';
+DELETE FROM ecos_control.td_data_field      WHERE field_id     LIKE 'fd_entmgmt_%';
 DELETE FROM ecos_data.ecos_data_asset    WHERE asset_id     LIKE 'asset_entmgmt_%';
-DELETE FROM ecos_data.td_catalog_item    WHERE catalog_id   LIKE 'cat_entmgmt_%';
+DELETE FROM ecos_control.td_catalog_item    WHERE catalog_id   LIKE 'cat_entmgmt_%';
 DELETE FROM ecos_data.dq_schedule        WHERE id           LIKE 'dqsch_entmgmt_%';
 DELETE FROM ecos_data.dq_rule            WHERE id           LIKE 'dq_entmgmt_%';
 DELETE FROM ecos_data.ecos_pipeline_edge WHERE id           LIKE 'pe_entmgmt_%';
 DELETE FROM ecos_data.ecos_pipeline_node WHERE id           LIKE 'pn_entmgmt_%';
 DELETE FROM ecos_data.ecos_pipeline_definition WHERE id     LIKE 'pl_entmgmt_%';
-DELETE FROM ecos_data.td_data_resource   WHERE resource_id  LIKE 'res_entmgmt_%';
-DELETE FROM ecos_data.td_datasource      WHERE datasource_id LIKE 'ds_entmgmt_%';
+DELETE FROM ecos_control.td_data_resource   WHERE resource_id  LIKE 'res_entmgmt_%';
+DELETE FROM ecos_control.td_datasource      WHERE datasource_id LIKE 'ds_entmgmt_%';
 
 -- ─── 1. 原始数据源登记（FILESYSTEM · CSV 台账根目录） ─────────────────────────
 -- connection_config 键 rootPath 为数据源类型 FILESYSTEM 的必填项（DataSourceTypeCatalog）。
-INSERT INTO ecos_data.td_datasource (
+INSERT INTO ecos_control.td_datasource (
     datasource_id, datasource_name, datasource_type, org_id, description,
     connection_config, status, tags, metadata_config, is_default, remark,
     create_by, create_time, update_by, update_time
@@ -166,7 +173,7 @@ SELECT
 FROM tmp_entmgmt_ledger;
 
 -- ─── 3. 源层资源（layer=SOURCE，9 行） ────────────────────────────────────────
-INSERT INTO ecos_data.td_data_resource (
+INSERT INTO ecos_control.td_data_resource (
     resource_id, resource_name, resource_type, org_id, org_name, datasource_id,
     source_path, description, tags, status, field_count, record_count,
     create_by, create_time, update_by, update_time, layer
@@ -189,7 +196,7 @@ SELECT
 FROM tmp_entmgmt_ledger;
 
 -- ─── 4. 治理层资源（layer=CURATED，4 行 · 对应 DW 四张业务事实表） ─────────────
-INSERT INTO ecos_data.td_data_resource (
+INSERT INTO ecos_control.td_data_resource (
     resource_id, resource_name, resource_type, org_id, org_name, datasource_id,
     source_path, description, tags, status, field_count, record_count,
     create_by, create_time, update_by, update_time, layer
@@ -221,14 +228,14 @@ FROM (VALUES
 ) AS t(sh, tbl, cn, ft, cols)
 CROSS JOIN LATERAL (
     -- 治理层落在平台主库（控制域数据源），无 ACTIVE 数据源时本段失败即暴露配置缺失
-    SELECT datasource_id FROM ecos_data.td_datasource
+    SELECT datasource_id FROM ecos_control.td_datasource
      WHERE datasource_type = 'POSTGRESQL' AND status = 'ACTIVE'
      ORDER BY is_default DESC, create_time ASC LIMIT 1
 ) d;
 
 -- ─── 5. 字段清单（td_data_field） ─────────────────────────────────────────────
 -- 5.1 源层 9 表 × 各自列
-INSERT INTO ecos_data.td_data_field (
+INSERT INTO ecos_control.td_data_field (
     field_id, resource_id, field_name, field_alias, field_type, nullable,
     is_primary_key, description, field_order
 )
@@ -254,7 +261,7 @@ FROM (
 ) x;
 
 -- 5.2 治理层 4 表 × 业务列
-INSERT INTO ecos_data.td_data_field (
+INSERT INTO ecos_control.td_data_field (
     field_id, resource_id, field_name, field_alias, field_type, nullable,
     is_primary_key, description, field_order
 )
@@ -282,7 +289,7 @@ FROM (VALUES
 unnest(t.cols) WITH ORDINALITY AS c(col, ord);
 
 -- ─── 6. 数据目录镜像（td_catalog_item，13 行 = 9 SOURCE + 4 CURATED） ──────────
-INSERT INTO ecos_data.td_catalog_item (
+INSERT INTO ecos_control.td_catalog_item (
     catalog_id, resource_id, resource_name, resource_type, org_name, description,
     tags, category_path, access_type, data_format, field_count, record_count,
     last_updated, status, tenant_id
@@ -467,15 +474,15 @@ INSERT INTO ecos_data.dq_schedule (
 );
 
 -- ─── 10. 落库自检（行数与五层分布） ───────────────────────────────────────────
-SELECT 'datasource' AS obj, count(*) AS n FROM ecos_data.td_datasource        WHERE datasource_id LIKE 'ds_entmgmt_%'
+SELECT 'datasource' AS obj, count(*) AS n FROM ecos_control.td_datasource        WHERE datasource_id LIKE 'ds_entmgmt_%'
 UNION ALL SELECT 'pipeline_def',  count(*) FROM ecos_data.ecos_pipeline_definition WHERE id LIKE 'pl_entmgmt_%'
 UNION ALL SELECT 'pipeline_node', count(*) FROM ecos_data.ecos_pipeline_node       WHERE definition_id = 'pl_entmgmt_ledger_raw'
 UNION ALL SELECT 'pipeline_edge', count(*) FROM ecos_data.ecos_pipeline_edge       WHERE definition_id = 'pl_entmgmt_ledger_raw'
-UNION ALL SELECT 'resource_source',   count(*) FROM ecos_data.td_data_resource WHERE layer = 'SOURCE'  AND resource_id LIKE 'res_entmgmt_%'
-UNION ALL SELECT 'resource_curated',  count(*) FROM ecos_data.td_data_resource WHERE layer = 'CURATED' AND resource_id LIKE 'res_entmgmt_%'
-UNION ALL SELECT 'resource_raw(expect 0)', count(*) FROM ecos_data.td_data_resource WHERE layer = 'RAW'
-UNION ALL SELECT 'data_field', count(*) FROM ecos_data.td_data_field      WHERE field_id   LIKE 'fd_entmgmt_%'
-UNION ALL SELECT 'catalog',    count(*) FROM ecos_data.td_catalog_item    WHERE catalog_id LIKE 'cat_entmgmt_%'
+UNION ALL SELECT 'resource_source',   count(*) FROM ecos_control.td_data_resource WHERE layer = 'SOURCE'  AND resource_id LIKE 'res_entmgmt_%'
+UNION ALL SELECT 'resource_curated',  count(*) FROM ecos_control.td_data_resource WHERE layer = 'CURATED' AND resource_id LIKE 'res_entmgmt_%'
+UNION ALL SELECT 'resource_raw(expect 0)', count(*) FROM ecos_control.td_data_resource WHERE layer = 'RAW'
+UNION ALL SELECT 'data_field', count(*) FROM ecos_control.td_data_field      WHERE field_id   LIKE 'fd_entmgmt_%'
+UNION ALL SELECT 'catalog',    count(*) FROM ecos_control.td_catalog_item    WHERE catalog_id LIKE 'cat_entmgmt_%'
 UNION ALL SELECT 'asset',      count(*) FROM ecos_data.ecos_data_asset    WHERE asset_id   LIKE 'asset_entmgmt_%'
 UNION ALL SELECT 'dq_rule',    count(*) FROM ecos_data.dq_rule            WHERE id LIKE 'dq_entmgmt_%'
 UNION ALL SELECT 'dq_schedule',count(*) FROM ecos_data.dq_schedule        WHERE id LIKE 'dqsch_entmgmt_%';

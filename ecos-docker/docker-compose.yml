@@ -118,9 +118,14 @@ services:
     mem_limit: 768m
 
   minio:
-    image: minio/minio:latest
+    # 2026-11-10：`minio/minio` 在 Docker Hub 已下架（pull 返回 "repository does not exist"），
+    # 改用 Bitnami 归档仓库同名二进制（同 MINIO_ROOT_USER 环境变量协议），仅镜像来源变更。
+    image: bitnamilegacy/minio:latest
     container_name: ecos-minio
     restart: unless-stopped
+    # Bitnami 默认以 1001 非 root 运行，写命名卷 /data 被拒（Unable to initialize backend:
+    # file access denied）。以 root 运行与官方镜像行为一致。
+    user: "0"
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -131,7 +136,7 @@ services:
     volumes:
       - miniodata:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5

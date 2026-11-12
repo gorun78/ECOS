@@ -9,7 +9,10 @@ import com.chinacreator.gzcm.engine.data.quality.model.DqRuleQuery;
  */
 public final class DqRuleSqlProvider {
 
-    private DqRuleSqlProvider() {
+    // MyBatis ProviderSqlSource 每个调用点都会反射实例化本类；private 构造器在 JDK 17 下
+    // 触发 IllegalAccessException（「cannot access a member ... with modifiers "private"」），
+    // 使 DqRuleMapper 全部查询 500。无状态工具类，公开构造器无副作用。
+    public DqRuleSqlProvider() {
     }
 
     /**

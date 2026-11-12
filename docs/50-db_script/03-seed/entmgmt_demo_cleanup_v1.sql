@@ -39,8 +39,8 @@ BEGIN;
 -- ── 1. ecos_ai：场景与智能体面（含航空 AOC 场景 sc001/sc002/sc003）──────────────
 --    代码权威：workspace/ScenarioService.java:134 读写 ecos_business_scenario；
 --    WorkspaceDataDao.java:191 实读 ecos_ai.*（V200 迁库遗留，非 ecos_control.ecos_scenario_definition）
-DELETE FROM ecos_ai.ecos_scenario_binding;      -- 8 行，binding_type 六值词表见 ScenarioService.java:41-46
-DELETE FROM ecos_ai.ecos_business_scenario;     -- 3 行，sc001/sc002/sc003（航空 AOC 贯通口径）
+DELETE FROM ecos_control.ecos_scenario_binding;      -- 8 行，binding_type 六值词表见 ScenarioService.java:41-46
+DELETE FROM ecos_control.ecos_business_scenario;     -- 3 行，sc001/sc002/sc003（航空 AOC 贯通口径）
 DELETE FROM ecos_ai.ecos_skill;                 -- 3 行
 DELETE FROM ecos_ai.ecos_agent_registry;        -- 9 行
 DELETE FROM ecos_ai.ecos_agent;                 -- 4 行
@@ -70,8 +70,8 @@ DELETE FROM ecos_control.ecos_object_state_machine;  -- 13 行
 DELETE FROM ecos_data.ecos_dq_issue;            -- 4 行（FK 子表，先于规则；规则表保留）
 DELETE FROM ecos_data.ecos_pipeline_node;       -- 27 行（子）
 DELETE FROM ecos_data.ecos_pipeline_definition; -- 9 行（父）
-DELETE FROM ecos_data.td_catalog_item;          -- 3 行
-DELETE FROM ecos_data.td_data_resource;         -- 3 行
+DELETE FROM ecos_control.td_catalog_item;          -- 3 行
+DELETE FROM ecos_control.td_data_resource;         -- 3 行
 
 -- ── 5. ecos_dw：v1 遗留演示三表 ─────────────────────────────────────────────────
 DELETE FROM ecos_dw.demo_invoice;               -- 3 行
@@ -90,7 +90,7 @@ DELETE FROM ecos_ontology.ecos_caliber;                -- 1 行（domain='defaul
 
 -- ── 影响面自检：删除集应全部归零 ───────────────────────────────────────────────
 SELECT 'deleted-scope 残留行数' AS check_item,
-       (SELECT count(*) FROM ecos_ai.ecos_business_scenario)
+       (SELECT count(*) FROM ecos_control.ecos_business_scenario)
      + (SELECT count(*) FROM ecos_cognitive.ecos_wm_goal)
      + (SELECT count(*) FROM ecos_control.ecos_scenario_blueprint)
      + (SELECT count(*) FROM ecos_data.ecos_pipeline_definition)

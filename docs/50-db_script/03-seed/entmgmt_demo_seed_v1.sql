@@ -549,7 +549,7 @@ ON CONFLICT (id) DO NOTHING;
 --     但完整度 coverage 的真实预期是 0.0（EdgeContractProbe 依赖的 ContractProbeFacade 无主 bean，D-12/B-2），
 --     不是 1.0 —— 这是代码缺口，不由数据面伪装。source_contract 如实留 NULL（不声明未验证的契约）。
 -- ─────────────────────────────────────────────────────────────────────────────
-INSERT INTO ecos_ai.ecos_business_scenario
+INSERT INTO ecos_control.ecos_business_scenario
     (id, name, description, business_goal, department, priority, status, budget,
      safety_index_target, actual_safety_index, metrics,
      create_time, update_time, create_by, update_by, is_deleted)
@@ -565,7 +565,7 @@ VALUES
      now(), now(), 'seed-entmgmt', 'seed-entmgmt', 0)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO ecos_ai.ecos_scenario_binding
+INSERT INTO ecos_control.ecos_scenario_binding
     (id, scenario_id, binding_type, target_ref, remark,
      create_time, update_time, create_by, update_by, is_deleted, target_id, target_type)
 VALUES
@@ -653,10 +653,10 @@ BEGIN
                 (SELECT count(*) FROM ecos_knowledge.ecos_kb_profile WHERE domain = 'entmgmt'), 4),
             ('ecos_knowledge.ecos_kb_assumption',
                 (SELECT count(*) FROM ecos_knowledge.ecos_kb_assumption WHERE domain = 'entmgmt'), 4),
-            ('ecos_ai.ecos_business_scenario',
-                (SELECT count(*) FROM ecos_ai.ecos_business_scenario WHERE id = 'sc_entmgmt'), 1),
-            ('ecos_ai.ecos_scenario_binding',
-                (SELECT count(*) FROM ecos_ai.ecos_scenario_binding WHERE scenario_id = 'sc_entmgmt'), 4),
+            ('ecos_control.ecos_business_scenario',
+                (SELECT count(*) FROM ecos_control.ecos_business_scenario WHERE id = 'sc_entmgmt'), 1),
+            ('ecos_control.ecos_scenario_binding',
+                (SELECT count(*) FROM ecos_control.ecos_scenario_binding WHERE scenario_id = 'sc_entmgmt'), 4),
             ('ecos_control.ecos_scenario_binding_link',
                 (SELECT count(*) FROM ecos_control.ecos_scenario_binding_link WHERE scenario_id = 'sc_entmgmt'), 3)
         ) AS t(tbl, got, want)

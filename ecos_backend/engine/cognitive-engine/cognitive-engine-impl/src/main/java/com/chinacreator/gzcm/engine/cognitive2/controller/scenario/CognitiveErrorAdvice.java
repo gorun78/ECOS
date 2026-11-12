@@ -9,6 +9,7 @@ import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -67,6 +68,26 @@ public class CognitiveErrorAdvice {
         // D.3 统一错误响应体：data 必须回显（此前构建未挂载，属响应面缺项）
         body.setData(data);
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
+    }
+
+    /**
+     * 必带查询参数缺失（如 E2 的 {@code mind}）→ 400 {@code ECOS-COG-400P}。
+     * <p>此前落入下方 catch-all 折叠成 500 {@code ECOS-COG-504} cognitive internal error
+     * （2026-11-10 live 实证：{@code GET .../cognition/operation-eval} 无 mind ⇒
+     * MissingServletRequestParameterException ⇒ 500），前端因此无法按 4xx/503 区分「参数缺失」
+     * 与「引擎故障」，违 D.5「失败语义独立状态码禁折叠」。</p>
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> onMissingParam(MissingServletRequestParameterException e) {
+        log.warn("cognitive missing request parameter: name={}", e.getParameterName());
+        Map<String, Object> data = new LinkedHashMap<>();
+        String tid = MDC.get("traceId");
+        if (tid != null) data.put("traceId", tid);
+        data.put("missing", e.getParameterName());
+        ApiResponse<Map<String, Object>> body =
+                ApiResponse.error(400, CognitiveErrorCode.E400_INVALID_PARAM, CognitiveErrorCode.MSG_INVALID_PARAM);
+        body.setData(data);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(Exception.class)

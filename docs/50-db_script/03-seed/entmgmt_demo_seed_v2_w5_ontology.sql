@@ -320,7 +320,7 @@ UNION ALL SELECT 'mapping_source_dangling', count(*) FROM ecos_ontology.ecos_ent
   WHERE mp.domain='entmgmt' AND NOT EXISTS (SELECT 1 FROM ecos_ontology.ecos_ontology_entity e JOIN ecos_ontology.ecos_ontology_property p ON p.entity_id=e.id
         WHERE e.code = split_part(fm->>'source','.',1) AND p.code = split_part(fm->>'source','.',2) AND p.domain='entmgmt')
 UNION ALL SELECT 'mapping_target_dangling', count(*) FROM ecos_ontology.ecos_entity_table_mapping mp, jsonb_array_elements(mp.field_mappings->'fieldMappings') fm
-  WHERE mp.domain='entmgmt' AND NOT EXISTS (SELECT 1 FROM ecos_data.td_data_field f WHERE f.resource_id = mp.field_mappings->>'datasetId' AND f.field_name = fm->>'target')
+  WHERE mp.domain='entmgmt' AND NOT EXISTS (SELECT 1 FROM ecos_control.td_data_field f WHERE f.resource_id = mp.field_mappings->>'datasetId' AND f.field_name = fm->>'target')
 UNION ALL SELECT 'metric_entitycode_dangling', count(*) FROM ecos_ontology.ecos_metric_definition m WHERE m.domain='entmgmt' AND m.entity_code IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM ecos_ontology.ecos_ontology_entity e WHERE e.code=m.entity_code)
 UNION ALL SELECT 'interface', count(*) FROM ecos_control.ecos_interface_ref WHERE id LIKE 'if_ent2_%';

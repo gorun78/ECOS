@@ -2,6 +2,17 @@
 -- entmgmt_demo_seed_v2_w6_ai_scenario.sql
 -- 二期 W6 · 域4 AI 工作台（智能体 + 工具 + 编排）+ 域5 场景工作台（六类绑定 + 必需三边 + 蓝图）
 --
+-- 【2026-11-11 schema 对齐批（前端巡检任务 #36）】重建库后 schema 实况与本脚本原口径有分叉，
+--   本批已按下述运行代码实际读路径改写前缀；PG 恢复后重放前须逐表确认 information_schema：
+--   * ecos_control.ecos_business_scenario / ecos_scenario_binding：WorkspaceDataDao 裸名（search_path
+--     首位 ecos_control），原脚本写 ecos_ai.（V315 补建的读端侧，实库 0 行）⇒ 已改 ecos_control。
+--   * ecos_ai.ecos_wagent_skill / ecos_wagent_tool_contract / ecos_ai_tool_registry：DAO 显式
+--     ecos_ai. 前缀（WAgentSkillDao.java:20 等）⇒ 保持不变。
+--   * ecos_ai.ecos_skill / ecos_agent_registry：⚠ 待验证 —— AgentRegistryRepository/SkillDao 均为
+--     裸表名（search_path 解析），重建库中 V4/V162 裸名建表落 ecos_control 侧；V316 头注的
+--     「search_path 第 4 位命中 ecos_ai」是旧库口径。重放时若 ecos_ai.ecos_skill 不存在
+--     （BadSqlGrammar）则改为 ecos_control. 前缀。
+--
 -- 契约依据（2026-10-17 information_schema 实查 + DAO 源码实读，非推定）：
 --   * 智能体活表 = ecos_ai.ecos_agent_registry（AgentRegistryRepository.java:14-39 唯一读写者）。
 --     幽灵表 ecos_ai.agent_registry / agent_definition 全仓零引用，且缺 created_at/updated_at 列
@@ -19,7 +30,7 @@
 --     DO NOTHING ⇒ 本批只补经营管控场景专属 4 条，tenant_id='default' 沿用 V266 头注口径）；
 --     词表 WAgentEnums：category ∈ read|compute|candidate|commit|notify，side_effect ∈ none|draft|production，
 --     disclosure ∈ always_loaded|searchable，status 生命周期 draft|registered|validated|active|deprecated|retired。
---   * 场景活表三件套 = ecos_ai.ecos_business_scenario（父）+ ecos_ai.ecos_scenario_binding（六类绑定）
+--   * 场景活表三件套 = ecos_control.ecos_business_scenario（父）+ ecos_control.ecos_scenario_binding（六类绑定）
 --     + ecos_control.ecos_scenario_binding_link（连边），全部由 WorkspaceDataDao 承流
 --     （:147/:238/:271/:352-399/:413-427）。
 --     幽灵面 = ecos_control.ecos_scenario_definition + ecos_scenario_asset_binding：ScenarioMapper.java 全仓
@@ -48,6 +59,11 @@
 --   _decision* / _candidate* / _evidence / agent_execution* / sys_agent_session / ecos_agent_alert =
 --   执行结果面；ecos_cognitive.ecos_business_scenario|ecos_scenario_binding|ecos_scenario_binding_link =
 --   错放镜像，只停写（CognitiveIronLawsTest IR03）。
+--   【2026-11-11 批 B 订正】_candidate* 禁 seed 语义保持：published_ref 必须指向真实 Git 归档
+--   （F10-23 发布唯一出口），种子伪造 published 行即伪造真理。场景绑定 WAgent 的通道 =
+--   GET /api/v1/workspace/scenarios/available/wagents（ScenarioOptionsController 批 B 新增，
+--   探 status=PUBLISHED 候选）；演示数据由真实发布链路产生（批 C 编排向导 E2E 发布首个候选），
+--   场景 AI_AGENT 绑定演示继续走本脚本 §1 agent_registry 形态（新旧两态并存对照）。
 --
 -- 幂等：按本批命名空间先删后插 —— ag_ent2_% / seed-entmgmt（工具·技能·契约·蓝图）/ sc_ent2_% /
 --   sb_ent2_% / bsl_ent2_%；一期 sc_entmgmt 及其 sb_*/bsl_* 存量行保留不动（仅为其补 2 类绑定 + 2 条边）。
@@ -60,8 +76,8 @@ BEGIN;
 -- ---------- 0. 清理（子表先删；一期 sc_entmgmt 面不动） ----------
 DELETE FROM ecos_control.ecos_scenario_binding_link WHERE id LIKE 'bsl\_ent2\_%';
 DELETE FROM ecos_control.ecos_scenario_blueprint    WHERE create_by='seed-entmgmt';
-DELETE FROM ecos_ai.ecos_scenario_binding            WHERE id LIKE 'sb\_ent2\_%';
-DELETE FROM ecos_ai.ecos_business_scenario           WHERE id LIKE 'sc\_ent2\_%';
+DELETE FROM ecos_control.ecos_scenario_binding            WHERE id LIKE 'sb\_ent2\_%';
+DELETE FROM ecos_control.ecos_business_scenario           WHERE id LIKE 'sc\_ent2\_%';
 DELETE FROM ecos_ai.ecos_wagent_tool_contract        WHERE create_by='seed-entmgmt';
 DELETE FROM ecos_ai.ecos_wagent_skill                WHERE create_by='seed-entmgmt';
 DELETE FROM ecos_ai.ecos_ai_tool_registry            WHERE create_by='seed-entmgmt';
@@ -193,7 +209,7 @@ VALUES
   'ecos_scenario_blueprint(V271);BlueprintStatus x16', 'entmgmt', '1', 'seed-entmgmt');
 
 -- ---------- 6. 业务场景 3（一期 sc_entmgmt 保留；department 落域0 真实组织行） ----------
-INSERT INTO ecos_ai.ecos_business_scenario
+INSERT INTO ecos_control.ecos_business_scenario
  (id, name, description, business_goal, department, priority, status, budget,
   safety_index_target, actual_safety_index, metrics, create_by, update_by, is_deleted)
 VALUES
@@ -218,7 +234,7 @@ VALUES
 
 -- ---------- 7. 六类绑定（本批 3 场景 × 6 = 18 行 + 一期 sc_entmgmt 补 SECURITY_POLICY/INTERFACE 2 行） ----------
 -- target_ref NOT NULL + 子查询解析 ⇒ 目标不存在则整事务回滚（内置悬挂闸）。
-INSERT INTO ecos_ai.ecos_scenario_binding
+INSERT INTO ecos_control.ecos_scenario_binding
  (id, scenario_id, binding_type, target_ref, target_id, target_type, remark, create_by, update_by, is_deleted)
 SELECT v.id, v.scenario_id, v.btype, r.ref, r.ref, v.btype,
        v.remark, 'seed-entmgmt', 'seed-entmgmt', 0
@@ -250,7 +266,7 @@ SELECT v.id, v.scenario_id, v.btype, r.ref, r.ref, v.btype,
   ) AS v(id, scenario_id, btype, tcode, remark)
  CROSS JOIN LATERAL (
    SELECT CASE v.btype
-     WHEN 'DATASET' THEN (SELECT d.resource_id FROM ecos_data.td_data_resource d
+     WHEN 'DATASET' THEN (SELECT d.resource_id FROM ecos_control.td_data_resource d
                            WHERE d.layer='CURATED' AND d.is_deleted=0
                            ORDER BY d.resource_id LIMIT 1 OFFSET v.tcode::integer)
      WHEN 'OBJECT_TYPE' THEN (SELECT e.id FROM ecos_ontology.ecos_ontology_entity e
@@ -272,7 +288,7 @@ INSERT INTO ecos_control.ecos_scenario_binding_link
 SELECT 'bsl_ent2_'||lower(e.ltype)||'_'||e.scenario_id, e.scenario_id, sb.id, tb.id, e.ltype,
        CASE WHEN e.ltype = 'MAPPING'
             THEN 'ent2://field-mappings/'||(SELECT ee.code FROM ecos_ontology.ecos_ontology_entity ee
-                                              JOIN ecos_ai.ecos_scenario_binding mb ON mb.id = tb.id
+                                              JOIN ecos_control.ecos_scenario_binding mb ON mb.id = tb.id
                                              WHERE ee.id = mb.target_ref LIMIT 1)
        END,
        e.remark, 'entmgmt', '1', 'seed-entmgmt', 'seed-entmgmt', 0
@@ -296,8 +312,8 @@ SELECT 'bsl_ent2_'||lower(e.ltype)||'_'||e.scenario_id, e.scenario_id, sb.id, tb
     ('sc_entmgmt','GOVERN','SECURITY_POLICY','AI_AGENT','安全策略治理智能体'),
     ('sc_entmgmt','EXPOSE','AI_AGENT','INTERFACE','智能体对外出口')
   ) AS e(scenario_id, ltype, stype, ttype, remark)
-  JOIN ecos_ai.ecos_scenario_binding sb ON sb.scenario_id = e.scenario_id AND sb.binding_type = e.stype
-  JOIN ecos_ai.ecos_scenario_binding tb ON tb.scenario_id = e.scenario_id AND tb.binding_type = e.ttype
+  JOIN ecos_control.ecos_scenario_binding sb ON sb.scenario_id = e.scenario_id AND sb.binding_type = e.stype
+  JOIN ecos_control.ecos_scenario_binding tb ON tb.scenario_id = e.scenario_id AND tb.binding_type = e.ttype
  WHERE NOT (e.ltype = 'MAPPING' AND sb.target_ref IS NULL);
 
 -- ---------- 9. 场景编蓝图 4（BLUEPRINT_READY：草案可评审，未执行 ⇒ actor/trace/release_* 全 NULL） ----------
@@ -316,7 +332,7 @@ SELECT 'bp_ent2_'||s.id, 'default', s.department, s.id, 1, 'BLUEPRINT_READY',
        '[]',
        '{"pipeline":["read_entmgmt_ledger","run_entmgmt_dq_gate","read_entmgmt_ontology_objects","ent2_metric_caliber_check","ent2_kb_doc_search","ent2_graph_query","ent2_forecast_submit"],"agents":["ag_ent2_data","ag_ent2_ontology","ag_ent2_knowledge","ag_ent2_cognitive","ag_ent2_wagent","ag_ent2_security"],"humanGateBeforeCommit":true}'::text,
        1, 'entmgmt', '1', 'seed-entmgmt', 'seed-entmgmt', 0
-  FROM ecos_ai.ecos_business_scenario s
+  FROM ecos_control.ecos_business_scenario s
  WHERE s.id IN ('sc_ent2_group_month','sc_ent2_segment_bench','sc_ent2_proj_risk','sc_entmgmt');
 
 -- ---------- 10. 对账 + 悬挂硬校验（任一非 0 即数据不合格） ----------
@@ -327,54 +343,54 @@ UNION ALL SELECT '04 skill(ecos_skill)', count(*)::text FROM ecos_ai.ecos_skill 
 UNION ALL SELECT '05 wagent_skill', count(*)::text FROM ecos_ai.ecos_wagent_skill WHERE create_by='seed-entmgmt'
 UNION ALL SELECT '06 wagent_tool_contract(本批)', count(*)::text FROM ecos_ai.ecos_wagent_tool_contract WHERE create_by='seed-entmgmt'
 UNION ALL SELECT '07 wagent_tool_contract(V266 累计)', count(*)::text FROM ecos_ai.ecos_wagent_tool_contract
-UNION ALL SELECT '08 business_scenario(本批)', count(*)::text FROM ecos_ai.ecos_business_scenario WHERE id LIKE 'sc\_ent2\_%'
-UNION ALL SELECT '09 binding(本批)', count(*)::text FROM ecos_ai.ecos_scenario_binding WHERE id LIKE 'sb\_ent2\_%'
-UNION ALL SELECT '10 binding(全库)', count(*)::text FROM ecos_ai.ecos_scenario_binding WHERE is_deleted=0
+UNION ALL SELECT '08 business_scenario(本批)', count(*)::text FROM ecos_control.ecos_business_scenario WHERE id LIKE 'sc\_ent2\_%'
+UNION ALL SELECT '09 binding(本批)', count(*)::text FROM ecos_control.ecos_scenario_binding WHERE id LIKE 'sb\_ent2\_%'
+UNION ALL SELECT '10 binding(全库)', count(*)::text FROM ecos_control.ecos_scenario_binding WHERE is_deleted=0
 UNION ALL SELECT '11 link(本批)', count(*)::text FROM ecos_control.ecos_scenario_binding_link WHERE id LIKE 'bsl\_ent2\_%'
 UNION ALL SELECT '12 blueprint', count(*)::text FROM ecos_control.ecos_scenario_blueprint WHERE create_by='seed-entmgmt'
 -- 悬挂闸
-UNION ALL SELECT '13 DANGLING binding(DATASET)', count(*)::text FROM ecos_ai.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='DATASET'
-   AND NOT EXISTS (SELECT 1 FROM ecos_data.td_data_resource d WHERE d.resource_id=b.target_ref AND d.is_deleted=0)
-UNION ALL SELECT '14 DANGLING binding(OBJECT_TYPE)', count(*)::text FROM ecos_ai.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='OBJECT_TYPE'
+UNION ALL SELECT '13 DANGLING binding(DATASET)', count(*)::text FROM ecos_control.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='DATASET'
+   AND NOT EXISTS (SELECT 1 FROM ecos_control.td_data_resource d WHERE d.resource_id=b.target_ref AND d.is_deleted=0)
+UNION ALL SELECT '14 DANGLING binding(OBJECT_TYPE)', count(*)::text FROM ecos_control.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='OBJECT_TYPE'
    AND NOT EXISTS (SELECT 1 FROM ecos_ontology.ecos_ontology_entity e WHERE e.id=b.target_ref)
-UNION ALL SELECT '15 DANGLING binding(KNOWLEDGE_BASE)', count(*)::text FROM ecos_ai.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='KNOWLEDGE_BASE'
+UNION ALL SELECT '15 DANGLING binding(KNOWLEDGE_BASE)', count(*)::text FROM ecos_control.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='KNOWLEDGE_BASE'
    AND NOT EXISTS (SELECT 1 FROM ecos_knowledge.ecos_kb_document k WHERE k.id=b.target_ref)
-UNION ALL SELECT '16 DANGLING binding(AI_AGENT)', count(*)::text FROM ecos_ai.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='AI_AGENT'
+UNION ALL SELECT '16 DANGLING binding(AI_AGENT)', count(*)::text FROM ecos_control.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='AI_AGENT'
    AND NOT EXISTS (SELECT 1 FROM ecos_ai.ecos_agent_registry a WHERE a.id=b.target_ref)
-UNION ALL SELECT '17 DANGLING binding(SECURITY_POLICY)', count(*)::text FROM ecos_ai.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='SECURITY_POLICY'
+UNION ALL SELECT '17 DANGLING binding(SECURITY_POLICY)', count(*)::text FROM ecos_control.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='SECURITY_POLICY'
    AND NOT EXISTS (SELECT 1 FROM ecos_control.td_abac_policy p WHERE p.policy_id=b.target_ref)
-UNION ALL SELECT '18 DANGLING binding(INTERFACE)', count(*)::text FROM ecos_ai.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='INTERFACE'
+UNION ALL SELECT '18 DANGLING binding(INTERFACE)', count(*)::text FROM ecos_control.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' AND b.binding_type='INTERFACE'
    AND NOT EXISTS (SELECT 1 FROM ecos_control.ecos_interface_ref f WHERE f.id=b.target_ref)
 UNION ALL SELECT '19 DANGLING link 两端', count(*)::text FROM ecos_control.ecos_scenario_binding_link l
    WHERE l.id LIKE 'bsl\_ent2\_%'
-     AND NOT EXISTS (SELECT 1 FROM ecos_ai.ecos_scenario_binding b WHERE b.id=l.source_binding_id)
-     AND NOT EXISTS (SELECT 1 FROM ecos_ai.ecos_scenario_binding b WHERE b.id=l.target_binding_id)
+     AND NOT EXISTS (SELECT 1 FROM ecos_control.ecos_scenario_binding b WHERE b.id=l.source_binding_id)
+     AND NOT EXISTS (SELECT 1 FROM ecos_control.ecos_scenario_binding b WHERE b.id=l.target_binding_id)
 UNION ALL SELECT '20 场景缺任一必需边', count(*)::text FROM (
-   SELECT s.id FROM ecos_ai.ecos_business_scenario s
+   SELECT s.id FROM ecos_control.ecos_business_scenario s
     WHERE s.id IN ('sc_ent2_group_month','sc_ent2_segment_bench','sc_ent2_proj_risk','sc_entmgmt')
       AND NOT (SELECT count(DISTINCT l.link_type) FROM ecos_control.ecos_scenario_binding_link l
                 WHERE l.scenario_id=s.id AND l.link_type IN ('MAPPING','EXTRACTION','COGNITION')) = 3) x
 UNION ALL SELECT '21 六类绑定未齐备场景数', count(*)::text FROM (
-   SELECT s.id FROM ecos_ai.ecos_business_scenario s
+   SELECT s.id FROM ecos_control.ecos_business_scenario s
     WHERE s.id IN ('sc_ent2_group_month','sc_ent2_segment_bench','sc_ent2_proj_risk','sc_entmgmt')
-      AND (SELECT count(DISTINCT b.binding_type) FROM ecos_ai.ecos_scenario_binding b
+      AND (SELECT count(DISTINCT b.binding_type) FROM ecos_control.ecos_scenario_binding b
             WHERE b.scenario_id=s.id AND b.is_deleted=0) < 6) x
-UNION ALL SELECT '22 孤岛绑定数(无入无边)', count(*)::text FROM ecos_ai.ecos_scenario_binding b
+UNION ALL SELECT '22 孤岛绑定数(无入无边)', count(*)::text FROM ecos_control.ecos_scenario_binding b
    WHERE b.scenario_id IN ('sc_ent2_group_month','sc_ent2_segment_bench','sc_ent2_proj_risk')
      AND NOT EXISTS (SELECT 1 FROM ecos_control.ecos_scenario_binding_link l
                       WHERE l.source_binding_id=b.id OR l.target_binding_id=b.id)
 UNION ALL SELECT '23 MAPPING 边缺 source_contract', count(*)::text FROM ecos_control.ecos_scenario_binding_link l
    WHERE l.id LIKE 'bsl\_ent2\_%' AND l.link_type='MAPPING' AND (l.source_contract IS NULL OR l.source_contract LIKE 'placeholder-%')
 UNION ALL SELECT '24 blueprint 场景悬挂', count(*)::text FROM ecos_control.ecos_scenario_blueprint bp
-   WHERE bp.create_by='seed-entmgmt' AND NOT EXISTS (SELECT 1 FROM ecos_ai.ecos_business_scenario s WHERE s.id=bp.scenario_id)
-UNION ALL SELECT '25 场景 department 悬挂', count(*)::text FROM ecos_ai.ecos_business_scenario s
+   WHERE bp.create_by='seed-entmgmt' AND NOT EXISTS (SELECT 1 FROM ecos_control.ecos_business_scenario s WHERE s.id=bp.scenario_id)
+UNION ALL SELECT '25 场景 department 悬挂', count(*)::text FROM ecos_control.ecos_business_scenario s
    WHERE s.id LIKE 'sc\_ent2\_%' AND NOT EXISTS (SELECT 1 FROM ecos_control.td_organization o WHERE o.org_id=s.department)
-UNION ALL SELECT '26 一期存量 AI_AGENT 目标悬挂(登记非本批)', count(*)::text FROM ecos_ai.ecos_scenario_binding b
+UNION ALL SELECT '26 一期存量 AI_AGENT 目标悬挂(登记非本批)', count(*)::text FROM ecos_control.ecos_scenario_binding b
    WHERE b.id='sb_198cf5d3da99' AND NOT EXISTS (SELECT 1 FROM ecos_ai.ecos_agent_registry a WHERE a.id=b.target_ref)
 ORDER BY 1;
 
 -- 目标解析审计（供册回写：绑定实际落到了哪些真实 id）
 SELECT b.binding_type||' | '||b.scenario_id||' -> '||b.target_ref AS resolved
-  FROM ecos_ai.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' ORDER BY b.scenario_id, b.binding_type;
+  FROM ecos_control.ecos_scenario_binding b WHERE b.id LIKE 'sb\_ent2\_%' ORDER BY b.scenario_id, b.binding_type;
 
 COMMIT;
