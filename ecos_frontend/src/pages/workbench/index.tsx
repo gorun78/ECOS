@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
+  Brain,
   ArrowRight,
   Building,
   ChevronDown,
@@ -129,6 +130,11 @@ export default function WorkbenchHome() {
           <h1 className={`text-lg font-bold tracking-tight ${styles.appText}`}>{t('workspace.l1.title')}</h1>
         </div>
         <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('workspace.l1.subtitle')}</p>
+        <div className="mt-3">
+          <Link to="/cognitive-workbench" className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold transition hover:opacity-80 ${styles.cardBorder} ${styles.cardText}`}>
+            <Brain size={14} /> {t('app.tab.cognitive_workbench')} <ArrowRight size={13} />
+          </Link>
+        </div>
       </div>
 
       {/* 离线 banner（离线态） */}
