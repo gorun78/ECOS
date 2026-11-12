@@ -186,20 +186,28 @@ public class AIPPipelineController {
     }
 
     /**
-     * 模板实例化 — POST /api/v1/aip/pipelines/template-sources/{ref}/instantiate。
+     * 模板实例化 — POST /api/v1/aip/pipelines/template-sources/instantiate。
+     *
+     * <p><b>ref 走请求体而非路径段</b>：模板引用天然含 {@code /}（git ref
+     * {@code repo/pb1}、内置 {@code builtin/intent/FORECAST}），编码成 {@code %2F} 会被
+     * Tomcat 以 400 拒绝（实测：{@code HTTP Status 400 – Bad Request}）。路径保持固定字面段，
+     * 同时避开 {@code /{id}} 通配竞争。</p>
      */
-    @PostMapping("/template-sources/{ref}/instantiate")
+    @PostMapping("/template-sources/instantiate")
     public ApiResponse<AipTemplateInstantiateRequest.Result> instantiateTemplate(
-            @PathVariable String ref,
             @RequestBody(required = false) AipTemplateInstantiateRequest body) {
         if (templateService == null) {
             return ApiResponse.error(503, "AIP-T01: 模板服务未装配");
         }
-        String name = body == null || body.name() == null ? null : body.name().trim();
+        if (body == null || body.ref() == null || body.ref().isBlank()) {
+            return ApiResponse.error(400, "AIP-T02: 缺少模板引用 ref");
+        }
+        String ref = body.ref().trim();
+        String name = body.name() == null ? null : body.name().trim();
         // 失败一律上浮（AiErrorAdvice 渲染），控制器禁自 catch + 禁回显异常原文（F06-15 / X-49）
         AipPipelineTemplateService.InstantiateResult result = templateService.instantiate(
                 currentTenant(), currentOperator(), ref, name,
-                body == null || body.slots() == null ? Map.of() : body.slots());
+                body.slots() == null ? Map.of() : body.slots());
         return ApiResponse.success(new AipTemplateInstantiateRequest.Result(
                 result.pipelineId(),
                 new AipTemplateInstantiateRequest.Report(result.mapped(), result.unmapped())));

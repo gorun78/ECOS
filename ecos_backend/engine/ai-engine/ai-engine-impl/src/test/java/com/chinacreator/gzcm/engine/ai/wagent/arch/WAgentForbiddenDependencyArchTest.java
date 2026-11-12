@@ -189,8 +189,11 @@ class WAgentForbiddenDependencyArchTest {
      * {@code dto.AipPipelineUpsertRequest}（DI-2 强类型收口）、
      * {@code dto.AipTemplateInstantiateRequest}（含 Result/Report 嵌套 record）
      * 七个生产文件（dto 三件 AipPipelineVO/SummaryVO/ExecResultVO 在本批前已入库，不计新增）。实扫 305。</p>
+     * <p>2026-11-12 +1（305→306）＝ 内置典型模板：新增
+     * {@code template.BuiltinPipelineTemplateCatalog}（八意图确定性骨架目录，
+     * 工具序列直取 {@code ExplorationPlanner} 单源）。实扫 306。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 305;
+    private static final int AI_SOURCE_FILE_FLOOR = 306;
 
     /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
      *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */
