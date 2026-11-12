@@ -126,6 +126,7 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // 2026-10-14 用户裁决：场景工作台入口指向 L1「我的场景」（#/workbench，详设-07），
   // 非 /project_workbench 高级技术视图（ScenarioManagementView，保留可达，不在本组出项）。
   { id: "workbench", route: "/workbench", labelKey: "app.tab.workbench", group: "workspaces", descKey: "sidebar.desc.workbench", icon: Briefcase, tabbable: true },
+  { id: "cognitive-workbench", route: "/cognitive-workbench", labelKey: "app.tab.cognitive_workbench", tabbable: true },
   { id: "agent_studio", route: "/agent_studio", labelKey: "app.tab.ai_workbench", group: "workspaces", descKey: "sidebar.desc.agent_studio", icon: Cpu, tabbable: true, palette: p("agent_studio", CAT.cognitive), searchTypes: ["Agent"] },
   { id: "knowledge_view", route: "/knowledge_view", labelKey: "app.tab.knowledge_view", group: "workspaces", descKey: "sidebar.desc.knowledge_view", icon: BookOpen, tabbable: true },
   { id: "ontology_workbench", route: "/ontology_workbench", labelKey: "app.tab.ontology_workbench", group: "workspaces", descKey: "sidebar.desc.ontology_workbench", icon: Network, tabbable: true },

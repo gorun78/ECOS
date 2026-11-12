@@ -67,6 +67,7 @@ const AIWorkbench = lazy(() => import('./pages/aiworkbench/index.tsx'));
 const ChatbotStudioRouterPage = lazy(() => import('./pages/aiworkbench/ChatbotStudioRouterPage.tsx'));
 const WorkshopView = lazy(() => import('./pages/WorkshopView.tsx'));
 const ScenarioManagementView = lazy(() => import('./pages/ScenarioManagementView.tsx'));
+const CognitiveWorkbench = lazy(() => import('./pages/CognitiveWorkbench.tsx'));
 // F07-06 workbench 3-tier IA
 const WorkbenchHome = lazy(() => import('./pages/workbench/index.tsx'));
 const WorkbenchScenarioDetail = lazy(() => import('./pages/workbench/[scenarioId]/index.tsx'));
@@ -193,6 +194,7 @@ createRoot(document.getElementById('root')!).render(
                 {/* K · 知识层 */}
                 <Route path="workflow_designer" element={<WorkshopView />} />
                 <Route path="project_workbench" element={<ScenarioManagementView />} />
+                <Route path="cognitive-workbench" element={<CognitiveWorkbench />} />
                 {/* F07-06 工作台三层 IA：我的场景 → 场景详情 → 预测推演 / 经营管控闭环（H-8 P08/P09） */}
                 <Route path="workbench" element={<WorkbenchHome />} />
                 <Route path="workbench/:scenarioId" element={<WorkbenchScenarioDetail />} />
