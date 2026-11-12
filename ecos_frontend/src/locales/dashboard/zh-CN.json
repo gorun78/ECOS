@@ -158,7 +158,7 @@
   "dashboard.taskCenter.detailAria": "任务详情面板",
   "dashboard.wm.confirmDeleteTitle": "确认删除？",
   "dashboard.wm.confirmDeleteMessage": "即将删除选中的世界模型实体，删除后不可恢复。确认继续？",
-  "dashboard.wm.codePending": "目标 Code 不再本地自动生成（后端发号端点未上线，待补）：请手动填写，或留空由后端落库时补发。",
+  "dashboard.wm.codePending": "目标编号不再本地自动生成（后端编号服务尚未上线）：请手动填写，或留空由后端保存时补发。",
   "dashboard.ops.noData": "无数据",
   "dashboard.ops.httpError": "服务返回异常（HTTP {status}）",
   "dashboard.ops.unitYi": "{v} 亿",

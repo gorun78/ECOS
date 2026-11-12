@@ -171,7 +171,7 @@ describe("WagentStudioView 真值纪律", () => {
     const arg = mockCreate.mock.calls[0][0] as Record<string, unknown>;
     expect(arg.targetObjectRefJson).toBe('{"objectId":"o-1","engine":"ontology"}');
     // 回显的是服务端返回的规范化形态（键序已重排），不是本地输入原文
-    expect(screen.getByText(/落库（规范化）: \{"engine":"ontology","objectId":"o-1"\}/)).toBeTruthy();
+    expect(screen.getByText(/已保存（规范形式）: \{"engine":"ontology","objectId":"o-1"\}/)).toBeTruthy();
   });
 
   it("③ generated 候选不可直接评审（按钮禁用）；须先走 validate 通道", async () => {

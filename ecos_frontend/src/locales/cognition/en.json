@@ -74,7 +74,7 @@
   "knowledge.cognition.situation.preflight.context": "Context complete",
   "knowledge.cognition.situation.preflight.model": "Cognitive model executable",
   "knowledge.cognition.situation.preflight.permission": "User has project read permission",
-  "knowledge.cognition.situation.preflight.neo4j": "Neo4j call expected",
+  "knowledge.cognition.situation.preflight.neo4j": "Graph database call expected",
   "knowledge.cognition.situation.preflight.llm": "LLM gateway reachability",
   "knowledge.cognition.situation.run": "Run Cognitive Inference",
   "knowledge.cognition.causal.title": "Causal Analysis",

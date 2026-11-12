@@ -158,7 +158,7 @@
   "dashboard.taskCenter.detailAria": "Task detail panel",
   "dashboard.wm.confirmDeleteTitle": "Confirm delete?",
   "dashboard.wm.confirmDeleteMessage": "The selected world-model entity will be deleted and cannot be restored. Continue?",
-  "dashboard.wm.codePending": "Goal code is no longer generated locally (backend issuing endpoint not yet available): type it manually, or leave it empty for the backend to assign.",
+  "dashboard.wm.codePending": "Goal codes are no longer generated locally (backend numbering service not yet available): type it manually, or leave it empty for the backend to assign on save.",
   "dashboard.ops.noData": "No data",
   "dashboard.ops.httpError": "Server returned an error (HTTP {status})",
   "dashboard.ops.unitYi": "{v}×100M CNY",

@@ -292,7 +292,6 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
             <ListOrdered size={13} className="text-indigo-500" />
             {t('knowledge.import.jobs')} ({jobs.length})
           </span>
-          <span className={`text-[9px] font-mono ${styles.muted}`}>/extract/structured/jobs</span>
         </div>
         <div className="w-full overflow-x-auto">
           <table className="w-full text-[11px] border-collapse whitespace-nowrap">

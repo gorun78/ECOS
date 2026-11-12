@@ -652,7 +652,7 @@ function GuardrailPanel({ agent }: { agent: AIPAgent | null }): React.JSX.Elemen
             <span className="h-1.5 w-1.5 rounded-full animate-pulse bg-current" />
             {t('aiworkbench.playground.guardrailSyncNote')}
           </div>
-          <div className={`text-[9px] font-mono leading-relaxed ${styles.cardTextMuted}`}>security-engine · RLS/CLS/ABAC</div>
+          <div className={`text-[9px] font-mono leading-relaxed ${styles.cardTextMuted}`}>{t('aiworkbench.playground.guardrailScope')}</div>
         </div>
         {agent.description ? (
           <p className={`text-[9px] font-mono leading-relaxed ${styles.muted} line-clamp-4`}>{agent.description}</p>

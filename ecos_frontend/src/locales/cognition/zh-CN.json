@@ -74,7 +74,7 @@
   "knowledge.cognition.situation.preflight.context": "上下文完整",
   "knowledge.cognition.situation.preflight.model": "认知模型可执行",
   "knowledge.cognition.situation.preflight.permission": "用户具备项目读取权限",
-  "knowledge.cognition.situation.preflight.neo4j": "Neo4j 预期调用",
+  "knowledge.cognition.situation.preflight.neo4j": "图数据库预期调用",
   "knowledge.cognition.situation.preflight.llm": "LLM 网关可达性",
   "knowledge.cognition.situation.run": "运行认知推理",
   "knowledge.cognition.causal.title": "因果分析",

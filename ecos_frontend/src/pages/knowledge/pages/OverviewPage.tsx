@@ -380,9 +380,6 @@ export default function OverviewPage() {
             <GitBranch className={`w-3.5 h-3.5 ${styles.accentText}`} />
             <span>{t('knowledge.overview.pipeline_title')}</span>
           </h3>
-          <span className={`text-[10px] font-mono uppercase tracking-wider ${styles.muted}`}>
-            {t('knowledge.overview.pipeline_strategy')}
-          </span>
         </div>
         <div className="flex flex-col md:flex-row md:items-center gap-1">
           {PIPELINE_STEPS.map((step, i) => (

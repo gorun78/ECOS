@@ -274,13 +274,10 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
           </div>
 
           {/* 底部状态（数据工作台同款：cardBg 统计卡 + border-t） */}
-          <div className={`p-4 border-t ${styles.cardBorder} ${styles.cardBg} space-y-1 text-[10px] ${styles.cardTextMuted}`}>
+          <div className={`p-4 border-t ${styles.cardBorder} ${styles.cardBg} text-[10px] ${styles.cardTextMuted}`}>
             <div className={`flex items-center gap-1.5 font-semibold ${styles.cardText}`}>
               <span className={styles.successText}>●</span>
               <span>{t('knowledge.engine')}</span>
-            </div>
-            <div className="opacity-70">
-              KB · Cogn · Sec · Data
             </div>
           </div>
         </aside>

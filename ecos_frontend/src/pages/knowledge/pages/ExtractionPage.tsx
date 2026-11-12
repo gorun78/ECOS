@@ -228,28 +228,21 @@ export default function ExtractionPage() {
            >
         <ArrowDownUp className={`w-4 h-4 ${styles.accentText}`} />
         <span className="text-base font-bold">{t('knowledge.nav.page_extract')}</span>
-        <span className={`text-[10px] font-mono ${styles.muted}`}>
-          {t('knowledge.extract.page_subtitle')}
-        </span>
       </div>
 
       {/* 双栏 grid：1.25fr / 0.75fr（PRD F4 验收 1） */}
       <div className="grid grid-cols-1 md:grid-cols-[1.25fr_0.75fr] gap-3">
-        {/* ═══════ 左栏 · 结构化 I→K（DW 层源头，1.25fr） ═══════ */}
+        {/* ═══════ 左栏 · 结构化抽取（数仓层源头，1.25fr） ═══════ */}
         <div
           className={`rounded-md border flex flex-col min-h-72 ${styles.cardBorder} ${styles.cardBg}`}
         >
-          {/* 头：I→K badge + 标题 */}
+          {/* 头：标题 */}
           <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}
                >
             <div className="flex items-center gap-2">
               <Boxes className={`w-4 h-4 ${styles.accentText}`} />
               <span className="text-sm font-semibold">{t('knowledge.extract.structured')}</span>
             </div>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${styles.badgeBg} ${styles.badgeText}`}
-                  >
-              I → K
-            </span>
           </div>
 
           <div className="p-3 space-y-3 flex-1">
@@ -362,21 +355,17 @@ export default function ExtractionPage() {
           </div>
         </div>
 
-        {/* ═══════ 右栏 · 文档导入 Document→K（0.75fr） ═══════ */}
+        {/* ═══════ 右栏 · 文档导入（0.75fr） ═══════ */}
         <div
           className={`rounded-md border flex flex-col min-h-72 ${styles.cardBorder} ${styles.cardBg}`}
         >
-          {/* 头：Document→K badge + 标题 */}
+          {/* 头：标题 */}
           <div className={`flex items-center justify-between px-3 py-2 border-b ${styles.cardBorder}`}
                >
             <div className="flex items-center gap-2">
               <FileUp className={`w-4 h-4 ${styles.accentText}`} />
               <span className="text-sm font-semibold">{t('knowledge.extract.document')}</span>
             </div>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${styles.badgeBg} ${styles.badgeText}`}
-                  >
-              Document → K
-            </span>
           </div>
 
           <div className="p-3 space-y-3 flex-1">
