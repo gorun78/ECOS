@@ -22,7 +22,6 @@
   "workspace.l1.card.pending_action": "待决策事项",
   "workspace.l1.card.pending_unit": "项",
   "workspace.l1.card.open": "进入场景",
-
   "workspace.create.title": "新建场景",
   "workspace.create.name": "场景名称",
   "workspace.create.name_ph": "例如：2027 年度利润预测",
@@ -40,7 +39,6 @@
   "workspace.create.no_id": "后端未回传新场景 id，请在「我的场景」中确认创建结果。",
   "workspace.create.failed": "场景创建失败：{msg}",
   "workspace.create.failed_unknown": "场景创建失败",
-
   "workspace.l2.back": "返回工作台",
   "workspace.l2.tab.overview": "总览",
   "workspace.l2.tab.decision": "决策",
@@ -90,7 +88,6 @@
   "workspace.wiz.go_forecast": "前往 L3 预测",
   "workspace.wiz.go_decisions": "前往决策/结果",
   "workspace.l2.cognition.go_forecast": "查看完整推演",
-
   "workspace.l3.title": "预测与推演",
   "workspace.l3.subtitle": "基于场景绑定的数据与知识，运行前瞻推演以评估不同选择的影响。",
   "workspace.l3.back": "返回场景总览",
@@ -108,7 +105,6 @@
   "workspace.l3.belief.title": "认知信念",
   "workspace.l3.run.btn": "运行推演",
   "workspace.l3.run.running": "推演运行中…",
-
   "workspace.404.title": "页面走丢了",
   "workspace.404.subtitle": "请求的地址不在工作台可访问范围内。",
   "workspace.404.go_home": "返回工作台首页",
@@ -273,7 +269,6 @@
   "workspace.adv.collapse": "收起",
   "workspace.adv.expand": "展开",
   "workspace.adv.legacy_link": "高级视图（融合/决策/Git）",
-
   "workspace.l3.prov.title": "运行溯源",
   "workspace.l3.prov.hint": "字段一律取自真实端点回显；后端未提供的字段显示「—」并标注来源缺失，不做本地合成。",
   "workspace.l3.prov.reload": "刷新",
@@ -293,7 +288,6 @@
   "workspace.l3.prov.runs_empty": "该场景暂无运行记录。",
   "workspace.l3.prov.degraded.yes": "已降级",
   "workspace.l3.prov.degraded.no": "正常",
-
   "workspace.l3.sim.title": "What-if 推演（探索通道）",
   "workspace.l3.sim.hint": "输入假设情景与变量后调用认知引擎推演；结果为探索口径，不影响正式数据、不参与核算。",
   "workspace.l3.sim.name_label": "情景名称",
@@ -320,7 +314,6 @@
   "workspace.l3.sim.guard_note": "防混淆护栏：本区块为推演（探索）通道产物——非核算口径、可能含模型推断，仅供比选参考，禁止当作核算/关账数据使用；核算结果请见结果四联视图。",
   "workspace.forecast.mode.exploratory": "推演（探索）",
   "workspace.forecast.mode.caliber": "口径",
-
   "workspace.l2.recent.loading": "加载动作记录…",
   "workspace.l2.recent.error": "动作记录加载失败：{msg}",
   "workspace.l2.recent.more": "仅列出返回结果的前 {n} 条；完整看板见决策面。",
@@ -370,5 +363,6 @@
   "workspace.completeness.missing.extraction": "本体实体 → 知识资产（抽取）",
   "workspace.completeness.missing.cognition": "知识资产 → AI Agent（认知）",
   "workspace.completeness.missing.expose": "AI Agent → 对外接口（出口）",
-  "workspace.completeness.missing.govern": "安全策略 → AI Agent（治理）"
+  "workspace.completeness.missing.govern": "安全策略 → AI Agent（治理）",
+  "workspace.cognition.sample_label": "示例场景 / SAMPLE"
 }

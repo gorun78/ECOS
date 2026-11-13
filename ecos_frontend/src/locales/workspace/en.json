@@ -22,7 +22,6 @@
   "workspace.l1.card.pending_action": "Pending decisions",
   "workspace.l1.card.pending_unit": "items",
   "workspace.l1.card.open": "Open scenario",
-
   "workspace.create.title": "New Scenario",
   "workspace.create.name": "Scenario Name",
   "workspace.create.name_ph": "e.g. 2027 Profit Forecast",
@@ -40,7 +39,6 @@
   "workspace.create.no_id": "Backend returned no id for the new scenario; verify in \"My Scenarios\".",
   "workspace.create.failed": "Scenario creation failed: {msg}",
   "workspace.create.failed_unknown": "Scenario creation failed",
-
   "workspace.l2.back": "Back to workbench",
   "workspace.l2.tab.overview": "Overview",
   "workspace.l2.tab.decision": "Decision",
@@ -90,7 +88,6 @@
   "workspace.wiz.go_forecast": "Open L3 forecast",
   "workspace.wiz.go_decisions": "Open decisions/outcomes",
   "workspace.l2.cognition.go_forecast": "Open forecast",
-
   "workspace.l3.title": "Forecast & Simulation",
   "workspace.l3.subtitle": "Run forward-looking simulations against the scenario's data and knowledge to weigh alternatives.",
   "workspace.l3.back": "Back to scenario overview",
@@ -108,7 +105,6 @@
   "workspace.l3.belief.title": "Cognition Beliefs",
   "workspace.l3.run.btn": "Run simulation",
   "workspace.l3.run.running": "Simulation running…",
-
   "workspace.404.title": "Page not found",
   "workspace.404.subtitle": "The requested address is outside the workbench surface.",
   "workspace.404.go_home": "Go to workbench home",
@@ -273,7 +269,6 @@
   "workspace.adv.collapse": "Collapse",
   "workspace.adv.expand": "Expand",
   "workspace.adv.legacy_link": "Advanced view (fusion/decision/Git)",
-
   "workspace.l3.prov.title": "Run provenance",
   "workspace.l3.prov.hint": "Every field comes straight from real endpoint responses; fields the backend does not provide render as “—” with a missing-source note — nothing is synthesized locally.",
   "workspace.l3.prov.reload": "Refresh",
@@ -293,7 +288,6 @@
   "workspace.l3.prov.runs_empty": "No runs recorded for this scenario yet.",
   "workspace.l3.prov.degraded.yes": "Degraded",
   "workspace.l3.prov.degraded.no": "Normal",
-
   "workspace.l3.sim.title": "What-if simulation (exploratory channel)",
   "workspace.l3.sim.hint": "Enter a hypothesis scenario and variables, then run the cognitive engine; results use the exploratory caliber — they do not affect production data and are not part of accounting.",
   "workspace.l3.sim.name_label": "Scenario name",
@@ -320,7 +314,6 @@
   "workspace.l3.sim.guard_note": "Anti-confusion guard: this block is exploratory-channel output — non-accounting caliber, possibly model-inferred — for comparison only; never treat it as accounting/closed-book data. See the outcome quad view for accounted results.",
   "workspace.forecast.mode.exploratory": "Exploratory",
   "workspace.forecast.mode.caliber": "Caliber",
-
   "workspace.l2.recent.loading": "Loading action records…",
   "workspace.l2.recent.error": "Failed to load action records: {msg}",
   "workspace.l2.recent.more": "Showing the first {n} returned rows; see the decisions surface for the full board.",
@@ -370,5 +363,6 @@
   "workspace.completeness.missing.extraction": "Ontology entity → knowledge asset (extraction)",
   "workspace.completeness.missing.cognition": "Knowledge asset → AI agent (cognition)",
   "workspace.completeness.missing.expose": "AI agent → external interface (expose)",
-  "workspace.completeness.missing.govern": "Security policy → AI agent (govern)"
+  "workspace.completeness.missing.govern": "Security policy → AI agent (govern)",
+  "workspace.cognition.sample_label": "SAMPLE SCENARIO"
 }

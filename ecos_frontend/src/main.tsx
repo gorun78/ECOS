@@ -151,6 +151,7 @@ createRoot(document.getElementById('root')!).render(
                     不在首页渲染。index 根仍为 Navigate 重定向（红线：路由根只增不删）。 */}
                 <Route index element={<Navigate to="/decision" replace />} />
                 <Route path="decision" element={<DecisionBoard />} />
+                <Route path="decision/cognition" element={<CognitiveWorkbench />} />
                 {/* R4 Mind 治理（差距分析 P0-6 / B3-c）：列表 + 详情（三轴 + 候选闸门） */}
                 <Route path="decision/mind" element={<DecisionMindList />} />
                 <Route path="decision/mind/:mindId" element={<DecisionMindDetail />} />
@@ -194,7 +195,7 @@ createRoot(document.getElementById('root')!).render(
                 {/* K · 知识层 */}
                 <Route path="workflow_designer" element={<WorkshopView />} />
                 <Route path="project_workbench" element={<ScenarioManagementView />} />
-                <Route path="cognitive-workbench" element={<CognitiveWorkbench />} />
+                <Route path="cognitive-workbench" element={<Navigate to="/decision/cognition" replace />} />
                 {/* F07-06 工作台三层 IA：我的场景 → 场景详情 → 预测推演 / 经营管控闭环（H-8 P08/P09） */}
                 <Route path="workbench" element={<WorkbenchHome />} />
                 <Route path="workbench/:scenarioId" element={<WorkbenchScenarioDetail />} />
