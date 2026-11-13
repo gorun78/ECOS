@@ -10,6 +10,7 @@ import './index.css';
 
 // Pages
 import CognitiveOperatingSystem from './pages/CognitiveOperatingSystem.tsx';
+import DecisionHomeV2 from './pages/DecisionHomeV2.tsx';
 import OperationalApps from './pages/OperationalApps.tsx';
 import MonitoringCenter from './pages/MonitoringCenter.tsx';
 import OntologyWorkbenchLayout, { OntologyWorkbenchLayoutStandalone } from './pages/OntologyWorkbenchLayout.tsx';
@@ -63,8 +64,10 @@ createRoot(document.getElementById('root')!).render(
               }
             >
               {/* 总览 */}
-              <Route index element={<CognitiveOperatingSystem />} />
-              <Route path="mission_control" element={<CognitiveOperatingSystem />} />
+              <Route index element={<DecisionHomeV2 />} />
+              <Route path="mission_control" element={<DecisionHomeV2 />} />
+              {/* 专业架构诊断保留独立入口，不再占据业务决策首页 */}
+              <Route path="cognitive-ops" element={<CognitiveOperatingSystem />} />
               <Route path="monitor" element={<MonitoringCenter />} />
               {/* 业务应用 */}
               <Route path="biz_dashboard" element={<BizDashboard />} />
