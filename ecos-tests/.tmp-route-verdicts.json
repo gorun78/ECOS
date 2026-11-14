@@ -1,0 +1,398 @@
+[
+ {
+  "v": "PASS",
+  "k": "login",
+  "kind": "render",
+  "d": "hash=#/login mainLen=0 bodyLen=55 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "no-access",
+  "kind": "render",
+  "d": "hash=#/no-access mainLen=0 bodyLen=51 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "index-redirect",
+  "kind": "render",
+  "d": "hash=#/decision mainLen=2241 bodyLen=2547 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "decision",
+  "kind": "render",
+  "d": "hash=#/decision mainLen=2241 bodyLen=2547 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "decision/mind",
+  "kind": "render",
+  "d": "hash=#/decision/mind mainLen=116 bodyLen=422 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "decision/mind/:mindId",
+  "kind": "param",
+  "d": "hash=#/decision/mind/none mainLen=191 bodyLen=497 boundary=false | （param 探针：对象不存在属预期，已如实呈现）"
+ },
+ {
+  "v": "PASS",
+  "k": "mission_control",
+  "kind": "render",
+  "d": "hash=#/mission_control mainLen=985 bodyLen=1296 boundary=false"
+ },
+ {
+  "v": "FAIL",
+  "k": "monitor",
+  "kind": "render",
+  "d": "hash=#/monitor mainLen=98 bodyLen=414 boundary=false | http: 404 /api/v1/monitor"
+ },
+ {
+  "v": "FAIL",
+  "k": "biz_dashboard",
+  "kind": "render",
+  "d": "hash=#/biz_dashboard mainLen=51 bodyLen=380 boundary=false | http: 404 /api/v1/ecos/biz/dashboard"
+ },
+ {
+  "v": "FAIL",
+  "k": "project_tracker",
+  "kind": "render",
+  "d": "hash=#/project_tracker mainLen=26 bodyLen=357 boundary=false | http: 404 /api/v1/ecos/objects/Project?page=1&pageSize=10"
+ },
+ {
+  "v": "FAIL",
+  "k": "contract_manager",
+  "kind": "render",
+  "d": "hash=#/contract_manager mainLen=26 bodyLen=362 boundary=false | http: 404 /api/v1/ecos/objects/Contract?page=1&pageSize=10"
+ },
+ {
+  "v": "FAIL",
+  "k": "ops_dashboard",
+  "kind": "render",
+  "d": "hash=#/ops_dashboard mainLen=28 bodyLen=373 boundary=false | http: 404 /api/v1/ecos/biz/dashboard"
+ },
+ {
+  "v": "FAIL",
+  "k": "ops_apps",
+  "kind": "render",
+  "d": "hash=#/ops_apps mainLen=477 bodyLen=825 boundary=false | http: 404 /api/v1/ontology/entities/Customer/instances, 404 /api/v1/ontology/entities/Facility/instances"
+ },
+ {
+  "v": "PASS",
+  "k": "marketplace",
+  "kind": "render",
+  "d": "hash=#/marketplace mainLen=95 bodyLen=448 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "resource-center",
+  "kind": "render",
+  "d": "hash=#/resource-center mainLen=305 bodyLen=672 boundary=false"
+ },
+ {
+  "v": "FAIL",
+  "k": "objects",
+  "kind": "render",
+  "d": "hash=#/objects mainLen=120 bodyLen=486 boundary=false | http: 404 /api/v1/ecos/objects/ENT_USER?page=1&pageSize=20, 404 /api/v1/ecos/objects/ENT_USER/schema"
+ },
+ {
+  "v": "PASS",
+  "k": "ontology_workbench",
+  "kind": "render",
+  "d": "hash=#/ontology_workbench mainLen=826 bodyLen=1197 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "business-workbench",
+  "kind": "render",
+  "d": "hash=#/business-workbench mainLen=1474 bodyLen=1851 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "data-workbench",
+  "kind": "render",
+  "d": "hash=#/data-workbench mainLen=138 bodyLen=521 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "dq_dashboard",
+  "kind": "render",
+  "d": "hash=#/dq_dashboard mainLen=243 bodyLen=636 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "gateway-diagnostics",
+  "kind": "render",
+  "d": "hash=#/gateway-diagnostics mainLen=330 bodyLen=735 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "alerts-center",
+  "kind": "render",
+  "d": "hash=#/alerts-center mainLen=77 bodyLen=482 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "domains(redirect)",
+  "kind": "redirect",
+  "d": "hash=#/ontology_workbench"
+ },
+ {
+  "v": "PASS",
+  "k": "domain_designer(redirect)",
+  "kind": "redirect",
+  "d": "hash=#/ontology_workbench"
+ },
+ {
+  "v": "PASS",
+  "k": "ontology(redirect)",
+  "kind": "redirect",
+  "d": "hash=#/ontology_workbench"
+ },
+ {
+  "v": "PASS",
+  "k": "ontology_designer(redirect)",
+  "kind": "redirect",
+  "d": "hash=#/ontology_workbench"
+ },
+ {
+  "v": "PASS",
+  "k": "glossary(redirect)",
+  "kind": "redirect",
+  "d": "hash=#/ontology_workbench"
+ },
+ {
+  "v": "PASS",
+  "k": "knowledge_graph",
+  "kind": "render",
+  "d": "hash=#/knowledge_graph mainLen=143 bodyLen=578 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "dict",
+  "kind": "render",
+  "d": "hash=#/dict mainLen=50 bodyLen=487 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "system-config",
+  "kind": "render",
+  "d": "hash=#/system-config mainLen=17627 bodyLen=18069 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "platform-governance",
+  "kind": "render",
+  "d": "hash=#/platform-governance mainLen=292 bodyLen=752 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "workflow_designer",
+  "kind": "render",
+  "d": "hash=#/workflow_designer mainLen=272 bodyLen=726 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "project_workbench",
+  "kind": "render",
+  "d": "hash=#/project_workbench mainLen=3052 bodyLen=3511 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "cognitive-workbench",
+  "kind": "render",
+  "d": "hash=#/cognitive-workbench mainLen=436 bodyLen=915 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "workbench",
+  "kind": "render",
+  "d": "hash=#/workbench mainLen=2073 bodyLen=2548 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "workbench/:scenarioId",
+  "kind": "param",
+  "d": "hash=#/workbench/sc001 mainLen=861 bodyLen=1336 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "workbench/:scenarioId/forecast",
+  "kind": "render",
+  "d": "hash=#/workbench/sc001/forecast mainLen=561 bodyLen=1036 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "workbench/:scenarioId/decisions",
+  "kind": "render",
+  "d": "hash=#/workbench/sc001/decisions mainLen=367 bodyLen=842 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "scenario-sandbox/:scenarioId",
+  "kind": "render",
+  "d": "hash=#/scenario-sandbox/sc001 mainLen=192 bodyLen=679 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "world_model",
+  "kind": "render",
+  "d": "hash=#/world_model mainLen=181 bodyLen=661 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "knowledge(legacy)",
+  "kind": "redirect",
+  "d": "hash=#/knowledge_view"
+ },
+ {
+  "v": "PASS",
+  "k": "knowledge_view",
+  "kind": "render",
+  "d": "hash=#/knowledge_view mainLen=453 bodyLen=947 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "agent_studio(redirect)",
+  "kind": "redirect",
+  "d": "hash=#/ai-workbench"
+ },
+ {
+  "v": "PASS",
+  "k": "ai-workbench",
+  "kind": "render",
+  "d": "hash=#/ai-workbench mainLen=1161 bodyLen=1667 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "chatbot_studio",
+  "kind": "render",
+  "d": "hash=#/chatbot_studio mainLen=1675 bodyLen=2193 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "workshop",
+  "kind": "render",
+  "d": "hash=#/workshop mainLen=272 bodyLen=789 boundary=false"
+ },
+ {
+  "v": "FAIL",
+  "k": "agent_mesh",
+  "kind": "render",
+  "d": "hash=#/agent_mesh mainLen=1224 bodyLen=1766 boundary=false | http: 502 /api/v1/agent-mesh/missions?limit=30"
+ },
+ {
+  "v": "PASS",
+  "k": "agent-builder(no id)",
+  "kind": "render",
+  "d": "hash=#/agent-builder mainLen=229 bodyLen=799 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "agent-test/:agentId",
+  "kind": "param",
+  "d": "hash=#/agent-test/agent-data mainLen=68 bodyLen=657 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "case_library",
+  "kind": "render",
+  "d": "hash=#/case_library mainLen=10 bodyLen=606 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "alerts",
+  "kind": "render",
+  "d": "hash=#/alerts mainLen=157 bodyLen=752 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "security-center",
+  "kind": "render",
+  "d": "hash=#/security-center mainLen=908 bodyLen=1506 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "guardrails",
+  "kind": "render",
+  "d": "hash=#/guardrails mainLen=108 bodyLen=711 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "iam",
+  "kind": "render",
+  "d": "hash=#/iam mainLen=860 bodyLen=1470 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "kanban",
+  "kind": "render",
+  "d": "hash=#/kanban mainLen=18 bodyLen=633 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "telemetry",
+  "kind": "render",
+  "d": "hash=#/telemetry mainLen=93 bodyLen=716 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "tokens",
+  "kind": "render",
+  "d": "hash=#/tokens mainLen=95 bodyLen=720 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "tenants",
+  "kind": "render",
+  "d": "hash=#/tenants mainLen=234 bodyLen=864 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "engine-security",
+  "kind": "render",
+  "d": "hash=#/engine-security mainLen=147 bodyLen=791 boundary=false"
+ },
+ {
+  "v": "FAIL",
+  "k": "engine-data",
+  "kind": "render",
+  "d": "hash=#/engine-data mainLen=204 bodyLen=849 boundary=false | http: 404 /api/v1/engine/data/settings"
+ },
+ {
+  "v": "PASS",
+  "k": "engine-ontology",
+  "kind": "render",
+  "d": "hash=#/engine-ontology mainLen=202 bodyLen=856 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "engine-cognitive",
+  "kind": "render",
+  "d": "hash=#/engine-cognitive mainLen=180 bodyLen=840 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "engine-knowledge",
+  "kind": "render",
+  "d": "hash=#/engine-knowledge mainLen=299 bodyLen=964 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "engine-ai",
+  "kind": "render",
+  "d": "hash=#/engine-ai mainLen=237 bodyLen=900 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "engine-tasks",
+  "kind": "render",
+  "d": "hash=#/engine-tasks mainLen=528 bodyLen=1193 boundary=false"
+ },
+ {
+  "v": "PASS",
+  "k": "*(404 fallback)",
+  "kind": "fallback",
+  "d": "hash=#/zzz-nonexistent-route marker=true"
+ }
+]

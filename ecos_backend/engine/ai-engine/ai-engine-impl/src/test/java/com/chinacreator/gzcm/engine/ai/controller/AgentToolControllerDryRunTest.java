@@ -6,10 +6,12 @@ import com.chinacreator.gzcm.engine.ai.guardrail.ToolObligations;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
+import com.chinacreator.gzcm.engine.ai.service.ToolSchema;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentToolContractDao;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.mock.env.MockEnvironment;
@@ -165,6 +167,47 @@ class AgentToolControllerDryRunTest {
         assertEquals("SELECT 1", data.path("arguments").path("sql").asText());
         assertFalse(data.path("adjudication").has("highRisk"),
                 "干跑不评估高危沙盒，禁放看似已评估的假值");
+    }
+
+    @Test
+    @DisplayName("D66 干跑按 schema 声明的 operation 裁决：写工具不再是 read（与真实执行同判据）")
+    void writeToolDryRunUsesDeclaredWriteOperation() throws Exception {
+        ToolSchema writeSchema = mock(ToolSchema.class);
+        when(writeSchema.getOperation()).thenReturn("write");
+        when(toolRegistry.get("query_data")).thenReturn(writeSchema);
+        when(subjectResolver.resolve()).thenReturn(subject("u1", List.of("admin")));
+        when(policyGate.review(any(ToolAdjudicationRequest.class)))
+                .thenReturn(ToolDecision.allow("pol-1", ToolObligations.none(), 5));
+
+        MvcResult r = postDryRun("{\"arguments\":{}}");
+
+        assertEquals(200, r.getResponse().getStatus());
+        var captor = org.mockito.ArgumentCaptor.forClass(ToolAdjudicationRequest.class);
+        org.mockito.Mockito.verify(policyGate).review(captor.capture());
+        assertEquals("write", captor.getValue().action().operation(),
+                "写工具干跑被按只读裁决 = 干跑结论与真实执行分叉");
+        JsonNode data = mapper.readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data");
+        assertEquals("write", data.path("adjudication").path("operation").asText(),
+                "回显的 operation 必须与裁决载荷同源");
+    }
+
+    @Test
+    @DisplayName("反向对照：未声明 operation 的只读工具仍按 read 裁决")
+    void readToolWithoutDeclaredOperationStaysRead() throws Exception {
+        ToolSchema readSchema = mock(ToolSchema.class);
+        when(readSchema.getOperation()).thenReturn(null);
+        when(toolRegistry.get("query_data")).thenReturn(readSchema);
+        when(subjectResolver.resolve()).thenReturn(subject("u1", List.of("admin")));
+        when(policyGate.review(any(ToolAdjudicationRequest.class)))
+                .thenReturn(ToolDecision.allow("pol-1", ToolObligations.none(), 5));
+
+        MvcResult r = postDryRun("{\"arguments\":{}}");
+
+        assertEquals(200, r.getResponse().getStatus());
+        var captor = org.mockito.ArgumentCaptor.forClass(ToolAdjudicationRequest.class);
+        org.mockito.Mockito.verify(policyGate).review(captor.capture());
+        assertEquals("read", captor.getValue().action().operation());
     }
 
     @Test

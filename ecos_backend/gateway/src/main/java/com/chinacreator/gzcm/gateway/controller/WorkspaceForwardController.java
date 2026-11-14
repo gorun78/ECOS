@@ -63,8 +63,25 @@ public class WorkspaceForwardController {
                 ? workspaceBaseUrl.substring(0, workspaceBaseUrl.length() - 1) : workspaceBaseUrl;
     }
 
-    /** 覆盖场景层全部动词与子路径（正典 v1 形态 + 去 v1 兼容形态）。 */
-    @RequestMapping({"/api/v1/workspace/**", "/api/workspace/**"})
+    /**
+     * 覆盖场景层全部动词与子路径。
+     *
+     * <p>除正典 {@code /api/v1/workspace/**} 与其去 v1 兼容形态外，另三条是 D31 补登
+     * （2026-11-14 验证批）：{@code ObjectController}/{@code ObjectActionController}/
+     * {@code ObjectRelationshipController}/{@code ObjectTimelineController}/{@code ObjectStateMachineController}
+     * 与 {@code ObjectQLController}/{@code QueryHistoryController} 都声明在
+     * {@code workspace.controller..*} 包内 —— 该包被 {@code GatewayApplication} 整包排除，
+     * 而转发面原只覆盖 {@code /api/v1/workspace/**}，导致 {@code #/project_tracker}、
+     * {@code #/contract_manager}、{@code #/ontology_workbench} 三个页面取数恒 404
+     * （矩阵 V-WS-090~096/050）。四条前缀均为 workspace 独占目录：
+     * {@code /api/v1/ecos} 根下另有 buszhi 的 {@code entities}/{@code ontologies} 子族，
+     * 故此处只按 {@code objects}/{@code state-machine}/{@code statemachine} 精确子族转发，不碰整根。
+     */
+    @RequestMapping({"/api/v1/workspace/**", "/api/workspace/**",
+            "/api/v1/ecos/objects/**", "/api/ecos/objects/**",
+            "/api/v1/ecos/state-machine/**", "/api/ecos/state-machine/**",
+            "/api/v1/ecos/statemachine/**", "/api/ecos/statemachine/**",
+            "/api/query/**"})
     public void forward(HttpServletRequest request, HttpServletResponse response) throws IOException {
         URI target;
         try {
@@ -140,7 +157,10 @@ public class WorkspaceForwardController {
                 response.getOutputStream().write(payload);
             }
         } catch (RestClientException e) {
-            log.warn("场景层转发失败: {} {}", request.getMethod(), target, e.getMessage());
+            // 占位符须与参数个数一致，否则异常信息被 logback 吞掉（2026-11-13 实测：原 "{} {}" 传三参导致
+            // 转发失败的真因在日志里完全看不到，只能看到 "场景层转发失败: PATCH <url>"）。
+            log.warn("场景层转发失败: {} {} -> {}: {}", request.getMethod(), target,
+                    e.getClass().getSimpleName(), e.getMessage(), e);
             response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
             response.setContentType("application/json");
             response.setCharacterEncoding("UTF-8");

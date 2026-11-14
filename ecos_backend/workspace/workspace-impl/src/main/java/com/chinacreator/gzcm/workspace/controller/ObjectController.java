@@ -64,40 +64,41 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
     }
 
     /**
-     * 从 ecos_ontology_entity 动态发现实体，回退到 demo 表。
-     * <p>
-     * 查询条件: entity_code, table_name WHERE status = 'published'
-     * 如果本体表不存在或无数据，则使用 demo 表作为回退。
+     * 实体 → 物理表 映射表。
+     *
+     * <p>D59（2026-11-14 验证批）：原实现按 {@code entity_code, table_name WHERE status='published'}
+     * 查询本体实体表 —— 三处都与 V200 后的真实结构不符（列名是 {@code code}；无 {@code table_name}
+     * 列；状态取值是 {@code ACTIVE} 而非 {@code published}）。查询必抛「列不存在」⇒ 恒走回退；
+     * 而回退清单里的 {@code demo_project}/{@code demo_order} 从未被任何迁移建过
+     * （V1__init.sql 只建 customer/supplier/invoice）⇒ {@code GET /ecos/objects/Project}
+     * 直接 {@code relation "demo_project" does not exist} 打成 500。
+     *
+     * <p>订正：本体实体表只用于「登记了几个实体」的诊断日志，不再臆造 {@code table_name} 列；
+     * 映射表只收<b>真实存在物理表</b>的实体，杜绝把 null 当表名拼进 SQL。
+     *
+     * <p><b>已知遗留（D59-b，另行登记）</b>：本类仍是「一实体一物理表」模型，而本系统对象
+     * 存储是多态表 {@code ecos_ontology.ecos_object_data(entity_code, object_data JSONB)}
+     * （同类内 {@code syncAllToNeo4j} 与 {@code ObjectQLParser} 都按多态表实现）。
+     * 本体实体 {@code ENT_*} 因此在本类下无表可查，返回「不存在」而非 500。
+     * 模型统一需按册裁决，不在单条缺陷范围内。
      */
     private Map<String, String> loadEntityTable() {
-        Map<String, String> map = new LinkedHashMap<>();
         try {
             List<Map<String, Object>> rows = objectQueryService.queryForList(
-                "SELECT entity_code, table_name FROM ecos_ontology_entity WHERE status = 'published'");
-            for (Map<String, Object> row : rows) {
-                String entityCode = (String) row.get("entity_code");
-                String tableName = (String) row.get("table_name");
-                if (entityCode != null && tableName != null) {
-                    map.put(entityCode, tableName);
-                }
-            }
-            if (!map.isEmpty()) {
-                log.info("Loaded {} entities from ecos_ontology_entity", map.size());
-                return Collections.unmodifiableMap(map);
-            }
+                "SELECT code FROM ecos_ontology_entity WHERE status = 'ACTIVE' AND is_deleted = 0");
+            log.info("ecos_ontology_entity 已登记 {} 个实体（多态存储，无独立物理表）", rows.size());
         } catch (Exception e) {
-            log.warn("Failed to load entities from ecos_ontology_entity: {}. Falling back to demo tables.", e.getMessage());
+            log.warn("读取 ecos_ontology_entity 失败（不影响物理表映射）: {}", e.getMessage());
         }
 
-        // Fallback to demo tables
-        log.info("Using demo entity tables as fallback");
+        Map<String, String> map = new LinkedHashMap<>();
+        // demo 三表 = V1__init.sql 实建（customer/supplier/invoice）
         map.put("Customer", "demo_customer");
         map.put("Supplier", "demo_supplier");
         map.put("Invoice", "demo_invoice");
-        map.put("Project", "demo_project");
-        map.put("project", "demo_project");
-        map.put("Order", "demo_order");
-        map.put("order", "demo_order");
+        // Project/Contract = 真实业务表（#/project_tracker、#/contract_manager 的数据源）
+        map.put("Project", "ecos_biz_project");
+        map.put("Contract", "ecos_biz_contract");
         return Collections.unmodifiableMap(map);
     }
 
@@ -136,7 +137,13 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             @PathVariable String entityCode,
             @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "50") int size) {
+            // D60（2026-11-14）：前端 #/project_tracker、#/contract_manager 传的是 pageSize，
+            // 而后端只认 size ⇒ 分页参数被静默忽略，恒按 50 返回，前端按 10 条/页算的页码错位。
+            // 两个名字都收，pageSize 优先（前端契约为准，size 保留给既有调用方）。
+            @RequestParam(name = "size", required = false) Integer sizeParam,
+            @RequestParam(name = "pageSize", required = false) Integer pageSizeParam) {
+        int size = pageSizeParam != null ? pageSizeParam : (sizeParam != null ? sizeParam : 50);
+        if (size <= 0) size = 50;
         String table = ENTITY_TABLE.get(entityCode);
         if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
 

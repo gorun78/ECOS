@@ -50,7 +50,9 @@ class ControllerSqlLiteralRatchetTest {
         BASELINE.put("engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/controller/QueryController.java", 1);
         BASELINE.put("engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/controller/OntologyMappingController.java", 1);
         BASELINE.put("engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/controller/OntologyProposalController.java", 9);
-        BASELINE.put("gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/SysConfigController.java", 2);
+        // D23（2026-11-13 验证）：原 reset 引用的 `UPDATE sys_config ...` 与不存在的 default_value 列
+        // 同批删除（该重置无默认值基线，改为如实 404）⇒ 本文件 SQL 字面量 2→1，按双向门禁同批下调。
+        BASELINE.put("gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/SysConfigController.java", 1);
         BASELINE.put("services/datanet/src/main/java/com/chinacreator/gzcm/services/datanet/controller/DqDashboardController.java", 13);
         BASELINE.put("services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/EntityTableMappingController.java", 7);
         BASELINE.put("services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/TenantController.java", 1);

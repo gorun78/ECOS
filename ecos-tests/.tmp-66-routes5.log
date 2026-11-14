@@ -1,0 +1,136 @@
+
+Running 1 test using 1 worker
+
+[PASS] login (render) hash=#/login mainLen=0 bodyLen=55 boundary=false
+[PASS] no-access (render) hash=#/no-access mainLen=0 bodyLen=51 boundary=false
+[PASS] index-redirect (render) hash=#/decision mainLen=2241 bodyLen=2547 boundary=false
+[PASS] decision (render) hash=#/decision mainLen=2241 bodyLen=2547 boundary=false
+[PASS] decision/mind (render) hash=#/decision/mind mainLen=116 bodyLen=422 boundary=false
+[PASS] decision/mind/:mindId (param) hash=#/decision/mind/none mainLen=191 bodyLen=497 boundary=false | （param 探针：对象不存在属预期，已如实呈现）
+[PASS] mission_control (render) hash=#/mission_control mainLen=985 bodyLen=1296 boundary=false
+[FAIL] monitor (render) hash=#/monitor mainLen=98 bodyLen=414 boundary=false | http: 404 /api/v1/monitor
+[FAIL] biz_dashboard (render) hash=#/biz_dashboard mainLen=51 bodyLen=380 boundary=false | http: 404 /api/v1/ecos/biz/dashboard
+[FAIL] project_tracker (render) hash=#/project_tracker mainLen=26 bodyLen=357 boundary=false | http: 404 /api/v1/ecos/objects/Project?page=1&pageSize=10
+[FAIL] contract_manager (render) hash=#/contract_manager mainLen=26 bodyLen=362 boundary=false | http: 404 /api/v1/ecos/objects/Contract?page=1&pageSize=10
+[FAIL] ops_dashboard (render) hash=#/ops_dashboard mainLen=28 bodyLen=373 boundary=false | http: 404 /api/v1/ecos/biz/dashboard
+[FAIL] ops_apps (render) hash=#/ops_apps mainLen=477 bodyLen=825 boundary=false | http: 404 /api/v1/ontology/entities/Customer/instances, 404 /api/v1/ontology/entities/Facility/instances
+[PASS] marketplace (render) hash=#/marketplace mainLen=95 bodyLen=448 boundary=false
+[PASS] resource-center (render) hash=#/resource-center mainLen=305 bodyLen=672 boundary=false
+[FAIL] objects (render) hash=#/objects mainLen=120 bodyLen=486 boundary=false | http: 404 /api/v1/ecos/objects/ENT_USER?page=1&pageSize=20, 404 /api/v1/ecos/objects/ENT_USER/schema
+[PASS] ontology_workbench (render) hash=#/ontology_workbench mainLen=826 bodyLen=1197 boundary=false
+[PASS] business-workbench (render) hash=#/business-workbench mainLen=1474 bodyLen=1851 boundary=false
+[PASS] data-workbench (render) hash=#/data-workbench mainLen=138 bodyLen=521 boundary=false
+[PASS] dq_dashboard (render) hash=#/dq_dashboard mainLen=243 bodyLen=636 boundary=false
+[PASS] gateway-diagnostics (render) hash=#/gateway-diagnostics mainLen=330 bodyLen=735 boundary=false
+[PASS] alerts-center (render) hash=#/alerts-center mainLen=77 bodyLen=482 boundary=false
+[PASS] domains(redirect) (redirect) hash=#/ontology_workbench
+[PASS] domain_designer(redirect) (redirect) hash=#/ontology_workbench
+[PASS] ontology(redirect) (redirect) hash=#/ontology_workbench
+[PASS] ontology_designer(redirect) (redirect) hash=#/ontology_workbench
+[PASS] glossary(redirect) (redirect) hash=#/ontology_workbench
+[PASS] knowledge_graph (render) hash=#/knowledge_graph mainLen=143 bodyLen=578 boundary=false
+[PASS] dict (render) hash=#/dict mainLen=50 bodyLen=487 boundary=false
+[PASS] system-config (render) hash=#/system-config mainLen=17627 bodyLen=18069 boundary=false
+[PASS] platform-governance (render) hash=#/platform-governance mainLen=292 bodyLen=752 boundary=false
+[PASS] workflow_designer (render) hash=#/workflow_designer mainLen=272 bodyLen=726 boundary=false
+[PASS] project_workbench (render) hash=#/project_workbench mainLen=3052 bodyLen=3511 boundary=false
+[PASS] cognitive-workbench (render) hash=#/cognitive-workbench mainLen=436 bodyLen=915 boundary=false
+[PASS] workbench (render) hash=#/workbench mainLen=2073 bodyLen=2548 boundary=false
+[PASS] workbench/:scenarioId (param) hash=#/workbench/sc001 mainLen=861 bodyLen=1336 boundary=false
+[PASS] workbench/:scenarioId/forecast (render) hash=#/workbench/sc001/forecast mainLen=561 bodyLen=1036 boundary=false
+[PASS] workbench/:scenarioId/decisions (render) hash=#/workbench/sc001/decisions mainLen=367 bodyLen=842 boundary=false
+[PASS] scenario-sandbox/:scenarioId (render) hash=#/scenario-sandbox/sc001 mainLen=192 bodyLen=679 boundary=false
+[PASS] world_model (render) hash=#/world_model mainLen=181 bodyLen=661 boundary=false
+[PASS] knowledge(legacy) (redirect) hash=#/knowledge_view
+[PASS] knowledge_view (render) hash=#/knowledge_view mainLen=453 bodyLen=947 boundary=false
+[PASS] agent_studio(redirect) (redirect) hash=#/ai-workbench
+[PASS] ai-workbench (render) hash=#/ai-workbench mainLen=1161 bodyLen=1667 boundary=false
+[PASS] chatbot_studio (render) hash=#/chatbot_studio mainLen=1675 bodyLen=2193 boundary=false
+[PASS] workshop (render) hash=#/workshop mainLen=272 bodyLen=789 boundary=false
+[FAIL] agent_mesh (render) hash=#/agent_mesh mainLen=1224 bodyLen=1766 boundary=false | http: 502 /api/v1/agent-mesh/missions?limit=30
+[PASS] agent-builder(no id) (render) hash=#/agent-builder mainLen=229 bodyLen=799 boundary=false
+[PASS] agent-test/:agentId (param) hash=#/agent-test/agent-data mainLen=68 bodyLen=657 boundary=false
+[PASS] case_library (render) hash=#/case_library mainLen=10 bodyLen=606 boundary=false
+[PASS] alerts (render) hash=#/alerts mainLen=157 bodyLen=752 boundary=false
+[PASS] security-center (render) hash=#/security-center mainLen=908 bodyLen=1506 boundary=false
+[PASS] guardrails (render) hash=#/guardrails mainLen=108 bodyLen=711 boundary=false
+[PASS] iam (render) hash=#/iam mainLen=860 bodyLen=1470 boundary=false
+[PASS] kanban (render) hash=#/kanban mainLen=18 bodyLen=633 boundary=false
+[PASS] telemetry (render) hash=#/telemetry mainLen=93 bodyLen=716 boundary=false
+[PASS] tokens (render) hash=#/tokens mainLen=95 bodyLen=720 boundary=false
+[PASS] tenants (render) hash=#/tenants mainLen=234 bodyLen=864 boundary=false
+[PASS] engine-security (render) hash=#/engine-security mainLen=147 bodyLen=791 boundary=false
+[FAIL] engine-data (render) hash=#/engine-data mainLen=204 bodyLen=849 boundary=false | http: 404 /api/v1/engine/data/settings
+[PASS] engine-ontology (render) hash=#/engine-ontology mainLen=202 bodyLen=856 boundary=false
+[PASS] engine-cognitive (render) hash=#/engine-cognitive mainLen=180 bodyLen=840 boundary=false
+[PASS] engine-knowledge (render) hash=#/engine-knowledge mainLen=299 bodyLen=964 boundary=false
+[PASS] engine-ai (render) hash=#/engine-ai mainLen=237 bodyLen=900 boundary=false
+[PASS] engine-tasks (render) hash=#/engine-tasks mainLen=528 bodyLen=1193 boundary=false
+[PASS] *(404 fallback) (fallback) hash=#/zzz-nonexistent-route marker=true
+
+==== 二次探针（同路径重放）====
+monitor: /api/v1/monitor 首屏=404 重放=404
+biz_dashboard: /api/v1/ecos/biz/dashboard 首屏=404 重放=404
+project_tracker: /api/v1/ecos/objects/Project?page=1&pageSize=10 首屏=404 重放=404
+contract_manager: /api/v1/ecos/objects/Contract?page=1&pageSize=10 首屏=404 重放=404
+ops_dashboard: /api/v1/ecos/biz/dashboard 首屏=404 重放=404
+ops_apps: /api/v1/ontology/entities/Customer/instances 首屏=404 重放=404
+ops_apps: /api/v1/ontology/entities/Facility/instances 首屏=404 重放=404
+objects: /api/v1/ecos/objects/ENT_USER?page=1&pageSize=20 首屏=404 重放=404
+objects: /api/v1/ecos/objects/ENT_USER/schema 首屏=404 重放=404
+agent_mesh: /api/v1/agent-mesh/missions?limit=30 首屏=502 重放=200
+engine-data: /api/v1/engine/data/settings 首屏=404 重放=200
+首屏失败但重放全绿的路由（瞬时抖动，不计入后端缺口计数）：agent_mesh, engine-data
+
+==== 失败分层 ====
+UNATTRIBUTED monitor
+D33 biz_dashboard
+D31 project_tracker
+D31 contract_manager
+D33 ops_dashboard
+D34 ops_apps
+D31 objects
+UNATTRIBUTED agent_mesh
+UNATTRIBUTED engine-data
+  x  1 [app] › tests\e2e\verification\route-registry-66.spec.ts:141:5 › 66 条路由全登记判定：无未判定项、无整页崩 (4.9m)
+
+
+  1) [app] › tests\e2e\verification\route-registry-66.spec.ts:141:5 › 66 条路由全登记判定：无未判定项、无整页崩 ───────
+
+    Error: 未归因失败 1 条（首屏失败但重放全绿的瞬时抖动 2 条已单列，有归因的后端缺口见控制台清单，二者仍计入失败总数、不得当通过）
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "monitor: hash=#/monitor mainLen=98 bodyLen=414 boundary=false | http: 404 /api/v1/monitor",
+    + ]
+
+      277 |     `未归因失败 ${unattributed.length} 条（首屏失败但重放全绿的瞬时抖动 ${flakyOnly.size} 条已单列，`
+      278 |       + `有归因的后端缺口见控制台清单，二者仍计入失败总数、不得当通过）`,
+    > 279 |   ).toEqual([]);
+          |     ^
+      280 | });
+      281 |
+      282 | /**
+        at D:\workspace\javaprojects\ECOS\ecos-tests\tests\e2e\verification\route-registry-66.spec.ts:279:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\verification-route-registry-66-66-条路由全登记判定：无未判定项、无整页崩-app\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\verification-route-registry-66-66-条路由全登记判定：无未判定项、无整页崩-app\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\verification-route-registry-66-66-条路由全登记判定：无未判定项、无整页崩-app\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\verification-route-registry-66-66-条路由全登记判定：无未判定项、无整页崩-app\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [app] › tests\e2e\verification\route-registry-66.spec.ts:141:5 › 66 条路由全登记判定：无未判定项、无整页崩 ────────

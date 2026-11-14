@@ -1,10 +1,13 @@
 package com.chinacreator.gzcm.engine.kb.config;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -35,7 +38,17 @@ public class KbEngineRestConfig {
     @Bean
     @Primary
     public RestTemplate restTemplate() {
-        RestTemplate restTemplate = new RestTemplate();
+        // 默认工厂 SimpleClientHttpRequestFactory 底层是 HttpURLConnection，**不支持 PATCH**
+        // （抛 ProtocolException: Invalid HTTP method: PATCH）。本 Bean 是 gateway 聚合宿主下
+        // 唯一的默认 RestTemplate（@Primary），裸注入它做转发的控制器（WorkspaceForwardController）
+        // 因此无法透传场景状态迁移的 PATCH，被折叠成 503（2026-11-13 活体缺陷 D1 真根因）。
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .version(HttpClient.Version.HTTP_1_1)
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofSeconds(30));
+        RestTemplate restTemplate = new RestTemplate(factory);
         restTemplate.setInterceptors(List.of(new CallerCredentialRelayInterceptor()));
         return restTemplate;
     }

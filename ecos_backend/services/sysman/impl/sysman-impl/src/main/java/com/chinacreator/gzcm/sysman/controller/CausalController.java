@@ -33,18 +33,34 @@ import com.chinacreator.gzcm.sysman.service.CausalQueryService.CausalNodeRow;
 @RequestMapping("/api/v1/causal")
 public class CausalController {
 
-    private final CausalQueryService causalQueryService;
     private static final Logger log = LoggerFactory.getLogger(CausalController.class);
 
     private final ConcurrentHashMap<String, CausalNodeRow> nodeStore = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, CausalEdgeRow> edgeStore = new ConcurrentHashMap<>();
 
-    public CausalController(CausalQueryService causalQueryService) {
-        this.causalQueryService = causalQueryService;
+    /** D48 裁决后本族为纯内存演示面，不再依赖任何 DAO（原 CausalQueryService 已无消费者）。 */
+    public CausalController() {
         initSeedData();
     }
 
-    /** 因果图（4 键）。 */
+    /**
+     * 因果图（4 键）。
+     *
+     * <p><b>2026-11-13 D48 裁决</b>：本族（{@code /causal/*}）是<b>演示形态</b>——
+     * {@code /compare} 用 {@code Math.random()} 造投影值、{@code /paths} 走内存 BFS，
+     * 前端生产代码也不消费本前缀（{@code monitorClient.fetchCausalGraph} 打的是
+     * {@code /api/v1/ecos/world-model-graph/causal-graph}，那条才是真图、返回真实目标行）。</p>
+     *
+     * <p>原实现里 {@code /graph} 多出一条「ping 得通就读 DB」的分支，读的是
+     * {@code ecos_causal_node}/{@code ecos_causal_edge}——两表全仓无 DDL、库中零命中，
+     * 于是必然 500（D48）。留着它就是「一半走库一半走内存」的双轨，且库里根本没有数据源。
+     * 裁决：<b>删掉该分支</b>，整族统一读内存种子，不让幽灵表继续制造 500，
+     * 也避免新建两张没有归属的孤立表（DDL 只增不删的红线要求新表有明确业务归属，
+     * 而这里没有——真图已由 world-model 承载）。</p>
+     *
+     * <p><b>诚实的代价</b>：{@code nodeCount/edgeCount} 是种子规模，不是库规模。
+     * 因此本响应<b>不伪装成真实统计</b>——需要真实因果数据请用 world-model 面。</p>
+     */
     public record CausalGraphVO(@JsonProperty("nodes") List<CausalNodeRow> nodes,
                                 @JsonProperty("edges") List<CausalEdgeRow> edges,
                                 @JsonProperty("nodeCount") int nodeCount,
@@ -101,15 +117,6 @@ public class CausalController {
                                   @JsonProperty("comparedCount") int comparedCount) {
     }
 
-    private boolean dbAvailable() {
-        try {
-            causalQueryService.ping();
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
     private void initSeedData() {
         String[][] nodes = {
                 {"n1", "数据采集", "process", "数据域"},
@@ -146,23 +153,9 @@ public class CausalController {
 
     @GetMapping("/graph")
     public ApiResponse<CausalGraphVO> getGraph() {
-        try {
-            List<CausalNodeRow> nodes;
-            List<CausalEdgeRow> edges;
-
-            if (dbAvailable()) {
-                nodes = causalQueryService.listNodes();
-                edges = causalQueryService.listEdges();
-            } else {
-                nodes = new ArrayList<>(nodeStore.values());
-                edges = new ArrayList<>(edgeStore.values());
-            }
-
-            return ApiResponse.success(new CausalGraphVO(nodes, edges, nodes.size(), edges.size()));
-        } catch (Exception e) {
-            log.error("获取因果图失败", e);
-            return ApiResponse.internalError("获取因果图失败");
-        }
+        List<CausalNodeRow> nodes = new ArrayList<>(nodeStore.values());
+        List<CausalEdgeRow> edges = new ArrayList<>(edgeStore.values());
+        return ApiResponse.success(new CausalGraphVO(nodes, edges, nodes.size(), edges.size()));
     }
 
     @GetMapping("/paths")

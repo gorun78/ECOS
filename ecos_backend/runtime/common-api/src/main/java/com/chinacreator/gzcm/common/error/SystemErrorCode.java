@@ -37,6 +37,24 @@ public final class SystemErrorCode {
     public static final String ECOS_SYS_404 = "ECOS-SYS-404";
 
     /**
+     * 405 — 方法不允许（{@code HttpRequestMethodNotSupportedException}）。
+     * <p>2026-11-13 验证缺陷 D6：原兜底把「路径存在但 HTTP 方法不匹配」报成 500，
+     * 违反 HTTP 状态行保真（405 与 500 的语义天差地别：前者是调用方用错方法，
+     * 后者是服务端故障）。本码只承载方法不匹配语义。</p>
+     */
+    public static final String ECOS_SYS_405 = "ECOS-SYS-405";
+
+    /**
+     * 415 — 请求媒体类型不被端点支持（{@code HttpMediaTypeNotSupportedException}）。
+     * <p>2026-11-13 验证缺陷 D47：网关组合面没有这条腿，端点声明的
+     * {@code consumes=multipart/form-data} 在收 JSON 时由 Spring 抛出该异常，
+     * 一路落到 {@code handleAny} 变成 <b>500 {@code ECOS-SYS-500}</b>——
+     * 实测同一请求直连 18086 得到正确的 415，说明是网关把 415 折成了 500。
+     * 与 {@link #ECOS_SYS_405} 同族：两者都是「调用方用错请求形态」，不是服务端故障。</p>
+     */
+    public static final String ECOS_SYS_415 = "ECOS-SYS-415";
+
+    /**
      * 400 — 入口面请求解析／校验失败（{@code MethodArgumentNotValidException}／
      * {@code NumberFormatException}／{@code HttpMessageNotReadableException} 兜底腿）。
      * <p>#142/B4-3e-27（差距 D-B4-65）按 §3.2.7 表内既有形态<b>追加登记</b>。

@@ -87,6 +87,13 @@ public class ScenarioService {
     @Transactional
     public ScenarioVO create(ScenarioSaveDTO dto) {
         validate(dto);
+        // 创建幂等：同名未删除场景已存在时直接返回既有记录，不再追加新行。
+        //（2026-11-13 活体缺陷 D2：同名重复创建会追加不同 id 多行，致列表膨胀与下游引用歧义）
+        List<String> existingIds = dao.findScenarioIdsByName(dto.getName());
+        if (!existingIds.isEmpty()) {
+            log.info("创建场景幂等命中 name={} 已存在 id={}", dto.getName(), existingIds.get(0));
+            return get(existingIds.get(0));
+        }
         String id = "sc_" + UUID.randomUUID().toString().substring(0, 12);
         String operator = currentOperator();
         String metricsJson = toMetricsJson(dto.getMetrics());
@@ -159,8 +166,10 @@ public class ScenarioService {
             args.add(normalizeEnum(dto.getStatus(), STATUSES, null, "状态"));
         }
         if (dto.getBudget() != null) {
-            sql.append(", budget = ?");
+            // D3 双写：旧文本列供存量读方，budget_amount 是 MC01 权威金额列
+            sql.append(", budget = ?, budget_amount = ?");
             args.add(dto.getBudget());
+            args.add(WorkspaceDataDao.parseBudgetAmount(dto.getBudget()));
         }
         if (dto.getSafetyIndexTarget() != null) {
             sql.append(", safety_index_target = ?");

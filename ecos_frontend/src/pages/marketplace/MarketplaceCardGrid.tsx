@@ -181,21 +181,25 @@ export default function MarketplaceCardGrid({
                     </span>
                   </div>
 
-                  {/* Rating & popularity */}
+                  {/* Rating & popularity（后端不返回评分/热度 ⇒ 对应小块不渲染，禁编造） */}
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1">
-                      <div className="flex items-center gap-0.5">
-                        {renderStars(asset.rating)}
+                    {typeof asset.rating === "number" && (
+                      <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
+                          {renderStars(asset.rating)}
+                        </div>
+                        <span className="text-[11px] opacity-60 ml-1">
+                          {asset.rating.toFixed(1)}
+                        </span>
                       </div>
-                      <span className="text-[11px] opacity-60 ml-1">
-                        {asset.rating.toFixed(1)}
-                      </span>
-                    </div>
+                    )}
                     <div className="flex items-center gap-3 text-[10px] opacity-45">
-                      <span className="flex items-center gap-1">
-                        <Eye className="w-3 h-3" />
-                        {fmtNum(asset.popularity)}
-                      </span>
+                      {typeof asset.popularity === "number" && (
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          {fmtNum(asset.popularity)}
+                        </span>
+                      )}
                       {asset.reviews && (
                         <span className="flex items-center gap-1">
                           <MessageSquare className="w-3 h-3" />

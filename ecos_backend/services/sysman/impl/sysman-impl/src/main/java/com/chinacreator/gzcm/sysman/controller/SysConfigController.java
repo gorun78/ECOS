@@ -27,7 +27,7 @@ import java.util.*;
  * ① {@code GET /} 的 data 元素仍是「原始列名」形态（id/config_group/…）；② {@code /metadata}
  * 的 {@code consumed_by} 仅在被消费时出现（属性级 NON_NULL，不得连累其它 null 键）。</p>
  */
-@RestController
+@RestController("sysmanSysConfigController")
 @RequestMapping("/api/v1/system/config")
 public class SysConfigController {
 

@@ -76,12 +76,20 @@ class OntologyAnonymousSurfaceTest {
     private static final String CLEARANCE_INTERCEPTOR_REL =
             "services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/security/ClearanceInterceptor.java";
 
-    /** 重写表条目总数基线（正向 10 + 反向精确 2 + 反向前缀 13 ⇒ 25，与 {@code route-rewrite-lint.ps1} 同口径）。 */
-    private static final int PINNED_REWRITE_ENTRY_COUNT = 25;
+    /**
+     * 重写表条目总数基线（与 {@code route-rewrite-lint.ps1} 同口径）。
+     * D22（2026-11-13 验证）：正向 10 → 5（删 5 条指向空目标的死条目）⇒ 总数 25 → 20。
+     * 与 RouteManifestParityTest / DatanetEndpointParityTest 同批锚。
+     */
+    private static final int PINNED_REWRITE_ENTRY_COUNT = 20;
 
-    /** 唯一允许命中"本域语义前缀"的重写条目（遗留空转，理由见类注释）。 */
-    private static final Set<String> PINNED_INERT_REWRITE_ENTRIES = Set.of(
-            "/api/v1/glossary/ -> /api/glossary/");
+    /**
+     * 唯一允许命中"本域语义前缀"的重写条目。
+     * D22 起为空集：原先登记的那条 `glossary` 正向条目已被删除（其目标 /api/glossary 全库无
+     * Controller，属死条目），因此本域零豁免。空集仍是"可核对的声明"——若将来又冒出本体前缀条目，
+     * 锁② 的 hitKeys 会非空而与本集不等，立刻红。
+     */
+    private static final Set<String> PINNED_INERT_REWRITE_ENTRIES = Set.of();
 
     /** 术语族扩展判定集：Controller 派生前缀之外的本域语义段（glossary 在 v1 命名下与本域同源）。 */
     private static final Set<String> EXTRA_ONTOLOGY_SEMANTIC_PREFIXES = Set.of(

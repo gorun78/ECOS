@@ -112,6 +112,24 @@ public class AssetDao extends JdbcTemplateDaoSupport {
             assetId);
     }
 
+    /** findAssetRows — 未登记资产的详情兜底（与 listPhysicalFallback 同源同列）。 */
+    public List<DataAssetVO> findPhysicalFallbackById(String assetId) {
+        return jdbcTemplate.query(
+            "SELECT r.resource_id AS asset_id, r.resource_id, r.resource_name AS asset_name, " +
+            "  r.resource_name, r.resource_type, r.datasource_id, NULL::text AS business_desc, " +
+            "  NULL::text AS owner, NULL::text AS owner_org, 'SOURCE'::text AS data_grain, " +
+            "  NULL::text AS category_id, NULL::text AS category_name, 'L2'::text AS sensitivity_level, " +
+            "  '内部'::text AS level_name, 'PENDING'::text AS category_status, " +
+            "  NULL::text AS last_tagged_by, NULL::timestamp AS last_tagged_at, " +
+            "  'default'::text AS domain, r.description, " +
+            "  COALESCE(r.field_count, 0) AS field_count, COALESCE(r.record_count, -1) AS record_count, " +
+            "  COALESCE(NULLIF(r.layer, ''), 'CURATED')::text AS layer, r.zone, r.last_sync_time, " +
+            "  0::bigint AS confirmed_field_count, '1'::text AS version_no " +
+            "FROM td_data_resource r WHERE r.resource_id = ?",
+            assetRowMapper(),
+            assetId);
+    }
+
     /** listAssets — 登记资产数统计（COUNT(*) 返回 int8，按 Long 取再降位，禁 Integer.class 直读）。 */
     public Integer countRegisteredAssets() {
         Long count = jdbcTemplate.queryForObject(

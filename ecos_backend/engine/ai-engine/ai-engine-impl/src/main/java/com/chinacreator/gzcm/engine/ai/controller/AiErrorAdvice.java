@@ -36,6 +36,7 @@ import java.util.Map;
  * </ul>
  */
 @RestControllerAdvice(basePackages = {"com.chinacreator.gzcm.engine.ai"})
+@org.springframework.core.annotation.Order(org.springframework.core.Ordered.HIGHEST_PRECEDENCE)
 public class AiErrorAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(AiErrorAdvice.class);

@@ -67,6 +67,15 @@ public class OntologyController {
     @PostMapping
     public ApiResponse<OntologyVO> createOntology(@RequestBody OntologySaveDTO dto) {
         OntologyVO ont = ontologyService.createOntology(dto);
+        // D54（2026-11-13 验证）：V200 治理把 ecos_ontology 主表并入 ecos_ontology_domain，
+        // 本路径的 insert/find 均 no-op ⇒ ont 恒为 null。此前直接 ont.getId() 抛 NPE，
+        // 被兜底成 500「服务内部错误」，用户看到的是"服务器坏了"而非"此面已停用"。
+        // 现改为显式 409 + 指向权威域源，禁假成功也禁伪装成内部故障。
+        if (ont == null) {
+            return ApiResponse.error(409,
+                    "本体主表已在 V200 schema 治理中并入域表，本路径不再承载创建；"
+                            + "请改用权威域源 /api/v1/ontology/domains");
+        }
         log.info("Ontology created: {} [{}]", ont.getId(), ont.getCode());
         return ApiResponse.success(ont);
     }

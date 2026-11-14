@@ -58,10 +58,17 @@ public final class ObjectQLParser {
     /**
      * 系统列 — 这些列存在于表结构中而非 JSONB object_data 内。
      * 不在白名单中的字段 → 从 object_data JSONB 中提取。
+     *
+     * <p>D61（2026-11-14 验证批）：原清单有 3 个列在 {@code ecos_ontology.ecos_object_data}
+     * 里根本不存在 —— {@code created_by} 实为 {@code create_by}（V200 统一列名），
+     * {@code classification}/{@code sensitivity} 从未建过。SELECT 一旦引用它们，
+     * PostgreSQL 直接 {@code column ecos_object_data.created_by does not exist} ⇒
+     * {@code POST /api/query/objectql} 恒「查询执行失败」。
+     * 现按 {@code information_schema} 实测列名收敛。
      */
     private static final Set<String> SYSTEM_COLS = Set.of(
         "id", "entity_code", "status", "created_at", "updated_at",
-        "created_by", "classification", "sensitivity", "tenant_id"
+        "create_by", "update_by", "tenant_id", "version_no", "domain"
     );
 
     private ObjectQLParser() {}
@@ -170,15 +177,17 @@ public final class ObjectQLParser {
             sql.append(String.join(", ", wrappedFields));
         } else {
             // ★ SELECT * → 显式列出系统列 + object_data（加表前缀避 JOIN 歧义）
+            // D61：原先列的是 created_by/classification/sensitivity —— 表里都没有，
+            // 恒抛「column does not exist」。按实测列名展开。
             sql.append(POLYMORPHIC_TABLE).append(".id, ")
                .append(POLYMORPHIC_TABLE).append(".entity_code, ")
                .append(POLYMORPHIC_TABLE).append(".status, ")
                .append(POLYMORPHIC_TABLE).append(".created_at, ")
                .append(POLYMORPHIC_TABLE).append(".updated_at, ")
-               .append(POLYMORPHIC_TABLE).append(".created_by, ")
-               .append(POLYMORPHIC_TABLE).append(".classification, ")
-               .append(POLYMORPHIC_TABLE).append(".sensitivity, ")
+               .append(POLYMORPHIC_TABLE).append(".create_by, ")
+               .append(POLYMORPHIC_TABLE).append(".update_by, ")
                .append(POLYMORPHIC_TABLE).append(".tenant_id, ")
+               .append(POLYMORPHIC_TABLE).append(".version_no, ")
                .append(POLYMORPHIC_TABLE).append(".object_data");
         }
         sql.append(" FROM ").append(POLYMORPHIC_TABLE);

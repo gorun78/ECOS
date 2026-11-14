@@ -294,7 +294,12 @@ public class AssetService {
         requireId("assetId", assetId);
         try {
             List<DataAssetVO> rows = assetDao.findAssetRows(assetId);
-            return rows.isEmpty() ? null : rows.get(0);
+            if (!rows.isEmpty()) {
+                return rows.get(0);
+            }
+            // D13：列表在无登记资产时走物理层兜底视图，详情若不兜底则 UI 上每条资产都点不开
+            List<DataAssetVO> fallback = assetDao.findPhysicalFallbackById(assetId);
+            return fallback.isEmpty() ? null : fallback.get(0);
         } catch (Exception e) {
             log.error("getAsset 失败 (assetId={}): {}", assetId, e.getMessage(), e);
             return null;

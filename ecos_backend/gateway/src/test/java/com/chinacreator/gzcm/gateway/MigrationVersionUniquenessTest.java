@@ -154,9 +154,12 @@ class MigrationVersionUniquenessTest {
      * 2026-11-12 AI 工作台逻辑编排融合批：V329（新建 {@code ecos_ai.ecos_aip_pipeline}
      * 逻辑编排定义表 + 三索引；dev PG 实跑 CREATE TABLE/INDEX/COMMENT 全成功）落地
      * ⇒ 按实测订正 328→329 / 下一号 329→330。
+     * 2026-11-13 产品级逐功能验证批（缺陷修复随批）：V330（scenario 预算列改 NUMERIC(18,2) 对齐 MC01）
+     * · V331（分类树层级回填）· V332（glossary 术语控制域镜像补语义列）落地
+     * ⇒ 按实测订正 329→332 / 下一号 332→333。
      */
-    private static final int MAX_BASELINE_VERSION = 329;
-    private static final int NEXT_FREE_VERSION = 330;
+    private static final int MAX_BASELINE_VERSION = 332;
+    private static final int NEXT_FREE_VERSION = 333;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

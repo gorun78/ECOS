@@ -22,7 +22,9 @@ public class OntologySourceDao extends JdbcTemplateDaoSupport {
             + "  e.id          AS \"ontologyId\", "
             + "  d.code        AS \"sourceDomain\", "
             + "  m.resource_name AS \"originManifest\", "
-            + "  e.created_at  AS \"createdAt\", "
+            // D41（2026-11-13 验证）：原行尾多一个逗号 ⇒ `AS "createdAt", FROM` 语法错误，
+            // 每次查询必抛 BadSqlGrammarException 并被 Controller 吞成 code=-1「查询本体来源失败」。
+            + "  e.created_at  AS \"createdAt\" "
             + "FROM ecos_entity_table_mapping m "
             + "INNER JOIN ecos_ontology_entity e ON e.code = m.entity_code "
             + "INNER JOIN ecos_ontology_domain d ON d.id = e.domain_id AND d.code = m.domain_code";

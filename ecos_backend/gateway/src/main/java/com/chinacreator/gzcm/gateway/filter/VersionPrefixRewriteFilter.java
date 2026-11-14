@@ -44,10 +44,23 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         // exists), so rewriting v1→no-v1 caused 404 on /api/v1/pipeline/definitions.
         // Removed /api/v1/knowledge/ rewrite — new KnowledgeApiController handles /api/v1/knowledge/** directly
         Map.entry("/api/v1/twins/",        "/api/twins/"),
-        Map.entry("/api/v1/alerts/",       "/api/alerts/"),
+        // D22（2026-11-13 验证）：删除 4 条指向空目标的正向条目。
+        // 全库取证（2026-11-13，grep -v /test/）：
+        //   /api/v1/alerts      → 唯一属主 gateway AlertController，只映射 v1（无 /api/alerts 副本）
+        //   /api/v1/agent-call  → 唯一属主 ai-engine AgentCallController，只映射 v1
+        //   /api/v1/sysconfig   → 唯一属主 gateway SysConfigController，只映射 v1
+        //   /api/v1/marketplace → 唯一属主 sysman MarketplaceController，只映射 v1
+        // 这些条目把正典 v1 路径改写到不存在的裸路径 ⇒ 前端所有调用 404：
+        //   /api/v1/marketplace/dashboard 404 → 数据市场页显示 0 资产（后端实有 5 条种子）
+        //   PUT /api/v1/sysconfig/{key}/reset 404 → 字典/系统配置重置按钮失效
+        //   /api/v1/alerts/{id} 404、/api/v1/agent-call/* 404
+        // 与已登记的 dq/pipeline/knowledge-bases/wagent「KEEP」教训同型。
+        // 保留的双路径前缀（两端都有 Controller）：portal（PortalSearchController 双映射）、
+        // datasource（PMO45DataSourceController 双映射）、twins（TwinController 仅裸路径，故正向重写仍必要）。
         Map.entry("/api/v1/portal/",       "/api/portal/"),
-        Map.entry("/api/v1/agent-call/",   "/api/agent-call/"),
-        Map.entry("/api/v1/glossary/",     "/api/glossary/"),
+        // KEEP /api/v1/glossary/ — 词汇表属主 ontology GlossaryController 映射在
+        // /api/v1/ontology/glossary（非 /api/glossary），本条目标同样为空；
+        // 前端 services/glossary.ts 走 /v1/ontology/glossary 正典路径，删除无影响。
         // KEEP /api/v1/pipeline/ — PipelineController 直接映射 /api/v1/pipeline/**，
         // 无 legacy /api/pipeline 副本，故不做 v1→去v1 重写（与上方 PMO-3J 注释一致）。
         // KEEP /api/v1/pipeline/debug — PipelineDebugController/PipelineDebugLogController
@@ -59,9 +72,7 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         // ── PMO-38 T5 遗留条目已收口：knowledge-bases 只做反向，不做正向 ──
         // KEEP /api/v1/knowledge-bases — KnowledgeListController 只映射 v1 单路径，全库无
         // /api/knowledge-bases 的 RequestMapping，正向条目会把正典路径改到空目标（网关 404）。
-        // /api/v1/sysconfig/ → /api/sysconfig/ (T4 双路径)
-        Map.entry("/api/v1/sysconfig/",     "/api/sysconfig/"),
-        Map.entry("/api/v1/marketplace/",   "/api/marketplace/"),
+        // D22：/api/v1/sysconfig/ 与 /api/v1/marketplace/ 两条正向条目同批删除（原因见上方 D22 注释）。
         // ── 卷 10 §5.1（W252/R-43，三滤波器登记）：/api/v1/wagent/ **正向不重写（KEEP）** ──
         // W 域新面 Controller（R2-A 落位）直接映射 /api/v1/wagent/** 正典路径，全库无 /api/wagent
         // 的 legacy Controller ⇒ 若加 v1→去v1 正向条目会把正典改到空目标（网关 404），

@@ -49,7 +49,15 @@ class RouteManifestParityTest {
     private static final String MANIFEST_REL =
             "ecos_backend/gateway/src/main/resources/route-manifest.json";
 
-    private static final int FORWARD_BASELINE = 10;
+    /**
+     * D22（2026-11-13 产品级逐功能验证）：正向基线 10 → 5。
+     * 删除的 5 条（alerts / agent-call / sysconfig / marketplace / glossary）都把 v1 正典路径
+     * 改写到**空目标** —— 这些前缀的唯一属主 Controller 只映射 v1（全库 grep -v /test/ 取证），
+     * 改写后必然 404，实测导致数据市场页 0 资产、配置重置按钮恒失败。
+     * 删的是死条目，不是放开门禁：保留的 5 条（agent-mesh / twins / portal / datasource / integration）
+     * 均经实测 200 验证。
+     */
+    private static final int FORWARD_BASELINE = 5;
     /**
      * 反向重写条目基线。13 → 15 的增量来自详设-10 R1-A 批次（卷 10 §5.1 / W252 / R-43）
      * 为 wagent 双路径登记的两条反向条目（{@code /api/wagent} 精确根形态 +
@@ -57,7 +65,8 @@ class RouteManifestParityTest {
      * 漂移在 2026-10-11 补充设计批次的真跑门禁中暴露并按门禁口径订正（只增不减，判定不放宽）。
      */
     private static final int REVERSE_BASELINE = 15;
-    private static final int TOTAL_BASELINE = 25;
+    /** 正向 5 + 反向 15 = 20（D22 后按实测订正，原 25）。 */
+    private static final int TOTAL_BASELINE = 20;
 
     private static Path repoRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();

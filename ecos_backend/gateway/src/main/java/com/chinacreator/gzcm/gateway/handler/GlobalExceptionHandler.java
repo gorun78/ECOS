@@ -13,6 +13,7 @@ import com.chinacreator.gzcm.common.exception.UnauthorizedException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -128,11 +129,60 @@ public class GlobalExceptionHandler {
      * 现改指 §3.2.7 {@code ECOS-SYS-*} 族登记码 {@link SystemErrorCode#ECOS_SYS_404}，
      * {@code code}＝404 与状态行不变。</p>
      */
+    /**
+     * 405 — 路径存在但 HTTP 方法不匹配（{@code HttpRequestMethodNotSupportedException}）。
+     *
+     * <p><b>2026-11-13 验证缺陷 D6</b>：此前本类无 405 分支，该异常落入兜底
+     * {@code handleGeneric} 被报成 <b>500 ECOS-SYS-500</b>——把「调用方用错方法」谎报成
+     * 「服务端故障」，违反 HTTP 状态行保真（405 与 500 的语义天差地别）。实测触发：
+     * {@code GET /api/v1/cognitive/executions}（该端点为 POST-only）返回 500。</p>
+     *
+     * <p>按 RFC 9110，405 响应<b>应当</b>带 {@code Allow} 头列出该资源支持的方法，
+     * 故本分支显式回写 {@code ex.getSupportedHttpMethods()}。</p>
+     */
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
+            org.springframework.web.HttpRequestMethodNotSupportedException ex) {
+        log.info("Method not allowed: {}", ex.getMessage());
+        HttpHeaders headers = new HttpHeaders();
+        var supported = ex.getSupportedHttpMethods();
+        if (supported != null && !supported.isEmpty()) {
+            headers.setAllow(supported);
+        }
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .headers(headers)
+                .body(ApiResponse.<Void>error(405, SystemErrorCode.ECOS_SYS_405,
+                        "请求方法不被支持").withTraceIdFromMdc());
+    }
+
     @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> handleRouteNotFound(Exception ex) {
         log.info("Route/Resource not found: {}", ex.getMessage());
         return ApiResponse.<Void>error(404, SystemErrorCode.ECOS_SYS_404, "资源不存在").withTraceIdFromMdc();
+    }
+
+    /**
+     * 415 — 请求体媒体类型不被端点支持（{@code HttpMediaTypeNotSupportedException}）。
+     *
+     * <p><b>2026-11-13 验证缺陷 D47</b>：端点上写的 {@code consumes = MULTIPART_FORM_DATA_VALUE}
+     * 在收到 JSON/text 请求时由 Spring MVC 抛本异常。<b>网关组合面此前没有这条腿</b>，
+     * 该异常一路落到 {@link #handleAny(Exception)} 被报成 <b>500 {@code ECOS-SYS-500}</b>。
+     * 实测证据：{@code POST /api/v1/knowledge/ingest/documents} 带 {@code Content-Type: application/json}
+     * 经网关 → 500；<b>同一请求直连 18086 → 415</b>（Spring 默认行为本来就是对的），
+     * 说明丢语义的是网关这一层，不是后端端点。</p>
+     *
+     * <p>与 {@link #handleMethodNotSupported} 同族：都是「调用方用错请求形态」，不是服务端故障；
+     * 回 500 会让客户端按 5xx 重试/告警，而正确修法是改 {@code Content-Type}。
+     * 本分支回写 {@code Accept-Post} 之外不做额外协商（端点未声明可接受类型时不猜）。</p>
+     */
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+    public ApiResponse<Void> handleMediaTypeNotSupported(
+            org.springframework.web.HttpMediaTypeNotSupportedException ex) {
+        log.info("Unsupported media type: {}", ex.getMessage());
+        return ApiResponse.<Void>error(415, SystemErrorCode.ECOS_SYS_415,
+                "请求 Content-Type 不被该端点支持").withTraceIdFromMdc();
     }
 
     /**

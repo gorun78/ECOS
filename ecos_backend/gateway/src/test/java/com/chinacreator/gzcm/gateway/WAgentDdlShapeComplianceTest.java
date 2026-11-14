@@ -88,7 +88,10 @@ class WAgentDdlShapeComplianceTest {
             "V266__wagent_tool_contract_seed.sql",
             "V270__wagent_tool_contract_contract_columns.sql",
             "V283__ecos_wagent_decision_action_loop.sql",
-            "V286__ecos_dw_wagent_option_amount.sql"
+            "V286__ecos_dw_wagent_option_amount.sql",
+            // #CLI-PROD-D（2026-11-11）L3 审批凭证列组（只加不删 + 四索引），该批次漏登记本清单；
+            // 2026-11-13 验证批按实测补入（脚本体与表清单同源，不漏项）。
+            "V326__wagent_approval_token_columns.sql"
     );
 
     /**

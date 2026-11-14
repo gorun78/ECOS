@@ -223,9 +223,11 @@ public class DiagnosticAgentController {
     @GetMapping("/config/{agentId}")
     public ApiResponse<AgentConfigVO> getAgentConfig(@PathVariable String agentId) {
         // 先从ecos_agent查
+        // schema 必须限定（数据库访问规范 §七 通用规则 1 / DR01）：ecos_agent 在 ecos_control 与 ecos_ai
+        // 同名各一份，裸表名靠 search_path 次序解析，次序一变即静默切表（详见 AgentDao 类注释）。
         List<AgentConfigVO> agents = diagnosticAgentService.query(
             "SELECT id, name, model_provider, model_name, system_prompt, tools " +
-            "FROM ecos_agent WHERE id = ?",
+            "FROM ecos_control.ecos_agent WHERE id = ?",
             (rs, _i) -> new AgentConfigVO(rs.getString("id"), rs.getString("name"),
                     rs.getString("model_provider"), rs.getString("model_name"),
                     rs.getString("system_prompt"), rs.getString("tools")),

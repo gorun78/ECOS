@@ -62,6 +62,13 @@ public class EventBusAuditPublisher {
      */
     public void publish(Map<String, Object> payload) {
         try {
+            // 消费端 AuditKafkaConsumer#insertAuditLog 以 id 或 eventId 派生落库主键，
+            // 二者双缺即整条丢弃（日志 WARN「审计事件缺 id 且缺 eventId」）。
+            // 各域发布器普遍只带业务字段 ⇒ 在此统一补齐，调用方显式给出时保留原值。
+            Object existing = payload.get("eventId");
+            if (existing == null || String.valueOf(existing).isBlank()) {
+                payload.put("eventId", java.util.UUID.randomUUID().toString());
+            }
             Object eventBus = resolveEventBus();
             if (eventBus == null) {
                 log.debug("[audit] EventBusService 不可用，跳过审计事件: eventType={}", payload.get("eventType"));

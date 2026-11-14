@@ -124,6 +124,41 @@ public class WorkspaceExceptionHandler {
         return build(500, "INTERNAL", INTERNAL_MESSAGE, Map.of());
     }
 
+    /**
+     * 携带状态行的业务异常（2026-11-13 验证缺陷 D50）。
+     *
+     * <p><b>缺陷形态（活体实测）</b>：{@code POST /api/v1/workspace/scenarios/sc001/cognitive/diagnose}
+     * （及 forecast/simulate/policy 三条同族腿）全部返回
+     * {@code 500 {"errorCode":"INTERNAL","message":"服务内部错误…"}}，而 workspace 日志里是
+     * {@code BusinessException: no_active_mind_for_scenario=sc001}——抛出点
+     * {@code ScenarioCognitiveController#buildPayload} 明明写的是
+     * {@code new BusinessException(404, 404, "no_active_mind_for_scenario=" + scenarioId)}。</p>
+     *
+     * <p><b>根因</b>：本 advice 有 {@code WorkspaceDomainException} / {@code ScenarioDomainException}
+     * 两条领域腿，但 {@code BusinessException}（及其父类 {@code DataBridgeException}）不在它们的
+     * 继承链上，于是落到 {@code handleUnexpected} 兜底 → 500。「场景还没配 Mind」是<b>调用方
+     * 没准备好前置条件</b>，不是服务故障：报 500 会让前端弹「系统错误」并触发 5xx 告警，
+     * 真正的修法（先给场景绑定 Mind）永远不会被提示。</p>
+     *
+     * <p><b>为什么用父类型 {@code DataBridgeException} 而不是 {@code BusinessException}</b>：
+     * 兄弟类 {@code NotFoundException} 已单独有 404 腿，这里接父类可以一次覆盖
+     * {@code BusinessException} / {@code DataBridgeException} 直接使用者 / 未来同族子类；
+     * 状态行取异常自带的 {@code httpStatus}，非法值由 common 单源
+     * {@link DataBridgeException#resolveHttpStatus} 回退 500（避免各宿主各写一份区间判据）。</p>
+     *
+     * <p><b>X-41 不变量</b>：{@code message} 是业务方写给调用方看的（如
+     * {@code no_active_mind_for_scenario=sc001}），原样入体；技术栈与堆栈仍只进日志。</p>
+     */
+    @ExceptionHandler(com.chinacreator.gzcm.common.exception.DataBridgeException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleDataBridge(
+            com.chinacreator.gzcm.common.exception.DataBridgeException ex) {
+        int status = com.chinacreator.gzcm.common.exception.DataBridgeException
+                .resolveHttpStatus(ex.getHttpStatus());
+        log.warn("workspace 业务异常 http={} code={} traceId={} message={}",
+                status, ex.getErrorCode(), EcosTraceContext.currentTraceId(), ex.getMessage());
+        return build(status, String.valueOf(ex.getErrorCode()), ex.getMessage(), Map.of());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Map<String, Object>>> handleUnexpected(Exception ex) {
         log.error("未预期异常 traceId={} type={}",

@@ -44,6 +44,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.engine",
     "com.chinacreator.gzcm.services.agent.runtime",
     "com.chinacreator.gzcm.services.agent.model",
+    // D52（2026-11-13 验证）：agent-service 的 AgentRuntimeController 在
+    // services.agent.controller 包，原扫描范围只到 .runtime/.model/.dao，
+    // 导致 /api/v1/agent-runtime/** 在网关全量 404（前端 agentMeshApi 的
+    // telemetry/default 与 plans 两条腿因此必然失败）。Controller 与 aiming
+    // :18084 上是同一份 class，但 gateway 是产品入口，必须自身可达。
+    "com.chinacreator.gzcm.services.agent.controller",
     // R2-B4b (agent-service JdbcTemplate 收口到 .dao): DAO 类在 .dao 包且带 @Repository，
     // 必须纳入 gateway 组件扫描，否则 toolrouter Tools 找不到 AgentToolDao bean。
     "com.chinacreator.gzcm.services.agent.dao",
@@ -65,7 +71,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
         com.chinacreator.gzcm.runtime.core.mybatis.config.MyBatisConfig.class,
         com.chinacreator.gzcm.sysman.config.dao.ConfigDao.class,
-        com.chinacreator.gzcm.sysman.controller.SysConfigController.class,
+        // D17（2026-11-13 验证）：原排除 sysman 侧 SysConfigController，导致
+        // GET /api/v1/system/config、/group、/audit、/metadata 在网关全线 404
+        // （/items 同前缀但属 ConfigController，能命中）。前端 dictConfigClient / 系统配置页整体打不开。
+        // 与 gateway 侧同名类的 Bean 名冲突已在 sysman 侧以 @RestController("sysmanSysConfigController")
+        // 显式命名消除；前缀不同（/api/v1/system/config vs /api/v1/sysconfig），无映射冲突。
+        // 故本行排除已移除。
         // 数据引擎已接管，旧 datanet 模块已删除（A+7c）
         // PMO-57 T2 (2026-09-13): ontology 侧 workflow Controller 副本已物理删除，
         // workflow 端点单点收敛至 buszhi 侧 WorkflowController（/api/v1/ecos/workflows），
@@ -83,9 +94,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // CognitiveConfigController 只处理 GET，两者都映射 GET /api/v1/cognitive/config
         // 导致 Ambiguous mapping。排除 ai 侧简化版，保留 cognitive2 完整版。
         com.chinacreator.gzcm.engine.ai.controller.CognitiveConfigController.class,
-        // 双重认知端点冲突: cognitive2/CognitiveEngineHealthController + ai-engine/CognitiveController 都映射 /api/v1/cognitive/health
-        // ai-engine/CognitiveController 应保留在 classpath，exclude cognitive-engine 版本
-        com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineHealthController.class,
+        // D73（2026-11-14 验证）：原条目「cognitive2/CognitiveEngineHealthController 与
+        // ai-engine/CognitiveController 都映射 /api/v1/cognitive/health，保留 ai 版」的
+        // 前提已消失——ai-engine/CognitiveController 现为空桩（类上自述「无任何端点」），
+        // 真实认知实现只在 cognitive2。继续排除 cognitive2 版本 ⇒ /api/v1/cognitive/health
+        // 无任何提供者，实测恒 404。故本行移除。
+        // （/api/v1/engine/cognitive/health 由 ai 侧 AiEngineStatusController 承担，另条排除
+        //   CognitiveEngineOpenHealthController 仍有效，不受本改动影响。）
         // 引擎接管: gateway→data-engine/cognitive-engine/security-engine (阶段6)
         com.chinacreator.gzcm.gateway.controller.EcosKnowledgeGraphController.class,
         com.chinacreator.gzcm.gateway.controller.SecurityController.class,

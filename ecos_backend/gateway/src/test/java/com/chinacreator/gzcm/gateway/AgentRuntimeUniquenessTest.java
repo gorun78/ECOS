@@ -38,14 +38,23 @@ public class AgentRuntimeUniquenessTest {
     private static final Pattern LOOP_ENTRY_SIG =
             Pattern.compile("\\bAgentLoopResult\\s+run\\s*\\(\\s*AgentLoopConfig\\b");
 
+    /**
+     * D25（2026-11-13 验证）：本门原按「{@code AgentLoopResult run(AgentLoopConfig ...} 签名出现次数」
+     * 计数，而 AgentLoopService 自 f8748c45 起有 <b>同一类内的两个重载</b>：
+     * {@code run(config,msg,session)} 委托给 {@code run(config,msg,session,deltaSink)}，
+     * 后者再委托给唯一实现 {@code doRun(...)}。两者是同一套 loop 的入口重载，不是「双套 loop」，
+     * 但旧口径把它们计成 ×2 ⇒ 恒红。
+     *
+     * <p>现改为<b>按类去重</b>：junction 的真实语义是「循环实现只能落在一个类里」。
+     * 同一类的多个重载 / 委托入口不再触发；跨类出现第二处入口仍然失败（原防线不变）。</p>
+     */
     @Test
     void onlyOneLoopImplementationInReactor() throws IOException {
         Path backend = backendRoot();
         List<Path> mainSources = mainSources(backend);
         assertTrue(!mainSources.isEmpty(), "未找到任何主源码，后端根定位异常: " + backend);
 
-        int entries = 0;
-        List<String> sites = new ArrayList<>();
+        List<String> classesWithLoopEntry = new ArrayList<>();
         for (Path src : mainSources) {
             String rel = backend.relativize(src).toString();
             if (rel.contains("AgentLoopResult")) {
@@ -53,24 +62,25 @@ public class AgentRuntimeUniquenessTest {
                 continue;
             }
             String executable = stripComments(new String(Files.readAllBytes(src), StandardCharsets.UTF_8));
-            int hits = 0;
+            boolean hasLoopEntry = false;
             for (String line : executable.split("\n")) {
                 if (LOOP_ENTRY_SIG.matcher(line).find()) {
-                    hits++;
+                    hasLoopEntry = true;
+                    break;
                 }
             }
-            if (hits > 0) {
-                entries += hits;
-                sites.add(rel + " (×" + hits + ")");
+            if (hasLoopEntry) {
+                classesWithLoopEntry.add(rel);
             }
         }
 
-        assertEquals(1, entries,
-                "Agent Loop 实现必须唯一（junction 义务 2 禁双套 loop）：期望恰 1 处循环入口，实得 "
-                        + entries + " 处：" + sites);
+        assertEquals(1, classesWithLoopEntry.size(),
+                "Agent Loop 实现必须唯一（junction 义务 2 禁双套 loop）：期望恰 1 个类承载循环入口"
+                        + "（同一类的重载入口不算第二套），实得 " + classesWithLoopEntry.size()
+                        + " 个类：" + classesWithLoopEntry);
 
-        assertTrue(sites.size() == 1 && sites.get(0).contains(SOLE_LOOP_CLASS),
-                "唯一 Agent Loop 必须落在 " + SOLE_LOOP_CLASS + "，实得：" + sites);
+        assertTrue(classesWithLoopEntry.get(0).contains(SOLE_LOOP_CLASS),
+                "唯一 Agent Loop 必须落在 " + SOLE_LOOP_CLASS + "，实得：" + classesWithLoopEntry);
     }
 
     // ── helpers ────────────────────────────────────────────────────────

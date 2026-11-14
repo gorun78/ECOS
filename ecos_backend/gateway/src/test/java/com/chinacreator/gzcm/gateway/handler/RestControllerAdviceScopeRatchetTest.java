@@ -52,7 +52,12 @@ class RestControllerAdviceScopeRatchetTest {
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/controller/ContextBuildErrorAdvice.java",
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/controller/scenario/CognitiveErrorAdvice.java",
             "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/support/KbErrorAdvice.java",
-            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/exception/WorkspaceExceptionHandler.java");
+            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/exception/WorkspaceExceptionHandler.java",
+            // D8（2026-11-13 验证）：HTTP 状态行保真（ApiResponse.code → 状态行）。
+            // 实现 ResponseBodyAdvice、不注册 @ExceptionHandler，本不涉及"争同一异常的命中顺序"；
+            // 但本门是纯静态扫描无法区分，故该类显式声明 basePackages = com.chinacreator.gzcm，
+            // 在此登记为限定域 advice（覆盖面不变）。
+            "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/HttpStatusFidelityAdvice.java");
 
     private static final String[] SCOPE_ATTRS =
             {"basePackages", "basePackageClasses", "assignableTypes", "value", "packages"};

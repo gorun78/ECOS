@@ -51,6 +51,32 @@ class WorkspaceRouteCarrierGateTest {
                 "兼容承流缺失: " + Arrays.toString(mappings));
     }
 
+    /**
+     * D31（2026-11-14）：对象面/查询面 Controller 在 workspace.controller 包内，
+     * 而该包被 gateway 整包排除 ⇒ 必须由本转发器按子族前缀承流，否则
+     * #/project_tracker、#/contract_manager、#/ontology_workbench 三页取数恒 404。
+     * 反向约束：{@code /api/v1/ecos} 整根不得转发（buszhi 的 entities/ontologies 子族仍在网关上）。
+     */
+    @Test
+    void forwardMappingCarriesWorkspaceObjectAndQuerySubfamilies() throws Exception {
+        Method forward = WorkspaceForwardController.class.getMethod(
+                "forward", jakarta.servlet.http.HttpServletRequest.class,
+                jakarta.servlet.http.HttpServletResponse.class);
+        java.util.List<String> mappings =
+                Arrays.asList(forward.getAnnotation(RequestMapping.class).value());
+        for (String required : new String[] {
+                "/api/v1/ecos/objects/**", "/api/ecos/objects/**",
+                "/api/v1/ecos/state-machine/**", "/api/v1/ecos/statemachine/**",
+                "/api/query/**" }) {
+            assertTrue(mappings.contains(required),
+                    "对象面/查询面承流缺失: " + required + "；实得 " + mappings);
+        }
+        assertFalse(mappings.contains("/api/v1/ecos/**"),
+                "/api/v1/ecos 整根属主不唯一（buszhi entities/ontologies），禁整根转发: " + mappings);
+        assertFalse(mappings.contains("/api/v1/query/**"),
+                "/api/v1/query 属 AI 域 NLQController，禁转给 workspace: " + mappings);
+    }
+
     @Test
     void gatewayStillExcludesWorkspaceControllers() throws Exception {
         org.springframework.context.annotation.ComponentScan scan =

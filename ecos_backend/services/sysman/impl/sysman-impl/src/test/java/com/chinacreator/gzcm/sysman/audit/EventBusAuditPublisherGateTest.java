@@ -118,6 +118,41 @@ class EventBusAuditPublisherGateTest {
     }
 
     @Test
+    @DisplayName("D69：缺 eventId 的载荷由投递口补齐（否则消费端整条丢弃，审计永不落库）")
+    void fillsMissingEventIdSoConsumerCanPersist() {
+        try (AnnotationConfigApplicationContext ctx = productionShapedContext(RecordingBus.class)) {
+            RecordingBus bus = (RecordingBus) ctx.getBean("fixtureBus");
+            EventBusAuditPublisher publisher = new EventBusAuditPublisher(ctx, FixtureBus.class.getName());
+
+            Map<String, Object> audit = payload("super_admin_bypass");
+            audit.remove("eventId");
+            assertNull(audit.get("eventId"), "前置：载荷本无 eventId");
+
+            publisher.publish(audit);
+
+            Object eventId = ((Map<?, ?>) bus.payloads.get(0)).get("eventId");
+            assertNotNull(eventId, "投递口必须补齐 eventId，否则 AuditKafkaConsumer 丢弃整条");
+            assertTrue(String.valueOf(eventId).matches("[0-9a-fA-F-]{36}"), "eventId 应为 UUID 形态: " + eventId);
+        }
+    }
+
+    @Test
+    @DisplayName("D69：调用方显式给出的 eventId 必须保留（不被覆盖，保证重放幂等）")
+    void keepsCallerProvidedEventId() {
+        try (AnnotationConfigApplicationContext ctx = productionShapedContext(RecordingBus.class)) {
+            RecordingBus bus = (RecordingBus) ctx.getBean("fixtureBus");
+            EventBusAuditPublisher publisher = new EventBusAuditPublisher(ctx, FixtureBus.class.getName());
+
+            Map<String, Object> audit = payload("super_admin_bypass");
+            audit.put("eventId", "fixed-event-id-001");
+
+            publisher.publish(audit);
+
+            assertEquals("fixed-event-id-001", ((Map<?, ?>) bus.payloads.get(0)).get("eventId"));
+        }
+    }
+
+    @Test
     @DisplayName("对照断言：同一上下文下旧写法 ObjectProvider<Object> 必然解析失败（缺陷机制）")
     void objectTypedProviderFailsOnSameContext() {
         try (AnnotationConfigApplicationContext ctx = productionShapedContext(RecordingBus.class)) {

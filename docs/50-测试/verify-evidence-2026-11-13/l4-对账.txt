@@ -1,0 +1,13 @@
+=== L4 对账（V-WS-100）2026-11-13T02:21:44Z ===
+[场景列表] API gateway count:
+32
+[场景列表] DB ecos_control (is_deleted=0):
+32
+[镜像表] ecos_ai / ecos_cognitive:
+0 / 0
+[蓝图] DB ecos_control.ecos_scenario_blueprint:
+10
+[运行] DB ecos_control.ecos_scenario_run:
+0
+[连边] DB ecos_control.ecos_scenario_binding_link:
+2

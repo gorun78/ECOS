@@ -22,8 +22,8 @@ import java.util.*;
  * 两者共存，路由均由 VersionPrefixRewriteFilter 管理。
  *
  * <p>PUT /api/v1/sysconfig/{key}/reset
- *   将指定 config_key 的 config_value 重置为 sys_config.default_value。
- *   响应: { configKey, resetValue, previousValue, updated }
+ *   重置配置项。D23 起：sys_config 无 default_value 列 ⇒ 无基线时如实 404（见方法注释）。
+ *   成功响应: { configKey, resetValue, previousValue, updated }
  *
  * <p>H10-T2 审计锚点（PMO-74 铁律 §2.4-5 + §4）：审计一律经 runtime-event
  * {@code EventBusService} 发 {@code KafkaTopics.AUDIT}（{@code ecos.audit}），
@@ -55,43 +55,35 @@ public class SysConfigController {
 
     /**
      * PUT /api/v1/sysconfig/{key}/reset
-     * 重置指定配置项为 default_value。
+     *
+     * <p>D23（2026-11-13 验证）：原实现 {@code SELECT config_value, default_value FROM sys_config}
+     * 引用了库中不存在的列 —— {@code sys_config} 在 {@code ecos_control} / {@code ecos_sysman}
+     * 两个 schema 均无 {@code default_value}（实测 information_schema，V13 建表 + V162 补列清单里都没有），
+     * 且 {@code public.sys_config} 根本不存在 ⇒ 每次调用必然抛 {@code BadSqlGrammarException}，
+     * 接口恒返 -1 并把 JDBC 异常原文塞进 message 给前端（系统配置页「重置」按钮 100% 失败）。
+     *
+     * <p>现在改为：只查真实存在的列；库内无默认值基线 ⇒ 如实返回 404 + 明确原因，
+     * 不再把 SQL 异常当业务错误外泄。默认值基线一旦落到 sys_config（新增列走迁移单源）即可恢复重置能力。
      */
     @RequirePermission(permission = "system:config:manage")
     @PutMapping("/{key}/reset")
     public ApiResponse<ResetResultVO> reset(@PathVariable String key) {
         try {
-            // 1. 查当前值 + default_value
             List<Map<String, Object>> rows = gatewaySysConfigService.queryForList(
-                    "SELECT config_value, default_value FROM sys_config WHERE config_key=?", (Object[]) new Object[]{key});
+                    "SELECT config_value FROM sys_config WHERE config_key=?", (Object[]) new Object[]{key});
             if (rows.isEmpty()) {
                 return ApiResponse.notFound("配置项不存在: " + key);
             }
 
-            Map<String, Object> row = rows.get(0);
-            Object currentVal = row.get("config_value");
-            Object defaultVal = row.get("default_value");
-            if (defaultVal == null) defaultVal = "";
+            Object currentVal = rows.get(0).get("config_value");
+            // sys_config 无 default_value 列（见方法注释）⇒ 无可回退基线，如实拒绝而非伪造成功
+            return ApiResponse.notFound(
+                    "配置项 " + key + " 未定义默认值基线，无法重置（当前值: " + currentVal + "）");
 
-            // 2. 执行重置
-            int affected = gatewaySysConfigService.update(
-                    "UPDATE sys_config SET config_value=?, updated_at=NOW() WHERE config_key=?",
-                    String.valueOf(defaultVal), key);
-
-            if (affected == 0) {
-                return ApiResponse.internalError("重置失败，配置项可能已被删除");
-            }
-
-            // 3. 审计出口（真实主体 + ecos.audit）
-            publishAuditEvent(buildAuditPayload(resolveOperator(), key, currentVal, String.valueOf(defaultVal)));
-
-            log.info("配置重置: key={} oldValue={} newValue={}", key, currentVal, defaultVal);
-
-            return ApiResponse.success(new ResetResultVO(key, String.valueOf(defaultVal),
-                    currentVal != null ? String.valueOf(currentVal) : null, true));
         } catch (Exception e) {
             log.error("配置重置失败: key={}", key, e);
-            return ApiResponse.internalError("配置重置失败: " + e.getMessage());
+            // 不外泄 JDBC 异常原文：只回可读结论，原文进服务端日志
+            return ApiResponse.internalError("配置重置失败，请稍后重试或凭追踪号联系管理员");
         }
     }
 

@@ -29,6 +29,17 @@ spring:
   flyway:
     enabled: false
 
+  # D51（2026-11-13 验证）：Neo4jReactiveHealthIndicator 读的是**标准前缀** spring.neo4j.*，
+  # 而本文件下面的 `neo4j.*` 是自定义前缀（业务侧 KGWriterService 用），探针看不到它 ⇒
+  # 探针以空凭据连库（日志：Unsupported authentication token, scheme 'none'）⇒ 组件 DOWN
+  # ⇒ /actuator/health 整体 503 {"status":"DOWN"} ⇒ CLI doctor 与任何 k8s liveness 全红。
+  # sysman / datanet / dccheng 三处早按 PMO-49 Q2 补过这段标准凭据，gateway 漏了，此处补齐。
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:}
+
   # PMO-59 P2b: 认知心智层 Kafka 事件通道 (ecos.cognitive / ecos.audit)
   # 由 runtime-event EventBus 统一发送 (铁律 §2.5, 禁引擎自建 KafkaTemplate);
   # spring-kafka AutoConfiguration 依据本配置激活 producer 装配,

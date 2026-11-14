@@ -7,7 +7,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../components/LanguageContext';
 import { showToastGlobal } from '../../components/common/Toast';
-import { apiFetch } from '../../api';
+import { apiFetchData } from '../../services/httpClient';
 import { API_BASE } from '../../services/httpClient';
 import { ECOS_ONTOLOGIES_BASE } from '../../services/ontologyApi';
 import { CopilotPanel } from '../../components/CopilotPanel';
@@ -97,11 +97,14 @@ export default function BusinessWorkbenchLayout({
   const loadOntologyData = async () => {
     try {
       // Try loading from backend API
+      // D30（2026-11-13 验证）：原用 `apiFetch(...)` 传**完整 URL**，而 apiFetch 内部还会拼
+      // `${API_BASE}`（= /api）⇒ 实际请求 /api/api/v1/ecos/* 恒 404，本页四处取数全部失败、
+      // 只能一直吃 mock 兜底。apiFetchData 接收完整 URL、不自加前缀，正是这里需要的语义。
       const [objectsResp, linksResp, actionsResp, domainsResp] = await Promise.allSettled([
-        apiFetch(ECOS_ONTOLOGIES_BASE) as Promise<any>,
-        apiFetch(`${API_BASE}/v1/ecos/relationships`) as Promise<any>,
-        apiFetch(`${API_BASE}/v1/ecos/actions`) as Promise<any>,
-        apiFetch(`${API_BASE}/v1/ecos/domains`) as Promise<any>,
+        apiFetchData(ECOS_ONTOLOGIES_BASE) as Promise<any>,
+        apiFetchData(`${API_BASE}/v1/ecos/relationships`) as Promise<any>,
+        apiFetchData(`${API_BASE}/v1/ecos/actions`) as Promise<any>,
+        apiFetchData(`${API_BASE}/v1/ecos/domains`) as Promise<any>,
       ]);
 
       // Use seed data as fallback, merge API data if available

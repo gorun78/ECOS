@@ -614,7 +614,9 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
           </div>
         </aside>
 
-        <main className="relative flex-1 min-w-0">
+        {/* 画布区用 section 而非 main：App.tsx:270 已有全局 <main>，嵌套两个 main
+            属 HTML 语义错误（2026-11-13 缺陷 D4，Playwright strict mode 直接暴露）。 */}
+        <section className="relative flex-1 min-w-0" aria-label="场景沙箱画布">
           <ReactFlow
             nodes={rfNodes as unknown as RfNode[]}
             edges={rfEdges as unknown as RfEdge[]}
@@ -681,7 +683,7 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
               {t("scenario.sandbox.version")} v{layoutVersion}
             </div>
           )}
-        </main>
+        </section>
       </div>
 
       {/* ── 资源 picker modal ─────────────────────────── */}

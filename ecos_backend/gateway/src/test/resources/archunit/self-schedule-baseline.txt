@@ -37,3 +37,7 @@ com.chinacreator.gzcm.engine.security.abac.cache.InMemoryAbacPolicyCacheService
 com.chinacreator.gzcm.engine.security.policy.engine.parallel.ParallelPolicyEvaluator
 com.chinacreator.gzcm.gateway.twin.DigitalTwinService
 com.chinacreator.gzcm.gateway.oag.OagForwardController
+# 2026-11-13 验证批实测补登记（既存违规，非本批引入）：MissionExecutionEngine.executeTasksInParallel
+# 每次调用自建 newFixedThreadPool（MissionExecutionEngine.java:176），违反 F05-15 X-36。
+# 收口 = 迁 runtime-task 统一 Executor（现无通用 Executor Bean，需新建底座 + 授权），本次不借验证之名重构。
+com.chinacreator.gzcm.engine.ai.agent.mesh.MissionExecutionEngine

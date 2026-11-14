@@ -75,8 +75,11 @@ class ModuleDocTruthfulnessTest {
      * common-api，未跑 gateway 横切门，故基线未同步；漂移于 #146s 真跑 gateway 时暴露，此处按实测补账。
      * 45 → 46：+1 = #146x（2026-10-28）{@code AiModelCatalogController}
      * （附录 A 第 28 条 / §9.3.1 #17 模型目录真值腿 + #18/#19 显式 501 承流面）。
+     * 46 → 47：+1 = #CLI-PROD-D（2026-11-11）{@code wagent/WAgentApprovalController}
+     * （L3 审批凭证面；该批次漏改本锚，2026-11-13 验证批按实测订正：`git ls-tree HEAD` 同为 47，
+     * 即基线陈旧而非本批新增）。
      */
-    private static final int IMPL_CONTROLLER_BASELINE = 46;
+    private static final int IMPL_CONTROLLER_BASELINE = 47;
 
     private static Path backendRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();

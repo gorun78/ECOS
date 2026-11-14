@@ -106,6 +106,10 @@ export default function UserList({
   // ── Batch selection state ──────────────────────────────
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [showBatchConfirm, setShowBatchConfirm] = React.useState(false);
+  // D21：移动端卡片展开态必须在任何提前 return 之前声明。
+  // 原实现写在 loading/empty 提前 return 之后，loading true→false 时 hooks 数量变化，
+  // React 抛 "Rendered more hooks than during the previous render" 整页崩 ErrorBoundary（/iam 与 /security-center 必现）。
+  const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
   // Clear selection when users change
   React.useEffect(() => {
@@ -190,7 +194,6 @@ export default function UserList({
 
   // 移动端：折叠卡片态（每卡头有 username+status，详情区折叠 email/org/roles，底部操作组 + 批量 checkbox）
   // 桌面态保留原生 <table> 不变
-  const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const toggleExpand = (id: string) => setExpandedId(prev => (prev === id ? null : id));
   if (isMobile) {
     return (

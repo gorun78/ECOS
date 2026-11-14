@@ -189,20 +189,48 @@ public class EcosOntologyEventConsumer {
 
     /**
      * 调 buszhi REST 拉 schema（同 JVM 走 localhost，跨 JVM 走 18083 内网端口，ADR-7 内网可达）。
-     * 失败时返回 placeholder hash（基于 ontologyId+version），保持幂等可恢复。
+     *
+     * <p><b>拉取失败必须抛，不得伪造 hash（D71）</b>：此前失败时返回
+     * {@code sha256("placeholder-" + ontologyId + "-" + versionId)} 并照常 upsert ⇒
+     * 库里落下的是一个<b>与本体内容无关</b>的假摘要。后果不是"记为失败"，而是"记为成功"：
+     * 下游拿 schema_hash 判"本体是否变了"，而真摘要（拉得到的那个 JVM 算出的）与 placeholder
+     * 会互相覆盖同一行（UNIQUE(ontology_id, version) upsert），最终值取决于谁最后写。
+     * 现改为抛 {@link SchemaFetchException}，由 {@link #runSync} 的既有 catch 走
+     * {@code kg_sync_log} FAILED 分支——「拉不到」就如实记录为失败，不再把缺口伪装成内容摘要。</p>
      */
     private String fetchAndHashSchema(String ontologyId, String versionId) {
+        Map<String, Object> resp;
         try {
             String url = buszhiBase + "/ontologies/" + ontologyId + "/versions/" + versionId;
             @SuppressWarnings("unchecked")
-            Map<String, Object> resp = restTemplate.getForObject(url, Map.class);
-            Object data = resp != null ? resp.get("data") : null;
+            Map<String, Object> fetched = restTemplate.getForObject(url, Map.class);
+            resp = fetched;
+        } catch (Exception e) {
+            throw new SchemaFetchException("schema 拉取失败（禁落 placeholder hash）: ontology="
+                    + ontologyId + " version=" + versionId + " err=" + e.getMessage(), e);
+        }
+        if (resp == null) {
+            throw new SchemaFetchException("schema 拉取返回空响应（禁落 placeholder hash）: ontology="
+                    + ontologyId + " version=" + versionId);
+        }
+        try {
+            Object data = resp.get("data");
             String schema = data == null ? "{}" : MAPPER.writeValueAsString(data);
             return sha256Hex(schema);
         } catch (Exception e) {
-            log.warn("fetch schema failed (use placeholder hash): ontology={} version={} err={}",
-                    ontologyId, versionId, e.getMessage());
-            return sha256Hex("placeholder-" + ontologyId + "-" + versionId);
+            throw new SchemaFetchException("schema 序列化失败（禁落 placeholder hash）: ontology="
+                    + ontologyId + " version=" + versionId + " err=" + e.getMessage(), e);
+        }
+    }
+
+    /** schema 取不到 ⇒ 本次快照写不成立。独立类型使 {@link #runSync} 能区分「取数缺口」与「写库异常」。 */
+    static class SchemaFetchException extends RuntimeException {
+        SchemaFetchException(String message) {
+            super(message);
+        }
+
+        SchemaFetchException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 

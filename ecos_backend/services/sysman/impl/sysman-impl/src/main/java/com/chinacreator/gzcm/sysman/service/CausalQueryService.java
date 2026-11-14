@@ -1,21 +1,25 @@
 package com.chinacreator.gzcm.sysman.service;
 
-import com.chinacreator.gzcm.sysman.dao.CausalQueryDao;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.Map;
 
 /**
- * CausalQueryService — Causal 查询服务（PMO-E2: 从 CausalController 下沉的 JdbcTemplate 访问层）。
- * <p>铁律 §2.5：数据访问下沉到 DAO（{@link CausalQueryDao}）。</p>
+ * Causal 行类型载体（原查询服务，2026-11-13 D48 裁决后只剩行类型）。
  *
- * <p><b>#147DE 行面强类型</b>：节点/边行改 record（键与 DAO 行映射逐键一致），
- * 供 {@code CausalController} 图/路径/对比三面直接消费。</p>
+ * <p><b>为什么只剩 record</b>：本类原含 {@code ping/listNodes/listEdges} 三个方法，
+ * 经 {@code CausalQueryDao} 读 {@code ecos_causal_node}/{@code ecos_causal_edge}。
+ * 这两张表全仓无 DDL、库中零命中，于是 {@code GET /api/v1/causal/graph} 恒 500（D48）。
+ * 同族的 {@code /paths} 与 {@code /compare} 本就走内存种子，前端生产代码也不消费
+ * 本前缀（真图在 {@code /api/v1/ecos/world-model-graph/causal-graph}）。
+ * 裁决：删掉那条读不到的库腿与 DAO，整族统一读内存，行类型留在此处供三个面共用。</p>
+ *
+ * <p><b>保留 {@code @Service} 无 Bean 冲突风险</b>：本类已无字段与方法，
+ * 不注入任何依赖；若将来给 {@code /causal/*} 接真实数据源，应在此处新增
+ * Service 方法（而不是在 Controller 里直连 DAO，铁律 §2.5）。</p>
  */
-@Service
-public class CausalQueryService {
+public final class CausalQueryService {
+
+    private CausalQueryService() {
+    }
 
     /** 因果节点行（4 键）。 */
     public record CausalNodeRow(@JsonProperty("id") String id,
@@ -30,35 +34,5 @@ public class CausalQueryService {
                                 @JsonProperty("target") String target,
                                 @JsonProperty("weight") double weight,
                                 @JsonProperty("type") String type) {
-    }
-
-    private final CausalQueryDao dao;
-
-    public CausalQueryService(CausalQueryDao dao) {
-        this.dao = dao;
-    }
-
-    public Integer ping() {
-        return dao.ping();
-    }
-
-    public List<CausalNodeRow> listNodes() {
-        return dao.listNodes().stream().map(CausalQueryService::toNode).toList();
-    }
-
-    public List<CausalEdgeRow> listEdges() {
-        return dao.listEdges().stream().map(CausalQueryService::toEdge).toList();
-    }
-
-    static CausalNodeRow toNode(Map<String, Object> m) {
-        return new CausalNodeRow((String) m.get("id"), (String) m.get("name"),
-                (String) m.get("type"), (String) m.get("group"));
-    }
-
-    static CausalEdgeRow toEdge(Map<String, Object> m) {
-        Object weight = m.get("weight");
-        return new CausalEdgeRow((String) m.get("id"), (String) m.get("source"),
-                (String) m.get("target"), weight instanceof Number n ? n.doubleValue() : 0.0,
-                (String) m.get("type"));
     }
 }

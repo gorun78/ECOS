@@ -83,6 +83,12 @@ public class DiagnosisController {
     @PostMapping("/diagnose")
     public ApiResponse<?> diagnose(@RequestBody Map<String, Object> request) {
         String metric = (String) request.get("metric");
+        // 2026-11-13 验证缺陷 D38：metric 缺省时原样下传，RootCauseAnalyzer.ruleBasedExpansion
+        // 拿 null 去查只读 Map（ImmutableCollections.MapN.get(null)）抛 NPE ⇒ 空体请求回 500。
+        // 入参缺失属 4xx：此处前置校验，禁让下游以 NPE 表达「参数没给」。
+        if (metric == null || metric.isBlank()) {
+            throw new com.chinacreator.gzcm.common.exception.BusinessException("COG-400: metric 必填");
+        }
         double deviation = request.get("deviation") != null ?
             ((Number) request.get("deviation")).doubleValue() : 0;
         String domain = (String) request.getOrDefault("domain", "default");

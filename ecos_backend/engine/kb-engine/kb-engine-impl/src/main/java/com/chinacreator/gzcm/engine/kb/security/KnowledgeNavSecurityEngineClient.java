@@ -3,6 +3,8 @@ package com.chinacreator.gzcm.engine.kb.security;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
+import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
@@ -289,8 +291,127 @@ public class KnowledgeNavSecurityEngineClient {
         }
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        // Accept 必须显式钉死 JSON：runtime-core 传递了 jackson-dataformat-xml，
+        // RestTemplate 默认 Accept 含 application/xml ⇒ 内容协商把应答序列化成 XML，
+        // 解析失败后会被归成「引擎不可用」（data-engine PipelineSecurityService 同源注释）。
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        relayCallerIdentity(headers);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
         ResponseEntity<Map> resp = serviceRestTemplate.postForEntity(baseUrl + path, entity, Map.class);
         return resp == null ? null : resp.getBody();
+    }
+
+    /**
+     * 出站身份中继（D49，2026-11-13 验证批）。
+     *
+     * <p><b>缺陷形态（活体实测）</b>：经网关调用 {@code POST /api/v1/knowledge/retrieval/search}
+     * 恒 503 {@code ECOS-KB-020}「security-engine 不可用」，日志里 security 侧回的是
+     * <b>403 {@code ECOS-AUTH-010}「缺少信任头（X-ECOS-USER 或 X-ECOS-TENANT）」</b>。
+     * 根因是<b>信任头在网关被剥离后没有回到出站请求</b>：
+     * {@code EcosTrustHeaderFilter} 无条件清空 {@code X-ECOS-USER/ROLE/TENANT}（防伪造，正确），
+     * 而 {@code CallerCredentialSource.current()} 读的是<b>请求头</b>——剥离后读不到，
+     * {@code CallerCredentialRelayInterceptor} 于是只中继了 {@code Authorization}。
+     * 直连带齐三枚信任头调用同一端点，裁决链路立刻通了（实测 503→403 策略拒绝），
+     * 证明缺的是身份传递而不是策略判定。</p>
+     *
+     * <p><b>为什么在这里补而不是改中继拦截器</b>：拦截器属全仓共享口径（{@code CallerCredentialSource}
+     * 单源，明令「不伪造主语」），把「从 SecurityContext/ServiceContext 反推身份」塞进去
+     * 会让所有裸注入该模板的调用都获得这种反推语义，属跨域横切变更。本类已经在用
+     * {@link #currentUserIdOrAnonymous()} / {@link #currentTenantIdOrDefault()} /
+     * {@link #currentRoleOrDefault()} 组装<b>裁决主体</b>——同一份身份再写进信任头，
+     * 只是让下游的入口校验看到与裁决主体一致的值，不新增身份来源、不升权。</p>
+     *
+     * <p><b>不伪造</b>：三个来源都取不到真实身份时（异步/定时线程），不加任何信任头，
+     * 由 security 侧按默认策略 DENY／回 403——与 {@code CallerCredentialSource} 的纪律一致。
+     * {@code anonymous}/{@code default}/{@code user} 三个回退值<b>不进信任头</b>：
+     * 它们只是裁决入参的占位，写成信任头就等于凭空造主语。</p>
+     */
+    private void relayCallerIdentity(HttpHeaders headers) {
+        String authorization = CallerCredentialSource.currentAuthorization();
+        if (authorization != null) {
+            headers.set(HttpHeaders.AUTHORIZATION, authorization);
+        }
+        String user = realUserIdOrNull();
+        if (user != null) {
+            headers.set(HeaderAuthInterceptor.H_USER, user);
+        }
+        String role = realRoleOrNull();
+        if (role != null) {
+            headers.set(HeaderAuthInterceptor.H_ROLE, role);
+        }
+        String tenant = realTenantIdOrNull();
+        if (tenant != null) {
+            headers.set(HeaderAuthInterceptor.H_TENANT, tenant);
+        }
+    }
+
+    /** 真实 userId（ServiceContext 优先、SecurityContext 兜底）；取不到返回 null（禁 anonymous 落地）。 */
+    private String realUserIdOrNull() {
+        try {
+            ServiceContext ctx = ServiceContext.current();
+            if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+                return ctx.getUserId();
+            }
+            org.springframework.security.core.Authentication auth =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext()
+                            .getAuthentication();
+            if (auth != null && auth.isAuthenticated() && auth.getName() != null
+                    && !auth.getName().isBlank()
+                    && !(auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
+                return auth.getName();
+            }
+        } catch (Exception ignored) {
+            // 取不到即无身份，交由下游 fail-closed
+        }
+        return null;
+    }
+
+    /** 真实首角色；取不到返回 null。 */
+    private String realRoleOrNull() {
+        try {
+            ServiceContext ctx = ServiceContext.current();
+            if (ctx != null && ctx.getRoles() != null && !ctx.getRoles().isBlank()) {
+                String roles = ctx.getRoles();
+                int comma = roles.indexOf(',');
+                String first = (comma >= 0 ? roles.substring(0, comma) : roles).trim();
+                if (!first.isEmpty()) {
+                    return first;
+                }
+            }
+            org.springframework.security.core.Authentication auth =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext()
+                            .getAuthentication();
+            if (auth != null && auth.isAuthenticated() && auth.getAuthorities() != null) {
+                for (org.springframework.security.core.GrantedAuthority a : auth.getAuthorities()) {
+                    if (a != null && a.getAuthority() != null && !a.getAuthority().isBlank()) {
+                        return a.getAuthority();
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // 同上
+        }
+        return null;
+    }
+
+    /** 真实 tenantId（ServiceContext 优先、TenantContextHolder 兜底）；取不到返回 null（禁 default 落地）。 */
+    private String realTenantIdOrNull() {
+        try {
+            ServiceContext ctx = ServiceContext.current();
+            if (ctx != null && ctx.getTenantId() != null && !ctx.getTenantId().isBlank()) {
+                return ctx.getTenantId();
+            }
+        } catch (Exception ignored) {
+            // 落到 TenantContextHolder 兜底
+        }
+        try {
+            String t = TenantContextHolder.getTenantId();
+            if (t != null && !t.isBlank()) {
+                return t;
+            }
+        } catch (Exception ignored) {
+            // 取不到即无身份，交由下游 fail-closed
+        }
+        return null;
     }
 }

@@ -266,6 +266,27 @@ function parseEnvelope(text: string): TraceBearingBody | null {
 }
 
 /**
+ * D27（2026-11-13 验证）：错误文案从 JSON 信封里取人读字段，而不是把整个响应体原文
+ * 当作 message。网关/引擎的 4xx/5xx 常返回
+ * `{"timestamp":...,"status":404,"error":"Not Found","path":"/api/v1/..."}`
+ * （Spring 默认体）或 `{"code":404,"message":"资源不存在","traceId":...}`（ECOS 信封）。
+ * 原实现直接 `throw new ApiRequestError(text)`，页面把 `e.message` 渲染出去（如对象浏览器
+ * 顶部出现整段 `{"timestamp":…,"path":…}` JSON）。此处统一收口：信封有 message/error 取之，
+ * 都没有才回落原文；非 JSON 保持原文（如 HTML 错误页）。
+ */
+function humanizeErrorBody(text: string, fallback: string): string {
+  if (!text) return fallback;
+  const parsed = parseEnvelope(text) as { message?: unknown; error?: unknown; path?: unknown } | null;
+  if (!parsed) return text;
+  const msg = typeof parsed.message === "string" && parsed.message.trim() !== "" ? parsed.message : "";
+  const err = typeof parsed.error === "string" && parsed.error.trim() !== "" ? parsed.error : "";
+  const detail = msg || err;
+  if (!detail) return fallback;
+  const path = typeof parsed.path === "string" ? parsed.path : "";
+  return path ? `${detail}（${path}）` : detail;
+}
+
+/**
  * 传输层业务/HTTP 错误统一形态：在 `message` 之外透出 `traceId` 与 `httpStatus`，
  * 使页面不必为拿追踪号各自拆信封（旧形态是 glossary/cognitiveClient 各写一份
  * `pickTraceId`，一处改口径另一处就悄悄漂移）。
@@ -396,8 +417,9 @@ export async function apiFetchData<T>(url: string, options?: RequestInit): Promi
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     const traceId = pickTraceId(res, parseEnvelope(text));
-    if (res.status === 403) throw new NoAccessError(text || `HTTP 403`, { traceId });
-    throw new ApiRequestError(text || `HTTP ${res.status}`, { httpStatus: res.status, traceId });
+    const friendly = humanizeErrorBody(text, `HTTP ${res.status}`);
+    if (res.status === 403) throw new NoAccessError(friendly, { traceId });
+    throw new ApiRequestError(friendly, { httpStatus: res.status, traceId });
   }
   const json = (await res.json()) as TraceBearingBody & { code?: number; message?: string; success?: boolean; data?: unknown };
   if (json.success === false) {

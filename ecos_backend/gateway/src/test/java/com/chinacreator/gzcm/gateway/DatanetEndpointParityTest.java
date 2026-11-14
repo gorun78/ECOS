@@ -66,8 +66,15 @@ class DatanetEndpointParityTest {
     private static final String CLEARANCE_REL =
             "ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/security/ClearanceInterceptor.java";
 
-    /** AGENTS.md 基线：正向 10 + 反向 15 = 25（13→15 增量 = 详设-10 R1-A 卷 10 §5.1 wagent 双路径两条反向条目；该批次 -DskipTests 未实跑本门禁，2026-10-11 真跑时按门禁口径订正）。 */
-    private static final int REWRITE_BASELINE = 25;
+    /**
+     * AGENTS.md 基线：正向 + 反向合计。
+     * 原 25（正向 10 + 反向 15；13→15 增量 = 详设-10 R1-A 卷 10 §5.1 wagent 双路径两条反向条目）。
+     * <p>D22（2026-11-13 产品级逐功能验证）：{@code V1_REWRITE_MAP} 删除 5 条指向空目标的正向条目
+     * （alerts / agent-call / sysconfig / marketplace / glossary）——它们的唯一属主 Controller 只映射
+     * v1 正典路径，正向重写把正典改到不存在的裸路径，导致数据市场页 0 资产、配置重置按钮 100% 404。
+     * 按实测订正 25→20（正向 5 + 反向 15），名实一致、只减不增（删的是死条目，非放开门禁）。</p>
+     */
+    private static final int REWRITE_BASELINE = 20;
 
     private static Path repoRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();
@@ -131,20 +138,20 @@ class DatanetEndpointParityTest {
     }
 
     @Test
-    @DisplayName("VersionPrefixRewriteFilter 重写表基线 = 25 条（正向 10 + 反向 15）")
+    @DisplayName("VersionPrefixRewriteFilter 重写表基线 = 20 条（正向 5 + 反向 15）")
     void rewriteFilterBaselineIs25() throws Exception {
         String filterSrc = read(repoRoot().resolve(FILTER_REL));
         List<MapEntry> all = parseFilterEntries(filterSrc);
         assertEquals(REWRITE_BASELINE, all.size(),
-                "AGENTS.md 基线 25 条；当前 = " + all.size() + "（正向 10 + 反向 15）");
-        // 正向 10 + 反向 15：分别断言两个 map 块存在
+                "基线 20 条；当前 = " + all.size() + "（正向 5 + 反向 15）");
+        // 正向 5 + 反向 15：分别断言两个 map 块存在
         assertTrue(filterSrc.contains("V1_REWRITE_MAP"), "V1_REWRITE_MAP 未定义");
         assertTrue(filterSrc.contains("REVERSE_EXACT_MAP"), "REVERSE_EXACT_MAP 未定义");
         assertTrue(filterSrc.contains("REVERSE_PREFIX_MAP"), "REVERSE_PREFIX_MAP 未定义");
         int forward = countEntriesInBlock(filterSrc, "V1_REWRITE_MAP");
         int reverseExact = countEntriesInBlock(filterSrc, "REVERSE_EXACT_MAP");
         int reversePrefix = countEntriesInBlock(filterSrc, "REVERSE_PREFIX_MAP");
-        assertEquals(10, forward, "正向应 10 条，当前 " + forward);
+        assertEquals(5, forward, "正向应 5 条（D22 后），当前 " + forward);
         assertEquals(15, reverseExact + reversePrefix, "反向应 15 条，当前 " + (reverseExact + reversePrefix));
     }
 

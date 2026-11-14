@@ -159,6 +159,14 @@ public final class ErrorCodeMapper {
 
     /** 单个异常类型 → 错误类；不可识别返回 null 交给 cause 链继续走。 */
     private static AiErrorClass classifyOne(Throwable t, Context ctx) {
+        // D58（2026-11-14）：Spring 参数缺失/类型不符属调用方错误，必须先于 IO/兜底分支识别，
+        // 否则会掉进 TOOL_BACKEND_ERROR 兜底被渲染成 502「数据服务异常」——
+        // 缺 RequestParam 是客户端问题，报 502 会把排查引向错误方向。
+        if (t instanceof org.springframework.web.bind.MissingServletRequestParameterException
+                || t instanceof org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+                || t instanceof org.springframework.web.bind.MissingPathVariableException) {
+            return AiErrorClass.INVALID_ARGUMENT;
+        }
         if (t instanceof IllegalArgumentException) {
             return AiErrorClass.INVALID_ARGUMENT;
         }

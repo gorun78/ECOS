@@ -201,19 +201,64 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             "FROM ecos_business_scenario WHERE id = ? AND is_deleted = 0", SCENARIO_ROW_MAPPER, id);
     }
 
-    /** 创建场景（metrics 走 JSONB 强转）。 */
+    /** 按名称查未删除场景的 id（创建幂等：同名已存在则复用，不追加新行）。 */
+    public List<String> findScenarioIdsByName(String name) {
+        return jdbcTemplate.queryForList(
+            "SELECT id FROM ecos_business_scenario WHERE name = ? AND is_deleted = 0 "
+            + "ORDER BY create_time ASC LIMIT 1", String.class, name);
+    }
+
+    /** 创建场景（metrics 走 JSONB 强转；budget 双写文本列与 MC01 数值列）。 */
     public int insertScenario(String id, String name, String description, String businessGoal,
                               String department, String priority, String status, String budget,
                               Object safetyIndexTarget, Object actualSafetyIndex, String metricsJson,
                               String createBy, String updateBy) {
         return jdbcTemplate.update(
             "INSERT INTO ecos_business_scenario " +
-            "(id, name, description, business_goal, department, priority, status, budget, " +
+            "(id, name, description, business_goal, department, priority, status, budget, budget_amount, " +
             " safety_index_target, actual_safety_index, metrics, create_by, update_by, is_deleted) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 0)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 0)",
             id, name, description, businessGoal, department, priority, status, budget,
+            parseBudgetAmount(budget),
             safetyIndexTarget, actualSafetyIndex, metricsJson, createBy, updateBy);
     }
+
+    /**
+     * 把预算文本解析为 MC01 金额（元），规则与 V330 回填 SQL 一致：
+     * 「850万」/「850万元」/「850 万」→ 8500000；纯数字（可带千分位）原样；空或不可解析 → null。
+     *
+     * <p>不可解析时返回 null 而不是抛异常：旧文本列仍照写，双写只是补齐权威列，
+     * 不该因为一个自由文本字段把创建流程打断。解析失败的值在 budget_amount 留空，可被巡检发现。</p>
+     */
+    public static java.math.BigDecimal parseBudgetAmount(String budget) {
+        if (budget == null) {
+            return null;
+        }
+        String text = budget.trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        try {
+            java.util.regex.Matcher wan = WAN_AMOUNT.matcher(text);
+            if (wan.matches()) {
+                return new java.math.BigDecimal(wan.group(1))
+                        .multiply(new java.math.BigDecimal("10000"))
+                        .setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+            String plain = text.replace(",", "");
+            if (PLAIN_AMOUNT.matcher(plain).matches()) {
+                return new java.math.BigDecimal(plain).setScale(2, java.math.RoundingMode.HALF_UP);
+            }
+        } catch (RuntimeException e) {
+            return null;
+        }
+        return null;
+    }
+
+    private static final java.util.regex.Pattern WAN_AMOUNT =
+            java.util.regex.Pattern.compile("^([0-9]+(?:\\.[0-9]+)?)\\s*万(?:元)?$");
+    private static final java.util.regex.Pattern PLAIN_AMOUNT =
+            java.util.regex.Pattern.compile("^[0-9]+(?:\\.[0-9]+)?$");
 
     /** 动态更新场景（SQL 与参数由调用方按非 null 字段组装，此处仅透传执行）。 */
     public int updateScenarioDynamic(String sql, Object[] args) {

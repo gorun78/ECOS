@@ -70,6 +70,9 @@ export default function MarketplaceHeader({
   const { styles } = useTheme();
   const tl = (zh: string, en: string) => (locale === "zh" ? zh : en);
 
+  // D29 补充（2026-11-13 验证）：后端 dashboard 实测只返回 totalAssets/byCategory/byStatus/
+  // recentAssets，**没有 avgRating 与 pendingRequests** ⇒ 原 `dashboard.avgRating.toFixed(1)`
+  // 直接抛 TypeError 导致整页落 ErrorBoundary。缺字段时如实显示 "—"，不编造数值。
   const statDefs: StatDef[] = [
     {
       labelZh: "资产总数",
@@ -82,16 +85,16 @@ export default function MarketplaceHeader({
     {
       labelZh: "平均评分",
       labelEn: "Avg Rating",
-      value: dashboard.avgRating.toFixed(1),
+      value: typeof dashboard.avgRating === "number" ? dashboard.avgRating.toFixed(1) : "—",
       icon: Star,
       color: "text-amber-400",
       bg: "bg-amber-500/10",
-      suffix: " / 5",
+      suffix: typeof dashboard.avgRating === "number" ? " / 5" : undefined,
     },
     {
       labelZh: "待审批",
       labelEn: "Pending",
-      value: dashboard.pendingRequests,
+      value: typeof dashboard.pendingRequests === "number" ? dashboard.pendingRequests : "—",
       icon: Clock,
       color: "text-orange-400",
       bg: "bg-orange-500/10",

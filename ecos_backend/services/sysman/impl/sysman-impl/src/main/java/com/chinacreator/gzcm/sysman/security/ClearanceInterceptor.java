@@ -293,6 +293,9 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             return;
         }
         Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        // 消费端（AuditKafkaConsumer#insertAuditLog）以 id 或 eventId 派生主键；
+        // 二者双缺即整条丢弃。本载荷此前只有业务字段 ⇒ 每次旁路留痕都进不了 ecos_audit_log。
+        payload.put("eventId", java.util.UUID.randomUUID().toString());
         payload.put("eventType", "super_admin_bypass");
         payload.put("action", "clearance.bypass.superAdmin");
         payload.put("userId", operator);

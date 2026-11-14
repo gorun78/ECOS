@@ -213,6 +213,13 @@ public class TaskController {
 
     @PostMapping("/submit")
     public ApiResponse<SubmitResultVO> submitTask(@RequestBody SubmitTaskRequest body) {
+        // D19：原先不校验必填，空 body 会创建一条无名称无类型的空任务并落库
+        if (body.taskName() == null || body.taskName().isBlank()) {
+            return ApiResponse.badRequest("taskName 不能为空");
+        }
+        if (body.taskType() == null || body.taskType().isBlank()) {
+            return ApiResponse.badRequest("taskType 不能为空");
+        }
         TaskDescription taskDesc = new TaskDescription();
         taskDesc.setTaskName(body.taskName());
         taskDesc.setTaskType(body.taskType());
@@ -254,8 +261,26 @@ public class TaskController {
         }
     }
 
+    /**
+     * D19（2026-11-13 验证）：cancel/pause/resume/archive 原先直接 setStatus，
+     * 对不存在的 taskId 也写库并返回 {@code "Task xxx cancelled"} 的假成功。
+     * 现统一前置存在性校验（与 {@link #getTask} 的 404 口径一致）。
+     */
+    private ApiResponse<MessageVO> requireTaskExists(String taskId) {
+        try {
+            if (taskManagementService.getTaskDescription(taskId) == null) {
+                return ApiResponse.notFound("任务不存在: " + taskId);
+            }
+        } catch (TaskManagementException e) {
+            return ApiResponse.error(-1, e.getMessage());
+        }
+        return null;
+    }
+
     @PostMapping("/{taskId}/cancel")
     public ApiResponse<MessageVO> cancelTask(@PathVariable String taskId) {
+        ApiResponse<MessageVO> missing = requireTaskExists(taskId);
+        if (missing != null) return missing;
         try {
             taskManagementService.cancelTask(taskId);
             return ApiResponse.success(new MessageVO("Task " + taskId + " cancelled"));
@@ -266,6 +291,8 @@ public class TaskController {
 
     @PostMapping("/{taskId}/pause")
     public ApiResponse<MessageVO> pauseTask(@PathVariable String taskId) {
+        ApiResponse<MessageVO> missing = requireTaskExists(taskId);
+        if (missing != null) return missing;
         try {
             taskManagementService.pauseTask(taskId);
             return ApiResponse.success(new MessageVO("Task " + taskId + " paused"));
@@ -276,6 +303,8 @@ public class TaskController {
 
     @PostMapping("/{taskId}/resume")
     public ApiResponse<MessageVO> resumeTask(@PathVariable String taskId) {
+        ApiResponse<MessageVO> missing = requireTaskExists(taskId);
+        if (missing != null) return missing;
         try {
             taskManagementService.resumeTask(taskId);
             return ApiResponse.success(new MessageVO("Task " + taskId + " resumed"));
@@ -284,8 +313,11 @@ public class TaskController {
         }
     }
 
+    /** 归档：终态收敛为 CANCELLED（runtime-task 无独立归档态），但必须先证明任务存在。 */
     @PostMapping("/{taskId}/archive")
     public ApiResponse<MessageVO> archiveTask(@PathVariable String taskId) {
+        ApiResponse<MessageVO> missing = requireTaskExists(taskId);
+        if (missing != null) return missing;
         try {
             taskManagementService.cancelTask(taskId);
             return ApiResponse.success(new MessageVO("Task " + taskId + " archived"));

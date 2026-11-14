@@ -118,6 +118,12 @@ export const ROUTE_MANIFEST: readonly RouteManifestEntry[] = Object.freeze([
   { prefix: "/api/v1/data-permission", engine: "security", port: 18081, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/policy-engine", engine: "security", port: 18081, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/engine/data", engine: "data", port: 18082, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
+  // D62（2026-11-14）：vite 前缀「首中生效」⇒ 更具体的子族必须先于 /api/v1/ecos 父前缀登记，
+  // 否则对象面/状态机被整根送去 ontology :18083（该服务无此映射，返回 Spring 默认 403/404）。
+  // 属主依据同 gateway route-manifest：/api/v1/ecos 整根不唯一，objects/state-machine 归 workspace。
+  { prefix: "/api/v1/ecos/objects", engine: "workspace", port: 18090, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
+  { prefix: "/api/v1/ecos/state-machine", engine: "workspace", port: 18090, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
+  { prefix: "/api/v1/ecos/statemachine", engine: "workspace", port: 18090, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/ecos", engine: "ontology", port: 18083, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   // PMO-60：workspace 独立 :18090；cognitive 并入 aiming :18084。两者同时是 BFF 开关分支条目。
   { prefix: "/api/v1/workspace", engine: "workspace", port: 18090, directInDev: true, directWhenFlag: true, alwaysGateway: false, streaming: false },

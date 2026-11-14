@@ -341,7 +341,7 @@ public class AgentToolController {
         ToolAdjudicationRequest request = new ToolAdjudicationRequest(
                 subject,
                 new ToolAdjudicationRequest.Action(ToolAdjudicationRequest.ACTION_TYPE,
-                        name, "read"),
+                        name, dryRunOperation(schema, name)),
                 ToolAdjudicationRequest.projectResource(arguments),
                 new ToolAdjudicationRequest.Environment(
                         AiTraceSupport.currentTraceId(),
@@ -360,7 +360,7 @@ public class AgentToolController {
         }
         // ALLOW ⇒ 组装干跑载荷（executed=false：本端点禁触发任何 dispatch/副作用）
         AdjudicationVO adjudication = new AdjudicationVO(decision.verdict().name(),
-                decision.policyId(), decision.reason(), "read", subject.userId(),
+                decision.policyId(), decision.reason(), dryRunOperation(schema, name), subject.userId(),
                 AiTraceSupport.currentTraceId());
         DryRunVO data = new DryRunVO(name, arguments,
                 body == null ? null : body.get("asOfTime"), true, false,
@@ -407,8 +407,21 @@ public class AgentToolController {
                         message == null ? AiErrorClass.GUARDRAIL_FAIL_CLOSED.renderMessage(null) : message));
     }
 
-    /** admin 角色判据：词表 admin／ROLE_ADMIN、大小写不敏感（与 F10-21 同口径）。 */
-    private static boolean hasAdminRole(List<String> roles) {
+    /**
+     * 干跑的 {@code action.operation}：取工具 schema 的声明值，缺省 read。
+     *
+     * <p>此前本端点硬编码 {@code "read"}，而真实执行腿走
+     * {@code ToolExecutorService#inferOperation}（schema 声明优先）⇒ 写工具干跑被按只读裁决，
+     * 干跑结论与真实执行结论会分叉。干跑的意义正是"预演真裁决"，二者必须同一判据。</p>
+     */
+    private static String dryRunOperation(ToolSchema schema, String toolName) {
+        if (schema != null && schema.getOperation() != null && !schema.getOperation().isBlank()) {
+            return schema.getOperation();
+        }
+        return "read";
+    }
+
+    /** admin 角色判据：词表 admin／ROLE_ADMIN、大小写不敏感（与 F10-21 同口径）。 */    private static boolean hasAdminRole(List<String> roles) {
         if (roles == null) return false;
         for (String r : roles) {
             if (r != null && DRY_RUN_ADMIN_ROLES.contains(r.toLowerCase(Locale.ROOT))) {

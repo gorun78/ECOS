@@ -179,16 +179,18 @@ export default function MarketplaceDetailPanel({
                 </span>
               </div>
 
-              {/* Rating */}
-              <div className="flex items-center gap-2 mt-3">
-                <div className="flex items-center gap-0.5">
-                  {renderStars(asset.rating, "w-5 h-5")}
+              {/* Rating（后端不返回 rating ⇒ 整行不渲染，禁编造分数） */}
+              {typeof asset.rating === "number" && (
+                <div className="flex items-center gap-2 mt-3">
+                  <div className="flex items-center gap-0.5">
+                    {renderStars(asset.rating, "w-5 h-5")}
+                  </div>
+                  <span className={`text-lg font-bold ${styles.cardText}`}>
+                    {asset.rating.toFixed(1)}
+                  </span>
+                  <span className="text-xs opacity-50">/ 5</span>
                 </div>
-                <span className={`text-lg font-bold ${styles.cardText}`}>
-                  {asset.rating.toFixed(1)}
-                </span>
-                <span className="text-xs opacity-50">/ 5</span>
-              </div>
+              )}
 
               {/* Tags */}
               {asset.tags && asset.tags.length > 0 && (

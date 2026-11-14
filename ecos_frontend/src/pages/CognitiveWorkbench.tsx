@@ -26,7 +26,9 @@ const STEPS = [
 export default function CognitiveWorkbench() {
   const { styles } = useTheme();
   const { locale } = useLanguage();
-  const zh = locale === 'zh' || locale === 'zh-CN';
+  // D28（2026-11-13 验证）：Locale 只有 "zh" | "en"（LanguageContext:34），
+  // 原 `locale === 'zh-CN'` 是恒假的无效比较（tsc TS2367）。保留单值判断即可。
+  const zh = locale === 'zh';
   const [view, setView] = useState<ViewKey>('overview');
   const [filter, setFilter] = useState<'all' | 'mental' | 'cognitive'>('all');
   const [ran, setRan] = useState(false);
@@ -72,7 +74,7 @@ export default function CognitiveWorkbench() {
     actualText: zh ? '演示数据尚未接入真实结果，需在行动执行后回填。' : 'Demo data is not connected to real outcomes; actual results must be recorded after execution.',
     varianceText: zh ? '结果回填后，对比预期与实际，复核假设并评估模型适用性。' : 'Compare actuals to expectations, review hypotheses and assess model fit after outcomes are recorded.',
   }), [zh]);
-  const nav: { id: ViewKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  const nav: { id: ViewKey; label: string; icon: React.ComponentType<{ className?: string; size?: number }> }[] = [
     { id: 'overview', label: t.overview, icon: Activity }, { id: 'scenario', label: t.scenario, icon: GitBranch },
     { id: 'mind', label: 'Mind', icon: Brain }, { id: 'models', label: t.models, icon: Lightbulb },
     { id: 'agent', label: 'W Agent', icon: Workflow }, { id: 'review', label: t.review, icon: RefreshCw },

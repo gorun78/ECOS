@@ -17,6 +17,14 @@ import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSuppor
  * 原 {@code config.AgentRepository}，SQL 与 {@code RowMapper} 原样搬运，只搬不改语义。
  * tools 和 knowledge 以 JSON 字符串存储在 TEXT 列中。
  * </p>
+ *
+ * <p><b>表名必须带 schema 限定（数据库访问规范 §七 通用规则第 1 条，DR01 + ST07 归属判定）</b>：
+ * {@code ecos_agent} 在库里<b>同名存在两份</b>——{@code ecos_control.ecos_agent}（V4 建表时未带
+ * schema 前缀，落进 search_path 首位的主控制 schema，活体数据在它这里）与
+ * {@code ecos_ai.ecos_agent}（06_ecos_ai.sql 标注「旧版」，0 行且多一列 {@code tenant_id}）。
+ * 写成裸表名时解析结果完全取决于连接的 {@code search_path} 顺序：现网首位是 {@code ecos_control}
+ * 所以"碰巧"读对，一旦 search_path 次序变化或某环境把 {@code ecos_ai} 前置，同一份代码就会
+ * 静默切到另一张空表——列表变空、写入进错表、无任何报错。故此处显式限定 schema。</p>
  */
 @Repository
 public class AgentDao extends JdbcTemplateDaoSupport {
@@ -42,19 +50,19 @@ public class AgentDao extends JdbcTemplateDaoSupport {
     };
 
     public List<AgentEntity> findAll(int limit) {
-        String sql = "SELECT * FROM ecos_agent ORDER BY updated_at DESC LIMIT ?";
+        String sql = "SELECT * FROM ecos_control.ecos_agent ORDER BY updated_at DESC LIMIT ?";
         return jdbcTemplate.query(sql, ROW_MAPPER, limit);
     }
 
     public Optional<AgentEntity> findById(String id) {
-        String sql = "SELECT * FROM ecos_agent WHERE id = ?";
+        String sql = "SELECT * FROM ecos_control.ecos_agent WHERE id = ?";
         List<AgentEntity> list = jdbcTemplate.query(sql, ROW_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     public int insert(AgentEntity entity) {
         String sql = """
-            INSERT INTO ecos_agent (id, name, model_provider, model_name, system_prompt, tools, knowledge, status, created_at, updated_at)
+            INSERT INTO ecos_control.ecos_agent (id, name, model_provider, model_name, system_prompt, tools, knowledge, status, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             """;
         return jdbcTemplate.update(sql,
@@ -66,7 +74,7 @@ public class AgentDao extends JdbcTemplateDaoSupport {
     public int update(String id, String name, String modelProvider, String modelName,
                       String systemPrompt, String tools, String knowledge, String status) {
         String sql = """
-            UPDATE ecos_agent SET
+            UPDATE ecos_control.ecos_agent SET
                 name = COALESCE(?, name),
                 model_provider = COALESCE(?, model_provider),
                 model_name = COALESCE(?, model_name),
@@ -82,25 +90,25 @@ public class AgentDao extends JdbcTemplateDaoSupport {
     }
 
     public int updateTools(String id, String tools) {
-        String sql = "UPDATE ecos_agent SET tools = ?, updated_at = NOW() WHERE id = ?";
+        String sql = "UPDATE ecos_control.ecos_agent SET tools = ?, updated_at = NOW() WHERE id = ?";
         return jdbcTemplate.update(sql, tools, id);
     }
 
     public int updateKnowledge(String id, String knowledge) {
-        String sql = "UPDATE ecos_agent SET knowledge = ?, updated_at = NOW() WHERE id = ?";
+        String sql = "UPDATE ecos_control.ecos_agent SET knowledge = ?, updated_at = NOW() WHERE id = ?";
         return jdbcTemplate.update(sql, knowledge, id);
     }
 
     public int publish(String id) {
-        String sql = "UPDATE ecos_agent SET status = 'published', updated_at = NOW() WHERE id = ?";
+        String sql = "UPDATE ecos_control.ecos_agent SET status = 'published', updated_at = NOW() WHERE id = ?";
         return jdbcTemplate.update(sql, id);
     }
 
     public int deleteById(String id) {
-        return jdbcTemplate.update("DELETE FROM ecos_agent WHERE id = ?", id);
+        return jdbcTemplate.update("DELETE FROM ecos_control.ecos_agent WHERE id = ?", id);
     }
 
     public long count() {
-        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ecos_agent", Long.class);
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ecos_control.ecos_agent", Long.class);
     }
 }

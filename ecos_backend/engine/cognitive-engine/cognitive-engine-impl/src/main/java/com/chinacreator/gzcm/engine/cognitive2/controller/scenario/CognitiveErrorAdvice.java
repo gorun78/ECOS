@@ -77,6 +77,28 @@ public class CognitiveErrorAdvice {
      * MissingServletRequestParameterException ⇒ 500），前端因此无法按 4xx/503 区分「参数缺失」
      * 与「引擎故障」，违 D.5「失败语义独立状态码禁折叠」。</p>
      */
+    /**
+     * 请求体不可解析（畸形 JSON / 类型不匹配）→ 400 {@code ECOS-COG-400P}。
+     *
+     * <p><b>2026-11-13 验证缺陷 D7</b>：此前 {@code HttpMessageNotReadableException} 落入下方
+     * catch-all 折叠成 500 {@code ECOS-COG-504 cognitive internal error}。实测：
+     * {@code POST /api/v1/cognitive/executions} 传 {@code {bad json} ⇒ HTTP 500}。
+     * 调用方传坏数据是 4xx 而非服务端故障，折叠成 500 会误导排障方向（与上一条
+     * {@code onMissingParam} 同一缺陷形态：catch-all 吞掉本可精确归类的异常）。</p>
+     */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> onUnreadableBody(
+            org.springframework.http.converter.HttpMessageNotReadableException e) {
+        log.warn("cognitive unreadable request body: {}", e.getMostSpecificCause().getMessage());
+        Map<String, Object> data = new LinkedHashMap<>();
+        String tid = MDC.get("traceId");
+        if (tid != null) data.put("traceId", tid);
+        ApiResponse<Map<String, Object>> body =
+                ApiResponse.error(400, CognitiveErrorCode.E400_INVALID_PARAM, CognitiveErrorCode.MSG_INVALID_PARAM);
+        body.setData(data);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiResponse<Map<String, Object>>> onMissingParam(MissingServletRequestParameterException e) {
         log.warn("cognitive missing request parameter: name={}", e.getParameterName());
@@ -88,6 +110,34 @@ public class CognitiveErrorAdvice {
                 ApiResponse.error(400, CognitiveErrorCode.E400_INVALID_PARAM, CognitiveErrorCode.MSG_INVALID_PARAM);
         body.setData(data);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    /**
+     * 域内业务校验失败 → 按异常自述状态行输出（一般为 400）。
+     *
+     * <p><b>2026-11-13 验证缺陷 D37</b>：认知域 Service 用 {@code BusinessException("COG-400: xxx 必填")}
+     * 表达入参缺失，但本 advice 没有该类型的处理器，落入下方 catch-all 折叠成 500
+     * {@code ECOS-COG-504 cognitive internal error}。实测 {@code POST /api/v1/cognitive/diagnose}、
+     * {@code /counterfactual}、{@code /forecast}、{@code /models}、{@code /beliefs}、
+     * {@code /hypotheses}、{@code /evidence} 七个写面空体全部 500——调用方传空体是 4xx 而非服务端故障，
+     * 与同文件 {@code onMissingParam}/{@code onUnreadableBody} 属同一「catch-all 吞掉可精确归类异常」形态。
+     * 状态行取 {@link com.chinacreator.gzcm.common.exception.DataBridgeException#resolveHttpStatus(int)}
+     * 单一裁决口径（非法携带值回退 500），不在此处二次判定。</p>
+     */
+    @ExceptionHandler(com.chinacreator.gzcm.common.exception.DataBridgeException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> onDataBridge(
+            com.chinacreator.gzcm.common.exception.DataBridgeException e) {
+        int status = com.chinacreator.gzcm.common.exception.DataBridgeException
+                .resolveHttpStatus(e.getHttpStatus());
+        log.warn("cognitive business error: httpStatus={} errorCode={} message={}",
+                status, e.getErrorCode(), e.getMessage());
+        Map<String, Object> data = new LinkedHashMap<>();
+        String tid = MDC.get("traceId");
+        if (tid != null) data.put("traceId", tid);
+        ApiResponse<Map<String, Object>> body =
+                ApiResponse.error(status, e.getMessage());
+        body.setData(data);
+        return ResponseEntity.status(HttpStatus.valueOf(status)).body(body);
     }
 
     @ExceptionHandler(Exception.class)

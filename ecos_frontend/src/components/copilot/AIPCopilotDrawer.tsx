@@ -39,80 +39,38 @@ interface AIPCopilotDrawerProps {
   onClose: () => void;
   viewMode?: 'ontology' | 'explorer' | 'integration' | 'knowledge' | 'aip' | 'security' | 'workshop';
   onViewModeChange?: (mode: 'ontology' | 'explorer' | 'integration' | 'knowledge' | 'aip' | 'security' | 'workshop') => void;
-  selectedCategory?: 'overview' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function';
-  onSelectCategory?: (category: 'overview' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function', id: string | null) => void;
-  integrationTab?: 'connections' | 'syncs' | 'pipelines' | 'health' | 'lineage' | 'pipeline-builder' | 'code-repositories' | 'code-workbooks' | 'contour' | 'guide';
-  onIntegrationTabChange?: (tab: 'connections' | 'syncs' | 'pipelines' | 'health' | 'lineage' | 'pipeline-builder' | 'code-repositories' | 'code-workbooks' | 'contour' | 'guide') => void;
-  showToast?: (type: 'success' | 'info' | 'error', message: string) => void;
-  objectTypes?: any[];
-  setObjectTypes?: React.Dispatch<React.SetStateAction<any[]>>;
-  linkTypes?: any[];
-  setLinkTypes?: React.Dispatch<React.SetStateAction<any[]>>;
-  datasets?: any[];
-  setDatasets?: React.Dispatch<React.SetStateAction<any[]>>;
   securityTab?: 'overview' | 'orgs' | 'dac' | 'mac' | 'pbac' | 'row_col' | 'audit';
   onSecurityTabChange?: (tab: 'overview' | 'orgs' | 'dac' | 'mac' | 'pbac' | 'row_col' | 'audit') => void;
-  securityOrgs?: any[];
-  setSecurityOrgs?: React.Dispatch<React.SetStateAction<any[]>> | ((val: any[]) => void);
-  securityProjects?: any[];
-  setSecurityProjects?: React.Dispatch<React.SetStateAction<any[]>> | ((val: any[]) => void);
-  securityMarkings?: any[];
-  setSecurityMarkings?: React.Dispatch<React.SetStateAction<any[]>> | ((val: any[]) => void);
-  securityPurposes?: any[];
-  setSecurityPurposes?: React.Dispatch<React.SetStateAction<any[]>> | ((val: any[]) => void);
-  securityRowColPolicies?: any[];
-  setSecurityRowColPolicies?: React.Dispatch<React.SetStateAction<any[]>> | ((val: any[]) => void);
-  securityAuditLogs?: any[];
-  setSecurityAuditLogs?: React.Dispatch<React.SetStateAction<any[]>> | ((val: any[]) => void);
-  securitySimUser?: string;
-  setSecuritySimUser?: (val: string) => void;
-  securitySimDataset?: string;
-  setSecuritySimDataset?: (val: string) => void;
-  securitySimPurpose?: string;
-  setSecuritySimPurpose?: (val: string) => void;
-  securitySimResult?: { verdict: 'GRANTED' | 'DENIED'; traces: string[] } | null;
-  setSecuritySimResult?: (val: { verdict: 'GRANTED' | 'DENIED'; traces: string[] } | null) => void;
-  securitySelectedRowColDs?: string;
-  setSecuritySelectedRowColDs?: (val: string) => void;
 }
 
 /**
  * Detect scenario type from a free-form user query,
  * by matching key Chinese/English keywords (logic keywords only, not display text).
+ *
+ * 2026-11-14：只剩 4 条真实安全场景。原先的 pipeline/ontology/health/lineage 与 4 条 ws_* 
+ * 分支已删除（纯 sleep 演示流，无后端调用）；未命中安全关键字一律**不走自动化**，
+ * 落到真实 chat（agent-loop）。
  */
 function detectScenarioType(
   viewMode: 'ontology' | 'explorer' | 'integration' | 'knowledge' | 'aip' | 'security' | 'workshop',
   query: string,
-): AgentScenarioType {
-  if (viewMode === 'workshop' || query.includes('无代码') || query.includes('大盘') || query.includes('画布') || query.includes('变量') || query.includes('绑定') || query.includes('看板') || query.includes('低代码') || query.includes('组件') || query.includes('挂载')) {
-    if (query.includes('大盘') || query.includes('一键组装') || query.includes('监控') || query.includes('生成')) return 'ws_generate_dashboard';
-    if (query.includes('变量') || query.includes('绑定') || query.includes('联动')) return 'ws_auto_bind';
-    if (query.includes('Copilot') || query.includes('辅助面板') || query.includes('协处理器') || query.includes('操作面板')) return 'ws_inject_copilot';
-    return 'ws_transform_theme';
-  }
+): AgentScenarioType | null {
   if (viewMode === 'security' || query.includes('安全') || query.includes('隔离') || query.includes('信任') || query.includes('审计') || query.includes('GDPR') || query.includes('脱敏') || query.includes('掩膜') || query.includes('行列') || query.includes('财务') || query.includes('越权') || query.includes('日志')) {
     if (query.includes('GDPR') || query.includes('零信任') || query.includes('欧盟')) return 'sec_gdpr';
     if (query.includes('脱敏') || query.includes('行列') || query.includes('ssn') || query.includes('过滤') || query.includes('pilots')) return 'sec_row_col';
     if (query.includes('审计') || query.includes('日志') || query.includes('拦截') || query.includes('扫描') || query.includes('越权')) return 'sec_audit';
     return 'sec_finance';
   }
-  if (query.includes('本体') || query.includes('实体') || query.includes('映射') || query.includes('AviationFlight') || query.includes('Object')) return 'ontology';
-  if (query.includes('健康') || query.includes('监控') || query.includes('质量') || query.includes('规则') || query.includes('check') || query.includes('SLA')) return 'health';
-  if (query.includes('血缘') || query.includes('链路') || query.includes('上下游') || query.includes('依赖') || query.includes('lineage')) return 'lineage';
-  return 'pipeline';
+  return null;
 }
 
 /**
- * Match a free-form query against the 12 preset prompts from the
- * scenario catalog (logic — string compare, not display).
+ * Match a free-form query against the 4 real security scenario prompts
+ * (logic — string compare, not display).
  */
 function isScenarioQuery(t: (k: string) => string, query: string): boolean {
   if (query.startsWith('/')) return true;
-  const typeList: AgentScenarioType[] = [
-    'pipeline', 'ontology', 'health', 'lineage',
-    'sec_gdpr', 'sec_row_col', 'sec_finance', 'sec_audit',
-    'ws_generate_dashboard', 'ws_auto_bind', 'ws_inject_copilot', 'ws_transform_theme',
-  ];
+  const typeList: AgentScenarioType[] = ['sec_gdpr', 'sec_row_col', 'sec_finance', 'sec_audit'];
   return typeList.some((type) => query.includes(scenarioPrompt(t, type).slice(0, 15)));
 }
 
@@ -138,41 +96,8 @@ export default function AIPCopilotDrawer({
   onClose,
   viewMode = 'aip',
   onViewModeChange = () => {},
-  selectedCategory = 'overview',
-  onSelectCategory = () => {},
-  integrationTab = 'connections',
-  onIntegrationTabChange = () => {},
-  showToast = () => {},
-  objectTypes = [],
-  setObjectTypes = (() => {}) as any,
-  linkTypes = [],
-  setLinkTypes = (() => {}) as any,
-  datasets = [],
-  setDatasets = (() => {}) as any,
   securityTab = 'overview',
   onSecurityTabChange = () => {},
-  securityOrgs = [],
-  setSecurityOrgs = (() => {}) as any,
-  securityProjects = [],
-  setSecurityProjects = (() => {}) as any,
-  securityMarkings = [],
-  setSecurityMarkings = (() => {}) as any,
-  securityPurposes = [],
-  setSecurityPurposes = (() => {}) as any,
-  securityRowColPolicies = [],
-  setSecurityRowColPolicies = (() => {}) as any,
-  securityAuditLogs = [],
-  setSecurityAuditLogs = (() => {}) as any,
-  securitySimUser = '',
-  setSecuritySimUser = () => {},
-  securitySimDataset = '',
-  setSecuritySimDataset = () => {},
-  securitySimPurpose = '',
-  setSecuritySimPurpose = () => {},
-  securitySimResult = null,
-  setSecuritySimResult = () => {},
-  securitySelectedRowColDs = '',
-  setSecuritySelectedRowColDs = () => {},
 }: AIPCopilotDrawerProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
@@ -192,45 +117,10 @@ export default function AIPCopilotDrawer({
     setMessages,
     runAgentAutomation,
   } = useAipAutomation({
-    viewMode,
     onViewModeChange,
-    selectedCategory,
-    onSelectCategory,
-    integrationTab,
-    onIntegrationTabChange,
-    securityTab,
     onSecurityTabChange,
-    showToast,
-    objectTypes,
-    setObjectTypes: (v: any) => { (setObjectTypes as any)(v); },
-    linkTypes,
-    setLinkTypes: (v: any) => { (setLinkTypes as any)(v); },
-    datasets,
-    setDatasets: (v: any) => { (setDatasets as any)(v); },
-    securityOrgs: securityOrgs as any,
-    setSecurityOrgs: (v: any) => { (setSecurityOrgs as any)(v); },
-    securityProjects: securityProjects as any,
-    setSecurityProjects: (v: any) => { (setSecurityProjects as any)(v); },
-    securityMarkings: securityMarkings as any,
-    setSecurityMarkings: (v: any) => { (setSecurityMarkings as any)(v); },
-    securityPurposes: securityPurposes as any,
-    setSecurityPurposes: (v: any) => { (setSecurityPurposes as any)(v); },
-    securityRowColPolicies: securityRowColPolicies as any,
-    setSecurityRowColPolicies: (v: any) => { (setSecurityRowColPolicies as any)(v); },
-    securityAuditLogs: securityAuditLogs as any,
-    setSecurityAuditLogs: (v: any) => { (setSecurityAuditLogs as any)(v); },
-    securitySimUser,
-    setSecuritySimUser,
-    securitySimDataset,
-    setSecuritySimDataset,
-    securitySimPurpose,
-    setSecuritySimPurpose,
-    securitySimResult: securitySimResult as any,
-    setSecuritySimResult: (v: any) => { (setSecuritySimResult as any)(v); },
-    securitySelectedRowColDs,
-    setSecuritySelectedRowColDs,
-  } as any);
-
+    showToast: () => {},
+  });
   // 6 内置智能体目录（服务端单源）；不可用时保持空列表（不伪造智能体）
   useEffect(() => {
     let cancelled = false;
@@ -284,8 +174,9 @@ export default function AIPCopilotDrawer({
     const query = raw.trim();
     if (!query || busy) return;
 
-    if (isScenarioQuery(t, query)) {
-      await runAgentAutomation(detectScenarioType(viewMode, query), query);
+    const scenario = isScenarioQuery(t, query) ? detectScenarioType(viewMode, query) : null;
+    if (scenario) {
+      await runAgentAutomation(scenario, query);
       return;
     }
 

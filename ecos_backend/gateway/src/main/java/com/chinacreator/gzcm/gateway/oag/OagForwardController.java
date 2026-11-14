@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -146,12 +147,13 @@ public class OagForwardController {
     public SseEmitter chatStream(@RequestBody String rawBody) {
         SseEmitter emitter = new SseEmitter(300_000L);
         URI targetUri = URI.create(baseUrl + "/api/v1/oag/chat/stream");
-        HttpRequest request = HttpRequest.newBuilder(targetUri)
+        HttpRequest.Builder streamBuilder = HttpRequest.newBuilder(targetUri)
                 .timeout(Duration.ofSeconds(300))
                 .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .header("Accept", MediaType.TEXT_EVENT_STREAM_VALUE)
-                .POST(HttpRequest.BodyPublishers.ofString(rawBody, StandardCharsets.UTF_8))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(rawBody, StandardCharsets.UTF_8));
+        applyAuthHeaders(streamBuilder);
+        HttpRequest request = streamBuilder.build();
         long requestStart = System.currentTimeMillis();
 
         try {
@@ -199,20 +201,44 @@ public class OagForwardController {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * 简易健康检查转发：目标返回 2xx 即健康，否则返回 503 语义。
+     * 健康检查转发（{@code POST /api/v1/oag/health}，操作面兼容腿）。
      *
      * @return ApiResponse 包装的健康状态描述
      */
     @PostMapping("/health")
     public ApiResponse<String> health() {
-        String target = baseUrl + "/api/v1/oag/health";
-        HttpRequest request = HttpRequest.newBuilder(URI.create(target))
+        return probeUpstreamHealth();
+    }
+
+    /**
+     * 健康检查转发（{@code GET /api/v1/oag/chat/health}，与上游 OagController 同名同动词）。
+     *
+     * <p>上游真实契约是 {@code GET /api/v1/oag/chat/health}（见 OagController 自身返回的
+     * endpoints 清单）；此前转发到不存在的 {@code POST /api/v1/oag/health}，配合缺失认证头
+     * 导致恒为 "OAG health check failed: HTTP 403"。两条动词都保留：GET 是上游原貌，
+     * POST 是网关既有调用方在用的兼容腿，二者共用同一探测实现。</p>
+     *
+     * @return ApiResponse 包装的健康状态描述
+     */
+    @GetMapping("/chat/health")
+    public ApiResponse<String> chatHealth() {
+        return probeUpstreamHealth();
+    }
+
+    /**
+     * 向上游 {@code GET /api/v1/oag/chat/health} 探测一次，2xx 即健康，否则 503 语义。
+     *
+     * @return ApiResponse 包装的健康状态描述
+     */
+    private ApiResponse<String> probeUpstreamHealth() {
+        String target = baseUrl + "/api/v1/oag/chat/health";
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(target))
                 .timeout(Duration.ofSeconds(10))
-                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                .POST(HttpRequest.BodyPublishers.noBody())
-                .build();
+                .header("Accept", MediaType.APPLICATION_JSON_VALUE)
+                .GET();
+        applyAuthHeaders(builder);
         try {
-            HttpResponse<String> resp = httpClient.send(request,
+            HttpResponse<String> resp = httpClient.send(builder.build(),
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int status = resp.statusCode();
             log.debug("[OAG-FWD] /health 转发, 目标 {}, HTTP {}", target, status);
@@ -234,6 +260,50 @@ public class OagForwardController {
     // ═══════════════════════════════════════════════════════════════
 
     /**
+     * 为转发请求补齐认证料：bearer token + 信任头。
+     *
+     * <p>aiming :18084 的 HeaderAuthInterceptor 要求 {@code X-ECOS-USER}/{@code X-ECOS-TENANT}
+     * 且安全链同时校验 {@code Authorization}；二者缺一即 403 ECOS-AUTH-010。而
+     * {@code EcosTrustHeaderFilter} 在网关链前无条件剥离客户端传来的信任头，故必须在此从
+     * 已认证主体重注入（做法与 WorkspaceForwardController:92-111 同一口径）。缺失即不注入，
+     * 由下游 fail-closed，不伪造身份。</p>
+     *
+     * @param builder 待发往上游的请求构造器
+     */
+    private void applyAuthHeaders(HttpRequest.Builder builder) {
+        org.springframework.web.context.request.ServletRequestAttributes attrs =
+                (org.springframework.web.context.request.ServletRequestAttributes)
+                        org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if (attrs != null) {
+            String authorization = attrs.getRequest().getHeader("Authorization");
+            if (StringUtils.hasText(authorization)) {
+                builder.header("Authorization", authorization);
+            }
+        }
+        org.springframework.security.core.Authentication auth =
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()
+                || auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
+            return;
+        }
+        builder.header(com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor.H_USER,
+                auth.getName());
+        String roles = auth.getAuthorities().stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.joining(","));
+        if (!roles.isBlank()) {
+            builder.header(com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor.H_ROLE,
+                    roles);
+        }
+        String tenant = com.chinacreator.gzcm.common.context.TenantContextHolder.getTenantId();
+        if (tenant != null && !tenant.isBlank()) {
+            builder.header(com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor.H_TENANT,
+                    tenant);
+        }
+    }
+
+    /**
      * 通用非流式 JSON 转发：POST rawBody 到目标 /api/v1/oag{path}，透传响应体与状态码。
      *
      * @param path    目标相对路径（含前导 /，如 /chat、/chat/v2）
@@ -243,11 +313,12 @@ public class OagForwardController {
      */
     private ResponseEntity<String> forwardJson(String path, String rawBody) {
         String target = baseUrl + "/api/v1/oag" + path;
-        HttpRequest request = HttpRequest.newBuilder(URI.create(target))
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(target))
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
-                .POST(HttpRequest.BodyPublishers.ofString(rawBody, StandardCharsets.UTF_8))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(rawBody, StandardCharsets.UTF_8));
+        applyAuthHeaders(builder);
+        HttpRequest request = builder.build();
         log.debug("[OAG-FWD] 转发 {} → {}", path, target);
         try {
             HttpResponse<String> resp = httpClient.send(request,

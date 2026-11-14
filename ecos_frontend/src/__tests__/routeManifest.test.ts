@@ -85,6 +85,16 @@ const GATEWAY_HOSTED_KNOWLEDGE_KEYS = [
   "/api/v1/knowledge/health",
 ];
 
+// D62（2026-11-14）：vite 前缀首中生效，/api/v1/ecos 整根归 ontology :18083，
+// 但 objects / state-machine 子族实际属 workspace :18090（GatewayApplication 整包排除
+// workspace.controller，故这两族只能走 :18090）。三条更具体的子族条目必须先于父前缀登记。
+// 属主口径与 gateway route-manifest 的三条 workspace 条目严格一致。
+const WORKSPACE_ECOS_SUBFAMILY_KEYS = [
+  "/api/v1/ecos/objects",
+  "/api/v1/ecos/state-machine",
+  "/api/v1/ecos/statemachine",
+];
+
 const viteConfigSrc = readFileSync(resolve(__dirname, "../../vite.config.ts"), "utf8");
 const serverSrc = readFileSync(resolve(__dirname, "../../server.ts"), "utf8");
 
@@ -99,10 +109,11 @@ describe("bff › route manifest single source (W194/C176)", () => {
     // server.ts 已无手写开关分支 / 手写 catch-all 字面量注册
     expect(serverSrc).not.toMatch(/app\.use\(\s*["']\/api\/(dq|datalake|v1\/ecos\/git)["']/);
 
-    // 1) dev 侧：vite 表 = 迁移前 21 条基线 + 3 条 gateway 宿主 knowledge 子路径，target 逐条等价
+    // 1) dev 侧：vite 表 = 迁移前 21 条基线 + 3 条 gateway 宿主 knowledge 子路径
+    //    + 3 条 workspace 的 ecos 子族（D62），target 逐条等价
     const table = buildViteDevProxyTable({});
     expect(Object.keys(table).sort()).toEqual(
-      [...PRE_MIGRATION_VITE_KEYS, ...GATEWAY_HOSTED_KNOWLEDGE_KEYS].sort(),
+      [...PRE_MIGRATION_VITE_KEYS, ...GATEWAY_HOSTED_KNOWLEDGE_KEYS, ...WORKSPACE_ECOS_SUBFAMILY_KEYS].sort(),
     );
     for (const [prefix, port] of Object.entries(PRE_MIGRATION_VITE_TARGETS)) {
       expect(table[prefix]?.target, `vite target of ${prefix}`).toBe(`http://localhost:${port}`);
@@ -110,11 +121,19 @@ describe("bff › route manifest single source (W194/C176)", () => {
     for (const prefix of GATEWAY_HOSTED_KNOWLEDGE_KEYS) {
       expect(table[prefix]?.target, `vite target of ${prefix}`).toBe("http://localhost:8080");
     }
+    for (const prefix of WORKSPACE_ECOS_SUBFAMILY_KEYS) {
+      expect(table[prefix]?.target, `vite target of ${prefix}`).toBe("http://localhost:18090");
+    }
     // 前缀归属不变式：更具体前缀必须排在父前缀之前（vite 按插入序首中，否则被 kb :18086 截胡）
     const prefixes = ROUTE_MANIFEST.map((e) => e.prefix);
     const knowledgeIdx = prefixes.indexOf("/api/v1/knowledge");
     for (const prefix of GATEWAY_HOSTED_KNOWLEDGE_KEYS) {
       expect(prefixes.indexOf(prefix), `${prefix} 必须早于 /api/v1/knowledge`).toBeLessThan(knowledgeIdx);
+    }
+    // D62 同一不变式：ecos 子族必须先于 /api/v1/ecos 父前缀（否则被 ontology :18083 截胡）
+    const ecosIdx = prefixes.indexOf("/api/v1/ecos");
+    for (const prefix of WORKSPACE_ECOS_SUBFAMILY_KEYS) {
+      expect(prefixes.indexOf(prefix), `${prefix} 必须早于 /api/v1/ecos`).toBeLessThan(ecosIdx);
     }
     // aiming dev 直连仍注入信任头（F05-14/R-16 等价迁移）
     expect(table["/api/v1/agent-loop"]?.headers).toEqual({

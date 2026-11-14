@@ -42,14 +42,21 @@ export async function requestMarketplaceAccess(
 
 // ── Marketplace P1-4 Browser ────────────────────────────────
 
+/**
+ * D29（2026-11-13 验证）：`rating` / `popularity` / `reviews` 后端**不返回**
+ * （sysman MarketplaceController 的资产载荷只有 id/name/nameZh/description/category/
+ * status/owner/version/tags/createdAt/updatedAt），而详情面板直接 `asset.rating.toFixed(1)`、
+ * 卡片直接 `Math.floor(asset.rating)` ⇒ 一进 `#/marketplace` 就抛 TypeError 落 ErrorBoundary 白屏。
+ * 后端契约只增不改，前端也不能编造评分 ⇒ 三字段降为可选，渲染层缺省即不展示该行。
+ */
 export interface MarketplaceBrowserAsset {
   id: string;
   name: string;
   description: string;
   category: string;
   owner: string;
-  rating: number;
-  popularity: number;
+  rating?: number;
+  popularity?: number;
   status: "published" | "draft" | "archived";
   tags: string[];
   createdAt: string;
@@ -66,10 +73,14 @@ export interface MarketplaceReview {
   createdAt: string;
 }
 
+/**
+ * D29 补充：后端实际只回 totalAssets/byCategory/byStatus/recentAssets。
+ * avgRating 与 pendingRequests 声明为可选——缺失时调用方显示 "—"，不编造。
+ */
 export interface MarketplaceDashboard {
   totalAssets: number;
-  avgRating: number;
-  pendingRequests: number;
+  avgRating?: number;
+  pendingRequests?: number;
 }
 
 /** GET /api/marketplace/assets — 获取市场资产列表，支持关键词和分类筛选 */

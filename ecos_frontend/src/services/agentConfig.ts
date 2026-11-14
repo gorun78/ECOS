@@ -182,11 +182,24 @@ export async function testAgent(
   return resp.data;
 }
 
-/** Fetch available LLM models */
+/**
+ * Fetch available LLM models（返回模型 id 列表）。
+ *
+ * <p>D26（2026-11-13 验证）：`GET /api/agent/models` 实际返回<b>对象数组</b>
+ * `[{id,name,provider}]`，而本函数原声明返回 `string[]` 且直接透传。调用方
+ * `AgentBuilder.tsx` 用 `key={m}` / `{m}` 渲染 ⇒ React 报 "two children with the same key"
+ * （对象转字符串恒为 "[object Object]"）且下拉项显示成对象文本。
+ * 后端契约属只增不改面，故在此归一化为 id 字符串数组（同时容忍纯字符串载荷）。</p>
+ */
 export async function fetchModels(): Promise<string[]> {
   try {
-    const resp = await apiFetch<{ code: number; data: string[] }>("/agent/models");
-    return resp.data || [];
+    const resp = await apiFetch<{ code: number; data: Array<string | { id?: string; name?: string }> }>(
+      "/agent/models",
+    );
+    const rows = resp.data || [];
+    return rows
+      .map((row) => (typeof row === "string" ? row : row?.id ?? ""))
+      .filter((id): id is string => Boolean(id));
   } catch {
     // Fallback models if backend unavailable
     return ["deepseek-v3", "deepseek-r1", "gpt-4o", "gpt-4-turbo", "claude-3.5-sonnet", "qwen-max"];

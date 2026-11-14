@@ -1,0 +1,19 @@
+=== 降级/缺陷证据 2026-11-13T02:22:08Z ===
+
+[D1 gateway PATCH 转发] PATCH /api/v1/workspace/scenarios/sc001/status via 8080:
+{"code":503,"errorCode":"ECOS-WS-503-UPSTREAM","message":"场景服务不可用（转发失败，fail-closed）","success":false}
+
+[D1 对照] 直连 18090 同请求:
+{"code":409,"errorCode":"ILLEGAL_TRANSITION","message":"非法状态迁移: ACTIVE -> DRAFT","timestamp":1794536528684,"traceId":"eef6c0fe-3edd-4ff2-a9ff-c44828bd2256","success":false}
+
+[D3 金额列] information_schema budget:
+budget:character varying
+
+[D3 对照] safety_index_target:
+safety_index_target:numeric
+
+[已知缺口] 系统参数 params via 8080:
+{"code":503,"errorCode":"ECOS-SYS-503","message":"ECOS-SYS-503: 系统参数服务 ISystemParamService未装配，配置面不可用","timestamp":1794536530099,"success":false}
+
+[已知缺口] 场景动作 actions via 8080:
+{"code":503,"errorCode":"COGNITIVE_UNAVAILABLE","message":"认知引擎暂不可用，请稍后重试或凭追踪号联系管理员","timestamp":1794536530290,"traceId":"85183f61-7453-4590-b84a-8311d693d28e","success":false}

@@ -1,0 +1,162 @@
+[
+  {
+    "route": "security-center",
+    "mainText": "身份与访问 安全策略 策略控制面 安全审计 审计查询 ECOS Security Center 身份与访问管理 (IAM) 新建 刷新 用户 角色 组织机构 权限 全部状态 正常 锁定 搜索 CSV导入 CSV导出 共 17 条 用户名 姓名 邮箱 组织 角色 状态 操作 ent2_sec_aud 秦岭 qin.lang@entmgmt.demo 华东建设集团（演示） - ● 活跃 ent2_energy_fin 郑凯 zheng.kai@entmgmt.demo 能源财务部 - ● 活跃 ent2_proj_a 孙立 sun.li@entmgmt.demo 基础设施第一项目部 - ● 活跃 ent2_proj_b 马涛 ma.tao@entmgmt.demo 能源项目部 - ● 活跃 ent2_proj_c 胡宁 hu.ning@entmgmt.demo 数字建造项目部 - ● 活跃 ent2_data_gov 唐宇 tang.yu@entmgmt.demo 集团运营管理中心 - ● 活跃 ent2_group_gm 郑国栋 zheng.guodong@entmgmt.demo 华东建设集团（演示） - ● 活跃 ent2_group_cfo 林洲 lin.zhou@entmgmt.demo 集团财务共享中心 - ● 活跃 ent2_infra_gm 陈明远 chen.mingy",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 总览 安全中心 决策面板 安全中心 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 身份与访问 安全策略 策略控制面 安全审计 审计查询 ECOS Security Center 身份与访问管理 (IAM) 新建 刷新 用户 角色 组织机构 权限 全部状态 正常 锁定 搜索 CSV导入 CSV导出 共 17 条 用户名 姓名 邮箱 组织 角色 状态 操作 ent2_sec_aud 秦岭 qin.lang@entmgmt.demo 华东建设集团（演示） - ● 活跃 ent2_energy_fin 郑凯 zheng.kai@entmgmt.demo 能源财务部 - ● 活跃 ent2_proj_a 孙立 sun.li@entmgmt.demo 基础设施第一项目部 - ● 活跃 ent2_proj_b 马涛 ma.tao@entmgmt.demo 能源项目部 - ● 活跃 ent2_proj_c 胡宁 hu.ning@entmgmt.demo 数字建造项目部 - ● 活跃 ent2_data_gov 唐宇 tang.yu@entmgmt.demo 集团运营管理中心 - ● 活跃 ent2_group_gm 郑国栋 zheng.guodong@entmgmt.demo 华东建设集团（演示） - ● 活跃 ent2_group_cfo 林洲 lin.zhou@entmgmt.demo 集团财务共享中心 - ● 活跃 ent2_infra_gm 陈明远 chen.mingyuan@entmgmt.demo 基础设施事业部 - ● 活跃 ent2_energy_gm 黄志远 huang.zhiyuan@entmgmt.demo 能源环保事业部 - ● 活跃 ent2_digital_gm 吴子涵 wu.zihan@entmgmt.demo 数字建造事业部 - ● 活跃 ent2_infra_fin 周雅 zhou.ya@entmgmt.demo 基础设施财务部 - ● 活跃 u-fin 财务负责人(演示) - - - ● 活跃 u-p1 项目负责人 P1(演示) - - - ● 活跃 u-d01 部门用户 D01(演示) - - - ● 活跃 第 1/2 页，共 17 条 1 2",
+    "errs": [],
+    "bad": []
+  },
+  {
+    "route": "iam",
+    "mainText": "身份与访问管理 (IAM) 新建 刷新 用户 角色 组织机构 权限 全部状态 正常 锁定 搜索 CSV导入 CSV导出 共 17 条 用户名 姓名 邮箱 组织 角色 状态 操作 ent2_sec_aud 秦岭 qin.lang@entmgmt.demo 华东建设集团（演示） - ● 活跃 ent2_energy_fin 郑凯 zheng.kai@entmgmt.demo 能源财务部 - ● 活跃 ent2_proj_a 孙立 sun.li@entmgmt.demo 基础设施第一项目部 - ● 活跃 ent2_proj_b 马涛 ma.tao@entmgmt.demo 能源项目部 - ● 活跃 ent2_proj_c 胡宁 hu.ning@entmgmt.demo 数字建造项目部 - ● 活跃 ent2_data_gov 唐宇 tang.yu@entmgmt.demo 集团运营管理中心 - ● 活跃 ent2_group_gm 郑国栋 zheng.guodong@entmgmt.demo 华东建设集团（演示） - ● 活跃 ent2_group_cfo 林洲 lin.zhou@entmgmt.demo 集团财务共享中心 - ● 活跃 ent2_infra_gm 陈明远 chen.mingyuan@entmgmt.demo 基础设施事业部 - ● 活跃 ent2_energy_gm 黄",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 系统管理 用户管理 决策面板 安全中心 用户管理 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 身份与访问管理 (IAM) 新建 刷新 用户 角色 组织机构 权限 全部状态 正常 锁定 搜索 CSV导入 CSV导出 共 17 条 用户名 姓名 邮箱 组织 角色 状态 操作 ent2_sec_aud 秦岭 qin.lang@entmgmt.demo 华东建设集团（演示） - ● 活跃 ent2_energy_fin 郑凯 zheng.kai@entmgmt.demo 能源财务部 - ● 活跃 ent2_proj_a 孙立 sun.li@entmgmt.demo 基础设施第一项目部 - ● 活跃 ent2_proj_b 马涛 ma.tao@entmgmt.demo 能源项目部 - ● 活跃 ent2_proj_c 胡宁 hu.ning@entmgmt.demo 数字建造项目部 - ● 活跃 ent2_data_gov 唐宇 tang.yu@entmgmt.demo 集团运营管理中心 - ● 活跃 ent2_group_gm 郑国栋 zheng.guodong@entmgmt.demo 华东建设集团（演示） - ● 活跃 ent2_group_cfo 林洲 lin.zhou@entmgmt.demo 集团财务共享中心 - ● 活跃 ent2_infra_gm 陈明远 chen.mingyuan@entmgmt.demo 基础设施事业部 - ● 活跃 ent2_energy_gm 黄志远 huang.zhiyuan@entmgmt.demo 能源环保事业部 - ● 活跃 ent2_digital_gm 吴子涵 wu.zihan@entmgmt.demo 数字建造事业部 - ● 活跃 ent2_infra_fin 周雅 zhou.ya@entmgmt.demo 基础设施财务部 - ● 活跃 u-fin 财务负责人(演示) - - - ● 活跃 u-p1 项目负责人 P1(演示) - - - ● 活跃 u-d01 部门用户 D01(演示) - - - ● 活跃 第 1/2 页，共 17 条 1 2",
+    "errs": [],
+    "bad": []
+  },
+  {
+    "route": "guardrails",
+    "mainText": "安全护栏管理控制台 策略 CRUD、编译部署与合规预览的统一治理面板。 策略管理 编译与预览 审计日志 护栏策略 (0) 新建 暂无护栏策略 点击「新建」创建第一条安全护栏策略。 请在左侧选择一条策略 或新建一条策略",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 安全 安全护栏 决策面板 安全中心 用户管理 安全护栏 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 安全护栏管理控制台 策略 CRUD、编译部署与合规预览的统一治理面板。 策略管理 编译与预览 审计日志 护栏策略 (0) 新建 暂无护栏策略 点击「新建」创建第一条安全护栏策略。 请在左侧选择一条策略 或新建一条策略",
+    "errs": [],
+    "bad": []
+  },
+  {
+    "route": "kanban",
+    "mainText": "ECOS 项目看板 系统重构与产品化",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 系统管理 项目看板 决策面板 安全中心 用户管理 安全护栏 项目看板 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD ECOS 项目看板 系统重构与产品化",
+    "errs": [],
+    "bad": []
+  },
+  {
+    "route": "telemetry",
+    "mainText": "链路追踪 查看分布式链路追踪与 Span 详情 刷新 系统状态 UP 0 SPANS 0 TOKEN RECORDS connected DATABASE 最近链路 (0) 暂无链路数据",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 总览 telemetry 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 链路追踪 查看分布式链路追踪与 Span 详情 刷新 系统状态 UP 0 SPANS 0 TOKEN RECORDS connected DATABASE 最近链路 (0) 暂无链路数据",
+    "errs": [],
+    "bad": []
+  },
+  {
+    "route": "tokens",
+    "mainText": "Token 审计 监控 LLM Token 用量，按模型与操作维度统计 最近 1 天 最近 7 天 最近 30 天 刷新 Token 总量 0tokens 按模型 暂无数据 按操作 暂无数据",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 总览 tokens 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD Token 审计 监控 LLM Token 用量，按模型与操作维度统计 最近 1 天 最近 7 天 最近 30 天 刷新 Token 总量 0tokens 按模型 暂无数据 按操作 暂无数据",
+    "errs": [],
+    "bad": []
+  },
+  {
+    "route": "tenants",
+    "mainText": "租户管理 租户CRUD、配额管理、用量监控与账单查看 新建租户 刷新 租户管理 配额管理 用量仪表盘 账单查看 全部 活跃 已暂停 已删除 ID 租户名称 编码 状态 用户上限 MB API/天 隔离 创建时间 操作 tenant-a 默认租户A tenant-a ACTIVE 0 0 0 ROW_FILTER 2026-11-09 tenant-b 测试租户B tenant-b ACTIVE 50 5.1K 10.0K ROW_FILTER 2026-11-09 ",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 系统管理 系统配置 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 租户管理 租户CRUD、配额管理、用量监控与账单查看 新建租户 刷新 租户管理 配额管理 用量仪表盘 账单查看 全部 活跃 已暂停 已删除 ID 租户名称 编码 状态 用户上限 MB API/天 隔离 创建时间 操作 tenant-a 默认租户A tenant-a ACTIVE 0 0 0 ROW_FILTER 2026-11-09 tenant-b 测试租户B tenant-b ACTIVE 50 5.1K 10.0K ROW_FILTER 2026-11-09 ",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": []
+  },
+  {
+    "route": "alerts",
+    "mainText": "全部触发 新建规则 实时推送未接入：后端暂无消息发布者，WebSocket 仅支持 SockJS 加载失败: Alert 详情由 workspace-service 提供 (端口:18090): rules 后端暂未提供：告警规则 / 历史 / 试触发三类接口均未接入 告警规则 (0) 告警历史 (0) 暂无历史",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 总览 alerts 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 全部触发 新建规则 实时推送未接入：后端暂无消息发布者，WebSocket 仅支持 SockJS 加载失败: Alert 详情由 workspace-service 提供 (端口:18090): rules 后端暂未提供：告警规则 / 历史 / 试触发三类接口均未接入 告警规则 (0) 告警历史 (0) 暂无历史",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": [
+      "404 /api/alerts/history?limit=20",
+      "404 /api/alerts/rules"
+    ]
+  },
+  {
+    "route": "world_model",
+    "mainText": "战略目标 目标金字塔 · 因果图谱 · 情景对比 · 决策模拟 2026 (本年) 2025 2024 2023 2022 历史 刷新 目标树 执行追踪 因果图谱 情景对比 复盘报告 决策模拟 帕累托寻优 目标金字塔 (0) 新建目标 展开全部 收起全部 ≥80% 50-79% <50% 战略 OKR KPI 工作流 Agent 暂无目标，点击「新建目标」创建",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 总览 认知蓝图 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 战略目标 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 战略目标 目标金字塔 · 因果图谱 · 情景对比 · 决策模拟 2026 (本年) 2025 2024 2023 2022 历史 刷新 目标树 执行追踪 因果图谱 情景对比 复盘报告 决策模拟 帕累托寻优 目标金字塔 (0) 新建目标 展开全部 收起全部 ≥80% 50-79% <50% 战略 OKR KPI 工作流 Agent 暂无目标，点击「新建目标」创建",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+      "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": [
+      "404 /api/v1/ecos/world-model-graph/goals",
+      "404 /api/v1/ecos/world-model-graph/scenarios",
+      "404 /api/v1/ecos/world-model-graph/links",
+      "404 /api/v1/ecos/world-model-graph/causal-graph",
+      "404 /api/v1/ecos/world-model-graph/goals/tree"
+    ]
+  },
+  {
+    "route": "mission_control",
+    "mainText": "蓝图接口不可达：下方六层蓝图与指标为「示意数据」，非真实系统审计结果。 示意数据 重试加载 蓝图一致性评级 93.8% 示意数据 已对齐验证架构层 0 / 6 层已核验 系统注册功能组件 33 个注册组件 示意数据 认知系统链路负载 — 企业认知操作系统 (ECOS) 六层拓扑核心设计蓝图 示意数据 高密度认知架构蓝图 阶段 15 战略与决策层 目标规划、双态多目标寻优、世界模型及数字孪生预测 92% 对齐完整度 阶段 13 认知与知识层 企业知识图谱 (EKG)、目标体系、经验案例库、自适应改进 88% 对齐完整度 阶段 11 智能体操作系统层 多智能体协同网络 (Agent Mesh)、协同协议、工具调用、追踪治理 95% 对齐完整度 阶段 9 语义与业务层 本体、对象运行时、决策规则引擎、流程设计、语义查询 90% 对齐完整度 阶段 7 数据平台层 数据连接器、元数据资产目录、Spark计算流水线、异构仓湖、质量雷达 100% 对齐完整度 阶段 5 安全治理、多租准入与基础设施 IAM准入、密码学数据合规双写脱敏、防篡改签名账本、系统级动态监控 98% 对齐完整度 层架构检查 战略与决策层 (Strategic & Cognitive Layer) 示意数据 ECOS 蓝图映射系统 ECOS首脑决策层。获取下方物理与语义模型，利用世界模型模拟真实物理限制，推演业务收益与风险冲",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 总览 认知蓝图 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 战略目标 认知蓝图 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 蓝图接口不可达：下方六层蓝图与指标为「示意数据」，非真实系统审计结果。 示意数据 重试加载 蓝图一致性评级 93.8% 示意数据 已对齐验证架构层 0 / 6 层已核验 系统注册功能组件 33 个注册组件 示意数据 认知系统链路负载 — 企业认知操作系统 (ECOS) 六层拓扑核心设计蓝图 示意数据 高密度认知架构蓝图 阶段 15 战略与决策层 目标规划、双态多目标寻优、世界模型及数字孪生预测 92% 对齐完整度 阶段 13 认知与知识层 企业知识图谱 (EKG)、目标体系、经验案例库、自适应改进 88% 对齐完整度 阶段 11 智能体操作系统层 多智能体协同网络 (Agent Mesh)、协同协议、工具调用、追踪治理 95% 对齐完整度 阶段 9 语义与业务层 本体、对象运行时、决策规则引擎、流程设计、语义查询 90% 对齐完整度 阶段 7 数据平台层 数据连接器、元数据资产目录、Spark计算流水线、异构仓湖、质量雷达 100% 对齐完整度 阶段 5 安全治理、多租准入与基础设施 IAM准入、密码学数据合规双写脱敏、防篡改签名账本、系统级动态监控 98% 对齐完整度 层架构检查 战略与决策层 (Strategic & Cognitive Layer) 示意数据 ECOS 蓝图映射系统 ECOS首脑决策层。获取下方物理与语义模型，利用世界模型模拟真实物理限制，推演业务收益与风险冲突之间的最佳帕累托平衡决策行动。 匹配的实际系统业务功能页面 C2EOS 协同主控大盘 / 帕累托进化沙盒 (本页面) 蓝图定义的核心功能模块 (CONSTITUENT ENTITIES) 战略规划引擎 优化引擎 场景模拟引擎 因果推理引擎 世界模型 (World Model) 企业数字孪生 (Enterprise Twin) 对齐诊断 层级一致性审计 对齐一致性审计与热加载 审计追踪终端： 诊断审计终端空闲。请点击上方按钮验证当前架构层与系统蓝图的对齐细节。 帕累托优化器 多目标寻优 基于认知引擎执行多目标帕累托前沿解集搜索，在预算、延迟、质量等约束下寻找最优权衡方案。 预算约束 延迟约束 (MS) 执行帕累托优化 规则推理 mode=rule 对当前选中的蓝图架构层执行规则推理，匹配ECOS知识库中的合规性规则与决策导则，输出匹配的规则列表。 执行规则推理",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+      "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": [
+      "404 /api/v1/cognitive/blueprint"
+    ]
+  },
+  {
+    "route": "monitor",
+    "mainText": "基础指标 引擎监控 数字孪生 系统监控 实时系统指标、进程与告警概览 刷新 运行诊断 实时监控数据尚未就绪 实时监控数据尚未就绪。后台服务连接后，系统指标、图表和告警将在此展示。点击刷新按钮重试。",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 总览 监控中心 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 战略目标 认知蓝图 监控中心 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 基础指标 引擎监控 数字孪生 系统监控 实时系统指标、进程与告警概览 刷新 运行诊断 实时监控数据尚未就绪 实时监控数据尚未就绪。后台服务连接后，系统指标、图表和告警将在此展示。点击刷新按钮重试。",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+      "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": [
+      "404 /api/v1/monitor"
+    ]
+  },
+  {
+    "route": "ops_dashboard",
+    "mainText": "看板数据加载失败 服务返回异常（HTTP 404） 重试",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 运营应用 产值分配看板 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 战略目标 认知蓝图 监控中心 产值分配看板 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 看板数据加载失败 服务返回异常（HTTP 404） 重试",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+      "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": [
+      "404 /api/v1/ecos/biz/dashboard"
+    ]
+  },
+  {
+    "route": "objects",
+    "mainText": "Not Found（/api/v1/ecos/objects/ENT_USER） ENT_USER ENT_ORG ENT_CASE 新建对象 「ENT_USER」下暂无对象 暂无对象数据，可创建第一个对象 创建对象 选择一个对象以查看详情",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 业务工作台 对象浏览器 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 战略目标 认知蓝图 监控中心 产值分配看板 对象浏览器 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD Not Found（/api/v1/ecos/objects/ENT_USER） ENT_USER ENT_ORG ENT_CASE 新建对象 「ENT_USER」下暂无对象 暂无对象数据，可创建第一个对象 创建对象 选择一个对象以查看详情",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+      "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": [
+      "404 /api/v1/ecos/objects/ENT_USER?page=1&pageSize=20",
+      "404 /api/v1/ecos/objects/ENT_USER/schema"
+    ]
+  },
+  {
+    "route": "marketplace",
+    "mainText": "数据市场 浏览、搜索数据资产，发布您的数据产品 发布资产 资产总数 5 平均评分 — 待审批 — 全部 数据集 数据服务 AI模型 API 报表 知识库 搜索 暂无数据资产，试试发布第一个吧",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 资源概览 数据市场 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 战略目标 认知蓝图 监控中心 产值分配看板 对象浏览器 数据市场 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 数据市场 浏览、搜索数据资产，发布您的数据产品 发布资产 资产总数 5 平均评分 — 待审批 — 全部 数据集 数据服务 AI模型 API 报表 知识库 搜索 暂无数据资产，试试发布第一个吧",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+      "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": []
+  },
+  {
+    "route": "business-workbench",
+    "mainText": "数据源未接入：当前展示演示数据（对象类型, 关系类型, 动作类型, 业务域, 接口, 共享属性, 数据集, 函数类型），非真实业务数据；写操作仅本地生效。 本体建模 数据浏览器 Copilot 本体全景与总览 配置全景 对象类型 (OBJECT TYPES) 4 飞机 (Aircraft) AIRCRAFT 机场 (Airport) AIRPORT 航班 (Flight) FLIGHT 飞行员 (Pilot) PILOT 链接关系 (LINK TYPES) 5 起飞机场关联 N:1 降落机场关联 N:1 航班执飞机身 N:1 执飞飞行员 N:1 飞行资质机型 M:N 操作类型 (ACTION TYPES) 3 更新航班状态 安排飞机适航维护 录入新飞行员 逻辑函数 (FUNCTIONS) 3 计算航班延误时数 INTEGER 校验飞行员机型资质 BOOLEAN 获取机场在勤飞机列表 OBJECTTYPESET 接口规范 (INTERFACES) 2 共享属性 (SHARED PROPERTIES) 2 原始数据集 (DATASETS) 5 新建本体元素 航空资产与运行智能本体 (Aviation Core Ontology) 物理世界实体网络庞大异构。为便于大型航司进行数字治理，我们支持将本体对象归属到不同的「业务域 (Domains)」分级中。 这有助于在大规模本体资产中按业务边",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 产品功能 本体工作台 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 战略目标 认知蓝图 监控中心 产值分配看板 对象浏览器 数据市场 业务工作台 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 数据源未接入：当前展示演示数据（对象类型, 关系类型, 动作类型, 业务域, 接口, 共享属性, 数据集, 函数类型），非真实业务数据；写操作仅本地生效。 本体建模 数据浏览器 Copilot 本体全景与总览 配置全景 对象类型 (OBJECT TYPES) 4 飞机 (Aircraft) AIRCRAFT 机场 (Airport) AIRPORT 航班 (Flight) FLIGHT 飞行员 (Pilot) PILOT 链接关系 (LINK TYPES) 5 起飞机场关联 N:1 降落机场关联 N:1 航班执飞机身 N:1 执飞飞行员 N:1 飞行资质机型 M:N 操作类型 (ACTION TYPES) 3 更新航班状态 安排飞机适航维护 录入新飞行员 逻辑函数 (FUNCTIONS) 3 计算航班延误时数 INTEGER 校验飞行员机型资质 BOOLEAN 获取机场在勤飞机列表 OBJECTTYPESET 接口规范 (INTERFACES) 2 共享属性 (SHARED PROPERTIES) 2 原始数据集 (DATASETS) 5 新建本体元素 航空资产与运行智能本体 (Aviation Core Ontology) 物理世界实体网络庞大异构。为便于大型航司进行数字治理，我们支持将本体对象归属到不同的「业务域 (Domains)」分级中。 这有助于在大规模本体资产中按业务边界过滤拓扑，维护实体上下级职责和可见性规范。 域分级已就绪 · 共 2 个业务域 业务对象实体 4 4 个已归域 | 0 个未归类 关系链接数量 5 包含域内关联与跨域多维关联 系统业务域 2 支持按域进行对象隔离与维护 接口与属性指标 4 2 契约规范 · 2 共享属性 关系拓扑图谱 (Ontology ER Diagram) 显示当前实体关联网络。可在上方切换不同业务域以进行视窗隔离和动态聚焦。 视图按域过滤: 全局全景 (4) 运行控制域 2 航空资产域 2 本体画布 (Interactive Canvas) 提示：可拖拽对象节点进行微调排版 起飞机场关联 N:1 降落机场关联 N:1 航班执飞机身 N:1 执飞飞行员 N:1 飞行资质机型 M:N 资产域 飞机 (Aircraft) 7 属性 · aircraft 资产域 机场 (Airport) 7 属性 · airport 运行域 航班 (Flight) 8 属性 · flight 运行域 飞行员 (Pilot) 6 属性 · pilot 业务分级域维护中心 (Business Domain Manager) 创建、编辑和删除业务分级域，直观进行本",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+      "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": []
+  },
+  {
+    "route": "engine-data",
+    "mainText": "数据引擎 引擎健康监控、配置信息与运行状态 刷新全部 引擎状态 UP 配置信息 {\"timestamp\":\"2026-11-13T10:57:35.958+00:00\",\"status\":404,\"error\":\"Not Found\",\"path\":\"/api/v1/engine/data/settings\"} 运行状态 名称 data-engine 状态 RUNNING 原始响应数据 展开原始 JSON",
+    "bodyFull": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·血缘·调度 资源概览 资源中心 本体图谱入口·数据/知识/认知资产融合视图 控制面板 内核状态 运行中 认知引擎 — ECOS 总览 engine-data 决策面板 安全中心 用户管理 安全护栏 项目看板 遥测监控 令牌管理 未知页面 未知页面 战略目标 认知蓝图 监控中心 产值分配看板 对象浏览器 数据市场 业务工作台 未知页面 石板雅白 (明亮) 智蓝星空 (暗黑) 极客终端 (炫绿) 皇家幽紫 (高贵) 中文 English admin 4级高阶授权专家 AD 数据引擎 引擎健康监控、配置信息与运行状态 刷新全部 引擎状态 UP 配置信息 {\"timestamp\":\"2026-11-13T10:57:35.958+00:00\",\"status\":404,\"error\":\"Not Found\",\"path\":\"/api/v1/engine/data/settings\"} 运行状态 名称 data-engine 状态 RUNNING 原始响应数据 展开原始 JSON",
+    "errs": [
+      "[navConfig] no tab labelKey for route id \"engine-data\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+    ],
+    "bad": [
+      "404 /api/v1/engine/data/settings"
+    ]
+  }
+]

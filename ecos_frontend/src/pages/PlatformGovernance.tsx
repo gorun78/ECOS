@@ -8,7 +8,8 @@
  *
  * @license SPDX-License-Identifier: Apache-2.0
  */
-import React, { useState } from "react";
+import React, { useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Activity, SlidersHorizontal, ShieldCheck } from "lucide-react";
 import { useTheme } from "../components/ThemeContext";
 import { useLanguage } from "../components/LanguageContext";
@@ -24,10 +25,20 @@ const TABS: ReadonlyArray<{ id: TabId; icon: typeof Activity; labelKey: string }
   { id: "diagnostics", icon: ShieldCheck, labelKey: "platform.governance.tab.diagnostics" },
 ];
 
+const TAB_IDS = new Set<string>(TABS.map(t => t.id));
+
 export default function PlatformGovernance() {
   const { styles } = useTheme();
   const { t } = useLanguage();
-  const [tab, setTab] = useState<TabId>("deployment");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Tab 态只读自 URL（与安全中心/监控中心同口径）：#/platform-governance?tab=config 可直达
+  const rawTab = searchParams.get("tab");
+  const tab: TabId = rawTab && TAB_IDS.has(rawTab) ? (rawTab as TabId) : "deployment";
+  const setTab = useCallback((id: TabId) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", id);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   return (
     <div className={`flex-1 flex flex-col min-h-0 ${styles.appBg} ${styles.appText}`}>

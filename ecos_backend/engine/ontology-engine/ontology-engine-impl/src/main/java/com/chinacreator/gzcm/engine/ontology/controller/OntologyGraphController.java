@@ -44,16 +44,38 @@ public class OntologyGraphController {
     /**
      * 获取本体子图（节点 + 边）。
      * <p>异常分支返回 {@code nodes/edges} 空列表 + {@code message} 提示（与既有 Map 行为一致）。
+     *
+     * <p>D14（2026-11-13 验证）：{@link IGraphService#getSubgraph} 无法区分「本体不存在」与
+     * 「本体存在但无图数据」，且部署态注入的 {@code StubGraphService} 恒返空图 ⇒ 原实现在两种
+     * 情况下都返回 {@code code=0 + nodes=[] + edges=[]}，前端无从分辨「空壳」与「真空图」。
+     * 现改为：空图时在 {@code message} 里如实标注来源（降级桩 / 无数据），信封外形不变。
      */
     @GetMapping("/{ontologyId}")
     public ApiResponse<OntologyGraphVO> getOntologyGraph(@PathVariable String ontologyId) {
         try {
             Map<String, Object> subgraph = graphService.getSubgraph(ontologyId);
-            return ApiResponse.success(toVO(subgraph));
+            OntologyGraphVO vo = toVO(subgraph);
+            if (isEmptyGraph(vo)) {
+                vo.setMessage("图服务未返回数据（本体 " + ontologyId
+                        + " 无子图，或当前部署注入的是降级图服务桩）");
+            }
+            return ApiResponse.success(vo);
         } catch (Exception e) {
             log.warn("Graph query failed for ontology {}: {}", ontologyId, e.getMessage());
             return ApiResponse.success(emptyVO(null, "Graph service unavailable: " + e.getMessage()));
         }
+    }
+
+    /** 判断子图是否为空（nodes 与 edges 都为空集合）。 */
+    private boolean isEmptyGraph(OntologyGraphVO vo) {
+        return isEmptyCollection(vo.getNodes()) && isEmptyCollection(vo.getEdges());
+    }
+
+    private boolean isEmptyCollection(Object v) {
+        if (v == null) return true;
+        if (v instanceof java.util.Collection<?> c) return c.isEmpty();
+        if (v instanceof Object[] a) return a.length == 0;
+        return false;
     }
 
     /**

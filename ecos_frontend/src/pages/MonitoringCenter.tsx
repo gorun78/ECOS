@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { BarChart3, CpuIcon, ChevronDown, Activity, Shield, Database, Network, Brain, BookOpen, Sparkles, RefreshCw, CheckCircle2, XCircle, Loader2, AlertTriangle, Lock } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
@@ -237,7 +238,15 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
 export default function MonitoringCenter() {
   const { t } = useLanguage();
   const { styles } = useTheme();
-  const [activeTab, setActiveTab] = useState(TABS[0].id);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Tab 态只读自 URL（与安全中心同口径）：深链接 /monitor?tab=twins 可直达，刷新保态
+  const rawTab = searchParams.get("tab");
+  const activeTab = rawTab && TABS.some(tab => tab.id === rawTab) ? rawTab : TABS[0].id;
+  const setActiveTab = useCallback((id: string) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", id);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   // 默认全部折叠：避免挂载即 6 卡 × (health+status) 并发风暴；展开由用户驱动
   const [expandedEngines, setExpandedEngines] = useState<Set<string>>(() => new Set());
   const [refreshKey, setRefreshKey] = useState(0);

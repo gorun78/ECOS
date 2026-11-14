@@ -1,10 +1,11 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.common.service.ICopilotAgentService;
 import com.chinacreator.gzcm.engine.ai.copilot.CopilotAgentCatalog;
 import com.chinacreator.gzcm.engine.ai.copilot.CopilotChatService;
 import com.chinacreator.gzcm.engine.ai.copilot.CopilotToolCatalog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,23 +23,19 @@ import java.util.UUID;
  * （六域全生命周期工具清单，工作台「工具面」管理消费）。</p>
  *
  * <p>对话路由：目录内智能体 → {@link CopilotChatService}（agent-loop + 引擎工具白名单，真实执行）；
- * 非目录智能体或 AgentLoop 未装配 → 回落既有 {@link ICopilotAgentService} 通道（保持兼容）。</p>
+ * 目录外 agentId → 400 明确拒绝（D18：不再回落会返回占位串的旧通道）。</p>
  */
 @RestController
 @RequestMapping("/api/v1/agent/copilot")
 public class CopilotController {
 
-    private final ICopilotAgentService copilotAgentService;
+    private static final Logger log = LoggerFactory.getLogger(CopilotController.class);
 
     @Autowired(required = false)
     private CopilotChatService copilotChatService;
 
     @Autowired(required = false)
     private CopilotAgentCatalog agentCatalog;
-
-    public CopilotController(ICopilotAgentService copilotAgentService) {
-        this.copilotAgentService = copilotAgentService;
-    }
 
     /** GET /agents — 内置智能体目录（6 个；不含系统提示词，提示词只留服务端）。 */
     @GetMapping("/agents")
@@ -66,7 +63,7 @@ public class CopilotController {
         return ApiResponse.success(wire);
     }
 
-    /** POST /chat — 目录内智能体走真实 agent-loop（工具调用），否则回落旧通道。 */
+    /** POST /chat — 目录内智能体走真实 agent-loop（工具调用）；目录外 agentId 明确拒绝。 */
     @PostMapping("/chat")
     public ApiResponse<Map<String, Object>> chat(@RequestBody Map<String, Object> request) {
         String agentId = (String) request.getOrDefault("agentId", "agent-data");
@@ -84,11 +81,17 @@ public class CopilotController {
             }
         }
 
-        Map<String, Object> legacy = copilotAgentService.chat(agentId, message, sessionId);
-        return ApiResponse.success(legacy);
+        // D18（2026-11-13 验证）：原实现对目录外 agentId 回落 CopilotAgentServiceImpl「旧通道」，
+        // 而该通道的 answer 来自 ExecutorServiceImpl 的占位串（"Task completed: …"）、
+        // thoughtChain 是写死的 ["Received: …","Planned","Executed"]、toolCalls 恒空、
+        // 且原样回显传入的 sessionId ⇒ 未知 Agent 会拿到一段"看起来像 AI 回答"的伪造结果。
+        // 现改为明确拒绝，让调用方看到真实原因（目录内的 agent 不受影响）。
+        log.warn("[Copilot] 未注册的 agentId={}（目录内 Agent 见 GET /api/v1/agent/copilot/agents）", agentId);
+        return ApiResponse.badRequest(
+            "未注册的 Copilot Agent: " + agentId + "（可选值见 GET /api/v1/agent/copilot/agents）");
     }
 
-    /** GET /quick-questions — 目录内智能体返回目录建议问题；否则回落旧通道。 */
+    /** GET /quick-questions — 目录内智能体返回目录建议问题；目录外 agentId 明确拒绝。 */
     @GetMapping("/quick-questions")
     public ApiResponse<List<Map<String, Object>>> quickQuestions(@RequestParam String agentId) {
         if (agentCatalog != null) {
@@ -104,7 +107,10 @@ public class CopilotController {
                 return ApiResponse.success(questions);
             }
         }
-        List<Map<String, Object>> questions = copilotAgentService.getQuickQuestions(agentId);
-        return ApiResponse.success(questions);
+        // D18 同源：旧通道对未注册 agentId 会 getOrDefault →「你好，有什么可以帮你？」，
+        // 让调用方以为该 Agent 存在。改为与 /chat 同口径的明确拒绝。
+        log.warn("[Copilot] quick-questions 收到未注册的 agentId={}", agentId);
+        return ApiResponse.badRequest(
+            "未注册的 Copilot Agent: " + agentId + "（可选值见 GET /api/v1/agent/copilot/agents）");
     }
 }

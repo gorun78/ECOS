@@ -158,8 +158,9 @@ export async function compareCausalScenarios(body: any): Promise<any> {
 
 
 // ── Monitoring Dashboard ───────────────────────────────
-// 对接 MonitorController (/api/monitor)
-export const MONITOR_BASE = `${API_BASE}/v1/monitor`;
+// 对接 MonitorController (/api/monitor) —— 该 Controller 类级映射无 v1 段，
+// 常量必须与之逐段一致（此前多写 /v1 ⇒ 全部 404「资源不存在」）。
+export const MONITOR_BASE = `${API_BASE}/monitor`;
 
 export interface MonitoringKpi {
   label: string;

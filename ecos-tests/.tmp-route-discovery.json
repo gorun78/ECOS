@@ -1,0 +1,1203 @@
+{
+  "mindId": "",
+  "agentId": "agent-data",
+  "results": [
+    {
+      "key": "login",
+      "url": "/#/login",
+      "hash": "#/login",
+      "bodyLen": 58,
+      "bodyHead": "ECOS Platform 企业认知操作系统 用户名 密码 登录 高级选项 安全平台访问 · 所有操作均被审计",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "no-access",
+      "url": "/#/no-access",
+      "hash": "#/no-access",
+      "bodyLen": 53,
+      "bodyHead": "无权限访问 您的账号当前无权访问该资源，如需权限请联系系统管理员 返回上一页 返回首页 切换到其他账号",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "index-redirect",
+      "url": "/#/",
+      "hash": "#/decision",
+      "bodyLen": 2786,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "decision",
+      "url": "/#/decision",
+      "hash": "#/decision",
+      "bodyLen": 2786,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "decision/mind",
+      "url": "/#/decision/mind",
+      "hash": "#/decision/mind",
+      "bodyLen": 428,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "decision/mind/:mindId",
+      "url": "/#/decision/mind/none",
+      "hash": "#/decision/mind/none",
+      "bodyLen": 501,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[decision-mind-proposals] CognitiveApiError: mind not found\n    at callJsonInternal (http://localhost:3000/src/services/cognitiveClient.ts:102:11)\n    at async fetchMindProposals (http://localhost:3000/src/services/cognitive/mindApi.ts:84:16)\n    at async http://localhost:3000/src/pages/decision/Dec",
+        "[decision-mind-detail] CognitiveApiError: mind not found\n    at callJsonInternal (http://localhost:3000/src/services/cognitiveClient.ts:102:11)\n    at async fetchMindDetail (http://localhost:3000/src/services/cognitive/mindApi.ts:66:16)\n    at async http://localhost:3000/src/pages/decision/DecisionM",
+        "[decision-mind-proposals] CognitiveApiError: mind not found\n    at callJsonInternal (http://localhost:3000/src/services/cognitiveClient.ts:102:11)\n    at async fetchMindProposals (http://localhost:3000/src/services/cognitive/mindApi.ts:84:16)\n    at async http://localhost:3000/src/pages/decision/Dec",
+        "[decision-mind-detail] CognitiveApiError: mind not found\n    at callJsonInternal (http://localhost:3000/src/services/cognitiveClient.ts:102:11)\n    at async fetchMindDetail (http://localhost:3000/src/services/cognitive/mindApi.ts:66:16)\n    at async http://localhost:3000/src/pages/decision/DecisionM"
+      ],
+      "bad": [
+        "400 /api/v1/cognitive/minds/proposals?mindId=none&limit=50",
+        "400 /api/v1/cognitive/minds/none",
+        "400 /api/v1/cognitive/minds/proposals?mindId=none&limit=50",
+        "400 /api/v1/cognitive/minds/none"
+      ]
+    },
+    {
+      "key": "mission_control",
+      "url": "/#/mission_control",
+      "hash": "#/mission_control",
+      "bodyLen": 1316,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": [
+        "404 /api/v1/cognitive/blueprint",
+        "404 /api/v1/cognitive/blueprint"
+      ]
+    },
+    {
+      "key": "monitor",
+      "url": "/#/monitor",
+      "hash": "#/monitor",
+      "bodyLen": 417,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": [
+        "404 /api/v1/monitor",
+        "404 /api/v1/monitor"
+      ]
+    },
+    {
+      "key": "biz_dashboard",
+      "url": "/#/biz_dashboard",
+      "hash": "#/biz_dashboard",
+      "bodyLen": 384,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": [
+        "404 /api/v1/ecos/biz/dashboard",
+        "404 /api/v1/ecos/biz/dashboard"
+      ]
+    },
+    {
+      "key": "project_tracker",
+      "url": "/#/project_tracker",
+      "hash": "#/project_tracker",
+      "bodyLen": 360,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": [
+        "404 /api/v1/ecos/objects/Project?page=1&pageSize=10",
+        "404 /api/v1/ecos/objects/Project?page=1&pageSize=10"
+      ]
+    },
+    {
+      "key": "contract_manager",
+      "url": "/#/contract_manager",
+      "hash": "#/contract_manager",
+      "bodyLen": 365,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": [
+        "404 /api/v1/ecos/objects/Contract?page=1&pageSize=10",
+        "404 /api/v1/ecos/objects/Contract?page=1&pageSize=10"
+      ]
+    },
+    {
+      "key": "ops_dashboard",
+      "url": "/#/ops_dashboard",
+      "hash": "#/ops_dashboard",
+      "bodyLen": 376,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": [
+        "404 /api/v1/ecos/biz/dashboard",
+        "404 /api/v1/ecos/biz/dashboard"
+      ]
+    },
+    {
+      "key": "ops_apps",
+      "url": "/#/ops_apps",
+      "hash": "#/ops_apps",
+      "bodyLen": 834,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": [
+        "404 /api/v1/ontology/entities/Customer/instances",
+        "404 /api/v1/ontology/entities/Facility/instances",
+        "404 /api/v1/ontology/entities/Customer/instances",
+        "404 /api/v1/ontology/entities/Facility/instances"
+      ]
+    },
+    {
+      "key": "marketplace",
+      "url": "/#/marketplace",
+      "hash": "#/marketplace",
+      "bodyLen": 457,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "resource-center",
+      "url": "/#/resource-center",
+      "hash": "#/resource-center",
+      "bodyLen": 678,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "objects",
+      "url": "/#/objects",
+      "hash": "#/objects",
+      "bodyLen": 488,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": [
+        "404 /api/v1/ecos/objects/ENT_USER/schema",
+        "404 /api/v1/ecos/objects/ENT_USER?page=1&pageSize=20"
+      ]
+    },
+    {
+      "key": "ontology_workbench",
+      "url": "/#/ontology_workbench",
+      "hash": "#/ontology_workbench",
+      "bodyLen": 1205,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "business-workbench",
+      "url": "/#/business-workbench",
+      "hash": "#/business-workbench",
+      "bodyLen": 1861,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "data-workbench",
+      "url": "/#/data-workbench",
+      "hash": "#/data-workbench",
+      "bodyLen": 521,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "dq_dashboard",
+      "url": "/#/dq_dashboard",
+      "hash": "#/dq_dashboard",
+      "bodyLen": 684,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "gateway-diagnostics",
+      "url": "/#/gateway-diagnostics",
+      "hash": "#/gateway-diagnostics",
+      "bodyLen": 744,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "alerts-center",
+      "url": "/#/alerts-center",
+      "hash": "#/alerts-center",
+      "bodyLen": 482,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "domains(redirect)",
+      "url": "/#/domains",
+      "hash": "#/ontology_workbench",
+      "bodyLen": 1238,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "domain_designer(redirect)",
+      "url": "/#/domain_designer",
+      "hash": "#/ontology_workbench",
+      "bodyLen": 1243,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "ontology(redirect)",
+      "url": "/#/ontology",
+      "hash": "#/ontology_workbench",
+      "bodyLen": 1249,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "ontology_designer(redirect)",
+      "url": "/#/ontology_designer",
+      "hash": "#/ontology_workbench",
+      "bodyLen": 1255,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "knowledge_graph",
+      "url": "/#/knowledge_graph",
+      "hash": "#/knowledge_graph",
+      "bodyLen": 576,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "glossary(redirect)",
+      "url": "/#/glossary",
+      "hash": "#/ontology_workbench",
+      "bodyLen": 1267,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "dict",
+      "url": "/#/dict",
+      "hash": "#/dict",
+      "bodyLen": 487,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "system-config",
+      "url": "/#/system-config",
+      "hash": "#/system-config",
+      "bodyLen": 19134,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "platform-governance",
+      "url": "/#/platform-governance",
+      "hash": "#/platform-governance",
+      "bodyLen": 762,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "workflow_designer",
+      "url": "/#/workflow_designer",
+      "hash": "#/workflow_designer",
+      "bodyLen": 732,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "project_workbench",
+      "url": "/#/project_workbench",
+      "hash": "#/project_workbench",
+      "bodyLen": 3779,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "cognitive-workbench",
+      "url": "/#/cognitive-workbench",
+      "hash": "#/cognitive-workbench",
+      "bodyLen": 925,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "workbench",
+      "url": "/#/workbench",
+      "hash": "#/workbench",
+      "bodyLen": 2789,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "workbench/:scenarioId",
+      "url": "/#/workbench/sc001",
+      "hash": "#/workbench/sc001",
+      "bodyLen": 1350,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[workbench-recent-actions] ScenarioActionError: 认知引擎暂不可用，请稍后重试或凭追踪号联系管理员\n    at toError (http://localhost:3000/src/services/scenarioActionClient.ts:156:10)\n    at unwrap (http://localhost:3000/src/services/scenarioActionClient.ts:166:22)\n    at listScenarioActions (http://localhost:3000/src/services"
+      ],
+      "bad": [
+        "503 /api/v1/workspace/scenarios/sc001/actions"
+      ]
+    },
+    {
+      "key": "workbench/:scenarioId/forecast",
+      "url": "/#/workbench/sc001/forecast",
+      "hash": "#/workbench/sc001/forecast",
+      "bodyLen": 1045,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "workbench/:scenarioId/decisions",
+      "url": "/#/workbench/sc001/decisions",
+      "hash": "#/workbench/sc001/decisions",
+      "bodyLen": 850,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": [
+        "503 /api/v1/workspace/scenarios/sc001/actions",
+        "503 /api/v1/workspace/scenarios/sc001/decisions",
+        "503 /api/v1/workspace/scenarios/sc001/actions",
+        "503 /api/v1/workspace/scenarios/sc001/decisions"
+      ]
+    },
+    {
+      "key": "scenario-sandbox/:scenarioId",
+      "url": "/#/scenario-sandbox/sc001",
+      "hash": "#/scenario-sandbox/sc001",
+      "bodyLen": 682,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "world_model",
+      "url": "/#/world_model",
+      "hash": "#/world_model",
+      "bodyLen": 664,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": [
+        "404 /api/v1/ecos/world-model-graph/goals",
+        "404 /api/v1/ecos/world-model-graph/goals",
+        "404 /api/v1/ecos/world-model-graph/scenarios",
+        "404 /api/v1/ecos/world-model-graph/scenarios",
+        "404 /api/v1/ecos/world-model-graph/links",
+        "404 /api/v1/ecos/world-model-graph/causal-graph",
+        "404 /api/v1/ecos/world-model-graph/links",
+        "404 /api/v1/ecos/world-model-graph/causal-graph",
+        "404 /api/v1/ecos/world-model-graph/goals/tree",
+        "404 /api/v1/ecos/world-model-graph/goals/tree"
+      ]
+    },
+    {
+      "key": "knowledge(legacy)",
+      "url": "/#/knowledge",
+      "hash": "#/knowledge_view",
+      "bodyLen": 963,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "knowledge_view",
+      "url": "/#/knowledge_view",
+      "hash": "#/knowledge_view",
+      "bodyLen": 963,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "agent_studio(redirect)",
+      "url": "/#/agent_studio",
+      "hash": "#/ai-workbench",
+      "bodyLen": 1693,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "ai-workbench",
+      "url": "/#/ai-workbench",
+      "hash": "#/ai-workbench",
+      "bodyLen": 1693,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "chatbot_studio",
+      "url": "/#/chatbot_studio",
+      "hash": "#/chatbot_studio",
+      "bodyLen": 2229,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "workshop",
+      "url": "/#/workshop",
+      "hash": "#/workshop",
+      "bodyLen": 795,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "agent_mesh",
+      "url": "/#/agent_mesh",
+      "hash": "#/agent_mesh",
+      "bodyLen": 1794,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": [
+        "502 /api/v1/agent-mesh/missions?limit=30",
+        "502 /api/v1/agent-mesh/missions?limit=30"
+      ]
+    },
+    {
+      "key": "agent-builder(no id)",
+      "url": "/#/agent-builder",
+      "hash": "#/agent-builder",
+      "bodyLen": 803,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "agent-test/:agentId",
+      "url": "/#/agent-test/agent-data",
+      "hash": "#/agent-test/agent-data",
+      "bodyLen": 662,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "case_library",
+      "url": "/#/case_library",
+      "hash": "#/case_library",
+      "bodyLen": 607,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "alerts",
+      "url": "/#/alerts",
+      "hash": "#/alerts",
+      "bodyLen": 753,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": [
+        "404 /api/alerts/rules",
+        "404 /api/alerts/history?limit=20",
+        "404 /api/alerts/rules",
+        "404 /api/alerts/history?limit=20"
+      ]
+    },
+    {
+      "key": "security-center",
+      "url": "/#/security-center",
+      "hash": "#/security-center",
+      "bodyLen": 1551,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "guardrails",
+      "url": "/#/guardrails",
+      "hash": "#/guardrails",
+      "bodyLen": 717,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "iam",
+      "url": "/#/iam",
+      "hash": "#/iam",
+      "bodyLen": 1515,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "kanban",
+      "url": "/#/kanban",
+      "hash": "#/kanban",
+      "bodyLen": 633,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "telemetry",
+      "url": "/#/telemetry",
+      "hash": "#/telemetry",
+      "bodyLen": 719,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "tokens",
+      "url": "/#/tokens",
+      "hash": "#/tokens",
+      "bodyLen": 725,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "tenants",
+      "url": "/#/tenants",
+      "hash": "#/tenants",
+      "bodyLen": 869,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "engine-security",
+      "url": "/#/engine-security",
+      "hash": "#/engine-security",
+      "bodyLen": 793,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"engine-security\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-security\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "engine-data",
+      "url": "/#/engine-data",
+      "hash": "#/engine-data",
+      "bodyLen": 851,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"engine-data\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-data\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": [
+        "404 /api/v1/engine/data/settings",
+        "404 /api/v1/engine/data/settings"
+      ]
+    },
+    {
+      "key": "engine-ontology",
+      "url": "/#/engine-ontology",
+      "hash": "#/engine-ontology",
+      "bodyLen": 858,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"engine-ontology\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-ontology\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "engine-cognitive",
+      "url": "/#/engine-cognitive",
+      "hash": "#/engine-cognitive",
+      "bodyLen": 844,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"engine-cognitive\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-cognitive\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-security\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-data\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-ontology\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-cognitive\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-security\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-data\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-ontology\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-cognitive\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "engine-knowledge",
+      "url": "/#/engine-knowledge",
+      "hash": "#/engine-knowledge",
+      "bodyLen": 966,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"engine-knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "engine-ai",
+      "url": "/#/engine-ai",
+      "hash": "#/engine-ai",
+      "bodyLen": 902,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"engine-ai\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-ai\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    },
+    {
+      "key": "engine-tasks",
+      "url": "/#/engine-tasks",
+      "hash": "#/engine-tasks",
+      "bodyLen": 1384,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [],
+      "bad": []
+    },
+    {
+      "key": "*(404 fallback)",
+      "url": "/#/zzz-nonexistent-route",
+      "hash": "#/zzz-nonexistent-route",
+      "bodyLen": 735,
+      "bodyHead": "ECOS v2.0 企业认知操作系统 总览 决策面板 经营决策·场景进展·资产速览 工作区 场景工作台 场景编排·认知演练·资源装配 AI工作台 Agent协同·模型目录·安全审计 知识工作台 知识库管理·RAG检索·数据对象图谱导入 本体工作台 本体建模·实体管理·关系图谱·术语标准 数据工作台 数据源·管道·治理·",
+      "errorBoundary": false,
+      "navError": "",
+      "consoleErrors": [
+        "[navConfig] no tab labelKey for route id \"zzz-nonexistent-route\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"zzz-nonexistent-route\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-security\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-data\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-ontology\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-cognitive\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-ai\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"zzz-nonexistent-route\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domains\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"domain_designer\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"project_workbench\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"scenario-sandbox\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"chatbot_studio\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"case_library\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"alerts\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"tenants\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-security\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-data\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-ontology\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-cognitive\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-knowledge\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"engine-ai\" — showing placeholder (W201 fail-closed, no raw-key fallback).",
+        "[navConfig] no tab labelKey for route id \"zzz-nonexistent-route\" — showing placeholder (W201 fail-closed, no raw-key fallback)."
+      ],
+      "bad": []
+    }
+  ]
+}

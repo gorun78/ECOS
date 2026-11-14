@@ -523,10 +523,15 @@ public class OntologySecurityInterceptor {
      * <p>码面取 {@link RlsExecutionContract} 单源常量，禁在本类写字面量。</p>
      */
     private static void markSecurityUnavailable(ApiResponse<?> resp, String reason) {
+        // D40（2026-11-13 验证批）：reason 里可能嵌着 security-engine 的**原始应答体**
+        // （实测透出了 `<Map><timestamp>..<status>403</status><error>Forbidden</error>
+        // <path>/api/v1/security/rls/apply</path></Map>`——上游框架体 + 内部端点路径）。
+        // 完整原因只进服务端日志（排障用），对外 message 只给稳定原因码，不逐字回显上游体。
+        log.warn("security-engine 不可用（对外只回原因码）: reason={}", reason);
         resp.setCode(RlsExecutionContract.SEC_UNAVAILABLE_HTTP);
         resp.setErrorCode(RlsExecutionContract.SEC_UNAVAILABLE_CODE);
         resp.setMessage(RlsExecutionContract.REASON_SERVICE_UNAVAILABLE
-                + "（security-engine 进程不可用，非「用户无权限」）: " + reason);
+                + "（security-engine 进程不可用，非「用户无权限」）");
         assignData(resp, Collections.emptyList());
     }
 

@@ -70,13 +70,17 @@ public class PipelineFunctionServiceImpl implements PipelineFunctionService {
             sql.append(" AND category = ?");
             params.add(category);
         }
-        sql.append(" ORDER BY category, name");
-
-        int offset = Math.max(0, page - 1) * pageSize;
+        // COUNT 必须在拼 ORDER BY 之前生成：PostgreSQL 不接受 "SELECT COUNT(*) ... ORDER BY"，
+        // 原写法先 append(" ORDER BY category, name") 再 replace 成 COUNT(*)，导致
+        // BadSqlGrammarException（2026-11-13 验证缺陷 D9：GET /api/v1/engine/data/functions
+        // 恒返回 code=-1「列出函数失败」）。
         String countSql = sql.toString().replace("SELECT *", "SELECT COUNT(*)");
         int total = functionDao.queryCount(countSql, params.toArray());
 
+        sql.append(" ORDER BY category, name");
+
         sql.append(" LIMIT ? OFFSET ?");
+        int offset = Math.max(0, page - 1) * pageSize;
         params.add(pageSize);
         params.add(offset);
 

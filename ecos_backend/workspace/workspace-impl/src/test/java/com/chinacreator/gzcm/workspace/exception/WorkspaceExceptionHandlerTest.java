@@ -148,4 +148,116 @@ class WorkspaceExceptionHandlerTest {
         assertEquals(500, resp.getStatusCode().value());
         assertFalse(resp.getBody().getMessage().contains("uk_scenario"));
     }
+
+    /**
+     * D50（2026-11-13 验证）：{@code BusinessException} 携带的状态行必须被采纳。
+     *
+     * <p><b>缺陷形态（活体实测）</b>：{@code POST /api/v1/workspace/scenarios/sc001/cognitive/diagnose}
+     * 及同族 forecast/simulate/policy 三条腿全部返回
+     * {@code 500 {"errorCode":"INTERNAL"}}，workspace 日志实为
+     * {@code BusinessException: no_active_mind_for_scenario=sc001}；
+     * 抛出点 {@code ScenarioCognitiveController#buildPayload} 写的是
+     * {@code new BusinessException(404, 404, ...)}。本 advice 当时只有
+     * {@code WorkspaceDomainException}/{@code ScenarioDomainException} 两条领域腿，
+     * {@code BusinessException} 不在其继承链上 ⇒ 落 {@code handleUnexpected} → 500。</p>
+     *
+     * <p>「场景还没配 Mind」是调用方前置条件缺失，不是服务故障：报 500 会让前端弹系统错误
+     * 并触发 5xx 告警，真正的修法（先绑 Mind）永远不会被提示。</p>
+     */
+    @Test
+    @DisplayName("D50：BusinessException 的 404 必须落成 404，不得被兜底成 500")
+    void businessExceptionKeepsItsOwnStatusLine() {
+        com.chinacreator.gzcm.common.exception.BusinessException ex =
+                new com.chinacreator.gzcm.common.exception.BusinessException(
+                        404, 404, "no_active_mind_for_scenario=sc001");
+
+        ResponseEntity<ApiResponse<Map<String, Object>>> resp = advice.handleDataBridge(ex);
+
+        assertEquals(404, resp.getStatusCode().value(),
+                "场景无激活 Mind 是前置条件缺失 ⇒ 404，不是 500");
+        assertEquals("404", resp.getBody().getErrorCode(),
+                "body code 必须与状态行同号（携带值 404）");
+        assertTrue(resp.getBody().getMessage().contains("no_active_mind_for_scenario"),
+                "业务文案必须原样透出——前端要靠它提示「先绑 Mind」");
+    }
+
+    @Test
+    @DisplayName("D50 腿二：默认 400 的 BusinessException 落 400（不得一律升 500）")
+    void businessExceptionDefaultsTo400() {
+        var resp = advice.handleDataBridge(
+                new com.chinacreator.gzcm.common.exception.BusinessException("invalid_mind_id: abc"));
+        assertEquals(400, resp.getStatusCode().value(),
+                "单参构造默认 400，是业务校验失败的标准落点");
+    }
+
+    @Test
+    @DisplayName("D50 腿三：越界状态行由 common 单源回退 500（不在本 advice 另写区间判据）")
+    void outOfRangeStatusFallsBackTo500() {
+        var resp = advice.handleDataBridge(
+                new com.chinacreator.gzcm.common.exception.DataBridgeException(200, 0, "骗人的 200"));
+        assertEquals(500, resp.getStatusCode().value(),
+                "200 不是合法错误状态 ⇒ 必须回退 500，禁把失败包装成成功");
+    }
+
+    @Test
+    @DisplayName("D50 腿四：既有 404 腿（NotFoundException）不被父类分支抢走")
+    void notFoundStillMapsTo404() {
+        var resp = advice.handleNotFound(
+                new com.chinacreator.gzcm.common.exception.NotFoundException("scenario 不存在: x"));
+        assertEquals(404, resp.getStatusCode().value());
+        expectNotFoundCode(resp.getBody());
+    }
+
+    private static void expectNotFoundCode(ApiResponse<Map<String, Object>> body) {
+        assertEquals("NOT_FOUND", body.getErrorCode(),
+                "既有 NotFoundException 腿的 errorCode 不得被 D50 新腿改写");
+    }
+
+    /**
+     * D50 注册面腿：`DataBridgeException` 分支必须真的挂在 advice 上。
+     *
+     * <p><b>为什么必须有这条</b>：上面三条行为腿是<b>直接调用</b> {@code advice.handleDataBridge(..)}，
+     * 绕过了 Spring 的分支选择——把方法上的 {@code @ExceptionHandler} 注解注掉后它们仍然全绿
+     * （已用变异探针实测：注掉注解 → 21 条仍 0 失败）。而活体缺陷恰恰发生在「Spring 选哪个
+     * handler」这一步：没有这条注册，异常就落 {@code handleUnexpected} → 500。
+     * 因此本腿用反射直接钉住注册关系，与行为腿互补（一条管"选得中"，一条管"选中的行为对"）。</p>
+     */
+    @Test
+    @DisplayName("D50 注册面：advice 上必须有面向 DataBridgeException 的 @ExceptionHandler")
+    void dataBridgeHandlerIsActuallyRegistered() throws NoSuchMethodException {
+        var method = WorkspaceExceptionHandler.class.getDeclaredMethod(
+                "handleDataBridge", com.chinacreator.gzcm.common.exception.DataBridgeException.class);
+        var ann = method.getAnnotation(
+                org.springframework.web.bind.annotation.ExceptionHandler.class);
+
+        assertNotNull(ann, "缺 @ExceptionHandler ⇒ Spring 永远不会选到该分支，BusinessException 回到 500（D50 复发）");
+        assertTrue(java.util.Arrays.asList(ann.value())
+                        .contains(com.chinacreator.gzcm.common.exception.DataBridgeException.class),
+                "注册类型必须是 DataBridgeException（BusinessException 的父类），实得 "
+                        + java.util.Arrays.toString(ann.value()));
+    }
+
+    /**
+     * D50 优先级腿：`NotFoundException` 自己有一条更具体的腿。
+     *
+     * <p>Spring 选 handler 时按异常类型的<b>最近祖先</b>匹配，{@code NotFoundException} 的腿
+     * 比父类 {@code DataBridgeException} 的腿更具体 ⇒ 仍走前者（errorCode=NOT_FOUND）。
+     * 本腿钉住「两条腿都在、且各自注册在正确的类型上」，防止有人合并两条腿时改掉既有契约。</p>
+     */
+    @Test
+    @DisplayName("D50 优先级：NotFoundException 仍有自己的腿（不被父类分支吸收）")
+    void notFoundHandlerStaysMoreSpecific() throws NoSuchMethodException {
+        var nf = WorkspaceExceptionHandler.class.getDeclaredMethod(
+                "handleNotFound", com.chinacreator.gzcm.common.exception.NotFoundException.class);
+        var db = WorkspaceExceptionHandler.class.getDeclaredMethod(
+                "handleDataBridge", com.chinacreator.gzcm.common.exception.DataBridgeException.class);
+
+        assertNotNull(nf.getAnnotation(org.springframework.web.bind.annotation.ExceptionHandler.class),
+                "NotFound 专腿必须保留");
+        assertNotNull(db.getAnnotation(org.springframework.web.bind.annotation.ExceptionHandler.class),
+                "DataBridge 父类腿必须存在");
+        assertTrue(com.chinacreator.gzcm.common.exception.DataBridgeException.class
+                        .isAssignableFrom(com.chinacreator.gzcm.common.exception.NotFoundException.class),
+                "前提：NotFound 是 DataBridge 子类，否则两腿互不影响、本腿失去意义");
+    }
 }
