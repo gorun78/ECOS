@@ -18,7 +18,7 @@ public class ExtractionPromoteResultVO {
     /** 成功生成候选本体提案的实体数 */
     private int created;
 
-    /** 已生成的提案 ID 列表（ontology-engine {@code ecos_ontology_proposals.id}） */
+    /** 已生成的提案 ID 列表（ontology-engine {@code ecos_ontology.ecos_ontology_proposal.id}） */
     private List<String> proposalIds;
 
     /** 失败明细（格式 {@code 实体名: 原因}） */

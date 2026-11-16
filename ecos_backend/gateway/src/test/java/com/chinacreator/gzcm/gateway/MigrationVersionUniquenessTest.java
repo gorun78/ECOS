@@ -157,9 +157,24 @@ class MigrationVersionUniquenessTest {
      * 2026-11-13 产品级逐功能验证批（缺陷修复随批）：V330（scenario 预算列改 NUMERIC(18,2) 对齐 MC01）
      * · V331（分类树层级回填）· V332（glossary 术语控制域镜像补语义列）落地
      * ⇒ 按实测订正 329→332 / 下一号 332→333。
+     * 2026-11-14 B2 认知引擎逐功能验证批 D74：V333（{@code ecos_control.ecos_cognitive_belief}
+     * 镜像补 12 列至读端口径——lifecycle_state/probability/prob_kind/calibration_ref/model_ref/
+     * scope_ref/as_of_time/distribution_json/mind_id/scenario_id/subject_type/subject_id；
+     * 只加不删、幂等；dev PG 实跑 ALTER/COMMENT 全成功）落地
+     * ⇒ 按实测订正 332→333 / 下一号 333→334。
+     * 2026-11-14 D98：V334（{@code sys_agent_message} 补 thread_id，修 agent-loop chat 恒 502）落地
+     * ⇒ 按实测订正 333→334 / 下一号 334→335。
+     * 2026-11-15 D106（世界模型 Pareto 优化 Tab 后端落地）：V335（新建
+     * {@code ecos_control.ecos_pareto_problem} 历史表 + created_at 索引；只加不删、幂等；
+     * dev PG 实跑 CREATE TABLE/INDEX/COMMENT 全成功）落地
+     * ⇒ 按实测订正 334→335 / 下一号 335→336。
+     * 2026-11-15 D89（sc001 演示场景 DATASET 绑定悬空）：V337（`ecos_control.ecos_scenario_binding`
+     * 的 sb001/sb002 target_ref 从虚构数据集 ds_flight_schedules/ds_passenger_feedback 改指真实资源
+     * res-dw-doc/res-dw-doc-chunk；只 UPDATE 不改结构、幂等）落地
+     * ⇒ 按实测订正 336→337 / 下一号 337→338。
      */
-    private static final int MAX_BASELINE_VERSION = 332;
-    private static final int NEXT_FREE_VERSION = 333;
+    private static final int MAX_BASELINE_VERSION = 337;
+    private static final int NEXT_FREE_VERSION = 338;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

@@ -71,6 +71,14 @@ ecos:
       enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   mybatis:
     type-aliases-package: com.chinacreator.gzcm.workspace
+  # ── D95（2026-11-14 验证，用户裁决：打开持久化）──────────────────────────
+  # 表 public.ecos_scenario_query_history 已由 V212 落库、JdbcQueryHistoryRepository
+  # 早已实现，唯独本节开关全仓从未配置 ⇒ @ConditionalOnProperty(havingValue="true")
+  # 恒不满足 ⇒ QueryHistoryService.save 只打一条 WARN「本次记录丢弃」，
+  # 查询历史永远为空（写入即丢弃）。现显式默认开启。
+  workspace:
+    query-history:
+      persistent: ${ECOS_WS_QUERY_HISTORY_PERSISTENT:true}
   # ── 卷07 F07-01 要点 3（R-24 已批准为 B 案）：两态鉴权等价 ──────────────────
   # 键名收口：原 `ecos.header-auth.enabled` 是死键（全仓 0 读取方，
   # HeaderAuthAutoConfiguration 只认 `ecos.security.header-auth`），

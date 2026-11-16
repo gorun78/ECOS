@@ -45,14 +45,19 @@ class ProposalSqlPortabilityTest {
     /** 提案表裸表名（FROM/UPDATE/INSERT INTO/DELETE FROM 后紧跟，无 schema 前缀点）（§四附则1）。 */
     private static final Pattern BARE_PROPOSAL_TABLE = Pattern.compile(
             "(?<![\\w.])(?:FROM|UPDATE|INSERT\\s+INTO|DELETE\\s+FROM)"
-                    + "\\s+ecos_ontology_proposals\\b", Pattern.CASE_INSENSITIVE);
+                    + "\\s+ecos_ontology_proposals\\b"
+                    // D137：合规表单数名同样禁裸用（必须经 qualifiedTable() 拼 schema）
+                    + "|(?<![\\w.])(?:FROM|UPDATE|INSERT\\s+INTO|DELETE\\s+FROM)"
+                    + "\\s+ecos_ontology_proposal\\b", Pattern.CASE_INSENSITIVE);
 
-    /** W72 整改落点（提案链路两个文件；相对仓库根）。 */
+    /** W72 整改落点（提案链路三文件：Controller / Service / DAO；相对仓库根）。 */
     private static final List<String> SCAN_RELS = List.of(
             "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/ontology/controller/OntologyProposalController.java",
             "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
-                    + "com/chinacreator/gzcm/engine/ontology/service/OntologyProposalService.java");
+                    + "com/chinacreator/gzcm/engine/ontology/service/OntologyProposalService.java",
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ontology/dao/OntologyProposalDao.java");
 
     @Test
     @DisplayName("提案 Controller/Service 源码无 (?::jsonb|::bigint|::text|::date) / 无提案表 SELECT * / 无提案表裸名")

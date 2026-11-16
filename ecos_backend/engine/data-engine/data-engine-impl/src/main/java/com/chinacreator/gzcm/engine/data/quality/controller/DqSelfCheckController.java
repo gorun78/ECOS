@@ -45,8 +45,14 @@ public class DqSelfCheckController {
 
     private static final Logger log = LoggerFactory.getLogger(DqSelfCheckController.class);
 
-    /** 目标 schema（V111 迁移建库） */
-    private static final String DQ_SCHEMA = "ecos_dq";
+    /**
+     * 目标 schema。
+     *
+     * <p>D123（2026-11-15）：原写 {@code ecos_dq}（跟 V111 脚本头一致），但**全库 DQ DAO 实际都读写
+     * {@code ecos_data.dq_*}（11 张表、dq_rule 36 行）**，而 {@code ecos_dq} schema 实存 0 张表 ——
+     * 自检因此恒定报「缺失表 [dq_rule…]，确认 V111 迁移完整」，属误报。现对齐代码真实落点。</p>
+     */
+    private static final String DQ_SCHEMA = "ecos_data";
 
     /** V111 应建 5 张表 */
     private static final List<String> DQ_TABLES = List.of(

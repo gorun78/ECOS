@@ -108,7 +108,8 @@ public class ObjectRelationshipController {
                 "删除关系 " + relId, "system", null);
             return ApiResponse.success("关系 " + relId + " 已删除");
         }
-        return ApiResponse.notFound("OBJ-004: 关系 " + relId + " 不存在");
+        throw new com.chinacreator.gzcm.common.exception.NotFoundException(
+                "OBJ-004: 关系 " + relId + " 不存在");
     }
 
     // ═══════════════ 关系图谱（图查询） ═══════════════════

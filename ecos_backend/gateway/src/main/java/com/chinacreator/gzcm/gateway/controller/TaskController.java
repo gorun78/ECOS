@@ -190,7 +190,10 @@ public class TaskController {
                 .map(this::toVO)
                 .collect(Collectors.toList());
 
-            return ApiResponse.success(new TaskListVO(items, items.size(), offset, limit));
+            // D119（2026-11-15）：原写 items.size()，即「当前页条数」冒充总数 ——
+            // 持久化打开后与 /task/stats 的 total 直接对不上（实测 20 vs 9）。
+            int total = taskManagementService.countTasks(condition);
+            return ApiResponse.success(new TaskListVO(items, total, offset, limit));
         } catch (TaskManagementException e) {
             return ApiResponse.error(-1, e.getMessage());
         }

@@ -45,10 +45,17 @@ public class AuthDao extends com.chinacreator.gzcm.runtime.core.database.support
                 userId);
     }
 
-    /** 查询用户租户ID。 */
+    /**
+     * 查询用户租户ID。
+     *
+     * <p>列名必须按 DDL 真实形态（不加引号的小写）书写：PostgreSQL 的双引号标识符<b>大小写敏感</b>，
+     * 旧写法 {@code "TENANT_ID"} 在真实库上必报 {@code column "TENANT_ID" does not exist}
+     * （DDL 单源建的是小写列）。该异常被登录端 catch 成"无租户"，于是所有用户都被兜到默认租户，
+     * 租户隔离形同虚设。</p>
+     */
     public List<Map<String, Object>> findTenantByUsername(String username) {
         return jdbcTemplate.queryForList(
-                "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"USERNAME\" = ?", username);
+                "SELECT tenant_id FROM TD_USER WHERE username = ?", username);
     }
 
     // ── 获取当前用户信息 ──────────────────────────────────

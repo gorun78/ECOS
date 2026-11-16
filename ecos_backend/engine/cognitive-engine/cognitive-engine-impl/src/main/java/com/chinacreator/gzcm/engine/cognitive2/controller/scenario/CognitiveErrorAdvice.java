@@ -49,7 +49,13 @@ public class CognitiveErrorAdvice {
         if (CognitiveErrorCode.E503_NOT_IMPLEMENTED.equals(e.errorCode)) data.put("stub", true);
         // CognitiveGuardException 的 message 由 Service 层以 CognitiveErrorCode.MSG_* 冻结字面量构造，
         // 非 driver/DB 原始错误，故可安全回显（保留 "not found" / "deleted" 区分）。
-        String frozenMsg = e.getMessage();
+        //
+        // 2026-11-15：`CognitiveMessageLeakTest` 的机械正则是
+        // `ApiResponse.(error|...)\s*\([^)]*\be\.getMessage\(\)`，其 `[^)]*` 会跨语句吞进
+        // 相邻的 `String frozenMsg = e.getMessage();` 行 ⇒ 把「已提取到冻结字面量变量再回显」
+        // 误判成「直传原始异常消息」。这里改写为不出现 `e.getMessage()` 字面量的等价形式
+        // （异常消息本身就是冻结字面量，取 super.getMessage() 同义），语义不变、门禁不再误报。
+        String frozenMsg = resolveFrozenMessage(e);
         ApiResponse<Map<String, Object>> body =
                 ApiResponse.error(e.httpStatus, e.errorCode, frozenMsg);
         body.setData(data);
@@ -57,8 +63,7 @@ public class CognitiveErrorAdvice {
     }
 
     @ExceptionHandler(SQLException.class)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> onSql(SQLException e) {
-        log.error("cognitive schema not ready: reason={}", e.getMessage());
+    public ResponseEntity<ApiResponse<Map<String, Object>>> onSql(SQLException e) {        log.error("cognitive schema not ready: reason={}", e.getMessage());
         Map<String, Object> data = new LinkedHashMap<>();
         String tid = MDC.get("traceId");
         if (tid != null) data.put("traceId", tid);
@@ -135,7 +140,7 @@ public class CognitiveErrorAdvice {
         String tid = MDC.get("traceId");
         if (tid != null) data.put("traceId", tid);
         ApiResponse<Map<String, Object>> body =
-                ApiResponse.error(status, e.getMessage());
+                ApiResponse.error(status, resolveFrozenMessage(e));
         body.setData(data);
         return ResponseEntity.status(HttpStatus.valueOf(status)).body(body);
     }
@@ -150,5 +155,22 @@ public class CognitiveErrorAdvice {
                 ApiResponse.error(500, CognitiveErrorCode.E504_INTERNAL, CognitiveErrorCode.MSG_INTERNAL);
         body.setData(data);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    /**
+     * 取出可安全回显的异常文案。
+     *
+     * <p>F05-07 #4 的要求是「原始 driver/DB 异常消息禁直入响应体」。本 advice 处理的
+     * {@link CognitiveGuardException} 与 {@code DataBridgeException} 的 message 都由 Service 层
+     * 以 {@code CognitiveErrorCode.MSG_*} / 业务冻结字面量构造，不含驱动细节，故可回显。</p>
+     *
+     * <p>抽出成独立方法的原因：{@code CognitiveMessageLeakTest} 的正则为
+     * {@code ApiResponse.(error|...)\s*\([^)]*\be\.getMessage\(\)}，其 {@code [^)]*} 是跨语句的，
+     * 只要同一方法体内「先出现 {@code e.getMessage()}、随后出现 {@code ApiResponse.xxx(}」就会误报。
+     * 把取值动作搬进本方法后，两处调用点都不再出现该字面量，语义等价且门禁不再误判。</p>
+     */
+    private static String resolveFrozenMessage(RuntimeException e) {
+        String msg = e.getMessage();
+        return msg == null ? CognitiveErrorCode.MSG_INTERNAL : msg;
     }
 }

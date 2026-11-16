@@ -70,6 +70,24 @@ ecos:
   # ⇒ ECOS-AUTH-010；直连内网端口由 CallerCredentialSource 中继原样信任头。
   endpoints:
     sysman: ${ECOS_ENDPOINT_SYSMAN:http://127.0.0.1:18081}
+  # D95（2026-11-14 用户裁决：打开持久化）：gateway 内嵌 workspace-impl，
+  # 开关必须与 workspace-service 同口径，否则经网关访问时查询历史仍被丢弃。
+  workspace:
+    query-history:
+      persistent: ${ECOS_WS_QUERY_HISTORY_PERSISTENT:true}
+  # D115（2026-11-15）：TaskController /api/v1/task/* 由 gateway 承载，持久化开关必须与
+  # services/dccheng 同口径（那里配了 runtime-task.persistence.enabled: true）。
+  # 漏配时 JdbcTaskPersistenceService 的 @ConditionalOnProperty(matchIfMissing=false) 不装配，
+  # submitTask/queryTasks 全部走内存 ConcurrentHashMap ⇒ 重启丢数据、API 计数与库永久对不上。
+  # 注：条件键是顶层 `runtime.task.persistence.enabled`（非 ecos.* 前缀）；dccheng 里嵌在
+  # ecos: 下对 @ConditionalOnProperty 无效，属同一处漏配的另一形态。
+
+# D115（2026-11-15）：runtime-task PG 持久化开关（@ConditionalOnProperty 精确键位）。
+# gateway 承载 TaskController /api/v1/task/*，不开则任务只进内存 ConcurrentHashMap。
+runtime:
+  task:
+    persistence:
+      enabled: ${ECOS_RUNTIME_TASK_PERSISTENCE_ENABLED:true}
 
 # MyBatis Configuration
 mybatis:

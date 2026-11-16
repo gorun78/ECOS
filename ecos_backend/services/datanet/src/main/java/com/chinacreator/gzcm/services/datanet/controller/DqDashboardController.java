@@ -45,22 +45,26 @@ public class DqDashboardController {
     public ApiResponse<DataPage<DqRuleRow>> listRules(
             @RequestParam(defaultValue = "") String severity,
             @RequestParam(defaultValue = "") String status) {
+        // D107: 真实表 ecos_dq_rule 无 code/target_entity/target_field/rule_expression/status/params 列
+        // (只有 id/name/description/rule_type/config_json/severity/enabled/created_at/updated_at/tenant_id).
+        // 按真实列取数；不存在的列如实给 null，禁编造 (编造 = 假成功).
+        // status 语义映射: enabled=true -> "ACTIVE", false -> "DISABLED" (前端按状态筛选仍可用).
         StringBuilder sql = new StringBuilder(
-            "SELECT id, code, name, description, rule_type, target_entity, target_field, " +
-            "rule_expression, severity, status, params, created_at, updated_at " +
-            "FROM ecos_dq_rule WHERE 1=1");
+            "SELECT id, name, description, rule_type, config_json, severity, enabled, " +
+            "created_at, updated_at FROM ecos_dq_rule WHERE 1=1");
         List<Object> params = new ArrayList<>();
         if (!severity.isBlank()) { sql.append(" AND severity = ?"); params.add(severity.toUpperCase()); }
-        if (!status.isBlank()) { sql.append(" AND status = ?"); params.add(status.toUpperCase()); }
+        if (!status.isBlank()) { sql.append(" AND enabled = ?"); params.add("ACTIVE".equalsIgnoreCase(status)); }
         sql.append(" ORDER BY created_at DESC");
 
         List<DqRuleRow> data = dqDashboardService.query(sql.toString(), (rs, _i) -> {
             Timestamp createdAt = rs.getTimestamp("created_at");
-            return new DqRuleRow(rs.getString("id"), rs.getString("code"), rs.getString("name"),
+            return new DqRuleRow(rs.getString("id"), null, rs.getString("name"),
                     rs.getString("description"), rs.getString("rule_type"),
-                    rs.getString("target_entity"), rs.getString("target_field"),
-                    rs.getString("rule_expression"), rs.getString("severity"), rs.getString("status"),
-                    rs.getString("params"),
+                    null, null,
+                    rs.getString("config_json"), rs.getString("severity"),
+                    rs.getBoolean("enabled") ? "ACTIVE" : "DISABLED",
+                    rs.getString("config_json"),
                     createdAt != null ? createdAt.toLocalDateTime().toString() : null,
                     rs.getTimestamp("updated_at"));
         }, params.toArray());
@@ -73,26 +77,39 @@ public class DqDashboardController {
             @RequestParam(defaultValue = "") String severity,
             @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "100") int limit) {
+        // D107: 真实表 ecos_dq_issue 只有 id/rule_id/asset_id/description/status/severity/created_at/resolved_at.
+        // 无 entity_type/entity_id/field_name/issue_type/current_value/expected_value/assigned_to/
+        // detected_at/resolution_note 列. 实体类型/ID 从 asset_id 按 "Type:key" 形态拆分
+        // (该表真实数据即此形态: Customer:c012 / Supplier:s003 / Invoice:inv008); 拆不出的整串放
+        // entity_id, entity_type 留 null. 其余缺失列如实 null, 禁编造.
         StringBuilder sql = new StringBuilder(
-            "SELECT id, rule_id, entity_type, entity_id, field_name, issue_type, " +
-            "severity, description, current_value, expected_value, status, assigned_to, " +
-            "detected_at, resolved_at, resolution_note " +
-            "FROM ecos_dq_issue WHERE 1=1");
+            "SELECT id, rule_id, asset_id, description, status, severity, " +
+            "created_at, resolved_at FROM ecos_dq_issue WHERE 1=1");
         List<Object> params = new ArrayList<>();
         if (!severity.isBlank()) { sql.append(" AND severity = ?"); params.add(severity.toUpperCase()); }
-        if (!status.isBlank()) { sql.append(" AND status = ?"); params.add(status.toUpperCase()); }
-        sql.append(" ORDER BY detected_at DESC LIMIT ?");
+        if (!status.isBlank()) { sql.append(" AND status = ?"); params.add(status.toLowerCase()); }
+        sql.append(" ORDER BY created_at DESC LIMIT ?");
         params.add(Math.min(limit, 1000));
 
         List<DqIssueRow> data = dqDashboardService.query(sql.toString(), (rs, _i) -> {
-            Timestamp detectedAt = rs.getTimestamp("detected_at");
+            Timestamp createdAt = rs.getTimestamp("created_at");
+            String assetId = rs.getString("asset_id");
+            String entityType = null;
+            String entityId = assetId;
+            if (assetId != null) {
+                int sep = assetId.indexOf((int) 58);
+                if (sep > 0 && sep < assetId.length() - 1) {
+                    entityType = assetId.substring(0, sep);
+                    entityId = assetId.substring(sep + 1);
+                }
+            }
             return new DqIssueRow(rs.getString("id"), rs.getString("rule_id"),
-                    rs.getString("entity_type"), rs.getString("entity_id"),
-                    rs.getString("field_name"), rs.getString("issue_type"), rs.getString("severity"),
-                    rs.getString("description"), rs.getString("current_value"),
-                    rs.getString("expected_value"), rs.getString("status"), rs.getString("assigned_to"),
-                    detectedAt != null ? detectedAt.toLocalDateTime().toString() : null,
-                    rs.getTimestamp("resolved_at"), rs.getString("resolution_note"));
+                    entityType, entityId,
+                    null, null, rs.getString("severity"),
+                    rs.getString("description"), null,
+                    null, rs.getString("status"), null,
+                    createdAt != null ? createdAt.toLocalDateTime().toString() : null,
+                    rs.getTimestamp("resolved_at"), null);
         }, params.toArray());
 
         return ApiResponse.success(new DataPage<>(data, data.size()));
@@ -100,20 +117,26 @@ public class DqDashboardController {
 
     @GetMapping("/dashboard")
     public ApiResponse<DqDashboardVO> dashboard() {
-        Integer totalRules = dqDashboardService.queryForObject("SELECT count(*) FROM ecos_dq_rule", Integer.class);
+        // D107: ecos_dq_rule.status -> enabled (ACTIVE 即 enabled=true);
+        // ecos_dq_issue.status 真实值为小写 (open/resolved), 原 'OPEN' 匹配不上;
+        // issue_type 列不存在 -> 按 asset_id 前缀 (Customer/Supplier/Invoice) 分组, 语义等价且真实.
+        Integer totalRules = dqDashboardService.queryForObject(
+            "SELECT count(*) FROM ecos_dq_rule", Integer.class);
         Integer activeRules = dqDashboardService.queryForObject(
-            "SELECT count(*) FROM ecos_dq_rule WHERE status = 'ACTIVE'", Integer.class);
+            "SELECT count(*) FROM ecos_dq_rule WHERE enabled = true", Integer.class);
 
-        Integer totalIssues = dqDashboardService.queryForObject("SELECT count(*) FROM ecos_dq_issue", Integer.class);
+        Integer totalIssues = dqDashboardService.queryForObject(
+            "SELECT count(*) FROM ecos_dq_issue", Integer.class);
         Integer openIssues = dqDashboardService.queryForObject(
-            "SELECT count(*) FROM ecos_dq_issue WHERE status = 'OPEN'", Integer.class);
+            "SELECT count(*) FROM ecos_dq_issue WHERE lower(status) = 'open'", Integer.class);
 
         List<SeverityCount> bySeverity = dqDashboardService.query(
             "SELECT severity, count(*) as cnt FROM ecos_dq_issue GROUP BY severity ORDER BY cnt DESC",
             (rs, _i) -> new SeverityCount(rs.getString("severity"), rs.getLong("cnt")));
 
         List<IssueTypeCount> byType = dqDashboardService.query(
-            "SELECT issue_type, count(*) as cnt FROM ecos_dq_issue GROUP BY issue_type ORDER BY cnt DESC",
+            "SELECT split_part(asset_id, ':', 1) AS issue_type, count(*) as cnt " +
+            "FROM ecos_dq_issue GROUP BY 1 ORDER BY cnt DESC",
             (rs, _i) -> new IssueTypeCount(rs.getString("issue_type"), rs.getLong("cnt")));
 
         return ApiResponse.success(new DqDashboardVO(
@@ -154,11 +177,14 @@ public class DqDashboardController {
     public ApiResponse<DataPage<DqExecutionRow>> listExecutions(
             @RequestParam(defaultValue = "") String ruleId,
             @RequestParam(defaultValue = "10") int limit) {
+        // D107：ecos_dq_execution_result.rule_id 是 varchar(64)，ecos_dq_rule.id 是 bigint，
+        // 直接 JOIN 会报 "operator does not exist: character varying = bigint"（实测 500）。
+        // 按文本比较两列（规则表 id 转文本），语义等价且不依赖隐式转换。
         StringBuilder sql = new StringBuilder(
             "SELECT r.id, r.rule_id, r.passed, r.total_rows, r.failed_rows, " +
             "r.error_details, r.executed_at, d.name as rule_name " +
             "FROM ecos_dq_execution_result r " +
-            "LEFT JOIN ecos_dq_rule d ON r.rule_id = d.id WHERE 1=1");
+            "LEFT JOIN ecos_dq_rule d ON r.rule_id = CAST(d.id AS VARCHAR) WHERE 1=1");
         List<Object> params = new ArrayList<>();
         if (!ruleId.isBlank()) { sql.append(" AND r.rule_id = ?"); params.add(ruleId); }
         sql.append(" ORDER BY r.executed_at DESC LIMIT ?");

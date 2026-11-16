@@ -57,6 +57,30 @@ public class DictDao extends com.chinacreator.gzcm.runtime.core.database.support
             dictType, dictCode);
     }
 
+    /**
+     * 按 (dict_type, dict_code) 查任意状态的一行（含已逻辑删除的 inactive）。
+     * <p>唯一索引 {@code sys_dict_dict_type_dict_code_key} 不看 status，删除只是置 inactive；
+     * 创建前若只查 active 会漏判，INSERT 撞索引 → 500。故复活判定必须用本方法。</p>
+     */
+    public SysDict findAnyStatus(String dictType, String dictCode) {
+        List<SysDict> rows = jdbcTemplate.query(
+            "SELECT " + COLS + " FROM sys_dict WHERE dict_type = ? AND dict_code = ? LIMIT 1",
+            ROW_MAPPER, dictType, dictCode);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /** 复活逻辑删除行：以新值覆盖并置回 active（同一定义键复用原行，不新建）。 */
+    public void revive(SysDict dict, String dictType, String dictCode) {
+        jdbcTemplate.update(
+            "UPDATE sys_dict SET dict_label = ?, dict_label_en = ?, sort_order = ?, status = ?, " +
+            "parent_code = ?, ext_value = ?, subsystem = ?, updated_at = NOW() " +
+            "WHERE dict_type = ? AND dict_code = ?",
+            dict.getDictLabel(), dict.getDictLabelEn(), dict.getSortOrder(),
+            dict.getStatus() != null ? dict.getStatus() : "active",
+            dict.getParentCode(), dict.getExtValue(), dict.getSubsystem(),
+            dictType, dictCode);
+    }
+
     /** 全量加载 active 字典项。 */
     public List<SysDict> listAllActive() {
         return jdbcTemplate.query(

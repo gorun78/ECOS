@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,7 +53,7 @@ public class TaskPersistenceDao extends JdbcTemplateDaoSupport {
                 "  \"CREATED_BY\",\"TENANT_ID\",\"TAGS\",\"EXTENSIONS\"," +
                 "  \"CREATED_TIME\",\"UPDATED_TIME\",\"create_time\",\"update_time\"," +
                 "  \"create_by\",\"update_by\",\"is_deleted\",\"domain\",\"version_no\") " +
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,NOW(),NOW(),?,?,?,0,'default','1') " +
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, ?,NOW(),NOW(),?,?,?,?,0,'default','1') " +
                 "ON CONFLICT (\"TASK_ID\") DO UPDATE SET " +
                 "  \"TASK_NAME\"=EXCLUDED.\"TASK_NAME\", " +
                 "  \"TASK_TYPE\"=EXCLUDED.\"TASK_TYPE\", " +
@@ -84,6 +85,7 @@ public class TaskPersistenceDao extends JdbcTemplateDaoSupport {
                 ext(task, "scheduleId"), ext(task, "nodeId"), ext(task, "executionMode"),
                 task.getCreatedBy(), task.getTenantId(),
                 jstr(task.getTags()), jstr(task.getExtensions()),
+                ts(task.getCreateTime()), ts(task.getCreateTime()),
                 task.getCreatedBy(), task.getCreatedBy());
 
         // 同步原大写字段（V150 双轨）
@@ -197,8 +199,8 @@ public class TaskPersistenceDao extends JdbcTemplateDaoSupport {
                 "  \"STATUS_MESSAGE\"=EXCLUDED.\"STATUS_MESSAGE\", " +
                 "  \"PROGRESS\"=EXCLUDED.\"PROGRESS\", " +
                 "  \"CURRENT_STEP_ID\"=EXCLUDED.\"CURRENT_STEP_ID\", " +
-                "  \"START_TIME\"=COALESCE(EXCLUDED.\"START_TIME\", \"START_TIME\"), " +
-                "  \"END_TIME\"=COALESCE(EXCLUDED.\"END_TIME\", \"END_TIME\"), " +
+                "  \"START_TIME\"=COALESCE(EXCLUDED.\"START_TIME\", " + T_STATUS + ".\"START_TIME\"), " +
+                "  \"END_TIME\"=COALESCE(EXCLUDED.\"END_TIME\", " + T_STATUS + ".\"END_TIME\"), " +
                 "  \"ESTIMATED_REMAINING_TIME\"=EXCLUDED.\"ESTIMATED_REMAINING_TIME\", " +
                 "  \"PROCESSED_COUNT\"=EXCLUDED.\"PROCESSED_COUNT\", " +
                 "  \"TOTAL_COUNT\"=EXCLUDED.\"TOTAL_COUNT\", " +
@@ -234,8 +236,53 @@ public class TaskPersistenceDao extends JdbcTemplateDaoSupport {
 
     // ============================= 查询 =============================
 
-    public List<Map<String, Object>> queryTasks(Map<String, Object> condition, int offset, int limit) {
+    /**
+     * D119（2026-11-15）：任务总数（与 {@link #queryTasks} 同一 WHERE 口径）。
+     * 供列表 total 与统计 total 共用一个数据源，避免「列表读库、统计读内存」两套口径。
+     */
+    public int countTasks(Map<String, Object> condition) {
         StringBuilder where = new StringBuilder(" WHERE is_deleted=0");
+        List<Object> params = new ArrayList<>();
+        if (condition != null) {
+            if (condition.get("taskType") != null) {
+                where.append(" AND \"TASK_TYPE\"=?");
+                params.add(condition.get("taskType"));
+            }
+            if (condition.get("taskId") != null) {
+                where.append(" AND \"TASK_ID\"=?");
+                params.add(condition.get("taskId"));
+            }
+            if (condition.get("tenantId") != null) {
+                where.append(" AND \"TENANT_ID\"=?");
+                params.add(condition.get("tenantId"));
+            }
+            if (condition.get("createdBy") != null) {
+                where.append(" AND \"CREATED_BY\"=?");
+                params.add(condition.get("createdBy"));
+            }
+        }
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM " + T_TASK + where, Integer.class, params.toArray());
+        return n == null ? 0 : n;
+    }
+
+    /**
+     * D119：按状态分组计数，且只统计「仍存活的任务」（join 过滤 is_deleted=0），
+     * 避免孤儿状态行把各状态之和顶到 total 之上。
+     */
+    public Map<String, Integer> countStatusByCategory() {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        jdbcTemplate.query(
+                "SELECT s.\"STATUS\" AS st, count(*) AS c FROM " + T_STATUS + " s "
+                        + "JOIN " + T_TASK + " t ON t.\"TASK_ID\" = s.\"TASK_ID\" AND t.is_deleted = 0 "
+                        + "GROUP BY s.\"STATUS\"",
+                rs -> {
+                    out.put(rs.getString("st"), rs.getInt("c"));
+                });
+        return out;
+    }
+
+    public List<Map<String, Object>> queryTasks(Map<String, Object> condition, int offset, int limit) {        StringBuilder where = new StringBuilder(" WHERE is_deleted=0");
         List<Object> params = new ArrayList<>();
         if (condition != null) {
             if (condition.get("taskType") != null) {
@@ -323,7 +370,7 @@ public class TaskPersistenceDao extends JdbcTemplateDaoSupport {
                 " (\"EXECUTION_ID\",\"TASK_ID\",\"STATUS\",\"START_TIME\",\"END_TIME\"," +
                 "  \"DURATION\",\"RESULT\",\"ERROR_MESSAGE\",\"ERROR_STACK\"," +
                 "  \"EXECUTION_NODE_ID\",\"CREATED_TIME\") " +
-                "VALUES (?,?,?,?,?,?,?,?,?,NOW()) " +
+                "VALUES (?,?,?,?,?,?,?,?,?,?,NOW()) " +
                 "ON CONFLICT (\"EXECUTION_ID\") DO NOTHING",
                 executionId, taskId, status, ts(startTime), ts(endTime),
                 duration, result, errorMessage, errorStack, executionNodeId);

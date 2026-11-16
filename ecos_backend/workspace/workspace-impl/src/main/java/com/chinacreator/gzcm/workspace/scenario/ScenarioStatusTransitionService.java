@@ -215,10 +215,26 @@ public class ScenarioStatusTransitionService {
         return scenarioService.get(scenarioId).getStatus();
     }
 
+    /**
+     * 是否存在<b>正式</b>运行（完成态门禁的唯一依据）。
+     *
+     * <p>D75（2026-11-14 验证）：原实现「有任何 run 即算」——V209 已落 {@code run_mode} 列，
+     * 该过渡期兜底成了缺陷：跑一次 SANDBOX 就能让完成态门禁通过，与 V-WS-042 第③条
+     * 「SANDBOX 运行不计 isFormalRunExists」直接冲突。现按 {@code run_mode='FORMAL'} 过滤；
+     * 历史行 {@code run_mode} 缺省值即 'FORMAL'（V209 NOT NULL DEFAULT），故旧数据判定不变。</p>
+     */
     private boolean hasFormalRun(String scenarioId) {
         List<Map<String, Object>> runs = dao.listRunHistory(scenarioId, 100);
-        // 过渡期：旧 run 表无 run_mode 列，任何成功运行按 FORMAL 处理（V209 新表落地后改读 run_mode='FORMAL'，见 Mapper 收口接缝）。
-        return runs != null && !runs.isEmpty();
+        if (runs == null) {
+            return false;
+        }
+        for (Map<String, Object> run : runs) {
+            Object mode = run.get("run_mode");
+            if (mode == null || "FORMAL".equalsIgnoreCase(String.valueOf(mode))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<String> statusNames(List<ScenarioStatus> statuses) {

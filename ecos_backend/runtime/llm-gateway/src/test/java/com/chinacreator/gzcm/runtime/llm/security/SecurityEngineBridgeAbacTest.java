@@ -48,6 +48,47 @@ class SecurityEngineBridgeAbacTest {
     // ═══════════════ 1. 显式 ALLOW / 显式 DENY / fallback / 缺失 ═══════════════
 
     @Test
+    @DisplayName("D99：出站裁决必须带跨 JVM 信任头（X-ECOS-USER/ROLE/TENANT），否则独立 service 态恒 403")
+    void outboundVerdictCallCarriesTrustHeaders() throws IOException {
+        try (Harness fx = Harness.withFakeSecurity("{\"code\":0,\"message\":\"ok\",\"data\":{\"allow\":true}}")) {
+            assertEquals(Verdict.ALLOW,
+                    fx.bridge.evaluateVerdict("u-admin", "tenant-a", "llm:chat", Map.of("model", "deepseek")));
+
+            List<String> lower = fx.captured.headerNames.stream()
+                    .map(h -> h.toLowerCase(java.util.Locale.ROOT)).toList();
+            assertTrue(lower.contains("x-ecos-user"),
+                    "缺 X-ECOS-USER ⇒ security-engine HeaderAuthInterceptor 403 ECOS-AUTH-010: " + lower);
+            assertTrue(lower.contains("x-ecos-tenant"),
+                    "缺 X-ECOS-TENANT 同 403: " + lower);
+            assertTrue(lower.contains("x-ecos-role"), "角色头便于 security 侧复核: " + lower);
+            assertFalse(lower.contains("x-ecos-service"),
+                    "X-ECOS-SERVICE 会触发 HMAC 验签，无签名反而 403 ECOS-AUTH-011: " + lower);
+        }
+    }
+
+    @Test
+    @DisplayName("D99 反向探针自检：旧形态（只带 X-Request-Id）确实会缺信任头")
+    void probeRecognizesLegacyHeaderSet() {
+        // 旧实现只加 trace 头；若把 trustHeaders 调用删掉，上面用例的 lower 里就只剩 x-request-id/content-type
+        List<String> legacy = List.of("x-request-id", "content-type", "content-length");
+        assertFalse(legacy.stream().anyMatch(h -> h.startsWith("x-ecos-")),
+                "旧头集不含任何 x-ecos-* ⇒ 本门禁在删除修复后必然转红");
+    }
+
+    @Test
+    @DisplayName("D99 第三层：带入口 Authorization 时必须中继（sysman 实测矩阵 = 仅信任头403／仅JWT403／两者200）")
+    void outboundRelaysInboundAuthorizationWhenPresent() throws IOException {
+        try (Harness fx = Harness.withFakeSecurity("{\"code\":0,\"message\":\"ok\",\"data\":{\"allow\":true}}")) {
+            // 无请求上下文 ⇒ CallerCredentialSource 取不到 Authorization（有意 fail-closed）
+            fx.bridge.evaluateVerdict("u-admin", "tenant-a", "llm:chat", Map.of());
+            List<String> lower = fx.captured.headerNames.stream()
+                    .map(h -> h.toLowerCase(java.util.Locale.ROOT)).toList();
+            assertFalse(lower.contains("authorization"),
+                    "无请求上下文时不得凭空造 Authorization（不伪造主语，§2.4-6）: " + lower);
+        }
+    }
+
+    @Test
     @DisplayName("security 返回 data.allow=true → ALLOW；请求体带 policy=rbac + subject；出站带 X-Request-Id")
     void explicitAllowFromSecurityRestPermits() throws IOException {
         try (Harness fx = Harness.withFakeSecurity("{\"code\":0,\"message\":\"ok\",\"data\":{\"allow\":true}}")) {

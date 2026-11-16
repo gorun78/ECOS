@@ -797,18 +797,31 @@ public class PipelineDebugService {
      */
     private void persistRun(Session s) {
         if (s.executionId == null) {
+            if (s.definitionId == null) {
+                // D121（2026-11-15）：ad-hoc 调试会话在库里没有对应的 pipeline 定义，
+                // 而 ecos_pipeline_execution.pipeline_id 有外键 fk_data_pexec_def —— 
+                // 原实现把 pipeline_id 伪造成 "adhoc-<sessionId>" 硬插，必然 409，
+                // 且把 PSQL 原文（表名/约束名/内部 id）直接透给调用方。
+                // 现改为：ad-hoc 会话只保留在内存（状态/日志/单步均可用），不写执行历史；
+                // 需要执行历史请先用 definitionId 建会话。
+                s.executionId = "adhoc-exec-" + s.id;
+                s.startedAt = nowIso();
+                execLogs.put(s.executionId, new ExecutionLog(s.executionId, Instant.now().toEpochMilli()));
+                logNode(s, null, "INFO", "ad-hoc 调试会话不落执行历史（无对应 pipeline 定义），executionId=" + s.executionId);
+                return;
+            }
             PipelineExecution exec = new PipelineExecution();
             exec.setId(UUID.randomUUID().toString().replace("-", ""));
-            // ad-hoc 调试会话无真实 definitionId；用 id 兜底（pipeline_id 为 NOT NULL 约束）
-            exec.setDefinitionId(s.definitionId != null ? s.definitionId : ("adhoc-" + s.id));
+            exec.setDefinitionId(s.definitionId);
             exec.setStatus("RUNNING");
             repository.insertExecution(exec);
             s.executionId = exec.getId() != null ? exec.getId() : UUID.randomUUID().toString().replace("-", "");
+            s.persisted = true;
             s.startedAt = nowIso();
             execLogs.put(s.executionId, new ExecutionLog(s.executionId, Instant.now().toEpochMilli()));
             logNode(s, null, "INFO", "Pipeline 调试执行已创建: executionId=" + s.executionId);
         }
-        if (isTerminal(s.state)) {
+        if (s.persisted && isTerminal(s.state)) {
             String dbStatus = s.state == State.COMPLETED ? "COMPLETED"
                     : s.state == State.FAILED ? "FAILED"
                     : s.state == State.STOPPED ? "CANCELLED" : "RUNNING";
@@ -1002,6 +1015,8 @@ public class PipelineDebugService {
         int completedNodes = 0;
         long totalRows;
         String executionId;
+        /** D121：只有真正写了 ecos_pipeline_execution 的会话才允许回写终态 */
+        boolean persisted = false;
         String startedAt;
         String finishedAt;
         String currentNodeId;

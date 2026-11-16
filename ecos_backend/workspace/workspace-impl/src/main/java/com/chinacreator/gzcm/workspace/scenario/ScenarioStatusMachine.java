@@ -42,12 +42,32 @@ public class ScenarioStatusMachine {
 
     private void assertTransition(ScenarioStatus from, ScenarioStatus to, TransitionContext ctx,
                                   MigrationPermissionChecker checker) {
-        if (from == null || to == null) {
-            throw IllegalScenarioTransitionException.illegal(str(from), str(to));
-        }
+        // D110（2026-11-15 重排）：三段式 —— ①纯结构非法边 ②权限 ③带载荷的前置条件。
+        // 原顺序是「权限 → 结构」，导致未授权主体对**本就非法的边**也只能看到 403
+        // （D57 缺权限键时 admin 对 DRAFT→SUSPENDED 拿到 403 scenario:write，
+        // 于是会去申请一个根本不存在的权限，而真正原因是他想做一件规则上不允许的事）。
+        // 但**不能**简单把整段合法性提到权限之前：`assertActivate` / SUSPENDED→ACTIVE
+        // 会抛 IslandBindingException，其响应体携带孤岛明细（bindingId/name/reason）——
+        // 未授权主体先跑完就能读到本该无权查看的绑定清单。
+        // 因此只把**不携带任何数据**的结构判定（目标态 DRAFT、终态出边、DRAFT 的非法出边、
+        // 以及各状态下不存在的目标态）提前；所有带载荷的前置判定留在权限之后。
+        assertStructurallyLegal(from, to);
         String perm = permissionPoint(from, to);
         if (perm != null && !checker.isAllowed(perm, ctx.getSubject())) {
             throw new ForbiddenOperationException(perm);
+        }
+        assertPreconditionsSatisfied(from, to, ctx);
+    }
+
+    /**
+     * ① 纯结构非法边：判定「这条边在状态机里存不存在」，不读任何业务数据、不产生载荷。
+     *
+     * <p>顺序在权限之前是安全的：它只回答「DRAFT 能不能直接到 SUSPENDED」这类
+     * 与调用者无关的规则问题，泄露的仅是设计文档里公开的状态机形状。</p>
+     */
+    private void assertStructurallyLegal(ScenarioStatus from, ScenarioStatus to) {
+        if (from == null || to == null) {
+            throw IllegalScenarioTransitionException.illegal(str(from), str(to));
         }
         if (to == ScenarioStatus.DRAFT) {
             throw IllegalScenarioTransitionException.illegal(from.name(), to.name());
@@ -63,35 +83,40 @@ public class ScenarioStatusMachine {
                 if (to == ScenarioStatus.COMPLETED) {
                     throw IllegalScenarioTransitionException.illegal(from.name(), to.name());
                 }
+                break;
+            case ACTIVE:
+            case SUSPENDED:
+                break;
+            default:
+                throw IllegalScenarioTransitionException.illegal(from.name(), to.name());
+        }
+    }
+
+    /**
+     * ③ 前置条件（可能携带业务载荷）—— 必须在权限校验通过之后才执行。
+     *
+     * <p>{@code assertActivate} 与 {@code SUSPENDED→ACTIVE} 都会抛
+     * {@link IslandBindingException}，其响应体含孤岛明细；放在权限前会构成越权信息泄露。</p>
+     */
+    private void assertPreconditionsSatisfied(ScenarioStatus from, ScenarioStatus to,
+                                              TransitionContext ctx) {
+        switch (from) {
+            case DRAFT:
+                // 结构上 DRAFT 只剩 →ACTIVE 一条出边（其余已在 ① 拦掉）
                 assertActivate(ctx);
                 break;
             case ACTIVE:
-                if (to == ScenarioStatus.SUSPENDED) {
-                    break;
+                if (to == ScenarioStatus.COMPLETED && !ctx.isFormalRunExists()) {
+                    throw IllegalScenarioTransitionException.noFormalRun();
                 }
-                if (to == ScenarioStatus.COMPLETED) {
-                    if (!ctx.isFormalRunExists()) {
-                        throw IllegalScenarioTransitionException.noFormalRun();
-                    }
-                    break;
-                }
-                if (to == ScenarioStatus.ACTIVE) {
-                    break;
-                }
-                throw IllegalScenarioTransitionException.illegal(from.name(), to.name());
+                break;
             case SUSPENDED:
-                if (to == ScenarioStatus.ACTIVE) {
-                    if (!ctx.isIslandsEmpty()) {
-                        throw new IslandBindingException(toIslandPayload(ctx));
-                    }
-                    break;
+                if (to == ScenarioStatus.ACTIVE && !ctx.isIslandsEmpty()) {
+                    throw new IslandBindingException(toIslandPayload(ctx));
                 }
-                if (to == ScenarioStatus.SUSPENDED) {
-                    break;
-                }
-                throw IllegalScenarioTransitionException.illegal(from.name(), to.name());
+                break;
             default:
-                throw IllegalScenarioTransitionException.illegal(from.name(), to.name());
+                break;
         }
     }
 

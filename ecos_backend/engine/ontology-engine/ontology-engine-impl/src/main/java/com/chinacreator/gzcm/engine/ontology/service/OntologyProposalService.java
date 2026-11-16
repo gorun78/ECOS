@@ -127,9 +127,9 @@ public class OntologyProposalService {
     }
 
     /**
-     * approve-and-publish：更新为 EXECUTED，回填 version_id。
+     * approve-and-publish：更新为 EXECUTED，回填 version_id（版本 ID，非 semver 版本号）。
      */
-    public void markExecutedWithVersion(String id, String status, Long versionId) {
+    public void markExecutedWithVersion(String id, String status, String versionId) {
         requireNonNullId(id);
         proposalDao.markExecutedWithVersion(id, status, versionId);
     }

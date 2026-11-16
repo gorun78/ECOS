@@ -96,7 +96,13 @@ public class AgentConfigService {
     }
 
     private String nextId() {
-        return "agent-" + ID_SEQ.incrementAndGet();
+        // D118（2026-11-15）：不能只用进程内计数器。重启后 ID_SEQ 归零，会重新生成
+        // 已存在的 agent-101 并撞主键（实测创建接口 502）。以库内数字型最大序号为基线下推。
+        int dbMax = repository.maxNumericAgentSuffix();
+        int base = Math.max(dbMax, ID_SEQ.get());
+        int next = Math.max(base, 100) + 1;
+        ID_SEQ.set(next);
+        return "agent-" + next;
     }
 
     /**
@@ -135,7 +141,9 @@ public class AgentConfigService {
         entity.setStatus("draft");
         repository.insert(entity);
         log.info("Agent created: {} [{}]", id, entity.getName());
-        return toRow(entity);
+        // 写后回读：DB 的 created_at/updated_at 默认值不会回填到 entity，
+        // 直接 toRow(entity) 会让创建响应返回 createdAt=null（与 GET 回读不一致）。
+        return repository.findById(id).map(this::toRow).orElseGet(() -> toRow(entity));
     }
 
     /**

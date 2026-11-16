@@ -14,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -52,6 +53,9 @@ class WorldModelGraphWireShapeTest {
 
         @Override
         public List<Map<String, Object>> listGoals() {
+            if (!dbUp) {
+                throw new IllegalStateException("db down");
+            }
             List<Map<String, Object>> rows = new ArrayList<>();
             Map<String, Object> root = new LinkedHashMap<>();
             root.put("id", 1L);
@@ -88,6 +92,9 @@ class WorldModelGraphWireShapeTest {
 
         @Override
         public List<Map<String, Object>> listCausalGraphNodes() {
+            if (!dbUp) {
+                throw new IllegalStateException("db down");
+            }
             Map<String, Object> n = new LinkedHashMap<>();
             n.put("id", "goal-1");
             n.put("label", "总体目标");
@@ -99,6 +106,9 @@ class WorldModelGraphWireShapeTest {
 
         @Override
         public List<Map<String, Object>> listCausalGraphEdges() {
+            if (!dbUp) {
+                throw new IllegalStateException("db down");
+            }
             Map<String, Object> e = new LinkedHashMap<>();
             e.put("id", "edge-1");
             e.put("source", "goal-1");
@@ -112,7 +122,7 @@ class WorldModelGraphWireShapeTest {
     @Test
     @DisplayName("DB 路径：目标 22 键、id/parentId 保持数值、createdAt 保持 ISO 字符串")
     void dbGoalsKeepNativeTypes() throws Exception {
-        WorldModelGraphController controller = new WorldModelGraphController(new FakeQueryService(true));
+        WorldModelGraphController controller = new WorldModelGraphController(new FakeQueryService(true), null);
 
         JsonNode data = dataOf(controller.listGoals());
 
@@ -127,66 +137,46 @@ class WorldModelGraphWireShapeTest {
     }
 
     @Test
-    @DisplayName("内存兜底：id/parentId 为业务字符串、createdAt 为毫秒数；树形 children 仅根有")
-    void memoryGoalsKeepTypesAndTreeShape() throws Exception {
-        WorldModelGraphController controller = new WorldModelGraphController(new FakeQueryService(false));
+    @DisplayName("D103 订正：DB 不可用时不再拿内存假数据兜底，如实报错")
+    void memoryFallbackRemoved() throws Exception {
+        WorldModelGraphController controller = new WorldModelGraphController(
+                new FakeQueryService(false), null);
 
-        JsonNode list = dataOf(controller.listGoals());
-        JsonNode goal = null;
-        for (JsonNode item : list.get("data")) {
-            if ("root-goal".equals(item.get("id").asText())) {
-                goal = item;
-            }
-        }
-        assertTrue(goal != null, "内存兜底含 root-goal");
-        assertEquals("root-goal", goal.get("id").asText());
-        assertTrue(goal.get("createdAt").isNumber(), "内存兜底时间为毫秒数");
-
-        JsonNode tree = MAPPER.valueToTree(controller.goalTree()).get("data");
-        assertEquals(1, tree.size(), "唯一根节点");
-        JsonNode root = tree.get(0);
-        assertEquals("root-goal", root.get("id").asText());
-        assertEquals(GOAL_KEYS.size() + 1, fieldNames(root).size(), "根节点多一枚 children（尾键）");
-        assertEquals("children", fieldNames(root).get(GOAL_KEYS.size()));
-        assertEquals(1, root.get("children").size());
-        assertEquals(GOAL_KEYS, fieldNames(root.get("children").get(0)), "叶子节点不带 children");
+        ApiResponse<?> listResp = controller.listGoals();
+        assertFalse(listResp.isSuccess(), "DB 不可用必须如实失败，不得用 root-goal 假数据冒充");
+        ApiResponse<?> graphResp = controller.causalGraph();
+        assertFalse(graphResp.isSuccess(), "因果图同口径：不可用即失败");
     }
 
     @Test
-    @DisplayName("因果图：DB 路径节点/边各 5 键；内存兜底各 4 键（条件键省略）")
-    void causalGraphKeepsDualShape() throws Exception {
-        JsonNode db = dataOf(new WorldModelGraphController(new FakeQueryService(true)).causalGraph());
+    @DisplayName("因果图：DB 路径节点/边各 5 键（内存兜底形态已随 D103 删除）")
+    void causalGraphKeepsDbShape() throws Exception {
+        JsonNode db = dataOf(new WorldModelGraphController(new FakeQueryService(true), null).causalGraph());
         assertEquals(List.of("nodes", "edges", "nodeCount", "edgeCount"), fieldNames(db));
         assertEquals(List.of("id", "label", "description", "status", "type"),
                 fieldNames(db.get("nodes").get(0)));
         assertEquals(List.of("id", "source", "target", "label", "description"),
                 fieldNames(db.get("edges").get(0)));
-
-        WorldModelGraphController memoryController =
-                new WorldModelGraphController(new FakeQueryService(false));
-        com.chinacreator.gzcm.sysman.controller.model.CausalLinkEntity link =
-                new com.chinacreator.gzcm.sysman.controller.model.CausalLinkEntity();
-        link.setTargetGoalId("child-goal");
-        link.setLabel("causal");
-        memoryController.addCausalLink("root-goal", link);
-        JsonNode mem = dataOf(memoryController.causalGraph());
-        assertEquals(List.of("id", "label", "description", "status"),
-                fieldNames(mem.get("nodes").get(0)));
-        assertEquals(List.of("id", "source", "target", "label"),
-                fieldNames(mem.get("edges").get(0)));
     }
 
     @Test
     @DisplayName("删除回执与因果链列表：键面固定")
     void deleteAndLinkListKeepKeys() throws Exception {
-        WorldModelGraphController controller = new WorldModelGraphController(new FakeQueryService(false));
+        WorldModelGraphController controller = new WorldModelGraphController(
+                new FakeQueryService(false), null);
 
-        JsonNode deletedGoal = dataOf(controller.deleteGoal("child-goal"));
-        assertEquals(List.of("success", "id", "cascadedLinksRemoved"), fieldNames(deletedGoal));
+        // D103：删除目标在没有真实 DAO 时不应谎报成功
+        ApiResponse<?> deletedGoal = controller.deleteGoal("child-goal");
+        assertFalse(deletedGoal.isSuccess(), "无 DAO 时删除必须失败，不得返回 success:true");
 
-        JsonNode links = dataOf(controller.listLinks());
+        WorldModelGraphController dbController = new WorldModelGraphController(
+                new FakeQueryService(true), null);
+        JsonNode links = dataOf(dbController.listLinks());
         assertEquals(List.of("data", "total"), fieldNames(links));
-        assertEquals(0, links.get("total").asInt());
+        // D103：listLinks 现在与因果图同源（dbUp=true 的边源恒 1 条），不再是内存 Map 的空列表
+        assertEquals(1, links.get("total").asInt());
+        assertEquals("1", links.get("data").get(0).get("id").asText(), "edge- 前缀须剥掉");
+        assertEquals("1", links.get("data").get(0).get("sourceGoalId").asText(), "goal- 前缀须剥掉");
     }
 
     // ── 辅助 ─────────────────────────────────────────────

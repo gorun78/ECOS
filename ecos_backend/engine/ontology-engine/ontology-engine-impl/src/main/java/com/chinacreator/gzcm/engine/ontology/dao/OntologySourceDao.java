@@ -14,8 +14,10 @@ import org.springframework.stereotype.Repository;
 public class OntologySourceDao extends JdbcTemplateDaoSupport {
 
     /**
-     * 三表 JOIN（ecos_entity_table_mapping × ecos_ontology_entity × ecos_ontology_domain），
+     * 三表 JOIN（ecos_entity_table_mapping × ecos_ontology_entity × {@code ecos_ontology.ecos_domain}），
      * 可选 domainCode 过滤，LIMIT 兜底由调用方控制。
+     *
+     * <p>域表必须 schema 限定：裸名 {@code ecos_ontology_domain} 会命中 public 空壳（D132）。</p>
      */
     public List<Map<String, Object>> listSourcesRaw(String domainCode, int limit) {
         String sql = "SELECT "
@@ -27,7 +29,7 @@ public class OntologySourceDao extends JdbcTemplateDaoSupport {
             + "  e.created_at  AS \"createdAt\" "
             + "FROM ecos_entity_table_mapping m "
             + "INNER JOIN ecos_ontology_entity e ON e.code = m.entity_code "
-            + "INNER JOIN ecos_ontology_domain d ON d.id = e.domain_id AND d.code = m.domain_code";
+            + "INNER JOIN ecos_ontology.ecos_domain d ON d.id = e.domain_id AND d.code = m.domain_code";
         if (domainCode != null && !domainCode.isBlank()) {
             sql += " WHERE m.domain_code = ?";
         }

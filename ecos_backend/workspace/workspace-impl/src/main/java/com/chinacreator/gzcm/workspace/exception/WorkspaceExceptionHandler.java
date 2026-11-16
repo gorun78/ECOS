@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.exception;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.base.MachineErrorCode;
 import com.chinacreator.gzcm.common.error.ScenarioErrorCode;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioDomainException;
@@ -156,7 +157,8 @@ public class WorkspaceExceptionHandler {
                 .resolveHttpStatus(ex.getHttpStatus());
         log.warn("workspace 业务异常 http={} code={} traceId={} message={}",
                 status, ex.getErrorCode(), EcosTraceContext.currentTraceId(), ex.getMessage());
-        return build(status, String.valueOf(ex.getErrorCode()), ex.getMessage(), Map.of());
+        return build(status, MachineErrorCode.orNumeric(ex.getMessage(), ex.getErrorCode()),
+                ex.getMessage(), Map.of());
     }
 
     @ExceptionHandler(Exception.class)

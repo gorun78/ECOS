@@ -195,9 +195,28 @@ test('66 条路由全登记判定：无未判定项、无整页崩', async ({ pa
       ok = hash.includes(c.expectHash!);
       detail = `hash=${hash}`;
     } else if (c.kind === 'fallback') {
-      const hasMarker = (c.expectAnyText ?? []).some((s) => bodyText.includes(s));
+      // 2026-11-15 硬化：404 兜底页挂文案的时机不稳定（同一代码 3 次连跑里 2 次在 3.5s 时还没挂上、
+      // 1 次已挂上），固定等待会把「渲染稍慢」判成假红。改轮询到 10s，仍取不到才记 false。
+      let hasMarker = false;
+      try {
+        await expect
+          .poll(
+            () => page.evaluate(
+              (ss: string[]) => {
+                const t = (document.body.innerText || '').replace(/\s+/g, ' ');
+                return ss.some((x) => t.includes(x));
+              },
+              c.expectAnyText ?? [],
+            ),
+            { timeout: 10_000 },
+          )
+          .toBe(true);
+        hasMarker = true;
+      } catch {
+        hasMarker = false;
+      }
       ok = hasMarker && !hitBoundary;
-      detail = `hash=${hash} marker=${hasMarker}`;
+      detail = `hash=${hash} marker=${hasMarker}` + (hasMarker ? "" : ` bodyHead=${bodyText.slice(0, 120)}`);
     } else {
       // render / param：必须有可读内容且不落错误边界。
       // login / no-access 是不走 App 布局壳的独立页（没有 <main>），故以 body 计；

@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.common.service;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.chinacreator.gzcm.common.dao.ObjectRuntimeDao;
 import com.chinacreator.gzcm.common.event.ObjectCreatedEvent;
@@ -29,7 +28,21 @@ import org.springframework.stereotype.Service;
 public class ObjectRuntimeService {
 
     private static final Logger log = LoggerFactory.getLogger(ObjectRuntimeService.class);
-    private static final AtomicInteger ID_SEQ = new AtomicInteger(500);
+
+    /**
+     * D91（2026-11-14 验证批）：进程内自增计数器换 UUID 后缀。
+     *
+     * <p>原实现 {@code "tl-" + ID_SEQ.incrementAndGet()} 从 500/1000 起算，而目标表是
+     * <b>持久表</b>——重启后计数器归零，必然撞上上一轮写过的行，
+     * {@code duplicate key value violates unique constraint "ecos_object_timeline_pkey"}。
+     * 该异常又被 {@code recordTimeline} 的 catch 吞成一条 WARN，
+     * 于是「对象建成功了、时间线却一条没有」成为静默数据缺失。</p>
+     *
+     * <p>前缀保留（库内既有行与读面都按 {@code tl-} 区分事件族），只把序号换成 UUID。</p>
+     */
+    private static String newId(String prefix) {
+        return prefix + UUID.randomUUID();
+    }
 
     /** 实体代码 → 表名映射（与 ObjectController 保持一致） */
     public static final Map<String, String> ENTITY_TABLE = Map.of(
@@ -54,7 +67,7 @@ public class ObjectRuntimeService {
         return versionArchiveProvider == null ? null : versionArchiveProvider.getIfAvailable();
     }
 
-    private String nextId() { return "ort-" + ID_SEQ.incrementAndGet(); }
+    private String nextId() { return newId("ort-"); }
 
     // ═══════════════ Timeline ═══════════════════
 
@@ -63,7 +76,7 @@ public class ObjectRuntimeService {
      */
     public void recordTimeline(String objectId, String entityCode, String eventType,
                                 String summary, String actor, Map<String, Object> details) {
-        String id = "tl-" + ID_SEQ.incrementAndGet();
+        String id = newId("tl-");
         try {
             dao.insertTimeline(id, objectId, entityCode, eventType, summary, actor,
                 details != null ? toJsonString(details) : null);
@@ -131,7 +144,7 @@ public class ObjectRuntimeService {
                 log.debug("Version {} created in git for {}/{}, v{}", commit.get(), entityCode, objectId, newVer);
                 return;
             }
-            String id = "ver-" + ID_SEQ.incrementAndGet();
+            String id = newId("ver-");
             // 获取当前最大版本号
             Long maxVer = dao.queryMaxVersion(objectId);
             int newVer = (maxVer != null ? maxVer.intValue() : 0) + 1;
@@ -204,7 +217,7 @@ public class ObjectRuntimeService {
                                                     String sourceEntityCode, String targetEntityCode,
                                                     String relationshipCode, String relationshipType,
                                                     Map<String, Object> properties) {
-        String id = "rel-" + ID_SEQ.incrementAndGet();
+        String id = newId("rel-");
         try {
             dao.insertRelationship(id, sourceObjectId, targetObjectId, sourceEntityCode, targetEntityCode,
                 relationshipCode, relationshipType, properties != null ? toJsonString(properties) : null);

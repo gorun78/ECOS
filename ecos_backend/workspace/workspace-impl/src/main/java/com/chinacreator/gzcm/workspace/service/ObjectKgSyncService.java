@@ -55,6 +55,42 @@ public class ObjectKgSyncService {
     }
 
     /**
+     * 对象属性 → Neo4j 可存储值（D92，2026-11-14 验证批）。
+     *
+     * <p><b>缺陷形态</b>：PG 行里 {@code created_at} 是 {@link java.sql.Timestamp}，
+     * Neo4j 驱动不认识该类型，整条写入抛
+     * {@code Unable to convert java.sql.Timestamp to Neo4j Value}。
+     * 该消息被本类 catch 吞成 WARN，于是<b>每一条对象</b>的图谱同步都失败，
+     * 知识图谱里始终没有节点，而主流程看起来完全正常。</p>
+     *
+     * <p>修法：只做「驱动不识类型 → 字符串/数字」的必要降型，其余原样透传；
+     * 时间统一转 ISO-8601 字符串（图谱侧按字符串存储与比较，语义无损）。</p>
+     */
+    private static Map<String, Object> toNeo4jProps(Map<String, Object> properties) {
+        if (properties == null || properties.isEmpty()) return Map.of();
+        Map<String, Object> out = new java.util.LinkedHashMap<>(properties.size());
+        for (Map.Entry<String, Object> e : properties.entrySet()) {
+            out.put(e.getKey(), toNeo4jValue(e.getValue()));
+        }
+        return out;
+    }
+
+    private static Object toNeo4jValue(Object v) {
+        if (v == null) return null;
+        if (v instanceof java.sql.Timestamp ts) return ts.toInstant().toString();
+        if (v instanceof java.sql.Date d) return d.toLocalDate().toString();
+        if (v instanceof java.sql.Time t) return t.toLocalTime().toString();
+        if (v instanceof java.time.temporal.TemporalAccessor t) return t.toString();
+        if (v instanceof java.util.Date d) return d.toInstant().toString();
+        if (v instanceof java.util.UUID u) return u.toString();
+        if (v instanceof Map<?, ?> m) return m;
+        if (v instanceof java.util.Collection<?> c) return c;
+        if (v instanceof Number || v instanceof Boolean || v instanceof String) return v;
+        // 驱动不认识的残余类型一律降为字符串，避免整条写入失败（宁可丢类型，不可丢节点）
+        return v.toString();
+    }
+
+    /**
      * 异步同步单个 Object 实例到 Neo4j。
      *
      * @param entityCode 实体代码（对应 Neo4j Label）
@@ -77,20 +113,21 @@ public class ObjectKgSyncService {
 
         taskExecutor.execute(() -> {
             try {
+                Map<String, Object> props = toNeo4jProps(properties);
                 switch (operation) {
                     case "CREATE" -> {
                         // 参数化写入：防止 Cypher 注入
                         // Label 名已通过正则安全校验
                         neo4jClient.write(
                             "MERGE (n:`" + entityCode + "` {id: $id}) SET n += $props",
-                            Map.of("id", objectId, "props", properties != null ? properties : Map.of())
+                            Map.of("id", objectId, "props", props)
                         );
                         log.debug("KG sync CREATE: {} id={}", entityCode, objectId);
                     }
                     case "UPDATE" -> {
                         neo4jClient.write(
                             "MATCH (n:`" + entityCode + "` {id: $id}) SET n += $props",
-                            Map.of("id", objectId, "props", properties != null ? properties : Map.of())
+                            Map.of("id", objectId, "props", props)
                         );
                         log.debug("KG sync UPDATE: {} id={}", entityCode, objectId);
                     }

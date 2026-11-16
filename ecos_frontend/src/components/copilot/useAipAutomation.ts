@@ -80,10 +80,16 @@ export function useAipAutomation({ showToast, onViewModeChange, onSecurityTabCha
   /**
    * 真实安全引擎评估通道：verdict 只来自 POST /api/v1/security/policy/evaluate 的实际返回。
    * 引擎不可用 → 错误提示，前端永不合成放行（与 security-engine DENY 语义对接）。
+   *
+   * <p>V-COP-026（2026-11-14 验证）：原实现只把裁决弹成 toast，消息体仍是静态 i18n 文案，
+   * 于是「智能体回了什么」与「引擎实际判了什么」两不相干——用户读到的是一段固定剧本。
+   * 现在把裁决**回传给调用方并写进消息体**；toast 保留为辅助提示。
+   *
+   * @return 引擎真实裁决（GRANTED/DENIED），不可用时返回 null（调用方据此写「无裁决」文案）
    */
   const runRealSecurityEval = useCallback(async (
     userId: string, datasetId: string, purposeId: string,
-  ) => {
+  ): Promise<'GRANTED' | 'DENIED' | null> => {
     try {
       const res = await evaluateAbacPolicy({
         subject: { userId, roles: [] },
@@ -91,11 +97,14 @@ export function useAipAutomation({ showToast, onViewModeChange, onSecurityTabCha
         action: 'READ_DATASET',
         context: { purpose: purposeId },
       });
+      const verdict: 'GRANTED' | 'DENIED' = res.allowed ? 'GRANTED' : 'DENIED';
       showToast(res.allowed ? 'success' : 'error',
-        t('copilot.toast.sim.engineVerdict', { verdict: res.allowed ? 'GRANTED' : 'DENIED' }));
+        t('copilot.toast.sim.engineVerdict', { verdict }));
+      return verdict;
     } catch (e) {
       console.warn('[AipAutomation] security engine evaluate unavailable — no verdict synthesized (fail-closed):', e);
       showToast('error', t('copilot.toast.sim.engineFail'));
+      return null;
     }
   }, [showToast, t]);
 
@@ -140,19 +149,24 @@ export function useAipAutomation({ showToast, onViewModeChange, onSecurityTabCha
       onSecurityTabChange('audit');
 
       // 告警只呈现真实审计流；引擎不可用 → 错误态，不合成告警。
+      // V-COP-026：审计条数必须进消息体（原实现只弹 toast）。
+      let auditSummary: string;
       try {
         const { ok, json } = await fetchSecurityAuditLogs();
         if (!ok) {
           showToast('error', t('copilot.toast.sim.engineFail'));
+          auditSummary = t('copilot.result.auditUnavailable');
         } else {
           const rows = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
           showToast('info', t('copilot.toast.sec_audit.real', { count: rows.length }));
+          auditSummary = t('copilot.result.auditCount', { count: rows.length });
         }
       } catch {
         showToast('error', t('copilot.toast.sim.engineFail'));
+        auditSummary = t('copilot.result.auditUnavailable');
       }
 
-      setAgentResult(agentMsgId, t(resultKey));
+      setAgentResult(agentMsgId, `${t(resultKey)}\n\n${auditSummary}`);
       return;
     }
 
@@ -168,9 +182,14 @@ export function useAipAutomation({ showToast, onViewModeChange, onSecurityTabCha
     }
 
     const target = ABAC_TARGETS[type];
-    await runRealSecurityEval(target.userId, target.datasetId, target.purposeId);
+    const verdict = await runRealSecurityEval(target.userId, target.datasetId, target.purposeId);
 
-    setAgentResult(agentMsgId, t(resultKey));
+    // V-COP-026：裁决写进消息体。无裁决（引擎不可用）时明确写"本次无裁决"，不复用成功文案。
+    const verdictLine = verdict
+      ? t('copilot.result.verdictLine', { verdict, datasetId: target.datasetId })
+      : t('copilot.result.verdictUnavailable', { datasetId: target.datasetId });
+
+    setAgentResult(agentMsgId, `${t(resultKey)}\n\n${verdictLine}`);
   }, [t, onViewModeChange, onSecurityTabChange, showToast, setAgentResult, runRealSecurityEval]);
 
   return { messages, isTyping, currentStep, setMessages, runAgentAutomation };

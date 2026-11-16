@@ -72,4 +72,31 @@ describe('copilot › scenario truthfulness (2026-11-14 伪场景清退回归哨
     expect(drawerSrc, 'detectScenarioType 必须可返回 null').toMatch(/\):\s*AgentScenarioType\s*\|\s*null/);
     expect(drawerSrc, '未命中须 return null，不得回落到某个默认伪场景').toMatch(/return\s+null;/);
   });
+
+  /**
+   * ⑥ V-COP-026（2026-11-14 验证）：场景结果回填必须携带真实执行结果。
+   *
+   * 缺陷形态：`runRealSecurityEval` 拿到 `res.allowed` 后只弹 toast，
+   * 消息体仍是 `setAgentResult(agentMsgId, t(resultKey))` 的静态剧本
+   * （文案甚至是「部署成功」）。用户读到的结论与引擎实际裁决无关。
+   *
+   * 判据（静态）：裁决/计数必须有机会进入消息体 —— 即存在把 verdict 与 count
+   * 拼进 setAgentResult 文案的键，且 setAgentResult 不再只有裸 t(resultKey)。
+   */
+  it('⑥ 场景回填必须携带真实裁决与审计条数（不得只剩静态 i18n 文案）', () => {
+    const bareResultFill = /setAgentResult\(\s*agentMsgId\s*,\s*t\(\s*resultKey\s*\)\s*\)/;
+    expect(hookSrc, '不得再出现裸 setAgentResult(agentMsgId, t(resultKey)) —— 那是静态剧本回填')
+      .not.toMatch(bareResultFill);
+
+    expect(hookSrc, '裁决必须回传进消息体文案').toContain('copilot.result.verdictLine');
+    expect(hookSrc, '无裁决时必须显式声明（不得复用成功文案）').toContain('copilot.result.verdictUnavailable');
+    expect(hookSrc, '审计条数必须进消息体').toContain('copilot.result.auditCount');
+    expect(hookSrc, '审计不可用时必须显式声明').toContain('copilot.result.auditUnavailable');
+    expect(hookSrc, 'runRealSecurityEval 必须 return verdict 供调用方使用')
+      .toMatch(/return\s+verdict\s*;/);
+
+    // 反向探针自检：旧写法的确会命中上面那条禁则
+    expect(bareResultFill.test('setAgentResult(agentMsgId, t(resultKey));'),
+      '门禁判据必须能识别旧写法，否则恒绿').toBe(true);
+  });
 });

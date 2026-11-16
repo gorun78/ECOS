@@ -8,15 +8,14 @@ import java.util.Map;
 /**
  * 本体变更提案 — T16-3 强类型返回。
  *
- * <p>字段对齐 {@code ecos_ontology_proposals} 表列（与 SQL
- * {@code SELECT * FROM ecos_ontology_proposals} 投影一致）：
- * id / domain_code / proposal_type / target_entity / payload / snapshot /
+ * <p>字段对齐 V174 合规表 {@code ecos_ontology.ecos_ontology_proposal} 的显式列投影
+ * （D137 口径；DTO 键面保持不变以守「API 只增不改」）：
+ * id / domain_code / proposal_type / target_entity / payload_json / snapshot_json /
  * status / author / reviewer / reviewer_comment / version_id /
- * optimistic_lock_version / created_at / updated_at。
+ * optimistic_lock_version / create_time / update_time。
  *
- * <p>{@code payload} 与 {@code snapshot} 为 PG JSONB 列，PG JDBC
- * 返回 PGobject；POJO 字段用 {@code Object} 承载（与
- * {@code OntologyEntityVO.mapping} 同款处理，仍属动态嵌套数据豁免）。
+ * <p>库列名与 DTO 键面不同名是刻意的：SQL 侧用列别名投影回 {@code payload} /
+ * {@code snapshot} / {@code created_at} / {@code updated_at}，前端契约零变更。
  */
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)

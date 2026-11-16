@@ -55,14 +55,17 @@ public class UserController {
 	private final IUserService userService;
 	private final PermissionCacheService permissionCacheService;
 	private final com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService permissionCheckService;
+	private final com.chinacreator.gzcm.sysman.iam.service.impl.LoginCredentialService loginCredentialService;
 
 	public UserController(IUserService userService, UserQueryService userQueryService,
 			PermissionCacheService permissionCacheService,
-			com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService permissionCheckService) {
+			com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService permissionCheckService,
+			com.chinacreator.gzcm.sysman.iam.service.impl.LoginCredentialService loginCredentialService) {
 		this.userService = userService;
 		this.userQueryService = userQueryService;
 		this.permissionCacheService = permissionCacheService;
 		this.permissionCheckService = permissionCheckService;
+		this.loginCredentialService = loginCredentialService;
 	}
 
 	@GetMapping
@@ -194,6 +197,14 @@ public class UserController {
 
 			UserAccount created = userService.createUser(user, password, "admin");
 			return ApiResponse.success(toVO(created));
+		} catch (IUserService.UserException e) {
+			// 同 resetPassword：无 cause = 业务拒绝（用户名/邮箱已存在、密码不符策略）⇒ 400
+			if (e.getCause() == null) {
+				log.warn("创建用户被拒: username={}, reason={}", body.getUsername(), e.getMessage());
+				return ApiResponse.badRequest(e.getMessage());
+			}
+			log.error("创建用户失败", e);
+			return ApiResponse.internalError("创建用户失败（详情见服务端日志）");
 		} catch (Exception e) {
 			log.error("创建用户失败", e);
 			return ApiResponse.internalError("创建用户失败（详情见服务端日志）");
@@ -243,6 +254,15 @@ public class UserController {
 			if (newPassword == null || newPassword.isEmpty()) return ApiResponse.badRequest("密码不能为空");
 			userService.resetPassword(id, newPassword, "admin");
 			return ApiResponse.success();
+		} catch (IUserService.UserException e) {
+			// 无 cause 的 UserException 是业务拒绝（密码不符策略/用户不存在）；带 cause 才是 DAO 失败。
+			// 之前一刀切 internalError，把「密码需包含大小写…」这种输入问题也报成 500。
+			if (e.getCause() == null) {
+				log.warn("重置密码被拒: id={}, reason={}", id, e.getMessage());
+				return ApiResponse.badRequest(e.getMessage());
+			}
+			log.error("重置密码失败", e);
+			return ApiResponse.internalError("重置密码失败（详情见服务端日志）");
 		} catch (Exception e) {
 			log.error("重置密码失败", e);
 			return ApiResponse.internalError("重置密码失败（详情见服务端日志）");
@@ -290,6 +310,8 @@ public class UserController {
 			for (String roleId : roleIds) {
 				userQueryService.update("INSERT INTO TD_USER_ROLE (user_id, role_id, created_by) VALUES (?, ?, 'admin')", id, roleId);
 			}
+			// 登录表 roles 列会原样进 JWT；不同步则改完角色直到下次改密才生效
+			loginCredentialService.syncRolesIfProvisioned(id);
 			// 授权关系是权限缓存的权威数据源：提交后必须立即失效该用户的全部缓存视图，
 			// 否则撤权要等 TTL 才生效（§2.9.8④「先提交权威数据、再失效缓存」+ ⑥「证明撤权生效」；#147AA）。
 			permissionCacheService.evictUser(id);
@@ -302,8 +324,18 @@ public class UserController {
 
 	// ── PMO-38 T1: 新增 3 个 P0 端点 ──────────────────────────────
 
-	/** 12 位临时密码字符集：去除 0/O/1/I/l 易混淆 */
-	private static final String PWD_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%";
+	/**
+	 * 临时密码四类字符池（D101）：必须与 {@code UserServiceImpl.PASSWORD_COMPLEXITY_REGEX}
+	 * 的允许面严格一致 —— 该正则只收 {@code [A-Za-z\d@$!%*?&]}，旧字符集里的 {@code #}
+	 * 落在允许面之外，生成命中即被策略判违规；且旧实现只做 12 次独立随机，
+	 * 不保证四类齐全。二者叠加导致本端点约四成概率自产自拒（表现为 500）。
+	 */
+	private static final String PWD_UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // 去 I/O
+	private static final String PWD_LOWER = "abcdefghijkmnpqrstuvwxyz";   // 去 l/o
+	private static final String PWD_DIGIT = "23456789";                   // 去 0/1
+	private static final String PWD_SPECIAL = "@$!%*?&";
+	private static final String PWD_CHARSET =
+			PWD_UPPER + PWD_LOWER + PWD_DIGIT + PWD_SPECIAL;
 	private static final SecureRandom CRYPTO = new SecureRandom();
 	private static final int PWD_MIN_LEN = 8;
 
@@ -345,6 +377,10 @@ public class UserController {
 			userService.resetPassword(id, tempPwd, "admin");
 			return ApiResponse.success(new ResetPasswordResultVO(id, tempPwd,
 					"密码已重置，请立即通知用户使用新密码"));
+		} catch (IUserService.UserException e) {
+			// 业务拒绝（用户不存在 / 密码策略不满足）= 400 并回显原因，禁折叠成 500（D101）
+			log.warn("[reset-password] 业务拒绝 id={} reason={}", id, e.getMessage());
+			return ApiResponse.badRequest(e.getMessage());
 		} catch (Exception e) {
 			log.error("[reset-password] 失败 id={}", id, e);
 			return ApiResponse.internalError("重置密码失败（详情见服务端日志）");
@@ -404,10 +440,23 @@ public class UserController {
 		}
 	}
 
-	private static String genTempPassword() {
-		StringBuilder sb = new StringBuilder(12);
-		for (int i = 0; i < 12; i++) sb.append(PWD_CHARSET.charAt(CRYPTO.nextInt(PWD_CHARSET.length())));
-		return sb.toString();
+	static String genTempPassword() {
+		// 四类各落一位（保证复杂度），其余从合集随机，最后整体洗牌避免确定性位置。
+		char[] out = new char[12];
+		out[0] = pick(PWD_UPPER);
+		out[1] = pick(PWD_LOWER);
+		out[2] = pick(PWD_DIGIT);
+		out[3] = pick(PWD_SPECIAL);
+		for (int i = 4; i < out.length; i++) out[i] = pick(PWD_CHARSET);
+		for (int i = out.length - 1; i > 0; i--) {
+			int j = CRYPTO.nextInt(i + 1);
+			char t = out[i]; out[i] = out[j]; out[j] = t;
+		}
+		return new String(out);
+	}
+
+	private static char pick(String pool) {
+		return pool.charAt(CRYPTO.nextInt(pool.length()));
 	}
 
 	static UserVO toVO(UserAccount u) {

@@ -69,9 +69,22 @@ public class OntologyService {
     private final OntologyRepository repository;
     private final OntologyMappingStore mappingStore;
 
+    /** 域解析（D136）：/domains/{domainCode}/entities 需把 domainCode 换成 domain_id。 */
+    @Autowired(required = false)
+    private ObjectProvider<OntologyDomainRepository> domainRepositoryProvider;
+
     public OntologyService(OntologyRepository repository, OntologyMappingStore mappingStore) {
         this.repository = repository;
         this.mappingStore = mappingStore;
+    }
+
+    private Optional<OntologyDomain> resolveDomain(String domainCodeOrId) {
+        OntologyDomainRepository repo = domainRepositoryProvider != null
+            ? domainRepositoryProvider.getIfAvailable() : null;
+        if (repo == null || domainCodeOrId == null || domainCodeOrId.isBlank()) {
+            return Optional.empty();
+        }
+        return repo.findByCode(domainCodeOrId).or(() -> repo.findById(domainCodeOrId));
     }
 
     /**
@@ -90,8 +103,20 @@ public class OntologyService {
 
     // ═══════════════ Entity (强类型路径) ═══════════════════
 
+    /**
+     * 列出本体下的对象类型。
+     *
+     * <p><b>D133（2026-11-16 验证）</b>：ontologyId 为空 ⇒ 返回全量实体。此前空串直接进
+     * {@code findEntitiesByOntology("")}，SQL 变成 {@code WHERE ontology_id = ''}，
+     * 而库里实体挂的是 {@code ont001}，于是 /api/v1/ontology/objects 与
+     * /api/v1/ontology/mappings/objects 两个端点恒返回空数组（Javadoc 承诺的"全量"没有兑现）。
+     * 非空时语义不变，仍是按本体过滤。</p>
+     */
     public List<OntologyEntityVO> listEntitiesVO(String ontologyId) {
-        return repository.findEntitiesByOntology(ontologyId).stream()
+        List<OntologyEntity> entities = (ontologyId == null || ontologyId.isBlank())
+            ? repository.findAllEntities()
+            : repository.findEntitiesByOntology(ontologyId);
+        return entities.stream()
             .map(this::entityToVO)
             .collect(Collectors.toList());
     }
@@ -116,8 +141,46 @@ public class OntologyService {
         return entityToVO(entity);
     }
 
-    public Optional<OntologyEntityVO> updateEntity(String entityId, OntologyEntitySaveDTO dto) {
-        return repository.findEntityById(entityId).map(existing -> {
+    /**
+     * 列出指定域下的实体（D136）。
+     * <p>此前 {@code /ecos/ontologies/domains/{domainCode}/entities} 把 domainCode 当 ontologyId
+     * 传给 {@link #listEntitiesVO(String)}，SQL 变成 {@code WHERE ontology_id = '<域码>'}——
+     * 与该路由的语义无关，正常实体（ontology_id = ont001）全部查不到。
+     * 现在按域解析后用 {@code domain_id} 关联。
+     *
+     * @return 域不存在时返回 {@code Optional.empty()}（调用方给 404，不静默返回空数组）
+     */
+    public Optional<List<OntologyEntityVO>> listEntitiesByDomainVO(String domainCode) {
+        return resolveDomain(domainCode).map(domain -> repository.findEntitiesByDomain(domain.getCode())
+            .stream().map(this::entityToVO).collect(Collectors.toList()));
+    }
+
+    /**
+     * 在指定域下创建实体（D136）。
+     * <p>此前把 domainCode 写进 {@code ontology_id} 而 {@code domain_id} 留空，导致该实体
+     * 用"按域查询"永远查不到。现在 {@code domain_id} 落解析出的域主键；{@code ontology_id}
+     * 仍写域码（V200 已把本体主表并入域表，域码即该表内可读的业务归属键）。
+     *
+     * @return 域不存在时返回 {@code Optional.empty()}
+     */
+    public Optional<OntologyEntityVO> createEntityInDomain(String domainCode, OntologyEntitySaveDTO dto) {
+        return resolveDomain(domainCode).map(domain -> {
+            OntologyEntity entity = new OntologyEntity();
+            entity.setId(nextId("ent", "ecos_ontology_entity"));
+            entity.setOntologyId(domain.getCode());
+            entity.setDomainId(domain.getId());
+            entity.setCode(dto.getCode() != null ? dto.getCode() : "");
+            entity.setName(dto.getName() != null ? dto.getName() : "");
+            entity.setDescription(dto.getDescription() != null ? dto.getDescription() : "");
+            entity.setEntityType(dto.getEntityType() != null ? dto.getEntityType() : "MASTER");
+            entity.setSortOrder(1);
+            repository.insertEntity(entity);
+            log.info("Entity created in domain {}: {} [{}]", domain.getCode(), entity.getId(), entity.getCode());
+            return entityToVO(entity);
+        });
+    }
+
+    public Optional<OntologyEntityVO> updateEntity(String entityId, OntologyEntitySaveDTO dto) {        return repository.findEntityById(entityId).map(existing -> {
             repository.updateEntity(entityId, dto.getCode(), dto.getName(),
                 dto.getDescription(), dto.getEntityType());
             return repository.findEntityById(entityId).map(this::entityToVO).orElse(null);

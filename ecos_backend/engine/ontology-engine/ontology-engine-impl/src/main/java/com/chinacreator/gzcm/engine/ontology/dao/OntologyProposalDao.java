@@ -11,22 +11,38 @@ import org.springframework.stereotype.Repository;
 
 /**
  * B3-a 数据访问收口（R2-B3 / 架构铁律 §2.5 #1 / IR06）：{@code OntologyProposalService}
- * （本体变更提案表 ecos_ontology_proposals）的 JDBC 落点。
+ * （本体变更提案表）的 JDBC 落点。
  *
- * <p>SQL 逐个搬运，只搬不改语义；MC06 schema（{@code ${ecos.ontology.control-schema:ecos_ontology}}）
- * 随 DAO 注入。id 空值守卫（404 语义）保留在 Service 层。</p>
+ * <p><b>D137（2026-11-16 活体验证）</b>：V174 已建合规表
+ * {@code ecos_ontology.ecos_ontology_proposal}（VARCHAR(36) PK / {@code payload_json TEXT} /
+ * DR06 审计列），但本 DAO 一直读写旧复数表 {@code ecos_ontology_proposals}
+ * （BIGSERIAL PK + {@code jsonb} 列 + 无 {@code is_deleted}）。后果三条活体症状：
+ * POST 创建 409（UUID 撞 {@code bigint} 主键）、GET 详情 500（{@code is_deleted} 列不存在）、
+ * 列表永不返回（读 0 行旧表）。本批按 V174 口径切到合规表。</p>
+ *
+ * <p>列名按合规表（{@code payload_json} / {@code snapshot_json} / {@code create_time} /
+ * {@code update_time}），投影别名回旧键面 {@code payload} / {@code snapshot} /
+ * {@code created_at} / {@code updated_at}，下游 toVO 与门禁的取键不变。</p>
+ *
+ * <p>MC06 schema（{@code ${ecos.ontology.control-schema:ecos_ontology}}）随 DAO 注入；
+ * id 空值守卫（404 语义）保留在 Service 层。</p>
  */
 @Repository
 public class OntologyProposalDao extends JdbcTemplateDaoSupport {
 
-    /** 提案表裸表名（V4.1/V108 建，代码现行读写目标；V174 合规新表见迁移脚本）。 */
-    static final String TABLE = "ecos_ontology_proposals";
+    /** 提案表裸表名（V174 合规表单数口径；旧复数表 {@code ecos_ontology_proposals} 已停写）。 */
+    static final String TABLE = "ecos_ontology_proposal";
 
-    /** IR04 显式列清单（替代旧 {@code SELECT *}）。字段顺序与 toVO 读取一致。 */
+    /**
+     * IR04 显式列清单（替代旧 {@code SELECT *}）。
+     *
+     * <p>列名取合规表真名，别名回旧键面，使 {@code toVO} / 发布门禁无需同时改键。</p>
+     */
     static final String ID_COLUMNS =
-            "id, domain_code, proposal_type, target_entity, payload, snapshot, status, "
+            "id, domain_code, proposal_type, target_entity, "
+                    + "payload_json AS payload, snapshot_json AS snapshot, status, "
                     + "author, reviewer, reviewer_comment, version_id, optimistic_lock_version, "
-                    + "created_at, updated_at";
+                    + "create_time AS created_at, update_time AS updated_at";
 
     private final String schema;
 
@@ -42,9 +58,11 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
 
     /**
      * 查询提案列表（可按 status / proposalType 过滤）。
+     * <p>D137：同 {@link #findProposalById}，只读未软删行（V174 DR05）。</p>
      */
     public List<Map<String, Object>> listProposals(String status, String proposalType) {
-        StringBuilder sql = new StringBuilder("SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE 1=1");
+        StringBuilder sql = new StringBuilder("SELECT " + ID_COLUMNS + " FROM " + qualifiedTable()
+                + " WHERE is_deleted=0");
         List<Object> params = new ArrayList<>();
 
         if (status != null && !status.isBlank()) {
@@ -55,7 +73,7 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
             sql.append(" AND proposal_type=?");
             params.add(proposalType);
         }
-        sql.append(" ORDER BY created_at DESC");
+        sql.append(" ORDER BY create_time DESC");
 
         return jdbcTemplate.queryForList(sql.toString(), params.toArray());
     }
@@ -76,14 +94,16 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
     /**
      * 插入新提案（指定状态）。
      * <p>W72：主键 {@code id} 由应用侧生成 UUID（V174 VARCHAR(36) 主键口径），不再依赖 DB 自增序列；
-     * JSON 列以 String 文本绑定（移除 {@code ?::jsonb} 强转）。返回生成并落库的 id。
+     * JSON 列以 String 文本绑定（移除 {@code ?::jsonb} 强转）。返回生成并落库的 id。</p>
+     * <p>D137：落 V174 合规表真列名（{@code payload_json} / {@code snapshot_json} /
+     * {@code create_time} / {@code update_time}）。</p>
      */
     public String insertProposal(String id, String domainCode, String proposalType, String targetEntity,
                                  String payloadJson, String snapshotJson, String status, String author) {
         jdbcTemplate.update(
                 "INSERT INTO " + qualifiedTable()
-                        + " (id, domain_code, proposal_type, target_entity, payload, snapshot, status, author, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
+                        + " (id, domain_code, proposal_type, target_entity, payload_json, snapshot_json, status, author, create_time, update_time) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 id, domainCode, proposalType, targetEntity, payloadJson, snapshotJson, status, author);
         return id;
     }
@@ -101,9 +121,11 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
 
     /**
      * 删除提案。
+     * <p>D137：V174 DR05 逻辑删除口径——{@code is_deleted=1}，不物理删行。</p>
      */
     public void deleteProposal(String id) {
-        jdbcTemplate.update("DELETE FROM " + qualifiedTable() + " WHERE id=?", id.trim());
+        jdbcTemplate.update("UPDATE " + qualifiedTable()
+                + " SET is_deleted=1, update_time=CURRENT_TIMESTAMP WHERE id=?", id.trim());
     }
 
     /**
@@ -117,7 +139,7 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
      * 执行提案：更新状态为 executed。
      */
     public void execute(String id) {
-        jdbcTemplate.update("UPDATE " + qualifiedTable() + " SET status=?, updated_at=NOW() WHERE id=?",
+        jdbcTemplate.update("UPDATE " + qualifiedTable() + " SET status=?, update_time=CURRENT_TIMESTAMP WHERE id=?",
                 "executed", id.trim());
     }
 
@@ -127,16 +149,19 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
     public void approve(String id, String status, String reviewer, String reviewerComment) {
         jdbcTemplate.update(
                 "UPDATE " + qualifiedTable()
-                        + " SET status=?, reviewer=?, reviewer_comment=?, updated_at=NOW() WHERE id=?",
+                        + " SET status=?, reviewer=?, reviewer_comment=?, update_time=CURRENT_TIMESTAMP WHERE id=?",
                 status, reviewer, reviewerComment, id.trim());
     }
 
     /**
      * approve-and-publish：更新为 EXECUTED，回填 version_id。
+     *
+     * <p>version_id 存版本 ID 字符串（V174 {@code VARCHAR(64)}，关联
+     * {@code ecos_ontology_version.id}），不是 semver 版本号（D139）。</p>
      */
-    public void markExecutedWithVersion(String id, String status, Long versionId) {
+    public void markExecutedWithVersion(String id, String status, String versionId) {
         jdbcTemplate.update(
-                "UPDATE " + qualifiedTable() + " SET status=?, version_id=?, updated_at=NOW() WHERE id=?",
+                "UPDATE " + qualifiedTable() + " SET status=?, version_id=?, update_time=CURRENT_TIMESTAMP WHERE id=?",
                 status, versionId, id.trim());
     }
 
@@ -144,7 +169,7 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
      * approve-and-publish：更新为 EXECUTED（无 version_id）。
      */
     public void markExecuted(String id, String status) {
-        jdbcTemplate.update("UPDATE " + qualifiedTable() + " SET status=?, updated_at=NOW() WHERE id=?",
+        jdbcTemplate.update("UPDATE " + qualifiedTable() + " SET status=?, update_time=CURRENT_TIMESTAMP WHERE id=?",
                 status, id.trim());
     }
 
@@ -166,7 +191,7 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
     /**
      * 乐观锁更新提案状态（PMO-29 §4.2）。
      *
-     * <p>SQL: {@code UPDATE ... SET status=?, reviewer=?, reviewer_comment=?, updated_at=NOW(),
+     * <p>SQL: {@code UPDATE ... SET status=?, reviewer=?, reviewer_comment=?, update_time=CURRENT_TIMESTAMP,
      *      optimistic_lock_version = optimistic_lock_version + 1
      *      WHERE id=? AND optimistic_lock_version = ?}</p>
      *
@@ -179,7 +204,7 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
                 status = ?,
                 reviewer = ?,
                 reviewer_comment = ?,
-                updated_at = NOW(),
+                update_time = CURRENT_TIMESTAMP,
                 optimistic_lock_version = optimistic_lock_version + 1
             WHERE id = ?
               AND optimistic_lock_version = ?
@@ -195,7 +220,7 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
         if (newStatus == null) {
             String sql = """
                 UPDATE %s SET
-                    updated_at = NOW(),
+                    update_time = CURRENT_TIMESTAMP,
                     optimistic_lock_version = optimistic_lock_version + 1
                 WHERE id = ?
                   AND optimistic_lock_version = ?
@@ -205,7 +230,7 @@ public class OntologyProposalDao extends JdbcTemplateDaoSupport {
         String sql = """
             UPDATE %s SET
                 status = ?,
-                updated_at = NOW(),
+                update_time = CURRENT_TIMESTAMP,
                 optimistic_lock_version = optimistic_lock_version + 1
             WHERE id = ?
               AND optimistic_lock_version = ?

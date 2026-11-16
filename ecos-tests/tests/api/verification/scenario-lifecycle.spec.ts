@@ -284,11 +284,13 @@ test('V-WS-090b 查询面经网关可达（D31：/api/query 子族）', async ({
   expect(nlq.status, '/api/v1/query 不得落到 workspace 的 QueryHistoryController').not.toBe(200);
 });
 
-test('V-WS-090c 实体映射指向真实表：未知实体 404 而非 500（D59）', async ({ request }) => {
+test('V-WS-090c 实体映射指向真实表：未知实体 404 而非 500（D59 / D113）', async ({ request }) => {
   // D59 之前：Project → demo_project（从未建表）→ relation does not exist → 500。
   // 修好后：真实业务表；未登记实体明确 404「实体 X 不存在」，不抛 500。
+  // D113（2026-11-15）：状态行也必须是 404 —— 原断言写死 `200 + 信封 code:404`，
+  // 是把当时的缺陷现状当契约固化了。HTTP 200 配 code:404 会让前端按 `res.ok` 读成空列表。
   const unknown = await call(request, 'GET', '/api/v1/ecos/objects/NO_SUCH_ENTITY_D59?page=1&pageSize=1', { token });
-  expect(unknown.status, '未登记实体必须是 200+业务 404，绝不能 500').toBe(200);
+  expect(unknown.status, '未登记实体必须是 404 状态行（禁 500，也禁 200+信封 404）').toBe(404);
   expect(unknown.json?.code, '业务码应为 404').toBe(404);
   expect(String(unknown.json?.message ?? ''), '必须点名缺哪个实体').toContain('NO_SUCH_ENTITY_D59');
 

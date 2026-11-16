@@ -176,7 +176,10 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
             (Object.keys(subsystemGroups).length > 0 ? Object.keys(subsystemGroups).sort() : ["G1","G2","G3","G4","G5"]).map(groupKey => {
               const groupTypes = subsystemGroups[groupKey] || [];
               const isExpanded = expandedGroups.has(groupKey);
-              const gMeta = G1_G5_LABELS[groupKey] || { labelKey: "", color: styles.cardText, border: styles.cardBorder, bg: styles.appBg };
+              // G0 = 后端对「未设 subsystem」的兜底分组（DictController#listBySubsystem）；
+              // 它不在 G1_G5_LABELS 里，配色走主题 token，标签走自己的 i18n 键（避免显示裸代号 G0）。
+              const gMeta = G1_G5_LABELS[groupKey]
+                || { labelKey: groupKey === "G0" ? "platform.dictionary.group.G0" : "", color: styles.cardText, border: styles.cardBorder, bg: styles.appBg };
               const visibleTypes = groupTypes.filter(dt =>
                 !dictSearch || (dt.dictName || dt.dictType).toLowerCase().includes(dictSearch.toLowerCase()) ||
                 dt.dictType.toLowerCase().includes(dictSearch.toLowerCase()));

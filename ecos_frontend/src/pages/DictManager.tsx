@@ -28,15 +28,12 @@ export default function DictManager() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const table = useTableMode(showToast, t);
-  const dict = useDictMode(showToast, t);
+  // 删除目标单点持有：两个模式 hook 共用这一份（各自私持会导致
+  // 「table 清空了自己那份、dict 那份还在」⇒ 合并式 deleteTarget 恒真、确认模态关不掉）
+  const [deleteTarget, setDeleteTarget] = useState<{ type: "table" | "column" | "dictItem"; id: string; name: string } | null>(null);
 
-  // Merge deleteTarget from both hooks (they each have their own)
-  const deleteTarget = table.deleteTarget || dict.deleteTarget;
-  const setDeleteTarget = (t: { type: "table" | "column" | "dictItem"; id: string; name: string } | null) => {
-    table.setDeleteTarget(t);
-    dict.setDeleteTarget(t);
-  };
+  const table = useTableMode(showToast, t, deleteTarget, setDeleteTarget);
+  const dict = useDictMode(showToast, t, deleteTarget, setDeleteTarget);
 
   return (
     <div className={`flex-1 ${styles.appBg} flex h-full overflow-hidden font-sans`}>
@@ -130,8 +127,8 @@ export default function DictManager() {
           openNewDictItem={dict.openNewDictItem}
           saving={table.saving}
           dictItemFormOpen={dict.dictItemFormOpen}
-          dictSearch={dict.dictSearch}
-          setDictSearch={dict.setDictSearch}
+          dictSearch={dict.itemSearch}
+          setDictSearch={dict.setItemSearch}
           dictItemForm={dict.dictItemForm}
           setDictItemForm={dict.setDictItemForm}
           handleSaveDictItem={(savingFn) => dict.handleSaveDictItem(savingFn || table.setSaving)}

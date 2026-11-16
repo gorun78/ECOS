@@ -55,7 +55,8 @@ public class ObjectStateMachineController {
         // 获取对象当前状态
         String currentStatus = getObjectStatus(entityCode, id);
         if (currentStatus == null) {
-            return ApiResponse.notFound("OBJ-001: 对象 " + entityCode + "/" + id + " 不存在");
+            throw new com.chinacreator.gzcm.common.exception.NotFoundException(
+                    "OBJ-001: 对象 " + entityCode + "/" + id + " 不存在");
         }
         Map<String, Object> result = engine.getTransitionsInfo(entityCode, currentStatus);
         return ApiResponse.success(result);
@@ -80,7 +81,8 @@ public class ObjectStateMachineController {
         // 获取对象当前状态
         String currentStatus = getObjectStatus(entityCode, id);
         if (currentStatus == null) {
-            return ApiResponse.notFound("OBJ-001: 对象 " + entityCode + "/" + id + " 不存在");
+            throw new com.chinacreator.gzcm.common.exception.NotFoundException(
+                    "OBJ-001: 对象 " + entityCode + "/" + id + " 不存在");
         }
 
         String comment = (String) body.getOrDefault("comment", "");
@@ -151,7 +153,8 @@ public class ObjectStateMachineController {
         if (engine.deleteDefinition(id)) {
             return ApiResponse.success("定义 " + id + " 已删除");
         }
-        return ApiResponse.notFound("定义 " + id + " 不存在");
+        throw new com.chinacreator.gzcm.common.exception.NotFoundException(
+                "定义 " + id + " 不存在");
     }
 
     // ═══════════════ Helper ═══════════════════

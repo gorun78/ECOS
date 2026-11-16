@@ -60,6 +60,20 @@ public class AgentDao extends JdbcTemplateDaoSupport {
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
+    /**
+     * 数字型 id（{@code agent-<n>}）的最大序号；没有数字型行时返回 0。
+     *
+     * <p>D118（2026-11-15）：创建时若只依赖进程内计数器，重启后计数器归零会重新生成
+     * 已存在的 id（实测 {@code agent-101} 撞主键 → 创建接口 502）。故 id 生成必须回查库。</p>
+     */
+    public int maxNumericAgentSuffix() {
+        Integer max = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM 7) AS INTEGER)), 0) " +
+                "FROM ecos_control.ecos_agent WHERE id ~ '^agent-[0-9]+$'",
+                Integer.class);
+        return max == null ? 0 : max;
+    }
+
     public int insert(AgentEntity entity) {
         String sql = """
             INSERT INTO ecos_control.ecos_agent (id, name, model_provider, model_name, system_prompt, tools, knowledge, status, created_at, updated_at)

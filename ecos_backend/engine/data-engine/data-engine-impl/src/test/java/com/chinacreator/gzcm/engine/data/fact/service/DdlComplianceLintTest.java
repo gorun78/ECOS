@@ -82,7 +82,14 @@ class DdlComplianceLintTest {
                 "V126__drop_ecos_ontology_ghost_tables.sql",
                 // 2026-11-06 用户明确授权（DD-4 / #147Z-6）：清退 public. 侧孤儿副本，
                 // DROP 前已 pg_dump 备份且两侧行数实测为 0；属一次性裁决，不构成新增先例。
-                "V315__ddl_code_schema_alignment.sql");
+                "V315__ddl_code_schema_alignment.sql",
+                // 2026-11-15 补齐：V323~V325 是铁律 v2.0 §3.1 明文例外「设计资产历史版本表可 DROP」
+                // 的首批落地（DS-4 收口）。三份脚本头部均记明三项前置均已达成——读写已切 Git、
+                // 停写期行数恒定、执行前已 pg_dump 备份。此前门禁名单漏列导致本用例恒红
+                // （592 例里唯一失败项），现按「同一条铁律例外」归位，未扩大豁免面。
+                "V323__drop_ontology_version_history_table.sql",
+                "V324__drop_rule_version_history_table.sql",
+                "V325__drop_object_version_history_table.sql");
         List<String> hits = new ArrayList<>();
         for (Path p : listMigrations()) {
             String name = p.getFileName().toString();

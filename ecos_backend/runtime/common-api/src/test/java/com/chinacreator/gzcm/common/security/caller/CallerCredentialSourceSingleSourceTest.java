@@ -101,6 +101,15 @@ class CallerCredentialSourceSingleSourceTest {
         m.put("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/RateLimitFilter.java", 1);
         m.put("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/"
                 + "security/JwtAuthenticationFilter.java", 1);
+        // 2026-11-15 补登记（D112 批）：以下两处是 WAgent 把入站 JWT **原样中继**给
+        // 属主引擎派发（`dispatchOwner(..., request.getHeader("Authorization"))` /
+        // `jwtUsername(request.getHeader("Authorization"))`），不参与本进程的安全裁决主语，
+        // 与单源「决定出站以谁的身份调用」的职责不同。此前两文件已在仓内但基线漏登 —— 
+        // 门禁抓到的正是这次漂移，故补入在册而非改业务签名。
+        m.put("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/"
+                + "ai/wagent/controller/WAgentApprovalController.java", 1);
+        m.put("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/"
+                + "ai/wagent/controller/WAgentDecisionActionController.java", 1);
         return m;
     }
 
@@ -248,6 +257,66 @@ class CallerCredentialSourceSingleSourceTest {
         CallerCredentialSource.applyTo(null, CallerCredentialSource.current());
         CallerCredentialSource.applyTo(new HttpHeaders(), Carrier.EMPTY);
         CallerCredentialSource.applyTo(new HttpHeaders(), null);
+    }
+
+    // ── 一·B、D112 回落：信任头被剥离后的 monolith 宿主取法 ─────────────────────
+
+    @Test
+    @DisplayName("D112：信任头为空时回落到 gateway 注入的请求属性（monolith 宿主唯一可用身份）")
+    void fallsBackToInjectedAttributesWhenTrustHeadersStripped() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        // 模拟 EcosTrustHeaderFilter 剥离后：X-ECOS-* 全空，身份只在属性里
+        req.setAttribute("ECOS_INJECTED_USER", "u-admin");
+        req.setAttribute("ECOS_INJECTED_TENANT", "tenant-a");
+        bind(req);
+
+        Carrier c = CallerCredentialSource.current();
+        assertEquals("u-admin", c.user(), "剥离态下必须从属性取回用户");
+        assertEquals("tenant-a", c.tenant(), "剥离态下必须从属性取回租户");
+    }
+
+    @Test
+    @DisplayName("D112 活体形态：只带 Authorization（真实入站）时，user/tenant 仍须从属性补齐")
+    void authorizationOnlyStillFillsUserAndTenantFromAttributes() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        // 真实入站：浏览器带 JWT，不带 X-ECOS-*（那是内部信任头，客户端本来就不该有）
+        req.addHeader(HttpHeaders.AUTHORIZATION, "Bearer eyJhbGciOiJSUzI1NiJ9.real-token");
+        req.setAttribute("ECOS_INJECTED_USER", "u-admin");
+        req.setAttribute("ECOS_INJECTED_TENANT", "tenant-a");
+        bind(req);
+
+        Carrier c = CallerCredentialSource.current();
+        assertEquals("Bearer eyJhbGciOiJSUzI1NiJ9.real-token", c.authorization(),
+                "Authorization 为真实入口凭证，必须逐字中继");
+        assertEquals("u-admin", c.user(),
+                "D112 复现：Authorization 存在时旧实现整包短路，user 永远取不到 ⇒ 出站缺信任头 403");
+        assertEquals("tenant-a", c.tenant(),
+                "D112 复现：同上，tenant 必须按字段回落而不是整包返回");
+    }
+
+    @Test
+    @DisplayName("D112：请求头齐备时**优先**用头，属性不得覆盖真实入站身份")
+    void headersTakePrecedenceOverInjectedAttributes() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.addHeader(HeaderAuthInterceptor.H_USER, "header-user");
+        req.addHeader(HeaderAuthInterceptor.H_TENANT, "header-tenant");
+        req.setAttribute("ECOS_INJECTED_USER", "attr-user");
+        req.setAttribute("ECOS_INJECTED_TENANT", "attr-tenant");
+        bind(req);
+
+        Carrier c = CallerCredentialSource.current();
+        assertEquals("header-user", c.user());
+        assertEquals("header-tenant", c.tenant());
+    }
+
+    @Test
+    @DisplayName("D112：两处都没有时保持空载体，不得伪造主语（fail-closed 不退化）")
+    void emptyWhenNeitherHeadersNorAttributes() {
+        bind(new MockHttpServletRequest());
+        Carrier c = CallerCredentialSource.current();
+        assertFalse(c.present(), "无任何身份来源时必须为空载体，否则会向下游伪造凭证");
+        assertNull(c.user());
+        assertNull(c.tenant());
     }
 
     // ── 二、实现面归零（差距本体） ─────────────────────────────────────────────

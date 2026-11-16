@@ -103,5 +103,9 @@
   "copilot.cite.rowFilter.desc": "Non-HR: only display senior flight instructors with 300+ cumulative hours this year",
   "copilot.toast.sim.engineVerdict": "The security service returned a real verdict: {verdict} (the decision comes from the security service itself; the frontend never synthesizes a grant).",
   "copilot.toast.sim.engineFail": "Security engine evaluation channel unavailable — no verdict is shown (the frontend never synthesizes grants or audit entries). Please retry later.",
-  "copilot.toast.sec_audit.real": "Switched to the audit center: the real audit stream currently returns {count} log entries (alerts come from the engine, none are synthesized)."
+  "copilot.toast.sec_audit.real": "Switched to the audit center: the real audit stream currently returns {count} log entries (alerts come from the engine, none are synthesized).",
+  "copilot.result.verdictLine": "**Actual security-service verdict**: {verdict} (for dataset `{datasetId}`, returned by the security service — never synthesized by the frontend).",
+  "copilot.result.verdictUnavailable": "**No verdict this time**: the security evaluation channel for dataset `{datasetId}` is unavailable. The frontend shows neither grant nor deny — please retry later.",
+  "copilot.result.auditCount": "**Real audit stream**: currently returns {count} log entries (alerts come from the engine, none are synthesized).",
+  "copilot.result.auditUnavailable": "**Audit stream unavailable**: no audit logs retrieved; the frontend synthesizes no alert entries."
 }

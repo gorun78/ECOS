@@ -15,15 +15,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import com.chinacreator.gzcm.sysman.service.WorldModelGraphQueryService;
 
 /**
  * World Model — 目标与因果链控制器。
  * <p>
- * Phase 2: 优先从 PostgreSQL ecos_wm_goal / ecos_wm_causal_link 读取真实数据，
- * 数据库不可用时回退到内存 ConcurrentHashMap (MVP demo)。
+ * D103：读写两面都只走 PostgreSQL {@code ecos_wm_goal} / {@code ecos_wm_causal_link}。
+ * 旧实现读库、写内存 Map，返回成功但重启即丢；内存兜底已删除，DB 不可用时如实报错。
  * </p>
  * <pre>
  * GET    /api/v1/ecos/world-model-graph/goals          — 目标列表
@@ -43,58 +42,23 @@ public class WorldModelGraphController {
         private final WorldModelGraphQueryService worldModelGraphQueryService;
 private static final Logger log = LoggerFactory.getLogger(WorldModelGraphController.class);
 
-    /** 内存存储 (fallback) */
-    private final ConcurrentHashMap<String, GoalEntity> goalStore = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, CausalLinkEntity> linkStore = new ConcurrentHashMap<>();
+    /**
+     * 真实写入通道（D103）：旧实现用两个 ConcurrentHashMap 承接写面，读面却查 PG，
+     * 造成「返回成功但没落库」。内存 Map 已删除，写面一律走本 DAO。
+     */
+    private final com.chinacreator.gzcm.sysman.dao.WorldModelGraphWriteDao writeDao;
 
-    /** WorldModelGraphQueryService — 构造函数注入 (optional, falls back to memory) */
-
-    public WorldModelGraphController(WorldModelGraphQueryService worldModelGraphQueryService) {
+    public WorldModelGraphController(WorldModelGraphQueryService worldModelGraphQueryService,
+                                     com.chinacreator.gzcm.sysman.dao.WorldModelGraphWriteDao writeDao) {
         this.worldModelGraphQueryService = worldModelGraphQueryService;
-        initFallbackData();
-    }
-
-    /** 数据库是否可用 */
-    private boolean dbAvailable() {
-        try {
-            worldModelGraphQueryService.ping();
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /** 初始化内存兜底数据 */
-    private void initFallbackData() {
-        GoalEntity rootGoal = new GoalEntity();
-        rootGoal.setId("root-goal");
-        rootGoal.setName("系统总体目标");
-        rootGoal.setDescription("ECOS 平台总体业务目标");
-        rootGoal.setProgress(0);
-        rootGoal.setStatus("PLANNED");
-        rootGoal.setCreatedAt(System.currentTimeMillis());
-        rootGoal.setUpdatedAt(System.currentTimeMillis());
-        goalStore.put("root-goal", rootGoal);
-
-        GoalEntity childGoal = new GoalEntity();
-        childGoal.setId("child-goal");
-        childGoal.setName("提升数据质量");
-        childGoal.setDescription("通过数据治理提升整体数据质量水平");
-        childGoal.setParentId("root-goal");
-        childGoal.setProgress(0);
-        childGoal.setStatus("PLANNED");
-        childGoal.setCreatedAt(System.currentTimeMillis());
-        childGoal.setUpdatedAt(System.currentTimeMillis());
-        goalStore.put("child-goal", childGoal);
-
-        log.info("WorldModelGraphController 初始化完成，已加载 {} 个默认目标 (fallback)", goalStore.size());
+        this.writeDao = writeDao;
     }
 
     // ═══════════════════════════════════════════════════════
     //  目标 CRUD
     // ═══════════════════════════════════════════════════════
 
-    /** 从 DB 读取目标列表，DB 不可用时回退内存 */
+    /** 从 DB 读取目标列表；DB 不可用即抛（D103：不再回退内存假数据） */
     @GetMapping("/goals")
     public ApiResponse<WorldModelListVO<WorldModelGoalVO>> listGoals() {
         try {
@@ -147,22 +111,25 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     }
 
     private List<WorldModelGoalVO> loadGoals() {
-        if (dbAvailable()) {
-            return queryGoalsAsVo();
-        }
-        return goalStore.values().stream()
-                .map(WorldModelGoalVO::ofEntity)
-                .collect(Collectors.toList());
+        // D103：去掉内存回退——DB 不可用时应如实报错，不能拿进程内假数据冒充真实目标
+        return queryGoalsAsVo();
     }
 
     @GetMapping("/goals/{id}")
     public ApiResponse<?> getGoal(@PathVariable String id) {
         try {
-            GoalEntity goal = goalStore.get(id);
-            if (goal == null) {
+            Long gid = parseIdOrNull(id);
+            if (gid == null) {
                 return ApiResponse.notFound("目标不存在: " + id);
             }
-            return ApiResponse.success(goal);
+            com.chinacreator.gzcm.sysman.dao.WorldModelGraphWriteDao.GoalRow row = writeDao.findGoal(gid);
+            if (row == null) {
+                return ApiResponse.notFound("目标不存在: " + id);
+            }
+            return ApiResponse.success(new GoalDetailVO(String.valueOf(row.id()), row.name(),
+                    row.description(), row.parentId() == null ? null : String.valueOf(row.parentId()),
+                    row.progress(), row.status(), row.goalType(), row.weight(), row.orgId(),
+                    row.ownerUserId(), row.createdAt(), row.updatedAt()));
         } catch (Exception e) {
             log.error("查询目标失败, id={}", id, e);
             return ApiResponse.internalError("查询失败");
@@ -172,50 +139,75 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     @PostMapping("/goals")
     public ApiResponse<?> createGoal(@RequestBody GoalEntity goal) {
         try {
-            String id = UUID.randomUUID().toString().replace("-", "");
-            goal.setId(id);
-            goal.setCreatedAt(System.currentTimeMillis());
-            goal.setUpdatedAt(System.currentTimeMillis());
             if (goal.getName() == null || goal.getName().isBlank()) {
-                goal.setName("目标 " + id.substring(0, 8));
+                return ApiResponse.badRequest("name 不能为空");
             }
-            if (goal.getStatus() == null || goal.getStatus().isBlank()) {
-                goal.setStatus("PLANNED");
-            }
-            if (goal.getProgress() == null) {
-                goal.setProgress(0);
-            }
+            Long parentId = parseIdOrNull(goal.getParentId());
             if (goal.getParentId() != null && !goal.getParentId().isBlank()) {
-                if (!goalStore.containsKey(goal.getParentId())) {
+                if (parentId == null || !writeDao.goalExists(parentId)) {
                     return ApiResponse.badRequest("父目标不存在: " + goal.getParentId());
                 }
             }
-            goalStore.put(id, goal);
-            log.info("目标创建成功, id={}, name={}", id, goal.getName());
-            return ApiResponse.success(goal);
+            long id = writeDao.insertGoal(
+                    goal.getName(), goal.getDescription(), parentId,
+                    goal.getProgress(),
+                    goal.getStatus() == null || goal.getStatus().isBlank() ? "PLANNED" : goal.getStatus(),
+                    null, null, null, null);
+            GoalEntity created = new GoalEntity();
+            created.setId(String.valueOf(id));
+            created.setName(goal.getName());
+            created.setDescription(goal.getDescription());
+            created.setParentId(parentId == null ? null : String.valueOf(parentId));
+            created.setProgress(goal.getProgress() == null ? 0 : goal.getProgress());
+            created.setStatus(goal.getStatus() == null || goal.getStatus().isBlank() ? "PLANNED" : goal.getStatus());
+            created.setCreatedAt(System.currentTimeMillis());
+            created.setUpdatedAt(System.currentTimeMillis());
+            log.info("目标创建成功, id={}, name={}", id, created.getName());
+            return ApiResponse.success(created);
         } catch (Exception e) {
             log.error("创建目标失败", e);
             return ApiResponse.internalError("创建失败");
         }
     }
 
+    /** 因果图行键带展示前缀（{@code edge-}/{@code goal-}），对外的 CausalLinkEntity 用裸数字 id。 */
+    private static String stripPrefix(Object value, String prefix) {
+        if (value == null) {
+            return null;
+        }
+        String s = String.valueOf(value);
+        return s.startsWith(prefix) ? s.substring(prefix.length()) : s;
+    }
+
+    /** 对外 id 是字符串，入库前严格转 long；非法即 null（交由调用方判 400）。 */
+    private static Long parseIdOrNull(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(raw.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     @PutMapping("/goals/{id}")
     public ApiResponse<?> updateGoal(@PathVariable String id, @RequestBody GoalEntity goal) {
         try {
-            GoalEntity existing = goalStore.get(id);
-            if (existing == null) {
+            Long gid = parseIdOrNull(id);
+            if (gid == null || !writeDao.goalExists(gid)) {
                 return ApiResponse.notFound("目标不存在: " + id);
             }
-            goal.setId(id);
-            goal.setCreatedAt(existing.getCreatedAt());
-            goal.setUpdatedAt(System.currentTimeMillis());
-            if (goal.getName() == null) goal.setName(existing.getName());
-            if (goal.getDescription() == null) goal.setDescription(existing.getDescription());
-            if (goal.getParentId() == null) goal.setParentId(existing.getParentId());
-            if (goal.getProgress() == null) goal.setProgress(existing.getProgress());
-            if (goal.getStatus() == null) goal.setStatus(existing.getStatus());
-            goalStore.put(id, goal);
-            log.info("目标更新成功, id={}, name={}", id, goal.getName());
+            Long parentId = parseIdOrNull(goal.getParentId());
+            if (parentId != null && parentId.equals(gid)) {
+                return ApiResponse.badRequest("父目标不能是自己");
+            }
+            int n = writeDao.updateGoal(gid, goal.getName(), goal.getDescription(), parentId,
+                    goal.getProgress(), goal.getStatus(), null, null);
+            if (n == 0) {
+                return ApiResponse.notFound("目标不存在: " + id);
+            }
+            log.info("目标更新成功, id={}, name={}", gid, goal.getName());
             return ApiResponse.success(goal);
         } catch (Exception e) {
             log.error("更新目标失败, id={}", id, e);
@@ -226,18 +218,17 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     @DeleteMapping("/goals/{id}")
     public ApiResponse<WorldModelDeleteGoalVO> deleteGoal(@PathVariable String id) {
         try {
-            GoalEntity removed = goalStore.remove(id);
-            if (removed == null) {
+            Long gid = parseIdOrNull(id);
+            if (gid == null || !writeDao.goalExists(gid)) {
                 return ApiResponse.notFound("目标不存在: " + id);
             }
-            List<String> linksToRemove = linkStore.values().stream()
-                    .filter(l -> id.equals(l.getSourceGoalId()) || id.equals(l.getTargetGoalId()))
-                    .map(CausalLinkEntity::getId)
-                    .collect(Collectors.toList());
-            linksToRemove.forEach(linkStore::remove);
-            log.info("目标删除成功, id={}, name={}, 级联删除 {} 条因果链",
-                    id, removed.getName(), linksToRemove.size());
-            return ApiResponse.success(new WorldModelDeleteGoalVO(true, id, linksToRemove.size()));
+            int links = writeDao.countLinksOfGoal(gid);
+            int n = writeDao.deleteGoal(gid);
+            if (n == 0) {
+                return ApiResponse.notFound("目标不存在: " + id);
+            }
+            log.info("目标删除成功, id={}, 级联删除 {} 条因果链", gid, links);
+            return ApiResponse.success(new WorldModelDeleteGoalVO(true, id, links));
         } catch (Exception e) {
             log.error("删除目标失败, id={}", id, e);
             return ApiResponse.internalError("删除失败");
@@ -251,7 +242,20 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     @GetMapping("/links")
     public ApiResponse<WorldModelListVO<CausalLinkEntity>> listLinks() {
         try {
-            List<CausalLinkEntity> all = new ArrayList<>(linkStore.values());
+            // D103：读面改为与因果图同一数据源（此前从内存 Map 读，恒为空）
+            // 因果图边的行键是 source/target（带 "goal-" 前缀），与 CausalLinkEntity 的
+            // sourceGoalId/targetGoalId 不同名，这里做一次显式映射，禁假定同名。
+            List<CausalLinkEntity> all = worldModelGraphQueryService.listCausalGraphEdges().stream()
+                    .map(row -> {
+                        CausalLinkEntity e = new CausalLinkEntity();
+                        e.setId(stripPrefix(row.get("id"), "edge-"));
+                        e.setSourceGoalId(stripPrefix(row.get("source"), "goal-"));
+                        e.setTargetGoalId(stripPrefix(row.get("target"), "goal-"));
+                        Object label = row.get("label");
+                        e.setLabel(label == null ? null : String.valueOf(label));
+                        return e;
+                    })
+                    .collect(Collectors.toList());
             return ApiResponse.success(new WorldModelListVO<>(all, all.size()));
         } catch (Exception e) {
             log.error("查询因果链列表失败", e);
@@ -267,23 +271,13 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
         try {
             List<WorldModelCausalNodeVO> nodes;
             List<WorldModelCausalEdgeVO> edges;
-            if (dbAvailable()) {
-                nodes = worldModelGraphQueryService.listCausalGraphNodes().stream()
-                        .map(WorldModelCausalNodeVO::ofRow)
-                        .collect(Collectors.toList());
-                edges = worldModelGraphQueryService.listCausalGraphEdges().stream()
-                        .map(WorldModelCausalEdgeVO::ofRow)
-                        .collect(Collectors.toList());
-            } else {
-                nodes = goalStore.values().stream()
-                        .map(g -> new WorldModelCausalNodeVO(
-                                g.getId(), g.getName(), g.getDescription(), g.getStatus(), null))
-                        .collect(Collectors.toList());
-                edges = linkStore.values().stream()
-                        .map(l -> new WorldModelCausalEdgeVO(
-                                l.getId(), l.getSourceGoalId(), l.getTargetGoalId(), l.getLabel(), null))
-                        .collect(Collectors.toList());
-            }
+            // D103：取消内存回退，DB 不可用即抛（由外层 catch 报 500「构建因果图失败」）
+            nodes = worldModelGraphQueryService.listCausalGraphNodes().stream()
+                    .map(WorldModelCausalNodeVO::ofRow)
+                    .collect(Collectors.toList());
+            edges = worldModelGraphQueryService.listCausalGraphEdges().stream()
+                    .map(WorldModelCausalEdgeVO::ofRow)
+                    .collect(Collectors.toList());
             return ApiResponse.success(new WorldModelCausalGraphVO(
                     nodes, edges, nodes.size(), edges.size()));
         } catch (Exception e) {
@@ -295,11 +289,15 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     @GetMapping("/links/{id}")
     public ApiResponse<?> getLink(@PathVariable String id) {
         try {
-            CausalLinkEntity link = linkStore.get(id);
-            if (link == null) {
+            Long lid = parseIdOrNull(id);
+            if (lid == null) {
                 return ApiResponse.notFound("因果链不存在: " + id);
             }
-            return ApiResponse.success(link);
+            com.chinacreator.gzcm.sysman.dao.WorldModelGraphWriteDao.LinkRow row = writeDao.findLink(lid);
+            if (row == null) {
+                return ApiResponse.notFound("因果链不存在: " + id);
+            }
+            return ApiResponse.success(row);
         } catch (Exception e) {
             log.error("查询因果链失败, id={}", id, e);
             return ApiResponse.internalError("查询失败");
@@ -309,50 +307,68 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     @PutMapping("/goals/{id}/links")
     public ApiResponse<?> addCausalLink(@PathVariable String id, @RequestBody CausalLinkEntity link) {
         try {
-            String srcId = link.getSourceGoalId() != null && !link.getSourceGoalId().isBlank()
+            String srcRaw = link.getSourceGoalId() != null && !link.getSourceGoalId().isBlank()
                     ? link.getSourceGoalId() : id;
-            String tgtId = link.getTargetGoalId();
-            if (tgtId == null || tgtId.isBlank()) {
+            String tgtRaw = link.getTargetGoalId();
+            if (tgtRaw == null || tgtRaw.isBlank()) {
                 return ApiResponse.badRequest("targetGoalId 不能为空");
             }
-            if (!goalStore.containsKey(srcId)) {
-                return ApiResponse.badRequest("源目标不存在: " + srcId);
+            Long srcId = parseIdOrNull(srcRaw);
+            Long tgtId = parseIdOrNull(tgtRaw);
+            if (srcId == null || !writeDao.goalExists(srcId)) {
+                return ApiResponse.badRequest("源目标不存在: " + srcRaw);
             }
-            if (!goalStore.containsKey(tgtId)) {
-                return ApiResponse.badRequest("目标目标不存在: " + tgtId);
+            if (tgtId == null || !writeDao.goalExists(tgtId)) {
+                return ApiResponse.badRequest("目标不存在: " + tgtRaw);
             }
-            String linkId = UUID.randomUUID().toString().replace("-", "");
-            link.setId(linkId);
-            link.setSourceGoalId(srcId);
-            link.setCreatedAt(System.currentTimeMillis());
-            if (link.getStrength() == null) {
-                link.setStrength(1.0);
-            }
-            if (link.getStrength() < 0.0 || link.getStrength() > 1.0) {
+            if (link.getStrength() != null && (link.getStrength() < 0.0 || link.getStrength() > 1.0)) {
                 return ApiResponse.badRequest("strength 必须在 0.0 ~ 1.0 之间");
             }
-            if (link.getLabel() == null || link.getLabel().isBlank()) {
-                link.setLabel("causal");
-            }
-            linkStore.put(linkId, link);
-            log.info("因果链创建成功, id={}, {} → {}, label={}",
-                    linkId, srcId, tgtId, link.getLabel());
-            return ApiResponse.success(link);
+            long lid = writeDao.insertLink(srcId, tgtId,
+                    link.getLabel() == null || link.getLabel().isBlank() ? "causal" : link.getLabel(),
+                    null,
+                    link.getStrength() == null ? null : java.math.BigDecimal.valueOf(link.getStrength()));
+            CausalLinkEntity created = new CausalLinkEntity();
+            created.setId(String.valueOf(lid));
+            created.setSourceGoalId(String.valueOf(srcId));
+            created.setTargetGoalId(String.valueOf(tgtId));
+            created.setLabel(link.getLabel() == null || link.getLabel().isBlank() ? "causal" : link.getLabel());
+            created.setStrength(link.getStrength() == null ? 1.0 : link.getStrength());
+            created.setCreatedAt(System.currentTimeMillis());
+            log.info("因果链创建成功, id={}, {} → {}", lid, srcId, tgtId);
+            return ApiResponse.success(created);
         } catch (Exception e) {
             log.error("创建因果链失败, sourceId={}", id, e);
             return ApiResponse.internalError("创建失败");
         }
     }
 
+    /**
+     * 目标详情 wire 面（12 键，与 D103 引入该端点时的键面逐字一致）。
+     *
+     * <p>不复用 {@link WorldModelGoalVO}：那是列表行（22 键，含 startDate/targetValue 等
+     * 该端点从未返回过的键）。详情端点只做载体替换，键面不扩。</p>
+     */
+    public record GoalDetailVO(String id, String name, String description, String parentId,
+                               Integer progress, String status, String goalType, Object weight,
+                               String orgId, String ownerUserId,
+                               java.sql.Timestamp createdAt, java.sql.Timestamp updatedAt) {
+    }
+
     @DeleteMapping("/links/{id}")
     public ApiResponse<WorldModelDeleteLinkVO> deleteLink(@PathVariable String id) {
         try {
-            CausalLinkEntity removed = linkStore.remove(id);
-            if (removed == null) {
+            Long lid = parseIdOrNull(id);
+            if (lid == null) {
                 return ApiResponse.notFound("因果链不存在: " + id);
             }
+            com.chinacreator.gzcm.sysman.dao.WorldModelGraphWriteDao.LinkRow existing = writeDao.findLink(lid);
+            if (existing == null) {
+                return ApiResponse.notFound("因果链不存在: " + id);
+            }
+            writeDao.deleteLink(lid);
             log.info("因果链删除成功, id={}, {} → {}",
-                    id, removed.getSourceGoalId(), removed.getTargetGoalId());
+                    id, existing.sourceGoalId(), existing.targetGoalId());
             return ApiResponse.success(new WorldModelDeleteLinkVO(true, id));
         } catch (Exception e) {
             log.error("删除因果链失败, id={}", id, e);

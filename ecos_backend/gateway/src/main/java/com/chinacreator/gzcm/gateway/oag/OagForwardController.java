@@ -271,14 +271,15 @@ public class OagForwardController {
      * @param builder 待发往上游的请求构造器
      */
     private void applyAuthHeaders(HttpRequest.Builder builder) {
-        org.springframework.web.context.request.ServletRequestAttributes attrs =
-                (org.springframework.web.context.request.ServletRequestAttributes)
-                        org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
-        if (attrs != null) {
-            String authorization = attrs.getRequest().getHeader("Authorization");
-            if (StringUtils.hasText(authorization)) {
-                builder.header("Authorization", authorization);
-            }
+        // 凭证载体单源（D-B4-61 / 门禁 CallerCredentialSourceSingleSourceTest）：
+        // 本类此前自己写了一份 RequestContextHolder + getHeader("Authorization")，
+        // 属门禁点名的「复制体」——各改各的会让「无上下文」分支语义重新分叉。
+        // 现在统一走 CallerCredentialSource，并由它承担 D112 的剥离态回落
+        // （信任头被 EcosTrustHeaderFilter 剥离后从请求属性取回身份）。
+        com.chinacreator.gzcm.common.security.caller.CallerCredentialSource.Carrier carrier =
+                com.chinacreator.gzcm.common.security.caller.CallerCredentialSource.current();
+        if (carrier.authorization() != null) {
+            builder.header("Authorization", carrier.authorization());
         }
         org.springframework.security.core.Authentication auth =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
@@ -296,7 +297,10 @@ public class OagForwardController {
             builder.header(com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor.H_ROLE,
                     roles);
         }
-        String tenant = com.chinacreator.gzcm.common.context.TenantContextHolder.getTenantId();
+        String tenant = carrier.tenant();
+        if (tenant == null || tenant.isBlank()) {
+            tenant = com.chinacreator.gzcm.common.context.TenantContextHolder.getTenantId();
+        }
         if (tenant != null && !tenant.isBlank()) {
             builder.header(com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor.H_TENANT,
                     tenant);

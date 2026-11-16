@@ -89,10 +89,17 @@ public class ScenarioMindsController {
         return ApiResponse.success(mindService.upsertMind(id, dto, label, false));
     }
 
-    /** 逻辑删除心智（删 base 自动补位）。 */
+    /** 逻辑删除心智（删 base 自动补位）。legacy Long mindId 面：按 VO.mindRef 解绑。 */
     @DeleteMapping("/{id}/minds/{mindId}")
     public ApiResponse<Void> deleteMind(@PathVariable String id, @PathVariable Long mindId) {
-        mindService.deleteMind(id, mindId);
+        ScenarioMindVO mind = mindService.getMind(mindId);
+        if (mind == null) {
+            throw new NotFoundException("MIND-404: 心智不存在: " + mindId);
+        }
+        boolean removed = mindService.deleteMind(id, mind.getMindRef());
+        if (!removed) {
+            throw new NotFoundException("MIND-404: 场景未绑定该 Mind: " + mind.getMindRef());
+        }
         return ApiResponse.success();
     }
 
@@ -155,14 +162,17 @@ public class ScenarioMindsController {
         return ApiResponse.success(mindService.saveBaselineMind(id, dto));
     }
 
-    /** 兼容：删除 base mind。 */
+    /** 兼容：删除 base mind（D78：转走认知域 V188 解绑通道，不再是 501 死路）。 */
     @DeleteMapping("/{id}/mind-model")
     public ApiResponse<Void> deleteMindModel(@PathVariable String id) {
         ScenarioMindVO base = mindService.getMindBase(id);
         if (base == null) {
             throw new NotFoundException("MIND-404: base mind 不存在: scenario=" + id);
         }
-        mindService.deleteMind(id, base.getId());
+        boolean removed = mindService.deleteMind(id, base.getMindRef());
+        if (!removed) {
+            throw new NotFoundException("MIND-404: 场景未绑定该 Mind: " + base.getMindRef());
+        }
         return ApiResponse.success();
     }
 

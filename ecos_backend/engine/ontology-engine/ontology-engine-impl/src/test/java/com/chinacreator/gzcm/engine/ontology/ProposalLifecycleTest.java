@@ -115,8 +115,14 @@ class ProposalLifecycleTest {
                 when(publishGate.validate(any())).thenReturn(passedGate());
                 Map<String, Object> version = new HashMap<>();
                 version.put("id", "v1");
-                version.put("versionNo", 1);
+                version.put("versionNo", "1.0.0");
                 when(versionService.createVersion(anyString(), any())).thenReturn(version);
+                // Git 通道发布产生新版本记录（Published），提案 version_id 须指向它（D139）
+                Map<String, Object> published = new HashMap<>();
+                published.put("id", "git-pub-1");
+                published.put("versionNo", "1.0.0");
+                published.put("status", "Published");
+                when(versionService.publishVersion(anyString(), anyString())).thenReturn(published);
 
                 ResponseEntity<ApiResponse<OntologyProposalVO>> entity = controller.executeProposal("p1");
                 // #142/B4-3e-37（D-B4-59）：成功态状态行显式 200（CODE_SUCCESS=0 不得折成 500）
@@ -128,6 +134,9 @@ class ProposalLifecycleTest {
                         + " msg=" + resp.getMessage());
                 assertEquals("EXECUTED", resp.getData().getStatus());
                 verify(versionService, times(1)).createVersion(anyString(), any());
+                // D139：version_id 回填发布后版本 ID 字符串（旧实现把 semver 转 Long ⇒ 恒空）
+                verify(proposalService).markExecutedWithVersion("p1", "EXECUTED", "git-pub-1");
+                verify(proposalService, never()).markExecuted(anyString(), anyString());
             }
             case "draft_execute_rejected" -> {
                 when(proposalService.queryForMap(anyString(), any())).thenReturn(row("p1", "DRAFT", "alice"));

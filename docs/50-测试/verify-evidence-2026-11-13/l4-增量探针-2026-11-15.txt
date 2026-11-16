@@ -1,0 +1,199 @@
+=== §5.1 第4行「DB 计数与 API 一致」增量探针（插 1 行 → +1 → 清理 → 复原） ===
+执行时间 2026-11-15T12:14~12:15Z（本机 Windows，docker exec psql + curl gateway:8080）
+
+--- 基线 ---
+[docker exec ecos-postgres psql -U postgres -d sys_man]
+SELECT count(*) FROM ecos_control.ecos_business_scenario WHERE is_deleted=0;
+192
+SELECT count(*) FROM ecos_control.ecos_business_scenario;
+195（其中 3 行 is_deleted=1）
+
+[curl GET /api/v1/workspace/scenarios?page=1&pageSize=500]
+code=0  api_count=192  isArray=true
+
+--- 插入 1 行（DB 侧手动） ---
+INSERT INTO ecos_control.ecos_business_scenario
+  (id,name,description,status,department,priority,is_deleted,domain,version_no)
+VALUES ('sc_l4probe_delta','VERIFY-L4-DELTA-PROBE','L4 count delta probe',
+        'DRAFT','verify','LOW',0,'default','1');
+INSERT 0 1
+SELECT 'db_after_insert='||count(*)...WHERE is_deleted=0;
+db_after_insert=193
+
+--- API 侧必须同步 +1 且该行可见 ---
+[curl GET /api/v1/workspace/scenarios?page=1&pageSize=500]
+code=0  api_count=193
+probe_row_visible=1
+{"id":"sc_l4probe_delta","name":"VERIFY-L4-DELTA-PROBE","description":"L4 count delta probe",
+ "businessGoal":"","department":"verify","priority":"LOW","status":"DRAFT","budget":null,...}
+
+--- 清理 ---
+DELETE FROM ecos_control.ecos_business_scenario WHERE id='sc_l4probe_delta';
+DELETE 1
+db_after_cleanup=192
+probe_left=0（id LIKE 'sc_l4probe%'）
+
+--- 复原后 API 必须回落 ---
+[curl GET /api/v1/workspace/scenarios?page=1&pageSize=500]
+code=0  api_count_after_cleanup=192
+probe_row_visible=0
+
+=== 结论 ===
+API 计数与库行数存在**真实同步关系**（192→193→192 双向跟随），
+不是「恒等常量」也不是「API 自报数组长度」。若 API 走缓存/内存表/写死数据，
+插入行不会在计数和列表中同时出现；若 API 过滤口径与对账 SQL 不一致，
++1 后会出现 193 vs 192 的偏差 —— 两者均未发生。
+探针按 §5.1 要求「随后清理」，清理后库与 API 均回业务基线 192，无残留。
+
+=== §5.1 第3/5行「合法跃迁 / DRAFT 可改」对照（同批活体） ===
+
+--- 第3行对照：场景状态机「合法边 vs 非法边」必须可区分 ---
+[自建 DRAFT 场景 sc_31c9d307-dbf]
+PATCH /api/v1/workspace/scenarios/{id}/status {"status":"SUSPENDED"}   ← 结构非法边
+→ http=409 {"code":409,"errorCode":"ILLEGAL_TRANSITION","message":"非法状态迁移: DRAFT -> SUSPENDED"}
+PATCH /api/v1/workspace/scenarios/{id}/status {"status":"ACTIVE"}      ← 结构合法边，但 D57 缺权限键
+→ http=403 {"code":403,"errorCode":"PERMISSION_DENIED","data":{"permission":"scenario:activate"}}
+PATCH /api/v1/workspace/scenarios/sc001/status {"status":"SUSPENDED"}  ← 结构合法边（ACTIVE 出发）
+→ http=403 {"code":403,"errorCode":"PERMISSION_DENIED","data":{"permission":"scenario:write"}}
+
+对照成立判据：非法边 409 / 合法边 403 —— 两类响应**错误码不同**。
+D110 修复前三条全是 403，本对照因此能证明「状态机真的在看边，不只是恒拒」。
+（合法边的 200 分支在 L1 由 ScenarioStatusMachineTest#activateRequiresEmptyIslandsAndNonEmptyVerdict
+  与 …#structurallyIllegalEdgeWinsOverDeniedPermission 的授权分支覆盖；活体 200 受 D57 权限键阻塞。）
+
+--- 第5行对照：蓝图 RELEASED 不可变 vs DRAFT 可改 ---
+[自建蓝图 bp=de0181ab-…（version=14, DRAFT）]
+POST /api/v1/business/scenarios/sc001/blueprints/{id}/transition {"target":"DISCOVERING"}
+→ http=200 {"code":0,"data":{"status":"DISCOVERING","allowedTransitions":["GAP_A..."],...}}
+   DB ecos_control.ecos_scenario_blueprint 该行 status=DRAFT→DISCOVERING 确已变更（可改对照成立）
+
+POST …/{id}/transition {"target":"ACTIVE"}   ← DISCOVERING 无 →ACTIVE 出边（矩阵 DRAFT 直进 ACTIVE 必拒族）
+→ http=409 {"code":409,"errorCode":"ILLEGAL_TRANSITION",
+            "message":"非法状态迁移: DISCOVERING → ACTIVE（合法出边: [GAP_ANALYSIS, NEEDS_CLARIFICATION, BLOCKED, DRAFT]，§6.3 迁移矩阵）"}
+
+RELEASED 冻结面：库内当前无 RELEASED 行（全库 13 行 = 13 DRAFT + 1 DISCOVERING 前基线），
+不可变断言由 L1 承担且已具正反对照：
+  BlueprintStatusMachineTest#releasedIsFrozenWithOnlyActiveOrDeprecationEdges
+    — RELEASED→DRAFT 抛 IllegalBlueprintTransitionException（拒）
+    — RELEASED→DEPRECATED 放行（合法对照）
+  ScenarioBlueprintServiceTest#publishedVersionRowIsNeverMutatedByLaterOperations
+    — RELEASED 行 revise 只 insert version+1 新 DRAFT，对旧行 updateTransition/updateRelease/updateApprovalRef 全部 never()
+
+--- 清理 ---
+DELETE FROM ecos_control.ecos_scenario_blueprint WHERE goal_statement='VERIFY-DRAFT-control probe'
+→ DELETE 1；bp_total=13（回基线）；bp_probe_left=0
+DELETE /api/v1/workspace/scenarios/sc_31c9d307-dbf → delete_http=200
+→ live_rows=192（回基线）；VERIFY-legal-transition 残留 0
+
+============================================================
+D128 蓝图发布摘要列错位（V-WS-054 取证派生）—— 修复 + 活体验证 2026-11-16
+============================================================
+[修复前源码事实]
+ScenarioBlueprintDao.updateRelease 原 SQL：
+  SET status=?, artifact_digest=?, release_artifact_ref=? ...
+第 4 实参（ScenarioBlueprintService.release）传的是 bp.getContextDigest()
+⇒ context digest 写入 release_artifact_ref；context_digest 列不参与 SET。
+
+[单元回归]
+新增 workspace-impl: com.chinacreator.gzcm.workspace.blueprint.ScenarioBlueprintReleaseSqlTest
+  断言 SQL 含 "context_digest = ?"、不含 "release_artifact_ref"、摘要位序按 updateRelease(…, contextDigest, …)
+修复态实跑：Tests run: 1, Failures: 0  (ScenarioBlueprintServiceTest 同跑 10/0)
+变异探针：SQL 临时改回 release_artifact_ref 形态 → 1 failed（"发布必须落 context_digest 列"）；
+          还原 → 1 passed。探针证「测试真能变红」。
+
+[重打包取证]
+rm gateway-1.0.0-SNAPSHOT.jar; mvn -o -f ecos_backend/pom.xml -pl gateway -am install -DskipTests → BUILD SUCCESS (4:11)
+unzip BOOT-INF/lib/workspace-impl-*.jar → ScenarioBlueprintDao.class：
+  grep "context_digest = ?" 命中 1；grep "release_artifact_ref = ?" 命中 0
+启动：start-backend.ps1 -Modules gateway -Profile enterprise → :8080 PID 21792（命令行实查指向新 fat jar）
+
+[活体链]
+POST /api/v1/business/scenarios/sc_2ccc6a74-0ac/blueprints  {"contextDigest":"sha256:d128liveprobe…"}
+→ 201 id=4badf38f-fdea-400e-aeaa-59d3e5b09f38（DRAFT，回显 contextDigest）
+transition ×5：DISCOVERING→GAP_ANALYSIS→BLUEPRINT_READY→VALIDATING→READY_FOR_APPROVAL 全 200
+POST …/approve {"approvalRef":"d128-probe-approval"} → 200 APPROVED
+POST …/release → 201 {"status":"RELEASED","artifactDigest":"ccbb4532f0216705…","contextDigest":"sha256:d128liveprobe…"}
+DB：SELECT id,status,artifact_digest IS NOT NULL,context_digest,coalesce(release_artifact_ref,'<NULL>'),released_time IS NOT NULL
+→ 4badf38f…|RELEASED|t|sha256:d128liveprobe…|<NULL>|t
+
+[判定]
+V-D128 已修并活体回归；V-WS-054 维持 PARTIAL（设计允许 contextDigest 为空，「缺 digest 不得发布」属矩阵口径过宽）。
+回归面：workspace-impl 全量 445 tests / 0 fail / 3 skipped（skip=WorkspaceRouteReachabilityIT 类级 @Disabled，live 栈旧登记项）。
+
+
+============================================================
+V-WS-056 Gap 分级发布门槛 —— 探针行补打穿 2026-11-16
+============================================================
+[构造方式] 该判据需蓝图行带 gaps_text JSON，产品面无 gap 编辑端点（创建恒写 []），
+故对探针蓝图行（bp=38721571-9112-47b0-86a5-592711c2d0f6，APPROVED）直接 UPDATE gaps_text。
+
+[反向] BLOCKER/OPEN
+  gaps=[{"gapId":"g-block","severity":"BLOCKER","status":"OPEN","category":"data"}]
+POST …/release → 409 {"errorCode":"BLUEPRINT_VALIDATION_FAILED",
+  "rejectedReasons":["存在未关闭的 BLOCKER 缺口: g-block（status=OPEN，须 RESOLVED 或 ACCEPTED_RISK，§6.6/§6.5）"],
+  "openBlockerGaps":[{"gapId":"g-block","category":"data","status":"OPEN"}]}
+
+[正向] BLOCKER/RESOLVED + WARNING/OPEN + SUGGESTION/OPEN
+POST …/release → 201 {"status":"RELEASED"}
+⇒ 关闭态不阻断；warnings/suggestions 不阻断（判据两面全覆盖）
+
+[清理] DELETE 探针行；bp_total 回 13
+
+============================================================
+V-WS-024 完整度变化探针 —— 三态实跑 2026-11-16
+============================================================
+判据：补足一条 MAPPING 连边后 coverage 必须变化。原记 NOT_EXECUTED（缺契约载体）。
+本轮发现 MAPPING present = 两端已绑定 + 连边行存在 + /ontology/entity-mappings 契约计数>0，
+契约源为空即「契约未通过」⇒ 造载体：POST /api/v1/ontology/mappings。
+
+状态 1（基线）      coverage=0.0    missing.MAPPING reason="OBJECT_TYPE 未引用任何 DATASET（契约未通过）"
+POST /ontology/mappings {"objectId":"aircraft","sourceName":"probe-d024-mapping",...}
+                    → 200 id=f7801cdbafaa4b81b931e137081dba3e；GET /ontology/entity-mappings 计数 0→1
+状态 2（契约+边齐）  coverage=0.3333333  presentEdges=[MAPPING sb001→sb003 contractCount=1 lastVerifiedAt=2026-11-15T16:38:41.949727Z]
+UPDATE ecos_scenario_binding_link SET is_deleted=1 WHERE id='bsl001'
+状态 3（无边）      coverage=0.0    missing.MAPPING reason="缺少 MAPPING 连边"；islands 回加 sb001(NO_REACHABLE_EDGE)
+UPDATE … is_deleted=0（复原）
+状态 4              coverage=0.3333333（与状态 2 一致）
+DELETE /ontology/mappings/f7801cdb…  → 200「已删除」；entity-mappings 计数 0
+状态 5（清理后）    coverage=0.0（回基线）
+
+缓存口径：读面 Caffeine TTL 30s，每步等待 32s 后取值，避免读到旧快照。
+基线复原：ecos_entity_table_mapping 0 行；ecos_scenario_binding_link bsl001/bsl002 均 is_deleted=0；coverage 0.0。
+
+============================================================
+V-WS-085 选项池七腿 —— D129/D131 修复后重验 2026-11-16
+============================================================
+[承流事实] /api/v1/workspace route=service ⇒ 真正承流进程是 workspace-service :18090
+（只重打 gateway fat-jar 不生效——本轮首次踩到，重打 :18090 jar 后修复才可见）。
+
+[D131 定位链]
+1) available/datasets → 200 []；直连 GET :18082/api/v1/datanet/datasource → 200 data=[DemoPG]（1 条）
+2) 停 18082 → 腿立刻 503（证明确实调上游，非空实现）
+3) 临时 INFO 探针（已删）：dataType=java.util.LinkedHashMap size=-1 ⇒ data 不是 List
+   ⇒ 根因：credentialedEntity() 未设 Accept，对端按 */* 协商回 XML，Map 反序列化把 data 读成 Map
+[修复] credentialedEntity() 统一 Accept: application/json
+[变异探针] 删 setAccept → ScenarioOptionsAcceptHeaderTest 1 failed；还原 → 1 passed
+[修复后] available/datasets → 200 data=[{"id":"dac14d03…","name":"DemoPG",…}]（1 ≡ 上游 1）
+
+[D129]
+原：/wagent/candidates?status=PUBLISHED（大写）→ 后端词表门 400 → 腿 503
+改：status=published → available/wagents 200 []
+对照：直调 ?status=PUBLISHED → 400 E-VALIDATION（门禁真实，非放松）
+
+[七腿终态]
+datasets 200 [1 条] · objects 200 [] · knowledge 200 [] · security 200 [] · interfaces 200 [] · wagents 200 [] · agents 503
+库侧基线：ecos_security_policy 0 · ecos_interface_ref 0 · ecos_ontology.ecos_ontology_entity 0（空与空一致）
+agents 503 上游因：GET /api/v1/agent/profiles → 502 ECOS-AI-502；IAgentProfileService 全仓零实现（D130）
+
+============================================================
+V-ONTO-070 本体/领域列表对账 —— 2026-11-16
+============================================================
+GET /api/v1/ecos/ontologies → 200 []（读路径自注：V200 表已 DROP，读面恒空，口径作废）
+ecos_ontology.ecos_ontology_domain → 表不存在（旧登记口径错误）
+ecos_ontology.ecos_domain → 5 行：dom_proc/dom_fin/dom_hr/dom_proj/dom_asset，tenant_id='tenant-a'，status=Active
+GET /api/v1/ecos/domains → 200 []（同租户口径：OntologyDomainRepository 自注 SELECT 自动加 AND (tenant_id=? OR tenant_id IS NULL)）
+⇒ 空结果与「当前租户上下文为空或非 tenant-a」相符；是否缺陷取决于 admin 应携带的租户（待裁），维持 PARTIAL。
+
+[环境备注] /api/v1/workspace route=service ⇒ 真正承流进程是 workspace-service :18090；
+gateway fat-jar 内嵌的 workspace-impl 副本此刻比源码旧（D129/D131 只打进了 :18090 包），
+因该前缀不落 gateway 承流，不影响本轮判定；后续若切回 monolith 需按「换包陷阱」重打 gateway。

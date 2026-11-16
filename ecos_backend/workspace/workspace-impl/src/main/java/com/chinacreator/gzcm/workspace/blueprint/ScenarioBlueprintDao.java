@@ -154,15 +154,17 @@ public class ScenarioBlueprintDao extends JdbcTemplateDaoSupport {
                 approvalRef, actor, id);
     }
 
-    /** 发布落库（状态/摘要/发布引用/发布时间，带状态守卫）。 */
-    public int updateRelease(String id, String toStatus, String artifactDigest,
-                             String releaseArtifactRef, String actor, String fromStatus) {
+    /** 发布落库（状态/artifact_digest/context_digest/发布时间，带状态守卫）。
+     *  两摘要列各归其位（§5.2 SUP-BP-03 回链）：context digest 不得占用 release_artifact_ref
+     *  （该列是制品仓库引用位，发布路径不产制品引用，保持原值）。 */
+    public int updateRelease(String id, String toStatus, String artifactDigest, String contextDigest,
+                             String actor, String fromStatus) {
         return jdbcTemplate.update(
-                "UPDATE " + TABLE + " SET status = ?, artifact_digest = ?, release_artifact_ref = ?, " +
+                "UPDATE " + TABLE + " SET status = ?, artifact_digest = ?, context_digest = ?, " +
                 "actor = ?, trace_id = ?, transition_reason = ?, released_time = NOW(), " +
                 "update_time = NOW(), update_by = ? " +
                 "WHERE id = ? AND status = ? AND is_deleted = 0",
-                toStatus, artifactDigest, releaseArtifactRef, actor, actor, actor, actor,
+                toStatus, artifactDigest, contextDigest, actor, actor, actor, actor,
                 id, fromStatus);
     }
 }

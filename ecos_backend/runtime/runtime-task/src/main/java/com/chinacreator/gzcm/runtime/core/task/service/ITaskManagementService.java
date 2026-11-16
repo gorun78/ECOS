@@ -96,6 +96,12 @@ public interface ITaskManagementService {
     List<TaskDescription> queryTasks(Map<String, Object> condition, int offset, int limit) throws TaskManagementException;
 
     /**
+     * D119 (2026-11-15): task count under the same condition/filter as {@link #queryTasks},
+     * so that list "total" equals the number of rows the list can actually page through.
+     */
+    int countTasks(Map<String, Object> condition) throws TaskManagementException;
+
+    /**
      * 获取任务统计
      * 
      * @return Map包含 total/running/pending/succeeded/failed/cancelled 计数

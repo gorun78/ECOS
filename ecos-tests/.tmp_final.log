@@ -1,0 +1,982 @@
+
+Running 518 tests using 1 worker
+
+[1/518] [api] › tests\api\cli-l3-approval.spec.ts:141:7 › CLI 控制面（14 条命令 / L0~L3） › 命令树守卫：operationId 均可解析，L3 必带审批，未接入命令自证原因
+[2/518] [api] › tests\api\cli-l3-approval.spec.ts:167:7 › CLI 控制面（14 条命令 / L0~L3） › doctor：六字段 + 五值 status，且逐项检查不含 UNKNOWN 造假
+[3/518] [api] › tests\api\cli-l3-approval.spec.ts:188:7 › CLI 控制面（14 条命令 / L0~L3） › cognition models list：活体只读成功，且凭据不回显
+[4/518] [api] › tests\api\cli-l3-approval.spec.ts:209:7 › CLI 控制面（14 条命令 / L0~L3） › --dry-run 不发请求：doctor 全项 UNKNOWN 且无 source 调用副作用
+[5/518] [api] › tests\api\cli-l3-approval.spec.ts:218:7 › CLI 控制面（14 条命令 / L0~L3） › agent inspect --dry-run：调用计划取自契约路径模板，零请求
+[6/518] [api] › tests\api\cli-l3-approval.spec.ts:227:7 › CLI 控制面（14 条命令 / L0~L3） › 未接入命令：UNAVAILABLE + 非零退出码（禁空集合伪成功）
+[7/518] [api] › tests\api\cli-l3-approval.spec.ts:238:7 › CLI 控制面（14 条命令 / L0~L3） › L3 命令：无 --approval-token ⇒ BLOCKED(2)，服务端未就绪 ⇒ 不发起写请求
+[8/518] [api] › tests\api\cli-l3-approval.spec.ts:281:7 › CLI 生产化：preflight / candidate / approval-token › preflight：11 步齐全、四值状态、createsRun=false（只报告不建 Run）
+[9/518] [api] › tests\api\cli-l3-approval.spec.ts:306:7 › CLI 生产化：preflight / candidate / approval-token › 写命令 --dry-run：只打印计划，库面零新增（断言真实不落库）
+[10/518] [api] › tests\api\cli-l3-approval.spec.ts:331:7 › CLI 生产化：preflight / candidate / approval-token › 建候选：201 + status=generated，payload 哈希由服务端计算
+[11/518] [api] › tests\api\cli-l3-approval.spec.ts:356:7 › CLI 生产化：preflight / candidate / approval-token › 建候选：类型越界 ⇒ 400（禁静默默认）
+[12/518] [api] › tests\api\cli-l3-approval.spec.ts:365:7 › CLI 生产化：preflight / candidate / approval-token › 审批凭证：admin 签发成功；自审批（requester=approver）⇒ 403
+[13/518] [api] › tests\api\cli-l3-approval.spec.ts:393:7 › CLI 生产化：preflight / candidate / approval-token › 凭证闸生效：无效 token ⇒ 403；有效 token 越过凭证闸（批 A 后真链路）
+[14/518] [api] › tests\api\cli-l3-approval.spec.ts:440:7 › CLI 生产化：preflight / candidate / approval-token › 批 A 授权墙双修：admin 角色 candidate:publish 经 OPA rbac 放行（策略可及）
+[15/518] [api] › tests\api\ontology-caliber.spec.ts:22:7 › ontology calibers (F03-01 只读消费面) › V-ONTO-009 口径列表 200 且 data 为数组（空库也是真实态）
+[api] › tests\api\ontology-caliber.spec.ts:22:7 › ontology calibers (F03-01 只读消费面) › V-ONTO-009 口径列表 200 且 data 为数组（空库也是真实态）
+[V-ONTO-009] calibers=0
+
+[16/518] [api] › tests\api\ontology-caliber.spec.ts:29:7 › ontology calibers (F03-01 只读消费面) › V-ONTO-009b 不存在口径的 current 必须 404 + errorCode（反向探针）
+[api] › tests\api\ontology-caliber.spec.ts:29:7 › ontology calibers (F03-01 只读消费面) › V-ONTO-009b 不存在口径的 current 必须 404 + errorCode（反向探针）
+[V-ONTO-009b] status=404 errorCode=ECOS-ONTO-080
+
+[17/518] [api] › tests\api\pipeline-contract.spec.ts:54:5 › A 登录签发 bearer token
+[18/518] [api] › tests\api\pipeline-contract.spec.ts:61:5 › B node-types 返回 12 类全集，且目录↔枚举同源、禁用项带 i18n 原因键
+[19/518] [api] › tests\api\pipeline-contract.spec.ts:84:5 › C–H 管道定义生命周期（创建→详情→执行→轮询→列表→逻辑删除→已删不可见）
+[20/518] [api] › tests\api\pipeline-contract.spec.ts:151:5 › I POST /pipeline/debug/sessions → sessionId（含断点）
+[21/518] [api] › tests\api\pipeline-git-versions.spec.ts:20:5 › 列出管道定义并选定一个作为详情/Git 版本入参
+[22/518] [api] › tests\api\pipeline-git-versions.spec.ts:44:5 › GET /pipeline/definitions/{id} → 200 且 id 一致、nodes 字段存在
+[23/518] [api] › tests\api\pipeline-git-versions.spec.ts:52:5 › GET /engine/data/pipeline/git/versions/{id} → 200 且 data 为数组
+[24/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:38:7 › V-AI-060 W 工具契约（3 映射） › tools 列表返回 10 键摘要且自述权限过滤形态
+[25/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:49:7 › V-AI-060 W 工具契约（3 映射） › describeTool 缺 version ⇒ 400（name+version 闭合定位），不 500
+[26/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:56:7 › V-AI-060 W 工具契约（3 映射） › describeTool 带 version 但工具不存在 ⇒ 404（合并隐私文案）
+[27/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:65:7 › V-AI-060 W 工具契约（3 映射） › searchTools 的 status 白名单：越界值 400，合法值 200
+[28/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:75:7 › V-AI-060 W 工具契约（3 映射） › validateToolContract：存在性通过后如实 501（五关执行器未接线，禁伪成功）
+[29/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:88:7 › V-AI-057 / 058 / 059 / 055 / 056 W 其余面 › V-AI-057 证据链：不存在 evidenceId ⇒ 404 且不 500
+[30/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:94:7 › V-AI-057 / 058 / 059 / 055 / 056 W 其余面 › V-AI-058 熔断开关：GET 不被支持（405），说明它是写端点
+[31/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:100:7 › V-AI-057 / 058 / 059 / 055 / 056 W 其余面 › V-AI-059 就绪度：不存在 questionId ⇒ 404 且不 500
+[32/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:106:7 › V-AI-057 / 058 / 059 / 055 / 056 W 其余面 › V-AI-056 决策动作：空体 ⇒ 400 参数不合法（不得 500）
+[33/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:113:7 › V-AI-057 / 058 / 059 / 055 / 056 W 其余面 › V-AI-055 审批凭证：真实签发腿可达，四眼与 scopeType 闸都在
+[34/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:136:7 › V-AI-070 LLM 网关（唯一出口） › POST /llm/chat 空体 ⇒ 400 messages 不能为空（点名缺什么）
+[35/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:143:7 › V-AI-070 LLM 网关（唯一出口） › POST /llm/embedding 空体 ⇒ 400 input/texts 不能同时为空
+[36/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:151:7 › V-AI-070 LLM 网关（唯一出口） › GET /llm 列表不存在（网关只有 chat/embedding 两个写面）
+[37/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:159:7 › V-AI-072 护栏（两套面：/guardrails 与 /aip/guardrails） › /guardrails/policies 返回数组；/guardrails/validate 返回裁决七键
+[38/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:176:7 › V-AI-072 护栏（两套面：/guardrails 与 /aip/guardrails） › /aip/guardrails 是另一套 CRUD 面，返回数组
+[39/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:184:7 › V-AI-074 / 073 / 077 演化·调度·目录 › V-AI-074 演化：trigger 返回 missionId；log 返回数组
+[40/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:197:7 › V-AI-074 / 073 / 077 演化·调度·目录 › V-AI-073 定时任务列表返回数组
+[41/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:203:7 › V-AI-074 / 073 / 077 演化·调度·目录 › V-AI-077 目录真实前缀是 /datanet/catalog（不是 /catalog）
+[42/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:223:7 › V-AI-078 / 079 / 080 能力目录与认知桥 › V-AI-078 capabilities 返回 13 条；models/providers 结构完整
+[43/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:238:7 › V-AI-078 / 079 / 080 能力目录与认知桥 › V-AI-079 动作桥/提示编译：available-actions 与 index-status 可达
+[44/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:251:7 › V-AI-078 / 079 / 080 能力目录与认知桥 › V-AI-080 cognitive/config 返回配置数组（AI 侧与认知域同名控制器需可区分）
+[45/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:259:7 › V-AI-081 引擎状态一致性 › ai 与 cognitive 的 status/health 四面均 200 且状态词一致
+[46/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:281:7 › V-AI-071 技能：MCP 未连时 501 且自述 stub › skills 501 + stub + reason 指认 MCP 通道
+[47/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:293:7 › V-AI-092 无 token 访问 AI 面全部被拒 › 六类 AI 端点无 token 必须 401/403，不得 200
+[48/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:325:9 › 端点未注册登记（404 ECOS-SYS-404） › V-AI-079 /api/v1/cognitive/action-bridge 路由未注册
+[49/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:325:9 › 端点未注册登记（404 ECOS-SYS-404） › V-AI-080 /api/v1/cognitive/config/defaults 路由未注册
+[50/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:345:7 › D52 / D53 回归钉 › D52 agent-runtime 经网关可达（telemetry 200）
+[51/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:352:7 › D52 / D53 回归钉 › D52 agent-runtime/tools 参数校验在（400 点名 agentId，不是 404）
+[52/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:358:7 › D52 / D53 回归钉 › D53 OAG health 转发到真实上游腿并 200
+[53/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:365:7 › D52 / D53 回归钉 › D53 OAG chat/health 与上游同名同动词（GET 可达）
+[54/518] [api] › tests\api\verification\ai-engine-remainder.spec.ts:371:7 › D52 / D53 回归钉 › D53 OAG chat 真链路：认证被上游认可（非 403）
+[55/518] [api] › tests\api\verification\cli-deep.spec.ts:77:7 › 一、通用输出契约（V-CLI-000/005） › V-CLI-000 输出六字段契约：status/ok/data/error/trace_id
+[56/518] [api] › tests\api\verification\cli-deep.spec.ts:87:7 › 一、通用输出契约（V-CLI-000/005） › V-CLI-005 traceId 贯通：输出 trace_id 非空
+[57/518] [api] › tests\api\verification\cli-deep.spec.ts:96:7 › 二、参数契约（V-CLI-007/009） › V-CLI-009 未知参数必须报错而非静默忽略
+[58/518] [api] › tests\api\verification\cli-deep.spec.ts:104:7 › 二、参数契约（V-CLI-007/009） › V-CLI-007 非法 timeout 必须被拒（禁静默夹紧）
+[59/518] [api] › tests\api\verification\cli-deep.spec.ts:112:7 › 三、只读命令真实性（V-CLI-023~027） › V-CLI-023 capabilities list 能力目录真实
+[api] › tests\api\verification\cli-deep.spec.ts:112:7 › 三、只读命令真实性（V-CLI-023~027） › V-CLI-023 capabilities list 能力目录真实
+[V-CLI-023] total=17 unwired=2 names=cognition model run,model route
+
+[60/518] [api] › tests\api\verification\cli-deep.spec.ts:122:7 › 三、只读命令真实性（V-CLI-023~027） › V-CLI-024 agent inspect：不存在 id 必须显式报错
+[61/518] [api] › tests\api\verification\cli-deep.spec.ts:128:7 › 三、只读命令真实性（V-CLI-023~027） › V-CLI-026 model list 输出 items 信封且非空
+[62/518] [api] › tests\api\verification\cli-deep.spec.ts:136:7 › 三、只读命令真实性（V-CLI-023~027） › V-CLI-027 model route 未接 ⇒ 明确报未实现（不得静默成功）
+[63/518] [api] › tests\api\verification\cli-deep.spec.ts:145:7 › 四、写命令与审批墙（V-CLI-040） › V-CLI-040 ontology publish 无 approval-token 必须 BLOCKED 且退出码 2
+[64/518] [api] › tests\api\verification\cli-deep.spec.ts:152:7 › 四、写命令与审批墙（V-CLI-040） › V-CLI-040b 用法错误退出码 64（与业务失败区分）
+[65/518] [api] › tests\api\verification\cli-semantics.spec.ts:65:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-025 agent readiness 缺必填参数必须报错（禁默认值兜底）
+[66/518] [api] › tests\api\verification\cli-semantics.spec.ts:80:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-071 只读链路 model list → agent inspect → agent readiness 串通
+[api] › tests\api\verification\cli-semantics.spec.ts:80:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-071 只读链路 model list → agent inspect → agent readiness 串通
+[V-CLI-071] model list=0 inspect(miss)=64 readiness=64
+
+[67/518] [api] › tests\api\verification\cli-semantics.spec.ts:92:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-070 冷启动 doctor 五项全绿
+[api] › tests\api\verification\cli-semantics.spec.ts:92:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-070 冷启动 doctor 五项全绿
+[V-CLI-070] doctor checks=4 allPASS=true
+
+[68/518] [api] › tests\api\verification\cli-semantics.spec.ts:104:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-074 凭据错误 → 明确 401 语义而非挂起
+[api] › tests\api\verification\cli-semantics.spec.ts:104:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-074 凭据错误 → 明确 401 语义而非挂起
+[V-CLI-074] bad token → exit=2 status=BLOCKED
+
+[69/518] [api] › tests\api\verification\cli-semantics.spec.ts:116:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-008 分页完整性：capabilities 与 list 命令不丢参数
+[api] › tests\api\verification\cli-semantics.spec.ts:116:7 › 一、只读链路（V-CLI-025/071/070） › V-CLI-008 分页完整性：capabilities 与 list 命令不丢参数
+[V-CLI-008] total=17 pagedCommands=0
+
+[70/518] [api] › tests\api\verification\cli-semantics.spec.ts:130:7 › 二、写链路与审批墙（V-CLI-033~045/072） › V-CLI-034 knowledge validate 缺参必须报错（不静默）
+[71/518] [api] › tests\api\verification\cli-semantics.spec.ts:137:7 › 二、写链路与审批墙（V-CLI-033~045/072） › V-CLI-035 cognition model validate 缺参必须报错
+[72/518] [api] › tests\api\verification\cli-semantics.spec.ts:143:7 › 二、写链路与审批墙（V-CLI-033~045/072） › V-CLI-036 cognition model run 未接 ⇒ UNAVAILABLE（不得静默成功）
+[73/518] [api] › tests\api\verification\cli-semantics.spec.ts:149:7 › 二、写链路与审批墙（V-CLI-033~045/072） › V-CLI-042 knowledge publish 无审批 ⇒ BLOCKED 退出码 2
+[74/518] [api] › tests\api\verification\cli-semantics.spec.ts:155:7 › 二、写链路与审批墙（V-CLI-033~045/072） › V-CLI-043 action commit 无审批 ⇒ BLOCKED 退出码 2
+[75/518] [api] › tests\api\verification\cli-semantics.spec.ts:161:7 › 二、写链路与审批墙（V-CLI-033~045/072） › V-CLI-044 伪造审批 token 必须被拒（不得当有效凭证）
+[api] › tests\api\verification\cli-semantics.spec.ts:161:7 › 二、写链路与审批墙（V-CLI-033~045/072） › V-CLI-044 伪造审批 token 必须被拒（不得当有效凭证）
+[V-CLI-044] forged token → exit=64 status=undefined
+
+[76/518] [api] › tests\api\verification\cli-semantics.spec.ts:169:7 › 二、写链路与审批墙（V-CLI-033~045/072） › V-CLI-045 审批 token 不回显（输出与日志均不得出现原文）
+[77/518] [api] › tests\api\verification\cli-semantics.spec.ts:178:7 › 三、错误链路（V-CLI-073/041） › V-CLI-041 ontology publish 有 token 仍失败（OPA 策略缺口，按实际登记）
+[api] › tests\api\verification\cli-semantics.spec.ts:178:7 › 三、错误链路（V-CLI-073/041） › V-CLI-041 ontology publish 有 token 仍失败（OPA 策略缺口，按实际登记）
+[V-CLI-041] publish with token → exit=64 status=undefined err=undefined
+
+[78/518] [api] › tests\api\verification\cli-semantics.spec.ts:186:7 › 三、错误链路（V-CLI-073/041） › V-CLI-073 错误 base-url → 明确错误而非挂起
+[api] › tests\api\verification\cli-semantics.spec.ts:186:7 › 三、错误链路（V-CLI-073/041） › V-CLI-073 错误 base-url → 明确错误而非挂起
+[V-CLI-073] bad base-url → exit=3 in 2307ms status=UNAVAILABLE
+
+[79/518] [api] › tests\api\verification\cli-semantics.spec.ts:198:7 › 四、命令级契约（V-CLI-006/033/037） › V-CLI-006 --dry-run 存在且不产生副作用（L1+ 写命令）
+[api] › tests\api\verification\cli-semantics.spec.ts:198:7 › 四、命令级契约（V-CLI-006/033/037） › V-CLI-006 --dry-run 存在且不产生副作用（L1+ 写命令）
+[V-CLI-006] --dry-run → exit=0 supported=true
+
+[80/518] [api] › tests\api\verification\cli-semantics.spec.ts:209:7 › 四、命令级契约（V-CLI-006/033/037） › V-CLI-037 幂等键参数被接受（--idempotency-key）
+[api] › tests\api\verification\cli-semantics.spec.ts:209:7 › 四、命令级契约（V-CLI-006/033/037） › V-CLI-037 幂等键参数被接受（--idempotency-key）
+[V-CLI-037] idempotency-key → exit=1
+
+[81/518] [api] › tests\api\verification\cli.spec.ts:77:7 › CLI 自检与发现 › V-CLI-001 doctor 四项检查全 PASS
+[82/518] [api] › tests\api\verification\cli.spec.ts:89:7 › CLI 自检与发现 › V-CLI-002 --help 列出命令且标注自动化等级
+[83/518] [api] › tests\api\verification\cli.spec.ts:99:7 › CLI 自检与发现 › V-CLI-003 capabilities list 返回 17 条命令与映射状态
+[84/518] [api] › tests\api\verification\cli.spec.ts:114:7 › CLI 只读命令真实性 › V-CLI-010 cognition models list 真实响应（空表也是真实态）
+[85/518] [api] › tests\api\verification\cli.spec.ts:121:7 › CLI 只读命令真实性 › V-CLI-011 model list 带 catalog 来源标注（禁无源编造）
+[86/518] [api] › tests\api\verification\cli.spec.ts:137:7 › CLI 未实装能力必须如实 UNAVAILABLE（核心反假绿） › V-CLI-020 model route 未实装必须 UNAVAILABLE 且带原因
+[87/518] [api] › tests\api\verification\cli.spec.ts:145:7 › CLI 未实装能力必须如实 UNAVAILABLE（核心反假绿） › V-CLI-021 L3 命令无审批凭证必须 BLOCKED（不得假执行）
+[88/518] [api] › tests\api\verification\cli.spec.ts:156:7 › CLI 未实装能力必须如实 UNAVAILABLE（核心反假绿） › V-CLI-022 缺必填参数必须报错退出（禁默认值兜底）
+[89/518] [api] › tests\api\verification\cli.spec.ts:166:7 › CLI 参数与安全边界 › V-CLI-030 --dry-run 只展示调用计划，不发请求
+[90/518] [api] › tests\api\verification\cli.spec.ts:179:7 › CLI 参数与安全边界 › V-CLI-031 凭据永不回显
+[91/518] [api] › tests\api\verification\cli.spec.ts:185:7 › CLI 参数与安全边界 › V-CLI-032 非法 timeout 必须被拒（禁静默夹紧）
+[92/518] [api] › tests\api\verification\cognitive-ai.spec.ts:33:9 › 认知只读面（E1~E4 及目录类） › V-COG 假设 → code=0 且 data 为数组
+[93/518] [api] › tests\api\verification\cognitive-ai.spec.ts:33:9 › 认知只读面（E1~E4 及目录类） › V-COG 证据 → code=0 且 data 为数组
+[94/518] [api] › tests\api\verification\cognitive-ai.spec.ts:33:9 › 认知只读面（E1~E4 及目录类） › V-COG 框架 → code=0 且 data 为数组
+[95/518] [api] › tests\api\verification\cognitive-ai.spec.ts:33:9 › 认知只读面（E1~E4 及目录类） › V-COG 方法 → code=0 且 data 为数组
+[96/518] [api] › tests\api\verification\cognitive-ai.spec.ts:33:9 › 认知只读面（E1~E4 及目录类） › V-COG 对象目录 → code=0 且 data 为数组
+[97/518] [api] › tests\api\verification\cognitive-ai.spec.ts:33:9 › 认知只读面（E1~E4 及目录类） › V-COG 模型注册表 → code=0 且 data 为数组
+[98/518] [api] › tests\api\verification\cognitive-ai.spec.ts:33:9 › 认知只读面（E1~E4 及目录类） › V-COG 流水线定义 → code=0 且 data 为数组
+[99/518] [api] › tests\api\verification\cognitive-ai.spec.ts:33:9 › 认知只读面（E1~E4 及目录类） › V-COG 配置 → code=0 且 data 为数组
+[100/518] [api] › tests\api\verification\cognitive-ai.spec.ts:42:5 › V-COG-001 认知引擎健康 UP
+[101/518] [api] › tests\api\verification\cognitive-ai.spec.ts:48:5 › V-COG-002 反向探针：不存在的认知资源必须 404
+[102/518] [api] › tests\api\verification\cognitive-ai.spec.ts:54:7 › AIP 编排（AI 工作台后端） › V-AI-001 AIP Agent 列表真实
+[103/518] [api] › tests\api\verification\cognitive-ai.spec.ts:60:7 › AIP 编排（AI 工作台后端） › V-AI-002 AIP 模型列表真实且非空
+[104/518] [api] › tests\api\verification\cognitive-ai.spec.ts:67:7 › AIP 编排（AI 工作台后端） › V-AI-003 AIP 流水线列表真实
+[105/518] [api] › tests\api\verification\cognitive-ai.spec.ts:73:7 › AIP 编排（AI 工作台后端） › V-AI-004 反向探针：不存在的 AIP 模型 404
+[106/518] [api] › tests\api\verification\cognitive-ai.spec.ts:80:7 › 护栏与 Agent 运行时 › V-AI-010 护栏策略列表
+[107/518] [api] › tests\api\verification\cognitive-ai.spec.ts:86:7 › 护栏与 Agent 运行时 › V-AI-011 Agent 配置列表真实
+[108/518] [api] › tests\api\verification\cognitive-ai.spec.ts:92:7 › 护栏与 Agent 运行时 › V-AI-012 Agent Mesh 工具清单：MCP 未连接时显式 501 降级
+[109/518] [api] › tests\api\verification\cognitive-ai.spec.ts:107:7 › HTTP 状态行保真（D6 回归，2026-11-13 修复） › V-HTTP-405 方法不匹配必须 405 + Allow 头，不得报 500
+[110/518] [api] › tests\api\verification\cognitive-ai.spec.ts:120:7 › HTTP 状态行保真（D6 回归，2026-11-13 修复） › V-HTTP-404 不存在的路径必须 404 而非 500
+[111/518] [api] › tests\api\verification\cognitive-ai.spec.ts:126:7 › HTTP 状态行保真（D6 回归，2026-11-13 修复） › V-HTTP-400 坏请求体必须 400 而非 500
+[112/518] [api] › tests\api\verification\cognitive-ai.spec.ts:136:7 › 权限（V5） › V-COG-SEC 无 token 访问认知端点被拒
+[113/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:44:7 › 一、Mind 治理（V-COG-030~037） › V-COG-030 Mind 列表 limit 边界：默认可用，越界拒绝或截断
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:44:7 › 一、Mind 治理（V-COG-030~037） › V-COG-030 Mind 列表 limit 边界：默认可用，越界拒绝或截断
+[V-COG-030] default=1 limit201=200
+
+[114/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:55:7 › 一、Mind 治理（V-COG-030~037） › V-COG-031 Mind 详情 + 反向探针（不存在 id 必须 4xx）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:55:7 › 一、Mind 治理（V-COG-030~037） › V-COG-031 Mind 详情 + 反向探针（不存在 id 必须 4xx）
+[V-COG-031] existing=mind_ent2_month status=200
+
+[115/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:71:7 › 一、Mind 治理（V-COG-030~037） › V-COG-033 候选列表必须有 mindId（缺参 4xx，不得 500）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:71:7 › 一、Mind 治理（V-COG-030~037） › V-COG-033 候选列表必须有 mindId（缺参 4xx，不得 500）
+[V-COG-033] missing=400 withMind=200 rows=0
+
+[116/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:91:7 › 一、Mind 治理（V-COG-030~037） › V-COG-034 候选回读反向探针（不存在 updateId 必须 4xx）
+[117/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:97:7 › 一、Mind 治理（V-COG-030~037） › V-COG-035 终态写反向：不存在 updateId 必须 4xx（不得假成功）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:97:7 › 一、Mind 治理（V-COG-030~037） › V-COG-035 终态写反向：不存在 updateId 必须 4xx（不得假成功）
+[V-COG-035] status=400
+
+[118/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:111:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-040 框架列表真实
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:111:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-040 框架列表真实
+[V-COG-040] frameworks=4 first=CF-01-01@1.0.0
+
+[119/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:120:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-041 框架详情反向探针
+[120/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:126:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-050 方法字典 5 方法且无写面（设计边界）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:126:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-050 方法字典 5 方法且无写面（设计边界）
+[V-COG-050] methods=5 POST=405
+
+[121/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:138:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-051 方法详情反向探针
+[122/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:144:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-052 认知资产目录真实（非空占位）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:144:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-052 认知资产目录真实（非空占位）
+[V-COG-052] catalog type=object size={"layers":{"A":"权威业务事实：所属业务引擎/data-engine 写入，必须有来源与版本（最高权威性）","B":"治理后的认知资产（Hypothesis/Belief/Decision Basis/Cognitive M
+
+[123/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:153:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-053 资产解析：缺 assetId 语义须 4xx（不得 500）
+[124/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:159:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-055 对象目录可达
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:159:7 › 二、框架注册与方法/资产目录（V-COG-040~055） › V-COG-055 对象目录可达
+[V-COG-055] object-catalog size=obj
+
+[125/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:168:7 › 三、Context 构建与安全裁剪（V-COG-060~062） › V-COG-060 Context 构建：空体必须 4xx（D37 回归常驻）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:168:7 › 三、Context 构建与安全裁剪（V-COG-060~062） › V-COG-060 Context 构建：空体必须 4xx（D37 回归常驻）
+[V-COG-060] empty build status=400
+
+[126/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:180:7 › 三、Context 构建与安全裁剪（V-COG-060~062） › V-COG-061 required 源 fail-closed：403 且 0 泄露（P1-9 缺口如实登记）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:180:7 › 三、Context 构建与安全裁剪（V-COG-060~062） › V-COG-061 required 源 fail-closed：403 且 0 泄露（P1-9 缺口如实登记）
+[V-COG-061] required-source status=400 leak=false
+
+[127/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:202:7 › 四、预测与结果评估（V-COG-070~075） › V-COG-070 预测计算：空体必须 4xx（D37 回归常驻）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:202:7 › 四、预测与结果评估（V-COG-070~075） › V-COG-070 预测计算：空体必须 4xx（D37 回归常驻）
+[V-COG-070] empty forecast status=400
+
+[128/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:214:7 › 四、预测与结果评估（V-COG-070~075） › V-COG-072 按幂等键查询：缺 key 必须 4xx
+[129/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:220:7 › 四、预测与结果评估（V-COG-070~075） › V-COG-073 结果评估：200 但 applicable=false（P1-18 缺口，记 PARTIAL 不判 PASS）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:220:7 › 四、预测与结果评估（V-COG-070~075） › V-COG-073 结果评估：200 但 applicable=false（P1-18 缺口，记 PARTIAL 不判 PASS）
+[V-COG-073] status=400（参数拒绝腿）
+
+[130/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-080 诊断：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-080 诊断：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[V-COG-080] POST /api/v1/cognitive/diagnose empty → 400
+
+[131/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-082 反事实：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-082 反事实：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[V-COG-082] POST /api/v1/cognitive/counterfactual empty → 400
+
+[132/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-085 信念登记：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-085 信念登记：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[V-COG-085] POST /api/v1/cognitive/beliefs empty → 400
+
+[133/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-085b 假设登记：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-085b 假设登记：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[V-COG-085b] POST /api/v1/cognitive/hypotheses empty → 400
+
+[134/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-085c 证据登记：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-085c 证据登记：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[V-COG-085c] POST /api/v1/cognitive/evidence empty → 400
+
+[135/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-086 模型注册：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:249:9 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-086 模型注册：空体必须 4xx 而非 500（D37/D38 回归常驻）
+[V-COG-086] POST /api/v1/cognitive/models empty → 400
+
+[136/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:263:7 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-080b 诊断历史可达且结构完整
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:263:7 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-080b 诊断历史可达且结构完整
+[V-COG-080b] history status=501 stub=true
+
+[137/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:272:7 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-081 情景推演 /scenario/simulate 存在且空体 4xx（实测订正：不在 /cognitive 根下）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:272:7 › 五、认知推理面（V-COG-080~086，D37/D38 回归） › V-COG-081 情景推演 /scenario/simulate 存在且空体 4xx（实测订正：不在 /cognitive 根下）
+[V-COG-081] /scenario/simulate=200 /simulate=404
+
+[138/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:301:9 › 六、世界模型与溯源（V-COG-090~094） › V-COG-090 世界模型读面：显式 stub 或真实数据（禁静默空壳）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:301:9 › 六、世界模型与溯源（V-COG-090~094） › V-COG-090 世界模型读面：显式 stub 或真实数据（禁静默空壳）
+[V-COG-090] status=501 stub=true
+
+[139/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:301:9 › 六、世界模型与溯源（V-COG-090~094） › V-COG-091a 世界模型读面：显式 stub 或真实数据（禁静默空壳）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:301:9 › 六、世界模型与溯源（V-COG-090~094） › V-COG-091a 世界模型读面：显式 stub 或真实数据（禁静默空壳）
+[V-COG-091a] status=501 stub=true
+
+[140/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:301:9 › 六、世界模型与溯源（V-COG-090~094） › V-COG-091b 世界模型读面：显式 stub 或真实数据（禁静默空壳）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:301:9 › 六、世界模型与溯源（V-COG-090~094） › V-COG-091b 世界模型读面：显式 stub 或真实数据（禁静默空壳）
+[V-COG-091b] status=501 stub=true
+
+[141/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:301:9 › 六、世界模型与溯源（V-COG-090~094） › V-COG-091c 世界模型读面：显式 stub 或真实数据（禁静默空壳）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:301:9 › 六、世界模型与溯源（V-COG-090~094） › V-COG-091c 世界模型读面：显式 stub 或真实数据（禁静默空壳）
+[V-COG-091c] status=501 stub=true
+
+[142/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:312:7 › 六、世界模型与溯源（V-COG-090~094） › V-COG-093 溯源：缺 entityType 必须 4xx（不得 500）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:312:7 › 六、世界模型与溯源（V-COG-090~094） › V-COG-093 溯源：缺 entityType 必须 4xx（不得 500）
+[V-COG-093] status=400 missing=entityType
+
+[143/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:322:7 › 七、其余面与权限（V-COG-101/102/105/120/122） › V-COG-101 认知管道可达（读面 200；写面缺参 4xx）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:322:7 › 七、其余面与权限（V-COG-101/102/105/120/122） › V-COG-101 认知管道可达（读面 200；写面缺参 4xx）
+[V-COG-101] GET=200 POST=400
+
+[144/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:335:7 › 七、其余面与权限（V-COG-101/102/105/120/122） › V-COG-102 认知配置读面结构完整
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:335:7 › 七、其余面与权限（V-COG-101/102/105/120/122） › V-COG-102 认知配置读面结构完整
+[V-COG-102] config type=array
+
+[145/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:342:7 › 七、其余面与权限（V-COG-101/102/105/120/122） › V-COG-120 无 token 访问认知面必须被拒（不得泄露业务数据）
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:342:7 › 七、其余面与权限（V-COG-101/102/105/120/122） › V-COG-120 无 token 访问认知面必须被拒（不得泄露业务数据）
+[V-COG-120] anon status=403
+
+[146/518] [api] › tests\api\verification\cognitive-engine-deep.spec.ts:351:7 › 七、其余面与权限（V-COG-101/102/105/120/122） › V-COG-122 认知写面需认证：无 token 注册 mind 必须被拒
+[api] › tests\api\verification\cognitive-engine-deep.spec.ts:351:7 › 七、其余面与权限（V-COG-101/102/105/120/122） › V-COG-122 认知写面需认证：无 token 注册 mind 必须被拒
+[V-COG-122] anon write status=403
+
+[147/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:41:7 › V-COG-010 / 011 / 012 认知健康三面 › V-COG-010 引擎健康：200 + status=UP + components 含 engine/db
+[148/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:51:7 › V-COG-010 / 011 / 012 认知健康三面 › V-COG-011 / 012 状态与内部健康前缀实测形态（404 登记，非静默通过）
+[149/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:64:7 › V-COG-021 / 022 / 024 认知 E2/E3 + 越权 › V-COG-021 operation-eval 缺参必 400 并点名缺什么（实测 missing=mind）
+[150/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:73:7 › V-COG-021 / 022 / 024 认知 E2/E3 + 越权 › V-COG-022 hypotheses 返回数组（状态词表须∈HypothesisStatus）
+[151/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:91:7 › V-COG-021 / 022 / 024 认知 E2/E3 + 越权 › V-COG-024 无效场景必须 404 + guard 标记，不裸 500、不泄露
+[152/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:109:9 › V-COG-091 世界模型三面：501 是设计内 stub（F05-16） › world-model/relations 返回 501 且带完整 stub 元数据
+[153/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:109:9 › V-COG-091 世界模型三面：501 是设计内 stub（F05-16） › world-model/rules 返回 501 且带完整 stub 元数据
+[154/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:109:9 › V-COG-091 世界模型三面：501 是设计内 stub（F05-16） › world-model/traces 返回 501 且带完整 stub 元数据
+[155/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:124:7 › V-COG-091 世界模型三面：501 是设计内 stub（F05-16） › world-model 独立前缀 `/api/v1/world-model` 路由未注册（404 登记）
+[156/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:134:7 › V-COG-032 / 045 / 036 Mind 与计划 › V-COG-032 提交提案：mind 不存在必须 400（不得 500）
+[157/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:142:7 › V-COG-032 / 045 / 036 Mind 与计划 › V-COG-045 计划校验：非法计划被拒且报出 issues，不 500
+[158/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:154:7 › V-COG-032 / 045 / 036 Mind 与计划 › V-COG-042 框架列表返回真实条目（实测 4 个）
+[159/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:171:9 › V-COG-074 / 075 / 087 / 071 契约面：不存在资源必须 404 且自述 › V-COG-074 /api/v1/cognitive/outcomes/x/backtest 不存在 id ⇒ 404 且点名资源类型
+[160/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:171:9 › V-COG-074 / 075 / 087 / 071 契约面：不存在资源必须 404 且自述 › V-COG-087 /api/v1/cognitive/decision-basis/x 不存在 id ⇒ 404 且点名资源类型
+[161/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:171:9 › V-COG-074 / 075 / 087 / 071 契约面：不存在资源必须 404 且自述 › V-COG-071 /api/v1/cognitive/forecast-runs/x/results 不存在 id ⇒ 404 且点名资源类型
+[162/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:171:9 › V-COG-074 / 075 / 087 / 071 契约面：不存在资源必须 404 且自述 › V-COG-071 /api/v1/cognitive/forecast-runs/x/evidence 不存在 id ⇒ 404 且点名资源类型
+[163/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:179:7 › V-COG-074 / 075 / 087 / 071 契约面：不存在资源必须 404 且自述 › V-COG-075 review-tasks 实测 405（路径在、动词不对）
+[164/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:188:7 › V-COG-103 / 104 / 094 目录与演示面：区分 405 与 404 › objects 目录返回真实条目（实测 11 条）
+[165/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:194:7 › V-COG-103 / 104 / 094 目录与演示面：区分 405 与 404 › executions / replay / assets-proposals 实测 405：端点已注册但动词不同
+[166/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:208:7 › V-COG-103 / 104 / 094 目录与演示面：区分 405 与 404 › assets / plans / demo-wave3 路由未注册（404 登记）
+[167/518] [api] › tests\api\verification\cognitive-engine-remainder.spec.ts:219:7 › V-COG-084 通用预测：缺 metric 必须 400 点名 › forecast 空体 ⇒ 400 + FCST-400 文案含 metric
+[168/518] [api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-SEC-003 安全中心·策略 后端面可达且 code=0
+[api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-SEC-003 安全中心·策略 后端面可达且 code=0
+[V-CTRL-SEC-003] /api/v1/security/policies → 200
+
+[169/518] [api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-SEC-004 安全中心·审计 后端面可达且 code=0
+[api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-SEC-004 安全中心·审计 后端面可达且 code=0
+[V-CTRL-SEC-004] /api/v1/security/audit/logs → 200
+
+[170/518] [api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-TASK-001 任务中心·列表 后端面可达且 code=0
+[api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-TASK-001 任务中心·列表 后端面可达且 code=0
+[V-CTRL-TASK-001] /api/v1/task/list → 200
+
+[171/518] [api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-MON-001 监控中心·指标 后端面可达且 code=0
+[api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-MON-001 监控中心·指标 后端面可达且 code=0
+[V-CTRL-MON-001] /api/v1/ecos/monitoring/dashboard → 200
+
+[172/518] [api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-DICT-001 数据字典·字典项 后端面可达且 code=0
+[api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-DICT-001 数据字典·字典项 后端面可达且 code=0
+[V-CTRL-DICT-001] /api/v1/system/dict → 200
+
+[173/518] [api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-DICT-002 数据字典·表模式 后端面可达且 code=0
+[api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-DICT-002 数据字典·表模式 后端面可达且 code=0
+[V-CTRL-DICT-002] /api/v1/dict/tables → 200
+
+[174/518] [api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-GW-002 告警中心·列表 后端面可达且 code=0
+[api] › tests\api\verification\control-panel-deep.spec.ts:33:9 › 一、控制面板五组后端面 › V-CTRL-GW-002 告警中心·列表 后端面可达且 code=0
+[V-CTRL-GW-002] /api/v1/monitor/alerts → 200
+
+[175/518] [api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG security 引擎健康可达且带 status 字段
+[api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG security 引擎健康可达且带 status 字段
+[V-CTRL-ENG] security → 200 status=UP
+
+[176/518] [api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG data 引擎健康可达且带 status 字段
+[api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG data 引擎健康可达且带 status 字段
+[V-CTRL-ENG] data → 200 status=UP
+
+[177/518] [api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG ontology 引擎健康可达且带 status 字段
+[api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG ontology 引擎健康可达且带 status 字段
+[V-CTRL-ENG] ontology → 200 status=UP
+
+[178/518] [api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG knowledge 引擎健康可达且带 status 字段
+[api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG knowledge 引擎健康可达且带 status 字段
+[V-CTRL-ENG] knowledge → 200 status=UP
+
+[179/518] [api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG cognitive 引擎健康可达且带 status 字段
+[api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG cognitive 引擎健康可达且带 status 字段
+[V-CTRL-ENG] cognitive → 200 status=UP
+
+[180/518] [api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG ai 引擎健康可达且带 status 字段
+[api] › tests\api\verification\control-panel-deep.spec.ts:47:9 › 二、引擎健康六类一致（V-CTRL-MON-004 / V-CTRL-ENG-001~006） › V-CTRL-ENG ai 引擎健康可达且带 status 字段
+[V-CTRL-ENG] ai → 200 status=UP
+
+[181/518] [api] › tests\api\verification\control-panel-deep.spec.ts:66:7 › 三、权限门控（V-CTRL-S-001~004） › V-CTRL-S-001 无 token 访问控制面板五面全部被拒
+[182/518] [api] › tests\api\verification\control-panel-deep.spec.ts:73:7 › 三、权限门控（V-CTRL-S-001~004） › V-CTRL-S-004 审计查询需认证（无 token 拒绝）
+[183/518] [api] › tests\api\verification\control-panel-deep.spec.ts:78:7 › 三、权限门控（V-CTRL-S-001~004） › V-CTRL-S-003 字典写越权：无 token 写必须拒绝
+[184/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:31:7 › V-CTRL-SEC-002 检测 Tab：四管理器后端 › RLS 策略面返回真实行（含 filter 表达式）
+[185/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:44:7 › V-CTRL-SEC-002 检测 Tab：四管理器后端 › CLS 列级安全策略面可达（允许空集，但形态必须正确）
+[186/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:51:7 › V-CTRL-SEC-002 检测 Tab：四管理器后端 › 脱敏：demo 返回真实脱敏样本（双前缀 `/mask` 与 `/masking` 等价）
+[187/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:66:7 › V-CTRL-SEC-002 检测 Tab：四管理器后端 › ABAC 策略面分页形态正确
+[188/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:75:7 › V-CTRL-SEC-002 检测 Tab：四管理器后端 › CLS 列查询：缺 tableName 必须 400（禁无界全量）
+[189/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:83:7 › V-CTRL-SEC-005 审计查询：真实行 + 分页 › 审计日志返回真实行且带事件字段
+[190/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:97:7 › V-CTRL-SEC-005 审计查询：真实行 + 分页 › 分页参数生效：pageSize 变化必须反映在返回行数上
+[191/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:107:7 › V-CTRL-MON-005 / GOV-002 引擎配置读面 › data 引擎配置族根返回真实分组（settings / groups / defaults 三腿）
+[192/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:125:7 › V-CTRL-MON-005 / GOV-002 引擎配置读面 › ontology 引擎配置读面返回真实配置行
+[193/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:134:7 › V-CTRL-MON-005 / GOV-002 引擎配置读面 › 登记事实：security/knowledge/cognitive/ai 四引擎无 settings 端点（404 是当前真实形态）
+[194/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:146:7 › V-CTRL-MON-003 / GOV-003 孪生与诊断 › 数字孪生健康面返回设备数与组件状态
+[195/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:156:7 › V-CTRL-MON-003 / GOV-003 孪生与诊断 › 网关诊断面列出全部制品与端口
+[196/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:169:7 › V-CTRL-D-003 / D-004 任务与告警（API 面；库对账留 L4） › 任务列表返回真实行且字段齐全
+[197/518] [api] › tests\api\verification\control-panel-remainder.spec.ts:180:7 › V-CTRL-D-003 / D-004 任务与告警（API 面；库对账留 L4） › 告警列表分页形态正确（空集允许，但必须自报 total）
+[198/518] [api] › tests\api\verification\control-panel.spec.ts:27:7 › 任务中心（V-CTRL-TASK） › V-CTRL-TASK-001 任务列表真实分页
+[199/518] [api] › tests\api\verification\control-panel.spec.ts:40:7 › 任务中心（V-CTRL-TASK） › V-CTRL-TASK-002 统计与列表交叉对账（防编造计数）
+[200/518] [api] › tests\api\verification\control-panel.spec.ts:61:7 › 任务中心（V-CTRL-TASK） › V-CTRL-TASK-003 任务类型清单非空（按分类分组）
+[201/518] [api] › tests\api\verification\control-panel.spec.ts:77:7 › 任务中心（V-CTRL-TASK） › V-CTRL-TASK-004 不存在任务必须 404（反向探针）
+[202/518] [api] › tests\api\verification\control-panel.spec.ts:82:7 › 任务中心（V-CTRL-TASK） › V-CTRL-TASK-005 不存在任务的状态查询必须 404
+[203/518] [api] › tests\api\verification\control-panel.spec.ts:87:7 › 任务中心（V-CTRL-TASK） › V-CTRL-TASK-006 不存在任务的取消必须被拒（不得假成功）
+[204/518] [api] › tests\api\verification\control-panel.spec.ts:93:7 › 任务中心（V-CTRL-TASK） › V-CTRL-TASK-007 不存在任务的归档必须被拒
+[205/518] [api] › tests\api\verification\control-panel.spec.ts:99:7 › 任务中心（V-CTRL-TASK） › V-CTRL-TASK-008 空提交必须被拒（不得创建空任务）
+[206/518] [api] › tests\api\verification\control-panel.spec.ts:107:7 › 数据字典（V-CTRL-DICT） › V-CTRL-DICT-001 字典类型列表真实
+[207/518] [api] › tests\api\verification\control-panel.spec.ts:113:7 › 数据字典（V-CTRL-DICT） › V-CTRL-DICT-002 字典表模式可达（空表也是真实态，不得 404）
+[208/518] [api] › tests\api\verification\control-panel.spec.ts:120:7 › 数据字典（V-CTRL-DICT） › V-CTRL-DICT-003 字典类型维度自查（每行有 dictType + 非空 items）
+[209/518] [api] › tests\api\verification\control-panel.spec.ts:138:7 › 监控中心（V-CTRL-MON） › V-CTRL-MON-001 监控三面齐备（指标/健康/告警）
+[210/518] [api] › tests\api\verification\control-panel.spec.ts:147:7 › 监控中心（V-CTRL-MON） › V-CTRL-MON-002 监控数值不得为编造常量（多字段为正数）
+[211/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:24:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-020 agents 目录真实（Copilot 可选 Agent）
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:24:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-020 agents 目录真实（Copilot 可选 Agent）
+[V-COP-020] agents=6
+
+[212/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:34:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-015 工具白名单可见（tools 端点真实且声明所属 Agent）
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:34:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-015 工具白名单可见（tools 端点真实且声明所属 Agent）
+[V-COP-015] tools=126
+
+[213/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:44:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-006 快捷问题来自后端（quick-questions 按 agentId 真实非空）
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:44:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-006 快捷问题来自后端（quick-questions 按 agentId 真实非空）
+[V-COP-006] agentId=agent-data quickQuestions=4 unknown→400
+
+[214/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:64:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-016 未知 agentId → 明确业务错误（不得 500）
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:64:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-016 未知 agentId → 明确业务错误（不得 500）
+[V-COP-016] unknown agent → 400
+
+[215/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:77:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-017 空消息必须被拒（不得当作有效提问）
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:77:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-017 空消息必须被拒（不得当作有效提问）
+[V-COP-017] empty message → 400 code=400
+
+[216/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:92:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-030 无 token 访问 Copilot 面必须被拒
+[217/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:101:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-033 凭据不回显：Copilot 读面响应不得含 token 原文
+[218/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:113:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-018 降级不伪造：LLM 不可用时 chat 必须显式失败而非编造回复
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:113:7 › 一、Copilot 端点面（V-COP-016~035） › V-COP-018 降级不伪造：LLM 不可用时 chat 必须显式失败而非编造回复
+[V-COP-018] chat → 400 code=400（显式失败，未伪造）
+
+[219/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-003 知识库列表 可达且 code=0
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-003 知识库列表 可达且 code=0
+[V-KB-003] /api/v1/knowledge-bases → 200
+
+[220/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-020 ECOS 图谱 可达且 code=0
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-020 ECOS 图谱 可达且 code=0
+[V-KB-020] /api/v1/knowledge/ecos-graph → 200
+
+[221/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-021 图谱查询 可达且 code=0
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-021 图谱查询 可达且 code=0
+[V-KB-021] /api/v1/knowledge/graph → 200
+
+[222/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-030 抽取文件 可达且 code=0
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-030 抽取文件 可达且 code=0
+[V-KB-030] /api/v1/knowledge/extract/files → 200
+
+[223/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-002 知识设置 可达且 code=0
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-002 知识设置 可达且 code=0
+[V-KB-002] /api/v1/knowledge/settings → 200
+
+[224/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-070 专家规则 可达且 code=0
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-070 专家规则 可达且 code=0
+[V-KB-070] /api/v1/knowledge/rules → 200
+
+[225/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-001 知识引擎健康 可达且 code=0
+[api] › tests\api\verification\copilot-kb-deep.spec.ts:147:9 › 二、知识引擎端点面（V-KB-004~083） › V-KB-001 知识引擎健康 可达且 code=0
+[V-KB-001] /api/v1/engine/knowledge/health → 200
+
+[226/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:156:7 › 二、知识引擎端点面（V-KB-004~083） › V-KB-080 无 token 访问知识面必须被拒
+[227/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:161:7 › 二、知识引擎端点面（V-KB-004~083） › V-KB-081 不存在的知识库 → 4xx 而非 5xx
+[228/518] [api] › tests\api\verification\copilot-kb-deep.spec.ts:167:7 › 二、知识引擎端点面（V-KB-004~083） › V-KB-060 认知供给面方法语义（POST 写面，GET 应 405）
+[229/518] [api] › tests\api\verification\copilot.spec.ts:21:7 › Copilot Agent 与工具面 › V-COP-001 Agent 清单真实且 engine 字段指向真实引擎
+[230/518] [api] › tests\api\verification\copilot.spec.ts:36:7 › Copilot Agent 与工具面 › V-COP-002 工具白名单真实且非空
+[231/518] [api] › tests\api\verification\copilot.spec.ts:46:7 › Copilot Agent 与工具面 › V-COP-003 快捷问题非空且为可读文本（agentId 必填）
+[232/518] [api] › tests\api\verification\copilot.spec.ts:64:7 › Copilot Agent 与工具面 › V-COP-003b 未注册 Agent 的快捷问题必须拒绝（D18 回归常驻）
+[233/518] [api] › tests\api\verification\copilot.spec.ts:70:7 › Copilot Agent 与工具面 › V-COP-004 chat 必须 POST（GET 应 405）
+[234/518] [api] › tests\api\verification\copilot.spec.ts:77:7 › Copilot 对话（核心：真调 vs 伪造） › V-COP-010 未知 Agent 必须明确拒绝（D18 回归常驻）
+[235/518] [api] › tests\api\verification\copilot.spec.ts:89:7 › Copilot 对话（核心：真调 vs 伪造） › V-COP-011 空消息必须拒绝（不得凭空生成答案）
+[236/518] [api] › tests\api\verification\copilot.spec.ts:99:7 › Copilot 对话（核心：真调 vs 伪造） › V-COP-012 真实提问：成功须可追溯，被护栏拦截须如实标注
+[api] › tests\api\verification\copilot.spec.ts:99:7 › Copilot 对话（核心：真调 vs 伪造） › V-COP-012 真实提问：成功须可追溯，被护栏拦截须如实标注
+[V-COP-012] agent-loop 未成功: ECOS-AI-503/GUARDRAIL_FAIL_CLOSED trace=278523e3d8ee41f68d6a4d41837189ca
+
+[237/518] [api] › tests\api\verification\copilot.spec.ts:134:7 › Copilot 对话（核心：真调 vs 伪造） › V-COP-013 会话 ID 语义：缺省会话必须新生成，跨请求可复用
+[238/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-主数据完整度事实
+[239/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-数据质量报告
+[240/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-定时抽取
+[241/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-知识图谱查询面
+[242/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-本体实体
+[243/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-版本清单
+[244/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-本体映射
+[245/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-安全资产(旧前缀)
+[246/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-安全审计(旧前缀)
+[247/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-工作流(ecos)
+[248/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-工作流(ontology)
+[249/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-任务(ecos)
+[250/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-实体表映射
+[251/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-世界模型场景
+[252/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-安全策略(sysman)
+[253/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-权限清单
+[254/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-场景绑定目录
+[255/518] [api] › tests\api\verification\coverage-registry.spec.ts:42:9 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-场景蓝图
+[256/518] [api] › tests\api\verification\coverage-registry.spec.ts:55:7 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-090 双前缀等价：/api/security/assets 与 /api/v1/security/assets
+[257/518] [api] › tests\api\verification\coverage-registry.spec.ts:65:7 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-091 世界模型场景与 workspace 场景为两套独立数据源（如实登记，不强行对齐）
+[api] › tests\api\verification\coverage-registry.spec.ts:65:7 › 未覆盖但真实可达的 18 个面（登记判定闭环） › V-COV-091 世界模型场景与 workspace 场景为两套独立数据源（如实登记，不强行对齐）
+[V-COV-091] world-model rows=4 workspace rows=162（独立数据源）
+
+[258/518] [api] › tests\api\verification\coverage-supplement.spec.ts:20:7 › AI 域补充面（域03 未覆盖部分） › V-AI-100 AI 能力目录真实（capabilityId + family）
+[259/518] [api] › tests\api\verification\coverage-supplement.spec.ts:33:7 › AI 域补充面（域03 未覆盖部分） › V-AI-101 Agent 工具面真实（name + description）
+[260/518] [api] › tests\api\verification\coverage-supplement.spec.ts:45:7 › AI 域补充面（域03 未覆盖部分） › V-AI-102 定时任务清单真实（id + cron 表达式）
+[261/518] [api] › tests\api\verification\coverage-supplement.spec.ts:55:7 › AI 域补充面（域03 未覆盖部分） › V-AI-103 Agent 会话列表可达（空也为真实态）
+[262/518] [api] › tests\api\verification\coverage-supplement.spec.ts:65:7 › AI 域补充面（域03 未覆盖部分） › V-AI-104 Skills 面未装配必须如实 501（禁伪造技能清单）
+[263/518] [api] › tests\api\verification\coverage-supplement.spec.ts:83:7 › AI 域补充面（域03 未覆盖部分） › V-AI-105 Agent Profile 依赖缺失必须 502（不得 200 空壳）
+[264/518] [api] › tests\api\verification\coverage-supplement.spec.ts:97:9 › WAgent 面（写语义面，只验方法契约） › V-AI-110 /api/v1/wagent/goals 只接受 POST（GET 必须 405）
+[265/518] [api] › tests\api\verification\coverage-supplement.spec.ts:97:9 › WAgent 面（写语义面，只验方法契约） › V-AI-110 /api/v1/wagent/questions 只接受 POST（GET 必须 405）
+[266/518] [api] › tests\api\verification\coverage-supplement.spec.ts:97:9 › WAgent 面（写语义面，只验方法契约） › V-AI-110 /api/v1/wagent/runs 只接受 POST（GET 必须 405）
+[267/518] [api] › tests\api\verification\coverage-supplement.spec.ts:103:7 › WAgent 面（写语义面，只验方法契约） › V-AI-111 WAgent goals 空提交必须被拒
+[268/518] [api] › tests\api\verification\coverage-supplement.spec.ts:109:7 › WAgent 面（写语义面，只验方法契约） › V-AI-112 WAgent 不存在 goal 必须 404/400
+[269/518] [api] › tests\api\verification\coverage-supplement.spec.ts:116:7 › 认知域补充面 › V-AI-120 认知引擎健康含组件明细
+[270/518] [api] › tests\api\verification\coverage-supplement.spec.ts:124:7 › 认知域补充面 › V-AI-121 认知模型注册表可达（契约路径 /api/v1/cognitive/models）
+[271/518] [api] › tests\api\verification\data-engine.spec.ts:41:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-020 数据源列表真实且结构完整
+[272/518] [api] › tests\api\verification\data-engine.spec.ts:53:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-021 数据源兼容面前缀 /api/v1/datasource 同源
+[273/518] [api] › tests\api\verification\data-engine.spec.ts:63:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-022 元数据 resources 双前缀一致（V-DATA-094；D10 裸数组登记）
+[274/518] [api] › tests\api\verification\data-engine.spec.ts:73:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-022b 元数据 resources 已知为空时的显式判定
+[275/518] [api] › tests\api\verification\data-engine.spec.ts:85:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-023 数据目录 dashboard/stats 数值自洽
+[276/518] [api] › tests\api\verification\data-engine.spec.ts:94:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-024 分类树结构正确且 level 与 parent 自洽（D12 回归常驻）
+[277/518] [api] › tests\api\verification\data-engine.spec.ts:113:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-025 资产列表契约（裸数组 + pageSize 生效；int8 陷阱 V-DATA-092）
+[278/518] [api] › tests\api\verification\data-engine.spec.ts:135:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-025b 资产层级与分类字典非空
+[279/518] [api] › tests\api\verification\data-engine.spec.ts:144:7 › 数据源与元数据（V-DATA-020~026） › V-DATA-090 资产详情 ↔ 列表 id 可回溯
+[280/518] [api] › tests\api\verification\data-engine.spec.ts:156:7 › 数据湖与分层（V-DATA-030~033） › V-DATA-030 数据湖状态真实
+[281/518] [api] › tests\api\verification\data-engine.spec.ts:161:7 › 数据湖与分层（V-DATA-030~033） › V-DATA-032 数据分层计数与存储分层规范一致
+[282/518] [api] › tests\api\verification\data-engine.spec.ts:176:7 › 数据湖与分层（V-DATA-030~033） › V-DATA-033 写通道存在且拒绝空请求（红线：确定性产物唯一写通道）
+[283/518] [api] › tests\api\verification\data-engine.spec.ts:187:7 › 管道与函数（V-DATA-040~051） › V-DATA-043 管道函数列表分页与过滤（D9 回归常驻）
+[284/518] [api] › tests\api\verification\data-engine.spec.ts:202:7 › 管道与函数（V-DATA-040~051） › V-DATA-043b 函数分类过滤生效
+[285/518] [api] › tests\api\verification\data-engine.spec.ts:217:7 › 管道与函数（V-DATA-040~051） › V-DATA-043c 函数越界页返回空但 total 不变
+[286/518] [api] › tests\api\verification\data-engine.spec.ts:228:7 › 管道与函数（V-DATA-040~051） › V-DATA-051 数据引擎状态真实
+[287/518] [api] › tests\api\verification\data-engine.spec.ts:233:7 › 管道与函数（V-DATA-040~051） › V-DATA-051b 引擎设置读写一致
+[288/518] [api] › tests\api\verification\data-engine.spec.ts:238:7 › 管道与函数（V-DATA-040~051） › V-DATA-047 数据新鲜度真实
+[289/518] [api] › tests\api\verification\data-engine.spec.ts:243:7 › 管道与函数（V-DATA-040~051） › V-DATA-048 Schema 变更列表可查
+[290/518] [api] › tests\api\verification\data-engine.spec.ts:248:7 › 管道与函数（V-DATA-040~051） › V-DATA-050 UDF 列表分页契约（空库时 total=0 且 list 空）
+[291/518] [api] › tests\api\verification\data-engine.spec.ts:255:7 › 管道与函数（V-DATA-040~051） › V-DATA-050b UDF 恶意代码登记应被拒（安全）
+[292/518] [api] › tests\api\verification\data-engine.spec.ts:269:7 › 管道与函数（V-DATA-040~051） › V-DATA-046 查询模板分页契约（字段名 items）
+[293/518] [api] › tests\api\verification\data-engine.spec.ts:277:7 › 管道与函数（V-DATA-040~051） › V-DATA-046b 查询历史可查
+[294/518] [api] › tests\api\verification\data-engine.spec.ts:282:7 › 管道与函数（V-DATA-040~051） › V-DATA-103 SQL 注入应被拒或参数化（安全）
+[295/518] [api] › tests\api\verification\data-engine.spec.ts:295:7 › 管道与函数（V-DATA-040~051） › V-DATA-045 管道 Copilot 五端点存在且失败显式不伪造
+[296/518] [api] › tests\api\verification\data-engine.spec.ts:314:7 › 数据质量 DQ（V-DATA-060~068） › V-DATA-061 DQ 规则列表真实
+[297/518] [api] › tests\api\verification\data-engine.spec.ts:319:7 › 数据质量 DQ（V-DATA-060~068） › V-DATA-061b DQ 规则状态机：DRAFT → submit → IN_REVIEW（自建数据，不依赖库内存量）
+[298/518] [api] › tests\api\verification\data-engine.spec.ts:351:7 › 数据质量 DQ（V-DATA-060~068） › V-DATA-062 DQ 告警列表与等级字典
+[299/518] [api] › tests\api\verification\data-engine.spec.ts:359:7 › 数据质量 DQ（V-DATA-060~068） › V-DATA-063 DQ 调度列表真实
+[300/518] [api] › tests\api\verification\data-engine.spec.ts:364:7 › 数据质量 DQ（V-DATA-060~068） › V-DATA-064 DQ 评分与系统评分自洽
+[301/518] [api] › tests\api\verification\data-engine.spec.ts:371:7 › 数据质量 DQ（V-DATA-060~068） › V-DATA-065 DQ 工单列表真实
+[302/518] [api] › tests\api\verification\data-engine.spec.ts:376:7 › 数据质量 DQ（V-DATA-060~068） › V-DATA-060 DQ 总面 dashboard 真实
+[303/518] [api] › tests\api\verification\data-engine.spec.ts:381:7 › 数据质量 DQ（V-DATA-060~068） › V-DATA-066 DQ 自检端点存在（POST 语义）
+[304/518] [api] › tests\api\verification\data-engine.spec.ts:390:7 › 血缘与健康（V-DATA-080~081） › V-DATA-080 血缘列表与拓扑可查
+[305/518] [api] › tests\api\verification\data-engine.spec.ts:397:7 › 血缘与健康（V-DATA-080~081） › V-DATA-080b 血缘兼容前缀 /api/lineage 存在
+[306/518] [api] › tests\api\verification\data-engine.spec.ts:403:7 › 血缘与健康（V-DATA-080~081） › V-DATA-081 数据服务健康双前缀等价（时间戳之外字段必须相等）
+[307/518] [api] › tests\api\verification\data-engine.spec.ts:417:7 › 权限与安全（V-DATA-100~104） › V-DATA-100 网关路径无 token 必须拒绝
+[308/518] [api] › tests\api\verification\data-engine.spec.ts:422:7 › 权限与安全（V-DATA-100~104） › V-DATA-104 数据源列表不回显明文密码
+[309/518] [api] › tests\api\verification\data-engine.spec.ts:428:7 › 权限与安全（V-DATA-100~104） › V-DATA-102 关账落点：网关可达 + 直连差异（记录实测，不判 PASS）
+[api] › tests\api\verification\data-engine.spec.ts:428:7 › 权限与安全（V-DATA-100~104） › V-DATA-102 关账落点：网关可达 + 直连差异（记录实测，不判 PASS）
+[V-DATA-102] gateway=200 direct18082=200
+
+[310/518] [api] › tests\api\verification\endpoint-matrix-scan.spec.ts:122:5 › 端点矩阵活体扫描 → 分类汇总（REACHABLE / GUARDED / MISSING / DEFECT）
+[api] › tests\api\verification\endpoint-matrix-scan.spec.ts:122:5 › 端点矩阵活体扫描 → 分类汇总（REACHABLE / GUARDED / MISSING / DEFECT）
+
+==== 端点矩阵扫描结果 ====
+
+[REACHABLE] V-AI-020 /api/v1/agent/usage → 200 code=0
+
+[GUARDED] V-AI-021 /api/v1/agent-call/stats → 502 ECOS-AI-502
+
+[REACHABLE] V-AI-022 /api/v1/agent-loop/sessions → 200 code=0
+
+[REACHABLE] V-AI-023 /api/v1/agents → 200 code=0
+
+[GUARDED] V-AI-024 /api/v1/agent/profiles → 502 ECOS-AI-502
+
+[REACHABLE] V-AI-025 /api/v1/agent/tools → 200 code=0
+
+[MISSING] V-AI-026 /api/v1/agent/runs/VERIFY_NOT_EXIST/replay → 404 本部署未装配
+
+[GUARDED] V-AI-027 /api/v1/agent/guardrail-decisions → 403 ECOS-AI-403
+
+[REACHABLE] V-AI-029 /api/agent-mesh/missions?limit=5 → 200 code=0
+
+[REACHABLE] V-AI-040 /api/v1/aip/agents → 200 code=0
+
+[REACHABLE] V-AI-041 /api/v1/aip/pipelines → 200 code=0
+
+[REACHABLE] V-AI-042 /api/v1/aip/models → 200 code=0
+
+[REACHABLE] V-AI-043 /api/v1/aip/guardrails → 200 code=0
+
+[REACHABLE] V-AI-044 /api/v1/aip/agent-templates → 200 code=0
+
+[REACHABLE] V-AI-045 /api/v1/aip/agents → 200 code=0
+
+[MISSING] V-AI-045b /api/v1/agent-metrics → 404 本部署未装配
+
+[REACHABLE] V-AI-046 /api/v1/aip/agent-templates → 200 code=0
+
+[GUARDED] V-AI-050 /api/v1/wagent/goals → 405 ECOS-SYS-405
+
+[GUARDED] V-AI-051 /api/v1/wagent/questions → 405 ECOS-SYS-405
+
+[REACHABLE] V-AI-052 /api/v1/wagent/candidates → 200 code=0
+
+[GUARDED] V-AI-053 /api/v1/wagent/runs → 405 ECOS-SYS-405
+
+[GUARDED] V-AI-054 /api/v1/wagent/approval-tokens → 405 ECOS-SYS-405
+
+[REACHABLE] V-ONTO-026 /api/v1/ontology/functions/whitelist → 200 code=0
+
+[REACHABLE] V-ONTO-026b /api/v1/ontology/functions/audit → 200 code=0
+
+[REACHABLE] V-ONTO-027 /api/v1/ecos/rules → 200 code=0
+
+[REACHABLE] V-ONTO-028 /api/v1/ontology/mappings → 200 code=0
+
+[GUARDED] V-ONTO-029 /api/v1/ontology/candidates?tenantId=tenant-a → 503 ECOS-SEC-501
+
+[GUARDED] V-ONTO-052 /api/v1/ontology/metrics/VERIFY/binding → 400 ECOS-ONTO-040
+
+[REACHABLE] V-ONTO-053 /api/v1/ontology/export/tasks → 200 code=0
+
+[REACHABLE] V-ONTO-054 /api/v1/lineage → 200 code=0
+
+[REACHABLE] V-ONTO-060 /api/v1/engine/ontology/settings → 200 code=0
+
+[REACHABLE] V-ONTO-061 /api/v1/engine/ontology/graph/full → 200 code=0
+
+[REACHABLE] V-ONTO-062 /api/v1/engine/ontology/copilot/validate → 200 code=0
+
+[REACHABLE] V-ONTO-063 /api/ecos/ontology/sources → 200 code=0
+
+[REACHABLE] V-ONTO-063b /api/v1/ecos/ontology/sources → 200 code=0
+
+[REACHABLE] V-ONTO-064 /api/v1/ontology/workflows → 200 code=0
+
+[REACHABLE] V-ONTO-006 /api/v1/ontology/functions/whitelist → 200 code=0
+
+[REACHABLE] V-ONTO-008 /api/v1/ontology/glossary → 200 code=0
+
+[REACHABLE] V-ONTO-008b /api/v1/ontology/glossary/relations → 200 code=0
+
+[REACHABLE] V-ONTO-009 /api/v1/ontology/calibers → 200 code=0
+
+[REACHABLE] V-ONTO-011 /api/v1/ontology/proposals → 200 code=0
+
+[REACHABLE] V-ONTO-030 /api/v1/ontology/versions → 200 code=0
+
+[REACHABLE] V-ONTO-031 /api/v1/engine/ontology/settings → 200 code=0
+
+[REACHABLE] V-ONTO-041 /api/v1/lineage → 200 code=0
+
+[MISSING] V-ONTO-042 /api/ontology/ontologies → 404 本部署未装配
+
+[REACHABLE] V-KB-003 /api/v1/knowledge-bases → 200 code=0
+
+[REACHABLE] V-KB-003b /api/knowledge-bases → 200 code=0
+
+[REACHABLE] V-KB-020 /api/v1/knowledge/ecos-graph → 200 code=0
+
+[REACHABLE] V-KB-021 /api/v1/knowledge/graph → 200 code=0
+
+[REACHABLE] V-KB-030 /api/v1/knowledge/extract/files → 200 code=0
+
+[GUARDED] V-KB-060 /api/v1/knowledge/cognition/supply → 405 ECOS-KB-070
+
+[REACHABLE] V-KB-001 /api/v1/engine/knowledge/health → 200 code=0
+
+[REACHABLE] V-KB-002 /api/v1/knowledge/settings → 200 code=0
+
+[REACHABLE] V-KB-070 /api/v1/knowledge/rules → 200 code=0
+
+[REACHABLE] V-SEC-028 /api/v1/security/policies → 200 code=0
+
+[REACHABLE] V-SEC-029 /api/v1/security/profiles → 200 code=0
+
+[REACHABLE] V-SEC-034 /api/v1/security/audit/logs → 200 code=0
+
+[REACHABLE] V-SEC-042 /api/v1/security/assets → 200 code=0
+
+[REACHABLE] V-SYS-032 /api/v1/ecos/world-model-graph/goals/tree → 200 code=0
+
+[REACHABLE] V-SYS-033 /api/v1/portal/search?q=a → 200 code=0
+
+[REACHABLE] V-SYS-034 /api/v1/marketplace/assets → 200 code=0
+
+[MISSING] V-SYS-035 /api/v1/interfaces/VERIFY_NOT_EXIST → 404 本部署未装配
+
+[REACHABLE] V-SYS-036 /api/v1/ecos/entity-table-mappings/datasource/x → 200 code=0
+
+[REACHABLE] V-GW-026 /api/v1/system/gateway-diagnostics → 200 code=0
+
+[REACHABLE] V-GW-027 /api/v1/ecos/monitoring/dashboard → 200 code=0
+
+[REACHABLE] V-GW-028 /api/v1/ecos/monitoring/dashboard → 200 code=0
+
+[REACHABLE] V-GW-029 /api/v1/alerts → 200 code=0
+
+[REACHABLE] V-GW-030 /api/v1/monitor/dlq → 200 code=0
+
+[REACHABLE] V-GW-031 /api/v1/system/events/topics → 200 code=0
+
+[REACHABLE] V-PLAT-006 /api/v1/ecos/monitoring/dashboard → 200 code=0
+
+[REACHABLE] V-PLAT-007 /api/v1/ecos/entity-table-mappings/datasource/x → 200 code=0
+
+[REACHABLE] V-PLAT-008 /api/v1/portal/search?q=a → 200 code=0
+
+[REACHABLE] V-PLAT-009 /api/v1/marketplace/assets → 200 code=0
+
+[MISSING] V-PLAT-010 /api/v1/interfaces/VERIFY_NOT_EXIST → 404 本部署未装配
+
+[REACHABLE] V-X-004 /api/v1/engine/security/health → 200 code=0
+
+[REACHABLE] V-X-005 /api/v1/engine/data/health → 200 code=0
+
+[REACHABLE] V-X-010 /api/v1/engine/ontology/health → 200 code=0
+
+[REACHABLE] V-X-011 /api/v1/engine/knowledge/health → 200 code=0
+
+[REACHABLE] V-X-012 /api/v1/engine/cognitive/health → 200 code=0
+
+[MISSING] V-X-020 /api/v1/engine/security → 404 本部署未装配
+
+[MISSING] V-X-021 /api/v1/engine/data → 404 本部署未装配
+
+[MISSING] V-X-022 /api/v1/engine/ontology → 404 本部署未装配
+
+[REACHABLE] V-WS-013 /api/v1/workspace/scenarios → 200 code=0
+
+[REACHABLE] V-WS-061 /api/v1/cognitive/minds?limit=5 → 200 code=0
+
+[REACHABLE] V-WS-080 /api/v1/workspace/scenarios/sc001/completeness → 200 code=0
+
+[REACHABLE] V-WS-090 /api/v1/workspace/scenarios/sc001/pre-validate → 200 code=0
+
+[REACHABLE] V-WS-110 /api/v1/workspace/scenarios/sc001/bindings → 200 code=0
+
+
+==== 分类汇总 ====
+
+REACHABLE: 69
+
+GUARDED: 10
+
+MISSING: 8
+
+
+DEFECT 明细（须逐条进台账）：
+  无
+
+[311/518] [api] › tests\api\verification\env-baseline.spec.ts:17:5 › V-GW-004 登录返回 code=0 且 token 非空（V-SEC-010 复用面）
+[312/518] [api] › tests\api\verification\env-baseline.spec.ts:21:5 › V-GW-005 五引擎健康全 200
+[313/518] [api] › tests\api\verification\env-baseline.spec.ts:28:5 › V-GW-006 认知引擎健康 UP 且 agents 字段为数字
+[314/518] [api] › tests\api\verification\env-baseline.spec.ts:35:5 › V-GW-007 无 token 访问受保护端点被拒绝且不泄露数据
+[315/518] [api] › tests\api\verification\env-baseline.spec.ts:45:5 › V-GW-008 错误 token 访问被拒绝
+[316/518] [api] › tests\api\verification\env-baseline.spec.ts:50:5 › V-GW-009 反向探针：不存在的场景详情必须 404（证明详情用例不是恒绿）
+[317/518] [api] › tests\api\verification\env-baseline.spec.ts:55:5 › V-GW-009b 反向探针：不存在的 mind 详情必须 404（证明 mind 用例不是恒绿）
+[318/518] [api] › tests\api\verification\env-baseline.spec.ts:60:5 › V-GW-010 路由清单对账：场景列表端点可达且返回数组（route-manifest ↔ 活体）
+[319/518] [api] › tests\api\verification\gateway-platform.spec.ts:27:7 › 网关诊断与运行时监控（V-GW-020） › V-GW-020 网关诊断返回工件与端口清单
+[320/518] [api] › tests\api\verification\gateway-platform.spec.ts:36:7 › 网关诊断与运行时监控（V-GW-020） › V-GW-021 运行时监控指标真实
+[321/518] [api] › tests\api\verification\gateway-platform.spec.ts:43:7 › 网关诊断与运行时监控（V-GW-020） › V-GW-022 监控健康含数据库状态
+[322/518] [api] › tests\api\verification\gateway-platform.spec.ts:50:7 › 网关诊断与运行时监控（V-GW-020） › V-GW-023 告警面双前缀可用且口径一致（空 vs 非空都自洽）
+[323/518] [api] › tests\api\verification\gateway-platform.spec.ts:58:7 › 网关诊断与运行时监控（V-GW-020） › V-GW-024 死信队列面真实
+[324/518] [api] › tests\api\verification\gateway-platform.spec.ts:64:7 › 网关诊断与运行时监控（V-GW-020） › V-GW-025 事件 topic 清单含 ecos.* 八主题
+[325/518] [api] › tests\api\verification\gateway-platform.spec.ts:77:7 › 网关转发器（V-GW-012/013/014） › V-GW-012 workspace 转发可达（21 场景）
+[326/518] [api] › tests\api\verification\gateway-platform.spec.ts:83:7 › 网关转发器（V-GW-012/013/014） › V-GW-012b workspace 不存在场景经网关必须 404（反向探针）
+[327/518] [api] › tests\api\verification\gateway-platform.spec.ts:88:7 › 网关转发器（V-GW-012/013/014） › V-GW-014 OAG 面存在（GET 应 405，POST 语义）
+[328/518] [api] › tests\api\verification\gateway-platform.spec.ts:95:7 › 网关安全头与限流（V-GW-015/017） › V-GW-017 响应必须带全套安全头
+[329/518] [api] › tests\api\verification\gateway-platform.spec.ts:111:7 › 网关安全头与限流（V-GW-015/017） › V-GW-017b CSP 必须禁止 frame 嵌入（frame-ancestors none）
+[330/518] [api] › tests\api\verification\gateway-platform.spec.ts:118:7 › 网关安全头与限流（V-GW-015/017） › V-GW-015 限流配置可探测（超限语义登记）
+[api] › tests\api\verification\gateway-platform.spec.ts:118:7 › 网关安全头与限流（V-GW-015/017） › V-GW-015 限流配置可探测（超限语义登记）
+[V-GW-015] burst=200,200,200,200,200,200,200,200
+
+[331/518] [api] › tests\api\verification\gateway-platform.spec.ts:131:7 › 平台管控读面（PLAT） › V-PLAT-001 告警列表可达
+[332/518] [api] › tests\api\verification\gateway-platform.spec.ts:136:7 › 平台管控读面（PLAT） › V-PLAT-002 告警不存在 id 必须 404（反向探针）
+[333/518] [api] › tests\api\verification\gateway-platform.spec.ts:141:7 › 平台管控读面（PLAT） › V-PLAT-003 门户检索必须要求关键字（禁无界全量）
+[334/518] [api] › tests\api\verification\gateway-platform.spec.ts:153:7 › 平台管控读面（PLAT） › V-PLAT-004 接口引用面可达
+[335/518] [api] › tests\api\verification\gateway-platform.spec.ts:158:7 › 平台管控读面（PLAT） › V-PLAT-005 安全审计日志面真实（seed 数据可读）
+[336/518] [api] › tests\api\verification\gateway-platform.spec.ts:169:7 › 降级与不可用语义（X 域，core） › V-X-001 不存在的引擎健康面必须 404（不得伪装 UP）
+[337/518] [api] › tests\api\verification\gateway-platform.spec.ts:175:7 › 降级与不可用语义（X 域，core） › V-X-002 无 token 不得泄露任何业务数据（响应体不含 data）
+[338/518] [api] › tests\api\verification\gateway-platform.spec.ts:181:7 › 降级与不可用语义（X 域，core） › V-X-003 错误响应必须带可追踪错误码
+[339/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:43:7 › 知识库与检索（V-KB-023 / 024 / 025 / 026） › V-KB-023 知识库列表双前缀一致且非空
+[340/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:52:7 › 知识库与检索（V-KB-023 / 024 / 025 / 026） › V-KB-024 知识检索：缺 question 必须 400（禁空查询返回空集冒充成功）
+[341/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:58:7 › 知识库与检索（V-KB-023 / 024 / 025 / 026） › V-KB-025 生命周期：资产列表 + 审计面可达且分页字段自洽
+[342/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:67:7 › 知识库与检索（V-KB-023 / 024 / 025 / 026） › V-KB-026 设置读写面：settings 非空 + upload-enabled 返回布尔闸门
+[343/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:79:7 › 档案 / 抽取 / 本体树 / RAG（V-KB-027 / 031~035） › V-KB-027 档案：列表可达 + resolve 缺 metric 必须 400 + stock 带证据表名
+[344/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:91:7 › 档案 / 抽取 / 本体树 / RAG（V-KB-027 / 031~035） › V-KB-031 抽取运行：水位线可达 + 不存在 taskId 必须 404
+[345/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:99:7 › 档案 / 抽取 / 本体树 / RAG（V-KB-027 / 031~035） › V-KB-032 结构化抽取：jobs 分页 + 不存在 status 必须 404
+[346/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:106:7 › 档案 / 抽取 / 本体树 / RAG（V-KB-027 / 031~035） › V-KB-032b 结构化抽取日志：无记录时返回文档化占位条目而非 500（登记 P3）
+[347/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:116:7 › 档案 / 抽取 / 本体树 / RAG（V-KB-027 / 031~035） › V-KB-033 定时抽取：列表可达（要求 agentId 之外的调度 CRUD 读面）
+[348/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:122:7 › 档案 / 抽取 / 本体树 / RAG（V-KB-027 / 031~035） › V-KB-034 本体树可达
+[349/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:128:7 › 档案 / 抽取 / 本体树 / RAG（V-KB-027 / 031~035） › V-KB-035 RAG：查询真实返回且降级态自述原因 + 图健康面可达
+[350/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:145:7 › 图谱与同步（V-KB-041~045） › V-KB-041 ECOS 图谱返回 nodes/edges/stats 三段且无悬空边
+[351/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:155:7 › 图谱与同步（V-KB-041~045） › V-KB-042 图查询：非法查询拒绝（缺 keyword / 缺端点）
+[352/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:168:7 › 图谱与同步（V-KB-041~045） › V-KB-043 实体链接：双前缀都在 + 缺 entityName 必须 400
+[353/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:176:7 › 图谱与同步（V-KB-041~045） › V-KB-044 同步状态/日志/任务三面可达，且 graph/sync 前缀独立可用
+[354/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:203:7 › 图谱与同步（V-KB-041~045） › V-KB-045 同步状态域维度 lastSyncTime 仍为 null（P1-13 残余，登记 PARTIAL 不得记 PASS）
+[api] › tests\api\verification\knowledge-engine-deep.spec.ts:203:7 › 图谱与同步（V-KB-041~045） › V-KB-045 同步状态域维度 lastSyncTime 仍为 null（P1-13 残余，登记 PARTIAL 不得记 PASS）
+[V-KB-045] lastSyncTime byType={"Table":null,"Column":null,"Task":null,"Indicator":null,"ALL":null}
+
+[355/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:222:7 › 合规 / 评估 / 假设 / 导航（V-KB-051~055） › V-KB-051 合规规则：列表真实 + 不存在 id 必须 404 + 规则族可达
+[356/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:231:7 › 合规 / 评估 / 假设 / 导航（V-KB-051~055） › V-KB-052 知识评估：真实计算并如实标注降级
+[357/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:240:7 › 合规 / 评估 / 假设 / 导航（V-KB-051~055） › V-KB-053 假设：列表可达 + resolve 缺 scenarioType 必须 400
+[358/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:248:7 › 合规 / 评估 / 假设 / 导航（V-KB-051~055） › V-KB-055 导航分类：树真实非空 + 域/模块/产品面可达 + version_no 为数值
+[359/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:268:7 › 写越权与上传安全（V-KB-082 / 083） › V-KB-082 知识写越权：无 token 写分类必须被拒
+[360/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:277:7 › 写越权与上传安全（V-KB-082 / 083） › V-KB-083 文档上传安全：恶意脚本类型必须 415（白名单外），合法 txt 才受理
+[361/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:299:7 › 写越权与上传安全（V-KB-082 / 083） › V-KB-083b 上传端点的 Content-Type 闸门：JSON 打 multipart 端点必须 415（D47）
+[362/518] [api] › tests\api\verification\knowledge-engine-deep.spec.ts:312:7 › 引擎与认知供给（辅助面） › 引擎 status/health 一致 + 认知供给三面可达
+[363/518] [api] › tests\api\verification\knowledge-engine.spec.ts:38:7 › 知识引擎健康与设置 › V-KB-001 知识引擎健康含组件明细
+[364/518] [api] › tests\api\verification\knowledge-engine.spec.ts:44:7 › 知识引擎健康与设置 › V-KB-002 知识引擎设置非空
+[365/518] [api] › tests\api\verification\knowledge-engine.spec.ts:49:7 › 知识引擎健康与设置 › V-KB-003 知识库列表真实且非空
+[366/518] [api] › tests\api\verification\knowledge-engine.spec.ts:56:7 › 知识引擎健康与设置 › V-KB-003b 知识库兼容前缀 /api/knowledge-bases 等价
+[367/518] [api] › tests\api\verification\knowledge-engine.spec.ts:64:7 › 知识资产与文章（V-KB-010） › V-KB-010 资产列表可达
+[368/518] [api] › tests\api\verification\knowledge-engine.spec.ts:69:7 › 知识资产与文章（V-KB-010） › V-KB-010b 文章根路径 GET 必须不存在（防空 GET 劫持 /assets 读面）
+[369/518] [api] › tests\api\verification\knowledge-engine.spec.ts:76:7 › 知识资产与文章（V-KB-010） › V-KB-010c 文章按分类查询（真实读端）
+[370/518] [api] › tests\api\verification\knowledge-engine.spec.ts:83:7 › 知识资产与文章（V-KB-010） › V-KB-010d 文章分类缺省必须拒绝（禁静默回落全量）
+[371/518] [api] › tests\api\verification\knowledge-engine.spec.ts:89:7 › 知识资产与文章（V-KB-010） › V-KB-010e 文章状态批量查询
+[372/518] [api] › tests\api\verification\knowledge-engine.spec.ts:99:7 › 知识资产与文章（V-KB-010） › V-KB-010f 文章检索拒绝空关键字
+[373/518] [api] › tests\api\verification\knowledge-engine.spec.ts:106:7 › 知识图谱（V-KB-020） › V-KB-020 ecos-graph 返回 nodes/edges/stats 三段
+[374/518] [api] › tests\api\verification\knowledge-engine.spec.ts:113:7 › 知识图谱（V-KB-020） › V-KB-020b 图谱无悬空边（防造边）
+[375/518] [api] › tests\api\verification\knowledge-engine.spec.ts:125:7 › 知识图谱（V-KB-020） › V-KB-020c 图谱 source 端点存在（GET 语义）
+[376/518] [api] › tests\api\verification\knowledge-engine.spec.ts:132:7 › 知识图谱（V-KB-020） › V-KB-020d 节点不存在必须 404（反向探针）
+[377/518] [api] › tests\api\verification\knowledge-engine.spec.ts:139:7 › 抽取与运行（V-KB-030） › V-KB-030 抽取文件列表可达
+[378/518] [api] › tests\api\verification\knowledge-engine.spec.ts:144:7 › 抽取与运行（V-KB-030） › V-KB-030b 抽取运行列表（POST 语义，GET 应为 405）
+[379/518] [api] › tests\api\verification\knowledge-engine.spec.ts:150:7 › 抽取与运行（V-KB-030） › V-KB-030c 结构化抽取空 body 有兜底但必须真实响应（登记 P3）
+[380/518] [api] › tests\api\verification\knowledge-engine.spec.ts:162:7 › 抽取与运行（V-KB-030） › V-KB-030d 结构化抽取 dryRun 同步路径不落库
+[381/518] [api] › tests\api\verification\knowledge-engine.spec.ts:184:9 › 规则/画像/假设/合规（V-KB-040） › V-KB-040 专家规则列表形态正确
+[382/518] [api] › tests\api\verification\knowledge-engine.spec.ts:184:9 › 规则/画像/假设/合规（V-KB-040） › V-KB-040 画像列表形态正确
+[383/518] [api] › tests\api\verification\knowledge-engine.spec.ts:184:9 › 规则/画像/假设/合规（V-KB-040） › V-KB-040 假设列表形态正确
+[384/518] [api] › tests\api\verification\knowledge-engine.spec.ts:184:9 › 规则/画像/假设/合规（V-KB-040） › V-KB-040 合规规则列表形态正确
+[385/518] [api] › tests\api\verification\knowledge-engine.spec.ts:192:7 › RAG 与检索（V-KB-050） › V-KB-050 RAG 空体走默认参数但必须如实返回零命中（登记 P3 宽语义）
+[386/518] [api] › tests\api\verification\knowledge-engine.spec.ts:207:7 › RAG 与检索（V-KB-050） › V-KB-050b 知识查询空体不得伪造结果
+[387/518] [api] › tests\api\verification\knowledge-engine.spec.ts:220:7 › 认知识别供给（V-KB-060） › V-KB-060 认知供给端点存在
+[388/518] [api] › tests\api\verification\knowledge-engine.spec.ts:227:7 › 权限（V5） › V-KB-070 网关路径无 token 必须拒绝
+[389/518] [api] › tests\api\verification\knowledge-engine.spec.ts:232:7 › 权限（V5） › V-KB-071 直连 18086 实测记录
+[api] › tests\api\verification\knowledge-engine.spec.ts:232:7 › 权限（V5） › V-KB-071 直连 18086 实测记录
+[V-KB-071] direct kb-engine:18086 = 403
+
+[390/518] [api] › tests\api\verification\ontology-engine.spec.ts:38:7 › 本体核心只读面（V-ONTO-020~024） › V-ONTO-020 本体列表可达且形态正确
+[391/518] [api] › tests\api\verification\ontology-engine.spec.ts:44:7 › 本体核心只读面（V-ONTO-020~024） › V-ONTO-021 本体域列表与自动发现预览
+[392/518] [api] › tests\api\verification\ontology-engine.spec.ts:49:7 › 本体核心只读面（V-ONTO-020~024） › V-ONTO-022/023 对象类型与属性可达
+[393/518] [api] › tests\api\verification\ontology-engine.spec.ts:56:7 › 本体核心只读面（V-ONTO-020~024） › V-ONTO-024 关系类型列表可达
+[394/518] [api] › tests\api\verification\ontology-engine.spec.ts:69:9 › 无持久化四类（V-ONTO-005/006）— 断言「无假成功」 › V-ONTO-025 动作类型只读列表形态正确
+[395/518] [api] › tests\api\verification\ontology-engine.spec.ts:75:7 › 无持久化四类（V-ONTO-005/006）— 断言「无假成功」 › V-ONTO-025b 动作类型写入必须被拒绝（无持久化 ⇒ 不得假成功）
+[396/518] [api] › tests\api\verification\ontology-engine.spec.ts:87:7 › 无持久化四类（V-ONTO-005/006）— 断言「无假成功」 › V-ONTO-006 函数白名单只读（39 条内置）
+[397/518] [api] › tests\api\verification\ontology-engine.spec.ts:95:7 › 无持久化四类（V-ONTO-005/006）— 断言「无假成功」 › V-ONTO-006b 函数审计分页契约
+[398/518] [api] › tests\api\verification\ontology-engine.spec.ts:104:7 › 本体图谱与导出（V-ONTO-013 / V6） › V-ONTO-013 图谱 full 返回 nodes/edges 双数组
+[399/518] [api] › tests\api\verification\ontology-engine.spec.ts:120:7 › 本体图谱与导出（V-ONTO-013 / V6） › V-ONTO-013b 图谱空结果必须如实标注（D14 回归常驻）
+[400/518] [api] › tests\api\verification\ontology-engine.spec.ts:130:7 › 本体图谱与导出（V-ONTO-013 / V6） › V-ONTO-014 本体导出快照五段齐全且为真实集合
+[401/518] [api] › tests\api\verification\ontology-engine.spec.ts:141:7 › 本体图谱与导出（V-ONTO-013 / V6） › V-ONTO-014b 导出任务列表可达
+[402/518] [api] › tests\api\verification\ontology-engine.spec.ts:148:7 › 术语与口径（V-ONTO-008/009） › V-ONTO-008 术语表根路径为路由索引，真实数据在 /terms
+[403/518] [api] › tests\api\verification\ontology-engine.spec.ts:165:7 › 术语与口径（V-ONTO-008/009） › V-ONTO-008b 术语关系端点必须真实存在（不得 404 假实现）
+[404/518] [api] › tests\api\verification\ontology-engine.spec.ts:170:7 › 术语与口径（V-ONTO-008/009） › V-ONTO-009 口径列表可达
+[405/518] [api] › tests\api\verification\ontology-engine.spec.ts:175:7 › 术语与口径（V-ONTO-008/009） › V-ONTO-009b 口径指标绑定端点存在（POST 语义，非 GET 列表）
+[406/518] [api] › tests\api\verification\ontology-engine.spec.ts:184:7 › 提案与候选（V-ONTO-011） › V-ONTO-011 提案列表可达
+[407/518] [api] › tests\api\verification\ontology-engine.spec.ts:189:7 › 提案与候选（V-ONTO-011） › V-ONTO-011b 候选列表强制租户隔离（显式设计，非法调用必须 400 且说明原因）
+[408/518] [api] › tests\api\verification\ontology-engine.spec.ts:196:7 › 提案与候选（V-ONTO-011） › V-ONTO-011c 候选不存在 id 必须 404（反向探针）
+[409/518] [api] › tests\api\verification\ontology-engine.spec.ts:203:7 › 版本与配置（V6） › V-ONTO-030 本体版本列表真实
+[410/518] [api] › tests\api\verification\ontology-engine.spec.ts:208:7 › 版本与配置（V6） › V-ONTO-031 本体引擎设置非空
+[411/518] [api] › tests\api\verification\ontology-engine.spec.ts:213:7 › 版本与配置（V6） › V-ONTO-032 本体引擎状态真实（RUNNING 或 UP 均为健康态）
+[412/518] [api] › tests\api\verification\ontology-engine.spec.ts:222:7 › 数据面与血缘（V-ONTO-040） › V-ONTO-040 本体数据分页契约自洽
+[413/518] [api] › tests\api\verification\ontology-engine.spec.ts:231:7 › 数据面与血缘（V-ONTO-040） › V-ONTO-041 血缘列表可达
+[414/518] [api] › tests\api\verification\ontology-engine.spec.ts:236:7 › 数据面与血缘（V-ONTO-040） › V-ONTO-042 本体只读面双前缀等价（/api/ontology 兼容面）
+[415/518] [api] › tests\api\verification\ontology-engine.spec.ts:251:7 › 权限（V5） › V-ONTO-050 网关路径无 token 必须拒绝
+[416/518] [api] › tests\api\verification\ontology-engine.spec.ts:256:7 › 权限（V5） › V-ONTO-051 直连 18083 无身份校验（已知设计，记录实测）
+[api] › tests\api\verification\ontology-engine.spec.ts:256:7 › 权限（V5） › V-ONTO-051 直连 18083 无身份校验（已知设计，记录实测）
+[V-ONTO-051] direct buszhi:18083 = 403
+
+[417/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:27:5 › V-WS-010 场景列表返回数组且含真实场景
+[418/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:36:5 › V-WS-011 场景详情：已存在 id 200，不存在 id 404（反向探针）
+[419/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:45:5 › V-WS-012 创建场景（VERIFY 前缀）后回读一致
+[420/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:64:5 › V-WS-012b【缺陷断言】创建幂等：同名重复创建必须拒绝或返回同 id（当前追加不同 id = 缺陷）
+[421/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:98:5 › V-WS-017 非法状态跃迁（直连 workspace 验状态机真身）：DRAFT 回退必须 409 ILLEGAL_TRANSITION
+[422/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:117:5 › V-WS-018 激活门禁（直连验真）：新建场景无任何绑定/连边时 DRAFT→ACTIVE 应被拒
+[423/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:130:5 › V-WS-024/100 完整度：sc001 基线 coverage=0.0 且结构完整
+[424/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:141:5 › V-WS-030 pre-validate 返回三项且结构完整
+[425/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:160:5 › V-WS-031 预校验 mind 项与 E1 detect 结论一致（双源对账）
+[426/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:184:5 › V-WS-060 Mind 列表：sc001 基线返回数组（不伪造）
+[427/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:190:5 › V-WS-070 场景动作：DecisionGateway 未装配时应显式 503 而非伪装空列表
+[428/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:201:5 › V-WS-019g【缺陷断言】gateway PATCH 转发：状态机经网关必须可用（当前 503 = 缺陷，不洗白）
+[429/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:213:5 › V-WS-105 金额列形态：场景金额权威列必须为 NUMERIC（D3 方案 A 已修，V330）
+[430/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:232:5 › V-WS-105b 新写入双写：创建场景时 budget_amount 按文本自动解析（D3 应用侧补齐）
+[431/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:267:5 › V-WS-090a 对象面经网关可达（D31：workspace.controller 整包排除，须由转发器承流）
+[432/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:277:5 › V-WS-090b 查询面经网关可达（D31：/api/query 子族）
+[433/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:287:5 › V-WS-090c 实体映射指向真实表：未知实体 404 而非 500（D59）
+[434/518] [api] › tests\api\verification\scenario-lifecycle.spec.ts:300:5 › V-WS-090d 分页参数 pageSize 生效（D60：曾只认 size，前端传 pageSize 被静默忽略）
+[435/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:44:9 › V-WS-085 场景选项聚合（7 个选项源） › available/datasets 返回数组且不 5xx
+[436/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:44:9 › V-WS-085 场景选项聚合（7 个选项源） › available/objects 返回数组且不 5xx
+[437/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:44:9 › V-WS-085 场景选项聚合（7 个选项源） › available/knowledge 返回数组且不 5xx
+[438/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:44:9 › V-WS-085 场景选项聚合（7 个选项源） › available/security 返回数组且不 5xx
+[439/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:44:9 › V-WS-085 场景选项聚合（7 个选项源） › available/interfaces 返回数组且不 5xx
+[440/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:56:7 › V-WS-085 场景选项聚合（7 个选项源） › available/agents 与 available/wagents 依赖认知引擎：503 必须带 COGNITIVE_UNAVAILABLE
+[441/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:72:7 › V-WS-081 / 083 / 084 契约面 › V-WS-081 预测范围返回完整结构
+[442/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:82:7 › V-WS-081 / 083 / 084 契约面 › V-WS-083 回测契约：403 时须自报 permission 与未解析绑定（不裸 500）
+[443/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:91:7 › V-WS-081 / 083 / 084 契约面 › V-WS-084 关账契约：非法期间必须业务拒绝且显式标注未落库
+[444/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:110:9 › V-WS-074 认知 v2 只读面（4 映射） › cognition/detect 不裸 500
+[445/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:110:9 › V-WS-074 认知 v2 只读面（4 映射） › cognition/operation-eval（缺必填参数 400 属正常） 不裸 500
+[446/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:110:9 › V-WS-074 认知 v2 只读面（4 映射） › cognition/hypotheses 不裸 500
+[447/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:110:9 › V-WS-074 认知 v2 只读面（4 映射） › cognition/beliefs 不裸 500
+[448/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:133:9 › V-WS-075 场景认知面（D50 回归常驻） › cognitive/diagnose 未绑 Mind 时归 404，不得 500（D50）
+[449/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:133:9 › V-WS-075 场景认知面（D50 回归常驻） › cognitive/forecast 未绑 Mind 时归 404，不得 500（D50）
+[450/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:133:9 › V-WS-075 场景认知面（D50 回归常驻） › cognitive/simulate 未绑 Mind 时归 404，不得 500（D50）
+[451/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:133:9 › V-WS-075 场景认知面（D50 回归常驻） › cognitive/policy 未绑 Mind 时归 404，不得 500（D50）
+[452/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:152:7 › V-WS-097 / 098 / 026 / 025 可达面 › V-WS-097 工作簿：health 报三运行时 + sessions/history 为数组
+[453/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:169:7 › V-WS-097 / 098 / 026 / 025 可达面 › V-WS-098 知识工作台：health/stats/engine-config 三面返回真实结构
+[454/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:186:7 › V-WS-097 / 098 / 026 / 025 可达面 › V-WS-026 绑定目录返回 6 类候选
+[455/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:195:7 › V-WS-097 / 098 / 026 / 025 可达面 › V-WS-025 完备度报告：islands 与 missingEdges 字段在位
+[456/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:205:7 › V-WS-097 / 098 / 026 / 025 可达面 › V-WS-041 运行列表为数组（含 run_mode/status 时逐行校验）
+[457/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:240:9 › 对象面/查询面路由已补齐（D31 修复后的正向回归） › V-WS-095 ObjectQLController 路由可达（不得再回退成 ECOS-SYS-404）
+[458/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:240:9 › 对象面/查询面路由已补齐（D31 修复后的正向回归） › V-WS-096 QueryHistoryController 路由可达（不得再回退成 ECOS-SYS-404）
+[459/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:240:9 › 对象面/查询面路由已补齐（D31 修复后的正向回归） › V-WS-090#search ObjectController#search 路由可达（不得再回退成 ECOS-SYS-404）
+[460/518] [api] › tests\api\verification\scenario-workbench-remainder.spec.ts:240:9 › 对象面/查询面路由已补齐（D31 修复后的正向回归） › V-WS-050 ScenarioBlueprintController 路由可达（不得再回退成 ECOS-SYS-404）
+[461/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:49:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-010 用户列表分页契约 + 不回显密码
+[462/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:58:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-011 角色列表真实
+[api] › tests\api\verification\security-sysman-deep.spec.ts:58:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-011 角色列表真实
+[V-SYS-011] roles=14
+
+[463/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:65:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-012 权限定义列表真实
+[api] › tests\api\verification\security-sysman-deep.spec.ts:65:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-012 权限定义列表真实
+[V-SYS-012] permissions=79
+
+[464/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:72:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-013 组织树：根路径只读语义不得 5xx
+[api] › tests\api\verification\security-sysman-deep.spec.ts:72:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-013 组织树：根路径只读语义不得 5xx
+[V-SYS-013] organizations root=405
+
+[465/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:80:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-014 租户列表真实
+[api] › tests\api\verification\security-sysman-deep.spec.ts:80:7 › 一、IAM 读面（V-SYS-010~014） › V-SYS-014 租户列表真实
+[V-SYS-014] tenants=2
+
+[466/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:89:7 › 二、配置与字典（V-SYS-020~022） › V-SYS-020 系统配置主读面可用（D17 回归）
+[467/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:93:7 › 二、配置与字典（V-SYS-020~022） › V-SYS-021 系统参数面：实测 503（矩阵已登记缺陷，如实判 FAIL 不洗白）
+[api] › tests\api\verification\security-sysman-deep.spec.ts:93:7 › 二、配置与字典（V-SYS-020~022） › V-SYS-021 系统参数面：实测 503（矩阵已登记缺陷，如实判 FAIL 不洗白）
+[V-SYS-021] status=503 errorCode=ECOS-SYS-503 message=ECOS-SYS-503: 系统参数服务 ISystemParamService未装配，配置面不可用
+
+[468/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:102:7 › 二、配置与字典（V-SYS-020~022） › V-SYS-022 字典类型与字典表双面可用
+[469/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:108:7 › 三、安全中心补面（V-SEC-032~042） › V-SEC-032 加密审计日志可达
+[470/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:112:7 › 三、安全中心补面（V-SEC-032~042） › V-SEC-033 密钥管理：列表可达且不明文回显
+[api] › tests\api\verification\security-sysman-deep.spec.ts:112:7 › 三、安全中心补面（V-SEC-032~042） › V-SEC-033 密钥管理：列表可达且不明文回显
+[V-SEC-033] keys payload bytes=94
+
+[471/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:120:7 › 三、安全中心补面（V-SEC-032~042） › V-SEC-042 安全资产目录真实
+[472/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:128:7 › 四、平台面（V-SYS-030~037） › V-SYS-031 监控聚合真实数值
+[api] › tests\api\verification\security-sysman-deep.spec.ts:128:7 › 四、平台面（V-SYS-030~037） › V-SYS-031 监控聚合真实数值
+[V-SYS-031] dashboard bytes=1286
+
+[473/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:135:7 › 四、平台面（V-SYS-030~037） › V-SYS-030 因果面可达（引擎不可用须显式 503）
+[api] › tests\api\verification\security-sysman-deep.spec.ts:135:7 › 四、平台面（V-SYS-030~037） › V-SYS-030 因果面可达（引擎不可用须显式 503）
+[V-SYS-030] causal/graph=200
+
+[474/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:142:7 › 四、平台面（V-SYS-030~037） › V-SYS-033 门户检索：缺 q 必须 4xx（禁无界全量）
+[api] › tests\api\verification\security-sysman-deep.spec.ts:142:7 › 四、平台面（V-SYS-030~037） › V-SYS-033 门户检索：缺 q 必须 4xx（禁无界全量）
+[V-SYS-033-missing-q] status=400 reason=q 不能为空
+
+[V-SYS-033] q-missing=400 q-given=200
+
+[475/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:149:7 › 四、平台面（V-SYS-030~037） › V-SYS-034 数据市场资产面可达
+[476/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:153:7 › 四、平台面（V-SYS-030~037） › V-SYS-036 实体表映射查询真实
+[api] › tests\api\verification\security-sysman-deep.spec.ts:153:7 › 四、平台面（V-SYS-030~037） › V-SYS-036 实体表映射查询真实
+[V-SYS-036] mapping status=200
+
+[477/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:160:7 › 四、平台面（V-SYS-030~037） › V-SYS-035 接口注册面存在（4xx 可归因，不得 5xx）
+[api] › tests\api\verification\security-sysman-deep.spec.ts:160:7 › 四、平台面（V-SYS-030~037） › V-SYS-035 接口注册面存在（4xx 可归因，不得 5xx）
+[V-SYS-035] interfaces/{{id}} status=404
+
+[478/518] [api] › tests\api\verification\security-sysman-deep.spec.ts:167:7 › 四、平台面（V-SYS-030~037） › V-SYS-037 存活探针
+[479/518] [api] › tests\api\verification\security-sysman.spec.ts:29:7 › 认证与会话（V-SEC-010~014） › V-SEC-010 登录成功返回 RS256 token
+[480/518] [api] › tests\api\verification\security-sysman.spec.ts:42:7 › 认证与会话（V-SEC-010~014） › V-SEC-010b 错误密码与不存在用户必须同形（不泄露用户存在性）
+[481/518] [api] › tests\api\verification\security-sysman.spec.ts:57:7 › 认证与会话（V-SEC-010~014） › V-SEC-013 当前用户返回身份三要素
+[482/518] [api] › tests\api\verification\security-sysman.spec.ts:65:7 › 认证与会话（V-SEC-010~014） › V-SEC-011 token 刷新语义（存在则验，不存在登记）
+[483/518] [api] › tests\api\verification\security-sysman.spec.ts:81:7 › 认证与会话（V-SEC-010~014） › V-SEC-012 登出端点存在且不返回 5xx
+[484/518] [api] › tests\api\verification\security-sysman.spec.ts:91:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-020 ABAC 策略分页契约
+[485/518] [api] › tests\api\verification\security-sysman.spec.ts:98:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-021 RLS 行级策略列表真实（13 条基线）
+[486/518] [api] › tests\api\verification\security-sysman.spec.ts:106:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-021b RLS 不存在策略必须 404（反向探针）
+[487/518] [api] › tests\api\verification\security-sysman.spec.ts:111:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-022 CLS 列级策略列表可达
+[488/518] [api] › tests\api\verification\security-sysman.spec.ts:116:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-023 数据脱敏 demo 端点真实
+[489/518] [api] › tests\api\verification\security-sysman.spec.ts:121:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-024 数据权限策略列表可达
+[490/518] [api] › tests\api\verification\security-sysman.spec.ts:126:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-025 策略引擎策略列表可达
+[491/518] [api] › tests\api\verification\security-sysman.spec.ts:131:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-026 安全资产目录 5 条基线
+[492/518] [api] › tests\api\verification\security-sysman.spec.ts:137:7 › 授权与策略四平面（V-SEC-020~023） › V-SEC-027 安全决策端点必须 POST（GET 应为 405）
+[493/518] [api] › tests\api\verification\security-sysman.spec.ts:144:7 › 安全配置与画像（V-SEC-030） › V-SEC-030 安全画像真实且含敏感等级
+[494/518] [api] › tests\api\verification\security-sysman.spec.ts:149:7 › 安全配置与画像（V-SEC-030） › V-SEC-031 安全配置 profile 面真实
+[495/518] [api] › tests\api\verification\security-sysman.spec.ts:156:7 › 审计（V-SEC-040） › V-SEC-040 审计日志分页契约
+[496/518] [api] › tests\api\verification\security-sysman.spec.ts:163:7 › 审计（V-SEC-040） › V-SEC-040b 审计 id 必须为数字（bigint 主键，非数字必须明确拒绝）
+[497/518] [api] › tests\api\verification\security-sysman.spec.ts:170:7 › 审计（V-SEC-040） › V-SEC-040c 加密审计端点可达
+[498/518] [api] › tests\api\verification\security-sysman.spec.ts:177:7 › 系统管理（SYS） › V-SYS-001 用户列表分页契约
+[499/518] [api] › tests\api\verification\security-sysman.spec.ts:187:7 › 系统管理（SYS） › V-SYS-002 角色列表分页真实
+[500/518] [api] › tests\api\verification\security-sysman.spec.ts:193:7 › 系统管理（SYS） › V-SYS-003 租户列表真实
+[501/518] [api] › tests\api\verification\security-sysman.spec.ts:201:7 › 系统管理（SYS） › V-SYS-004 数据字典类型列表非空
+[502/518] [api] › tests\api\verification\security-sysman.spec.ts:207:7 › 系统管理（SYS） › V-SYS-005 系统配置主读面可用（D17 回归常驻）
+[503/518] [api] › tests\api\verification\security-sysman.spec.ts:218:7 › 系统管理（SYS） › V-SYS-005b 配置消费审计面真实（178 条基线）
+[504/518] [api] › tests\api\verification\security-sysman.spec.ts:225:7 › 系统管理（SYS） › V-SYS-005c /items 面为细粒度权限面（admin 无 config:READ 时须 403 且说明）
+[505/518] [api] › tests\api\verification\security-sysman.spec.ts:235:7 › 系统管理（SYS） › V-SYS-006 配置 metadata 面可用 + /group 为内部服务面
+[506/518] [api] › tests\api\verification\security-sysman.spec.ts:246:7 › 系统管理（SYS） › V-SYS-007 系统配置写操作必须拒绝未知名（不静默成功）
+[507/518] [api] › tests\api\verification\security-sysman.spec.ts:255:7 › 系统管理（SYS） › V-SYS-008 字典表端点非空
+[508/518] [api] › tests\api\verification\security-sysman.spec.ts:262:7 › 安全引擎状态（V-SEC-050） › V-SEC-050 安全引擎状态健康
+[509/518] [api] › tests\api\verification\security-sysman.spec.ts:270:7 › 权限（V5） › V-SEC-060 无 token 与错 token 都必须被拒（不得放行）
+[api] › tests\api\verification\security-sysman.spec.ts:270:7 › 权限（V5） › V-SEC-060 无 token 与错 token 都必须被拒（不得放行）
+[V-SEC-060] noToken=403 badToken=401
+
+[510/518] [api] › tests\api\verification\security-sysman.spec.ts:279:7 › 权限（V5） › V-SEC-061 敏感面不得匿名访问（abac/rls/audit）
+[511/518] [api] › tests\api\verification\storage-semantics.spec.ts:25:7 › 存储语义（D42/D44 钉桩） › D42-1 系统参数面形态必须被显式归类（503 未装配 或 200 且分页自洽）
+[api] › tests\api\verification\storage-semantics.spec.ts:25:7 › 存储语义（D42/D44 钉桩） › D42-1 系统参数面形态必须被显式归类（503 未装配 或 200 且分页自洽）
+[D42-1] 503 未装配（诚实不可用态）
+
+[512/518] [api] › tests\api\verification\storage-semantics.spec.ts:50:7 › 存储语义（D42/D44 钉桩） › D42-2 系统参数详情：不存在 id 必须 4xx（禁 200+null）
+[api] › tests\api\verification\storage-semantics.spec.ts:50:7 › 存储语义（D42/D44 钉桩） › D42-2 系统参数详情：不存在 id 必须 4xx（禁 200+null）
+[D42-2] 503 未装配（诚实态），跳过后半判定
+
+[513/518] [api] › tests\api\verification\storage-semantics.spec.ts:63:7 › 存储语义（D42/D44 钉桩） › D44-1 已知真库族端点必须返回与库一致的数据（对照组）
+[api] › tests\api\verification\storage-semantics.spec.ts:63:7 › 存储语义（D42/D44 钉桩） › D44-1 已知真库族端点必须返回与库一致的数据（对照组）
+[D44-1] ABAC 策略面（真库族对照组）可达
+
+[514/518] [api] › tests\api\verification\world-model-tabs.spec.ts:28:7 › 世界模型 7 Tab 承流（D104 / D105 / D106） › 场景列表来自数据库且不含默认场景假数据（D104）
+[515/518] [api] › tests\api\verification\world-model-tabs.spec.ts:43:7 › 世界模型 7 Tab 承流（D104 / D105 / D106） › 目标追踪经网关可达并返回真实容器（D105）
+[516/518] [api] › tests\api\verification\world-model-tabs.spec.ts:52:7 › 世界模型 7 Tab 承流（D104 / D105 / D106） › 嵌套 DQ 面板端点均可达（D105/D107）
+[517/518] [api] › tests\api\verification\world-model-tabs.spec.ts:61:7 › 世界模型 7 Tab 承流（D104 / D105 / D106） › Pareto 优化→历史→回取闭环，且前沿互不支配无重复（D106）
+[518/518] [api] › tests\api\verification\world-model-tabs.spec.ts:115:7 › 世界模型 7 Tab 承流（D104 / D105 / D106） › Pareto 参数越界 400 / 未知 id 404（反向探针）
+  518 passed (4.3m)

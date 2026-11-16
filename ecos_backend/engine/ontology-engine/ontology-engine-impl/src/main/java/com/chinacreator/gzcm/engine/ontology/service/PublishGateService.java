@@ -7,6 +7,8 @@ import com.chinacreator.gzcm.engine.ontology.dto.GateResult;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService.CaliberMissingException;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService.CaliberNotApprovedException;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +54,9 @@ import java.util.function.Supplier;
 public class PublishGateService {
 
     private static final Logger log = LoggerFactory.getLogger(PublishGateService.class);
+
+    /** payload 文本解析（DB TEXT/jsonb 列读回是字符串，非 Map）。 */
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final CaliberService caliberService;
     private final DatNetLineageGuard lineageGuard;
@@ -193,11 +198,31 @@ public class PublishGateService {
 
     // ── payload 解析辅助 ──────────────────────────────────────────
 
+    /**
+     * 取出 payload 对象。
+     *
+     * <p><b>D138（2026-11-16 活体验证）</b>：活体行进 Controller 时 {@code payload} 来自数据库列
+     * （合规表 {@code payload_json TEXT}、旧表 {@code jsonb → PGobject}），读回是 <b>字符串</b>，
+     * 旧实现只认 {@code Map} 否则回落整行 → {@link #extractMetrics} 永远取不到 {@code metrics}，
+     * V1/V2 一条都不跑、V3 无事实表引用直接返回，<b>三套守卫整体空转</b>（单测因直接塞 Map 而全绿）。
+     * 本批补 JSON 文本解析。</p>
+     */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> extractPayload(Map<String, Object> proposalRow) {
         if (proposalRow == null) return Map.of();
         Object p = proposalRow.get("payload");
-        return p instanceof Map ? (Map<String, Object>) p : proposalRow;
+        if (p instanceof Map) return (Map<String, Object>) p;
+        if (p != null) {
+            String text = String.valueOf(p).trim();
+            if (text.startsWith("{")) {
+                try {
+                    return MAPPER.readValue(text, Map.class);
+                } catch (JsonProcessingException e) {
+                    log.warn("publish-gate: payload 无法解析为 JSON（门禁按整行评估）: {}", e.getMessage());
+                }
+            }
+        }
+        return proposalRow;
     }
 
     @SuppressWarnings("unchecked")

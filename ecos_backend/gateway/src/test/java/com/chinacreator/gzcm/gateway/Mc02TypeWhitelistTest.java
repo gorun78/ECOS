@@ -133,7 +133,14 @@ class Mc02TypeWhitelistTest {
             "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
                     + ".steps_json:JSONB",
             "V311__cognitive_framework_registry.sql#ecos_cognitive.ecos_cognitive_framework"
-                    + ".stop_conditions_json:JSONB");
+                    + ".stop_conditions_json:JSONB",
+            // 2026-11-15 世界模型承流批 D108：V336 把「代码读端 ecos_control 真身」登记进单源
+            // （此前该表只由 search_path 落库，单源里没有建表脚本 ⇒ 从零建库必断）。
+            // metrics 与 dev 实存同为 JSONB，且 WorkspaceDataDao 的写面就是 `metrics = ?::jsonb`
+            // ⇒ 改 TEXT 会让写端断、改 JSON 会与真身分叉。按 V295「存量真身锚定」同族入待收口名录，
+            // 收口去向仍属 144-c 需授权追加迁移，本批只登记不假装合规。
+            "V336__ecos_control_business_scenario.sql#ecos_control.ecos_business_scenario"
+                    + ".metrics:JSONB");
 
     /** GOVERNED 段建表/列解析数下限（实测口径由本类首跑钉死，只增不减）。 */
     private static final int GOVERNED_TABLE_FLOOR = 60;
@@ -159,7 +166,10 @@ class Mc02TypeWhitelistTest {
      *  2026-11-02 #147AE：V307（注册表 exclude_paths 播种，纯 UPDATE）落地 ⇒ 按实测订正 256→257。
      *  2026-11-06 #147Z-6：V308~V315 共 8 枚入库；V311 建表带 6 枚 JSONB 列进待收口名录，
      *  V315 建 5 表（列型全在白名单内）零新增 ⇒ 按实测订正 257→265（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 282;
+    // 2026-11-15：V337（D89 修 sc001 DATASET 绑定）落地后本锚漏改，实测 287 ≠ 286 而恒红；
+    // 同批订正 286→287（Mc02/Mc03/Dr 三枚 SCRIPT_FLOOR 同步；MigrationVersionUniquenessTest 走
+    // MAX_BASELINE_VERSION=337 口径，不参与本锚）。
+    private static final int SCRIPT_FLOOR = 287;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。

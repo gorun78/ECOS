@@ -178,19 +178,29 @@ public class ScenarioMindService {
      */
     @Transactional
     public ScenarioMindVO activateMind(String scenarioId, Long mindId) {
-        throw new BusinessException(501, 501, STOPPED_WRITE_MSG);
+        // D78：同 deleteMind —— 该面早已有认知域通道 setActiveByRef，不再抛 501。
+        throw new BusinessException(400, 400,
+                "MIND-400: legacy Long mindId 已停用，请走 PATCH /minds/ref/{mindRef}（active=true|false）");
     }
 
     /**
      * 逻辑删除心智。若删除的是 base（mind_label='base'），自动补位：找其他未删 mind 的第一个设为 active=1。
      *
+     * <p>D78（2026-11-14 验证）：原实现直接抛 501「legacy 停写」，但同一端点的
+     * {@link #upsertMind} 早已改走认知域 V188 注册门面，而 {@link #unbindByRef}
+     * 就是现成的解绑通道——DELETE /mind-model 成了「读得到、写不进、删不掉」的瘸腿端点。
+     * 现按 mindRef 走 {@link #unbindByRef}；{@code mindId}（legacy Long）不再使用。</p>
+     *
      * @param scenarioId 场景 id
-     * @param mindId     心智 id
-     * @return 是否删除成功
+     * @param mindRef    认知 Mind 引用（{@code ScenarioMindVO#getMindRef()}）
+     * @return 是否删除成功（受影响行数 > 0）
      */
     @Transactional
-    public boolean deleteMind(String scenarioId, Long mindId) {
-        throw new BusinessException(501, 501, STOPPED_WRITE_MSG);
+    public boolean deleteMind(String scenarioId, String mindRef) {
+        if (mindRef == null || mindRef.isBlank()) {
+            throw new BusinessException(400, 400, "MIND-400: mindRef 必填（legacy Long id 已停用）");
+        }
+        return unbindByRef(scenarioId, mindRef) > 0;
     }
 
     /**

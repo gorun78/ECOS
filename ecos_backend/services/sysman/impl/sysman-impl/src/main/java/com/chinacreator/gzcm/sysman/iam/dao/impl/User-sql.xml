@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sqlMap namespace="User">
+    <!-- real_name 必须在建号时落库：列表/详情都从该列读 realName，
+         漏写会让"建号时填了姓名、列表里却显示空"成为静默数据丢失。 -->
     <insert id="insertUser">
         INSERT INTO TD_USER (
-            user_id, username, password, email, mobile_tel1, status, locked, lock_time,
+            user_id, username, password, real_name, email, mobile_tel1, status, locked, lock_time,
             last_login_time, created_time, created_by, updated_time, updated_by
         ) VALUES (
-            #[userId], #[username], #[password], #[email], #[phone], #[status], #[locked], #[lockTime],
+            #[userId], #[username], #[password], #[realName], #[email], #[phone], #[status], #[locked], #[lockTime],
             #[lastLoginTime], #[createdTime], #[createdBy], #[updatedTime], #[updatedBy]
         )
     </insert>
@@ -20,6 +22,16 @@
             locked = #[locked],
             lock_time = #[lockTime],
             last_login_time = #[lastLoginTime],
+            updated_time = #[updatedTime],
+            updated_by = #[updatedBy]
+        WHERE user_id = #[userId]
+    </update>
+
+    <!-- 改密专用：updateUser 刻意不含 password（资料编辑不得顺带覆盖口令），
+         故改密必须走这条独立语句，否则接口回 200 而库里密码纹丝不动。 -->
+    <update id="updatePassword">
+        UPDATE TD_USER SET
+            password = #[password],
             updated_time = #[updatedTime],
             updated_by = #[updatedBy]
         WHERE user_id = #[userId]

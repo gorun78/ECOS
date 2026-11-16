@@ -24,12 +24,14 @@ public class AutoDiscoverPreviewQueryDao extends JdbcTemplateDaoSupport {
 
     /**
      * 按实体码 + 业务域统计数据模型行数（已发现判定）。
+     *
+     * <p>域表必须 schema 限定：裸名 {@code ecos_ontology_domain} 会命中 public 空壳（D132）。</p>
      */
     public Integer countEntityByCodeAndDomain(String entityCode, String domainCode) {
         return jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM ecos_ontology_entity " +
             "WHERE code = ? AND domain_id = " +
-            "(SELECT id FROM ecos_ontology_domain WHERE code = ?)",
+            "(SELECT id FROM ecos_ontology.ecos_domain WHERE code = ?)",
             Integer.class, entityCode, domainCode);
     }
 }

@@ -78,7 +78,8 @@ public class ObjectActionController {
         // 1. 查找 Action 定义（从 ecos_ontology_action 表）
         List<Map<String, Object>> actions = findActionByCode(actionCode);
         if (actions.isEmpty()) {
-            return ApiResponse.notFound("OBJ-003: Action " + actionCode + " 不存在");
+            throw new com.chinacreator.gzcm.common.exception.NotFoundException(
+                    "OBJ-003: Action " + actionCode + " 不存在");
         }
 
         Map<String, Object> actionDef = actions.get(0);
@@ -99,17 +100,22 @@ public class ObjectActionController {
         }
 
         // 2. 验证对象是否存在
+        // D113（2026-11-15）：notFound 必须在 try 之外抛 —— try 的 catch(Exception) 会把
+        // 自己抛的 NotFoundException 一并吞成 debug 日志，对象不存在被静默放行执行 Action。
         String table = ObjectRuntimeService.ENTITY_TABLE.get(entityCode);
+        boolean objectMissing = false;
         if (table != null) {
             try {
                 List<Map<String, Object>> obj = objectActionService.queryForList(
                     "SELECT id FROM " + table + " WHERE id = ?", id);
-                if (obj.isEmpty()) {
-                    return ApiResponse.notFound("OBJ-001: 对象 " + entityCode + "/" + id + " 不存在");
-                }
+                objectMissing = obj.isEmpty();
             } catch (Exception e) {
                 log.debug("Cannot verify object existence for {}/{}: {}", entityCode, id, e.getMessage());
             }
+        }
+        if (objectMissing) {
+            throw new com.chinacreator.gzcm.common.exception.NotFoundException(
+                    "OBJ-001: 对象 " + entityCode + "/" + id + " 不存在");
         }
 
         // 3. 根据 action_type 执行

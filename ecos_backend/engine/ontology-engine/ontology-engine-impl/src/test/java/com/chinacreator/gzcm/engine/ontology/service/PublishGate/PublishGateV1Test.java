@@ -74,6 +74,28 @@ class PublishGateV1Test {
         return row;
     }
 
+    /**
+     * D138（2026-11-16 活体验证）：活体行进 Controller 时 {@code payload} 是数据库列读回的
+     * <b>JSON 文本</b>（合规表 {@code payload_json TEXT}），旧实现只认 {@code Map}、否则回落整行，
+     * 于是 {@code metrics} 永远取不到 —— V1/V2 一条不跑、V3 无事实表直接跳过，三套守卫整体空转。
+     */
+    @Test
+    void payloadAsJsonTextStillRunsV1() {
+        doThrow(new CaliberService.CaliberMissingException("no caliber bound"))
+                .when(caliberService).assertMetricCaliberApprovedForPublish(METRIC);
+
+        Map<String, Object> row = new java.util.HashMap<>();
+        row.put("id", "proposal-1");
+        row.put("payload", "{\"metrics\":[{\"code\":\"" + METRIC + "\",\"caliber_id\":\"cb-1\"}],"
+                + "\"changeType\":\"CREATE_METRIC\"}");
+
+        GateResult r = service().validate(row);
+
+        assertFalse(r.isPassed(), "payload 为 JSON 文本时门禁不得空转（应为不通过）");
+        assertTrue(hasViolation(r, "V1_CALIBER", "ECOS-ONTO-040"),
+                "应仍产出 V1_CALIBER/ECOS-ONTO-040，实际 " + r.getViolations());
+    }
+
     private static boolean hasViolation(GateResult r, String gate, String code) {
         return r.getViolations().stream()
                 .anyMatch(v -> gate.equals(v.getGate()) && code.equals(v.getCode()));

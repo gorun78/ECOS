@@ -1,12 +1,14 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.copilot.CopilotAgentCatalog;
 import com.chinacreator.gzcm.engine.ai.copilot.CopilotChatService;
 import com.chinacreator.gzcm.engine.ai.copilot.CopilotToolCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -63,21 +65,30 @@ public class CopilotController {
         return ApiResponse.success(wire);
     }
 
-    /** POST /chat — 目录内智能体走真实 agent-loop（工具调用）；目录外 agentId 明确拒绝。 */
+    /**
+     * POST /chat — 目录内智能体走真实 agent-loop（工具调用）；目录外 agentId 明确拒绝。
+     *
+     * <p><b>D63①（2026-11-14 验证，HTTP 状态行保真族）</b>：原实现无论 agent-loop 成功还是
+     * 护栏 DENY，一律 {@code ApiResponse.success(...)} ⇒ 传输层恒 200，403/503 语义只藏在
+     * body 的 {@code errorCode} 里（curl 与浏览器看到两个不同的"成败"）。
+     * 现按信封 {@code code} 一族规则补状态行：<b>信封逐字段不动</b>、路径/入参零改动，
+     * 只在 {@code result.success=false} 时把 {@code errorCode} 经 {@link AiErrorClass}
+     * 单源查表抬成对应的 HTTP 状态（查不到族码 → 500，不猜）。</p>
+     */
     @PostMapping("/chat")
-    public ApiResponse<Map<String, Object>> chat(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> chat(@RequestBody Map<String, Object> request) {
         String agentId = (String) request.getOrDefault("agentId", "agent-data");
         String message = (String) request.get("message");
         String sessionId = (String) request.getOrDefault("sessionId", UUID.randomUUID().toString());
 
         if (message == null || message.isBlank()) {
-            return ApiResponse.badRequest("message 不能为空");
+            return ResponseEntity.badRequest().body(ApiResponse.badRequest("message 不能为空"));
         }
 
         if (copilotChatService != null && copilotChatService.supports(agentId)) {
             Map<String, Object> result = copilotChatService.chat(agentId, message, sessionId);
             if (result != null) {
-                return ApiResponse.success(result);
+                return withStatusForEnvelope(ApiResponse.success(result), result);
             }
         }
 
@@ -87,8 +98,38 @@ public class CopilotController {
         // 且原样回显传入的 sessionId ⇒ 未知 Agent 会拿到一段"看起来像 AI 回答"的伪造结果。
         // 现改为明确拒绝，让调用方看到真实原因（目录内的 agent 不受影响）。
         log.warn("[Copilot] 未注册的 agentId={}（目录内 Agent 见 GET /api/v1/agent/copilot/agents）", agentId);
-        return ApiResponse.badRequest(
-            "未注册的 Copilot Agent: " + agentId + "（可选值见 GET /api/v1/agent/copilot/agents）");
+        return ResponseEntity.badRequest().body(ApiResponse.badRequest(
+            "未注册的 Copilot Agent: " + agentId + "（可选值见 GET /api/v1/agent/copilot/agents）"));
+    }
+
+    /**
+     * 按 agent-loop 结果补 HTTP 状态行（信封不动）。
+     *
+     * <p>成功 ⇒ 200；失败 ⇒ 按 {@code errorCode} 在 {@link AiErrorClass} 冻结表里查 httpStatus。
+     * 族码查不到（含 {@code ECOS-AI-500} 这类非枚举码位）⇒ 500 —— 宁可报服务端错误，
+     * 也不把失败压成 200。</p>
+     */
+    private static ResponseEntity<ApiResponse<Map<String, Object>>> withStatusForEnvelope(
+            ApiResponse<Map<String, Object>> body, Map<String, Object> result) {
+        Object success = result.get("success");
+        if (!Boolean.FALSE.equals(success)) {
+            return ResponseEntity.ok(body);
+        }
+        Object code = result.get("errorCode");
+        int status = httpStatusOf(code == null ? null : code.toString());
+        return ResponseEntity.status(status).body(body);
+    }
+
+    /** 族码 → HTTP 状态（单源 = {@link AiErrorClass#httpStatus()}）；未登记码位一律 500。 */
+    private static int httpStatusOf(String errorCode) {
+        if (errorCode != null) {
+            for (AiErrorClass c : AiErrorClass.values()) {
+                if (c.errorCode().equals(errorCode)) {
+                    return c.httpStatus();
+                }
+            }
+        }
+        return 500;
     }
 
     /** GET /quick-questions — 目录内智能体返回目录建议问题；目录外 agentId 明确拒绝。 */

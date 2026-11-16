@@ -121,7 +121,25 @@ public class WorkspaceForwardController {
             if (!roles.isBlank()) {
                 headers.set(com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor.H_ROLE, roles);
             }
-            String tenant = com.chinacreator.gzcm.common.context.TenantContextHolder.getTenantId();
+            // tenant 取法有先后（D111，2026-11-15 活体实证）：
+            // ① 首选 auth.getDetails() 里的 JWT Claims —— 这是 tenant_id 的原始载体，
+            //    与 EcosTrustHeaderFilter.reinjectBestEffort 同源取法（该 Filter:166）。
+            //    注意**不能**读 ATTR_INJECTED_TENANT：该属性在 Filter 的 finally 里才设置，
+            //    而本控制器在 chain.doFilter 内部执行 ⇒ 读到的永远是 null。
+            // ② 兜底 TenantContextHolder —— 仅 QuotaFilter 命中时才有值。
+            // 原实现只读 ②，导致 /workspace/calibers 这类未被 QuotaFilter 覆盖的路径
+            // 出站 tenant 恒空，下游 H_TENANT 必填 ⇒ 403 missing trust headers。
+            String tenant = null;
+            Object details = auth.getDetails();
+            if (details instanceof io.jsonwebtoken.Claims claims) {
+                Object t = claims.get("tenant_id");
+                if (t != null && !String.valueOf(t).isBlank()) {
+                    tenant = String.valueOf(t);
+                }
+            }
+            if (tenant == null || tenant.isBlank()) {
+                tenant = com.chinacreator.gzcm.common.context.TenantContextHolder.getTenantId();
+            }
             if (tenant != null && !tenant.isBlank()) {
                 headers.set(com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor.H_TENANT, tenant);
             }

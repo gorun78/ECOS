@@ -930,6 +930,7 @@
   "platform.dictionary.group.G3": "G3 Data Assets",
   "platform.dictionary.group.G4": "G4 AI Agents",
   "platform.dictionary.group.G5": "G5 System Management",
+  "platform.dictionary.group.G0": "Ungrouped",
   "platform.dictionary.status.all": "All",
   "platform.dictionary.source.other": "Other",
   "platform.dictionary.coltypes.string": "String",

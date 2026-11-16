@@ -103,5 +103,9 @@
   "copilot.cite.rowFilter.desc": "非HR仅显示本年累计飞行满300小时的资深教官",
   "copilot.toast.sim.engineVerdict": "安全服务已返回真实裁决：{verdict}（判定以安全服务实际返回为准，前端不合成放行）。",
   "copilot.toast.sim.engineFail": "安全引擎评估通道不可用，本次不输出任何裁决（前端不合成放行或审计条目），请稍后重试。",
-  "copilot.toast.sec_audit.real": "已切换至审计中心：真实审计流当前返回 {count} 条日志（告警以引擎上报为准，前端不合成告警）。"
+  "copilot.toast.sec_audit.real": "已切换至审计中心：真实审计流当前返回 {count} 条日志（告警以引擎上报为准，前端不合成告警）。",
+  "copilot.result.verdictLine": "**安全服务实际裁决**：{verdict}（针对数据集 `{datasetId}`，由安全服务返回，前端不合成）。",
+  "copilot.result.verdictUnavailable": "**本次无裁决**：数据集 `{datasetId}` 的安全评估通道不可用，前端不输出放行/拒绝结论，请稍后重试。",
+  "copilot.result.auditCount": "**真实审计流**：当前返回 {count} 条日志（告警以引擎上报为准，前端不合成）。",
+  "copilot.result.auditUnavailable": "**审计流不可用**：本次未取到审计日志，前端不合成任何告警条目。"
 }

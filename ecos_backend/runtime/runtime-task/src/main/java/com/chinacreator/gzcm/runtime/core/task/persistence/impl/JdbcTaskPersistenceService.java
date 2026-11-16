@@ -269,6 +269,30 @@ public class JdbcTaskPersistenceService implements ITaskPersistenceService {
         }
     }
 
+    /**
+     * D119（2026-11-15）：任务总数（与 queryTasks 同 WHERE 口径）。
+     */
+    public int countTasks(Map<String, Object> condition) throws TaskPersistenceException {
+        try {
+            return dao.countTasks(condition);
+        } catch (Exception e) {
+            logger.error("PG countTasks 失败", e);
+            throw new TaskPersistenceException("PG countTasks 失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * D119：按状态分组计数（只统计仍存活的任务）。
+     */
+    public Map<String, Integer> countStatusByCategory() throws TaskPersistenceException {
+        try {
+            return dao.countStatusByCategory();
+        } catch (Exception e) {
+            logger.error("PG countStatusByCategory 失败", e);
+            throw new TaskPersistenceException("PG countStatusByCategory 失败: " + e.getMessage(), e);
+        }
+    }
+
     @Override
     public List<TaskStatus> queryTaskStatuses(Map<String, Object> condition, int offset, int limit)
             throws TaskPersistenceException {

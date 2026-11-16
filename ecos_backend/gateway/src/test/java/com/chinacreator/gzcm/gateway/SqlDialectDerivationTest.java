@@ -120,7 +120,9 @@ class SqlDialectDerivationTest {
     static final Map<String, Map<String, Integer>> JAVA_PIN = build(RULE_NAMES, Map.ofEntries(
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/agent/mesh/knowledge/repository/KnowledgeNodeRepository.java", Map.of( "A_SQL_CAST", 2,  "B_ILIKE", 2,  "F_JSON_FB", 1)),
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/agent/mesh/repository/AgentRegistryRepository.java", Map.of( "A_SQL_CAST", 4)),
-            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/agent/mesh/repository/MissionRepository.java", Map.of( "A_SQL_CAST", 2)),
+            // MissionRepository 的 A_SQL_CAST=2 已随其批次收口（两处 `#{x}::jsonb` 强转删除，
+            // 写入改按列型直传），名录同批剪除该条目。2026-11-15 世界模型承流批实测 grep '::' = 0。
+            // 原条目仅供追述：Map.entry(".../MissionRepository.java", Map.of("A_SQL_CAST", 2))
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/agent/mesh/repository/MissionTaskRepository.java", Map.of( "A_SQL_CAST", 2)),
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/controller/DiagnosticAgentController.java", Map.of( "A_SQL_CAST", 1)),
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/dao/AgentMetricsDao.java", Map.of( "A_SQL_CAST", 3)),
@@ -137,7 +139,10 @@ class SqlDialectDerivationTest {
             Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/dao/InvalidationDao.java", Map.of( "A_SQL_CAST", 1)),
             Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/dao/MindAssetDao.java", Map.of( "G_REGCLASS", 2)),
             Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/dao/MindUpdateDao.java", Map.of( "G_REGCLASS", 2)),
-            Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/AssetDao.java", Map.of( "A_SQL_CAST", 18,  "B_ILIKE", 5)),
+            // 2026-11-15 世界模型承流批：18 → 20。+2 来自物理层兜底列清单抽成
+            // PHYSICAL_FALLBACK_SELECT 常量后，两腿共用同一段（此前详情腿是列表腿的整块复制，
+            // 已先合掉 15 行重复；剩下 2 枚 `::bigint`/`::text` 是 mapper 类型必需，删不掉）。
+            Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/AssetDao.java", Map.of( "A_SQL_CAST", 20,  "B_ILIKE", 5)),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/CatalogDao.java", Map.of( "B_ILIKE", 6)),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/DataLineageDao.java", Map.of( "A_SQL_CAST", 5,  "C_UPSERT", 2,  "F_JSON_FB", 2)),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/DqRuleIssueDao.java", Map.of( "A_SQL_CAST", 2,  "F_JSON_FB", 1)),
@@ -220,7 +225,13 @@ class SqlDialectDerivationTest {
             Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/dao/EntityTableMappingQueryDao.java", Map.of( "A_SQL_CAST", 1)),
             Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/dao/SecurityProfileQueryDao.java", Map.of( "C_UPSERT", 2)),
             Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/dao/SysConfigDao.java", Map.of( "C_UPSERT", 2,  "E_GEN_UUID", 2)),
-            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ObjectController.java", Map.of( "B_ILIKE", 4)),
+            // 2026-11-15 世界模型承流批：B_ILIKE 4（原）+ G_REGCLASS 2（新增）。
+            // 这 2 处是 D90 修的「按 search_path 锁定唯一表」：本库同一表名在 ecos_control 与
+            // ecos_sysman 各有一份，列集是跨 schema 并集，写路径落 search_path 首位那张时
+            // legacy 独有列必 500。`to_regclass(?)` 是该语义的 PG 原生取法，无 ANSI 等价
+            //（CAST AS regclass 只是同一语义换皮，属规避门禁不属收口）。
+            // 与已登记的 MindAssetDao/MindUpdateDao 同族（同判据、同理由）。
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ObjectController.java", Map.of( "B_ILIKE", 4,  "G_REGCLASS", 2)),
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ObjectQLParser.java", Map.of( "A_SQL_CAST", 2,  "F_JSON_FB", 9)),
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/dao/WorkspaceDataDao.java", Map.of( "A_SQL_CAST", 8,  "C_UPSERT", 3)),
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioService.java", Map.of( "A_SQL_CAST", 1))

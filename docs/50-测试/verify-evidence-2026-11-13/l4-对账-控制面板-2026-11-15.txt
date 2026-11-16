@@ -1,0 +1,61 @@
+=== L4 对账（V-CTRL-D-003 / V-CTRL-D-004）2026-11-15（D115/D116 修复后）===
+
+前置：D115 修复（gateway 补 runtime.task.persistence.enabled + TaskPersistenceDao 三处 SQL 对齐）
+后重新打包 gateway（-pl gateway -am，先删旧 fat jar）并重启。
+
+--- V-CTRL-D-003 任务 ↔ 库（双向 id 集合对账） ---
+[同一时刻抓两侧]
+curl "http://localhost:8080/api/v1/task/list?offset=0&limit=1000"
+  → api_count = 6
+
+docker exec ecos-postgres psql -U postgres -d sys_man \
+  -c 'SELECT "TASK_ID" FROM ecos_control.td_runtime_task WHERE is_deleted=0 ORDER BY 1'
+  → db = 6
+
+comm -23 (only in API)  → 空
+comm -13 (only in DB)   → 空
+⇒ 两侧 id 集合完全相等（V-CTRL-D-003「任务表行数一致」判据首次真正成立）
+
+[前置缺陷证据：修复前该对账是不成立的]
+修复前：POST /api/v1/task/submit → 200 返回 taskId；
+        SELECT ... WHERE "TASK_ID"=<该 id> → 0 行（ecos_control 与 public 两处都 0）；
+        根因 = runtime.task.persistence.enabled 未配 ⇒ JdbcTaskPersistenceService 不装配 ⇒ 只写内存 Map。
+修复中二次暴露：开关打开后 SQL 立刻报三处错误（详见台账 D115 第二层表格）。
+修复后：POST → 200 taskId=21cb934d-82a3-4315-a280-8c1c9a7d8f8b；
+        SELECT count(*) → 1；grep -c "saveTask 失败" → 0
+
+--- V-CTRL-D-004 告警 ↔ 库（增量探针，指向正确表） ---
+[判据订正] /api/v1/monitor/alerts 的数据源是 public.ecos_runtime_alert_record
+           （V242__ecos_runtime_alert.sql 建表），不是 ecos_control.ecos_alert_history。
+
+[基线]
+public.ecos_runtime_alert_record total = 0
+GET /api/v1/monitor/alerts?status=open → total = 0, rows = []
+
+[插入 1 行]
+INSERT INTO public.ecos_runtime_alert_record
+  (id,rule_code,severity,status,title,occurred_at,version_no,is_deleted,domain,tenant_id)
+VALUES ('VERIFY-D004-PROBE','R-PROBE','warn','open','L4 alert delta probe',NOW(),'1',0,'default','tenant-a');
+→ INSERT 0 1
+SELECT count(*) WHERE status='open' AND is_deleted=0 → 1
+
+[API 必须同步]
+GET /api/v1/monitor/alerts?status=open →
+  total = 1
+  rows[0] = {"id":"VERIFY-D004-PROBE","rule_code":"R-PROBE","severity":"warn","status":"open",
+             "title":"L4 alert delta probe","occurred_at":"2026-11-15T05:21:40.865+00:00",
+             "tenant_id":"tenant-a", ...}
+⇒ 每个字段都有真实值，不是空壳
+
+[清理并复原]
+DELETE FROM public.ecos_runtime_alert_record WHERE id='VERIFY-D004-PROBE'  → DELETE 1
+DELETE FROM ecos_control.ecos_alert_history WHERE rule_name='VERIFY-D004-PROBE' → DELETE 1（误插的探针，一并清）
+库：alert_record_left = 0 / alert_history_left = 0
+API：total = 0, rows = []
+⇒ 双侧复原，无残留
+
+=== 结论 ===
+- V-CTRL-D-003：从「只测非空行」升级为「API id 集合 ≡ 库 id 集合（双向空差集）」，且该等式在 D115 修复前
+  根本不可能成立（写入端没落库）——原 PASS 属把缺陷现状当契约。
+- V-CTRL-D-004：原判据未指明表名，实际对错了对象；订正后增量探针 0→1→0 双向跟随成立。
+- 两条探针数据均已清理，库与 API 均回基线。

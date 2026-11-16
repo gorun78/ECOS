@@ -2,8 +2,16 @@ import { expect, test } from '@playwright/test';
 import { loginAsAdmin, call } from '../../helpers/ecos';
 
 /**
- * 覆盖补充 2 — 282 Controller 登记判定中「活体探测返回 200 但前序 spec 未命中」的 18 个前缀。
+ * 覆盖补充 2 — 282 Controller 登记判定中「活体探测返回 200 但前序 spec 未命中」的前缀。
  * 这些是**真实可达**面，必须实测而非在未覆盖清单里写理由蒙混。
+ *
+ * 2026-11-15 加固（复核 121 个未覆盖前缀活体状态时发现）：
+ *  1. 原断言允许 `[200,400,401,403,404]`，其中 **404 是假绿后门** —— 这些面的
+ *     登记理由恰恰是「已确认 200 可达」，若某天路由回退成 404，旧断言照样绿。
+ *     现改为：登记为可达的必须 **200 + code=0 + data 非空壳**。
+ *  2. 补入 `CaliberContractController /api/v1/workspace/calibers`：它 11-13 登记时
+ *     是 403（D112 跨服务凭证中继失效），D112 修复后实测 **200** 且
+ *     `dataSource="ontology-owner-rest"`（属主真值回源），但一直没有任何 spec 覆盖。
  */
 
 let token = '';
@@ -35,20 +43,25 @@ const TARGETS: Array<{ path: string; label: string; kind: 'array' | 'object' | '
   { path: '/api/v1/system/permissions', label: '权限清单', kind: 'any' },
   { path: '/api/v1/workspace/binding-catalog', label: '场景绑定目录', kind: 'any' },
   { path: '/api/v1/business/scenarios/scenarioId/blueprints', label: '场景蓝图', kind: 'any' },
+  { path: '/api/v1/workspace/calibers', label: '口径契约(属主回源)', kind: 'any' },
+  // 2026-11-15 追加：登记册把这 2 个 wAgent 面判「未覆盖（前缀是常量/无 path）」，
+  // 但正文自述「已实测 GET → 200」。既已确认可达就必须有用例，否则「未覆盖」清单
+  // 会长期藏真实面。
+  { path: '/api/v1/wagent/tools', label: 'wAgent 工具契约面', kind: 'any' },
+  { path: '/api/v1/wagent/candidates', label: 'wAgent 候选面', kind: 'any' },
 ];
 
-test.describe('未覆盖但真实可达的 18 个面（登记判定闭环）', () => {
+test.describe('未覆盖但真实可达的面（登记判定闭环）', () => {
   for (const { path, label, kind } of TARGETS) {
     test(`V-COV-${label}`, async ({ request }) => {
       const { status, json } = await reachable(request, path);
-      // 每个面必须给出确定性状态：可达(200) 或明确拒绝(4xx)，不得 5xx
-      expect(status, `${label} 不得 5xx（实得 ${status}）`).toBeLessThan(500);
-      expect([200, 400, 401, 403, 404], `${label} 状态应为确定性，实得 ${status}`).toContain(status);
-      if (status === 200) {
-        expect(json?.code, `${label} 200 时 code 应为 0`).toBe(0);
-        expect(json?.data === undefined, `${label} 200 时必须返回 data（不得空响应冒充）`).toBe(false);
-        if (kind === 'array') expect(Array.isArray(json.data)).toBe(true);
-      }
+      // 登记口径 = 「已确认 200 可达」，因此必须真的 200。
+      // 旧断言允许 404/403，会让「路由回退」这种回归静默变绿 —— 2026-11-15 收紧。
+      expect(status, `${label} 登记为可达面，必须 200（实得 ${status}）；404 说明路由回退或装配丢失`)
+          .toBe(200);
+      expect(json?.code, `${label} code 应为 0`).toBe(0);
+      expect(json?.data === undefined, `${label} 必须返回 data（不得空响应冒充）`).toBe(false);
+      if (kind === 'array') expect(Array.isArray(json.data)).toBe(true);
     });
   }
 
@@ -78,10 +91,18 @@ test.describe('未覆盖但真实可达的 18 个面（登记判定闭环）', (
     const wsRows = ws.json?.data as any[];
     expect(Array.isArray(wsRows), 'workspace 场景应返回数组').toBe(true);
 
-    // 两套是独立数据源（世界模型图为图谱投影，workspace 为场景主表），条数不要求相等；
-    // 但世界模型必须至少包含默认场景，否则说明投影未生成。
+    // 两套是独立数据源（世界模型场景表 ecos_wm_scenario，workspace 为场景主表
+    // ecos_business_scenario），条数不要求相等。
+    //
+    // 2026-11-15 订正（D104 落地后）：原断言写的是「世界模型必须含 default-scenario
+    // 默认节点」，而 `default-scenario` 恰恰是 D104 修掉的那条**内存假数据**
+    // （ScenarioController 曾用 ConcurrentHashMap + 构造器塞一条默认场景冒充数据源）。
+    // 现在该端点读 DB，返回的是 ecos_wm_scenario 的真实行。留着旧断言等于
+    // 要求缺陷复发 ⇒ 改为正向断言真实行、并以反向断言钉死假数据不得回归。
     const wmIds = wmRows.map((r: any) => String(r.id ?? ''));
-    expect(wmIds, '世界模型投影应含 default-scenario 默认节点').toContain('default-scenario');
+    expect(wmIds, '世界模型场景不得出现 default-scenario 假节点（D104 反向钉）')
+        .not.toContain('default-scenario');
+    expect(wmIds.every((id) => id !== '' && id !== 'undefined'), '每行都应有真实 id').toBe(true);
     console.log(`[V-COV-091] world-model rows=${wmRows.length} workspace rows=${wsRows.length}（独立数据源）`);
   });
 });

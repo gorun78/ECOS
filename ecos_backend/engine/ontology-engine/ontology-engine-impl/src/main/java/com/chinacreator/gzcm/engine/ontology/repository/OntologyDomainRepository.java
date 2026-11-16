@@ -8,7 +8,7 @@ import com.chinacreator.gzcm.engine.ontology.model.OntologyDomain;
 import org.springframework.stereotype.Repository;
 
 /**
- * 领域 CRUD 仓库（ecos_ontology_domain 表）。
+ * 领域 CRUD 仓库（{@code ecos_ontology.ecos_domain} 表，见 D132）。
  *
  * <p>PMO-30 P1-1 多租户 RLS：查询带 tenant_id 过滤（兼容 NULL 行共享可见），
  * 写操作自动打 tenantId 标签。

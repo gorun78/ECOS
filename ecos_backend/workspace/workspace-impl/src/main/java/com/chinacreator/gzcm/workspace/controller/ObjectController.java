@@ -8,10 +8,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.service.ObjectRuntimeService;
 import com.chinacreator.gzcm.common.engine.StateMachineEngine;
 import com.chinacreator.gzcm.common.engine.IFunctionPropertyEvaluator;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.workspace.exception.ActionValidationException;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
 import com.chinacreator.gzcm.workspace.security.RlsFilter;
@@ -145,7 +147,9 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
         int size = pageSizeParam != null ? pageSizeParam : (sizeParam != null ? sizeParam : 50);
         if (size <= 0) size = 50;
         String table = ENTITY_TABLE.get(entityCode);
-        if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
+        if (table == null) {
+            throw new NotFoundException("实体 " + entityCode + " 不存在");
+        }
 
         // ★ ABAC 行过滤（#142/B4-3c-2 / D-B4-17）：security 发的执行契约是
         //   「带 ? 的片段 + 同序参数」，两者必须成对下推 —— 旧写法只取片段
@@ -188,12 +192,27 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
 
     // ═══════════════ 详情 ═══════════════════
 
+    /**
+     * 对象详情。
+     *
+     * <p><b>D93（2026-11-14 验证，HTTP 状态行保真族）</b>：原实现两条 notFound 分支都
+     * {@code return ApiResponse.notFound(...)} —— 信封 {@code code:404} 却配 HTTP 200 状态行，
+     * 于是「同一 id PUT 成功、GET 说不存在」时无法从传输层分辨是哪种结果。
+     * 现改抛 {@link NotFoundException}，由 {@code WorkspaceExceptionHandler#handleNotFound}
+     * 写定 404 状态行（信封形状不变：仍是 {@code code/message/data} 三元）。</p>
+     *
+     * <p>注：{@code RLS_NO_POLICY_MATCHED} 引发的空行同样按「不存在」处置 —— 这是既有
+     * fail-closed 基线（无策略即拒绝，且不向调用方泄露「行存在但被策略挡住」）。
+     * 本批不改该语义，只让状态行如实反映 404。</p>
+     */
     @GetMapping("/{entityCode}/{id}")
     public ApiResponse<Map<String, Object>> getDetail(
             @PathVariable String entityCode,
             @PathVariable String id) {
         String table = ENTITY_TABLE.get(entityCode);
-        if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
+        if (table == null) {
+            throw new NotFoundException("实体 " + entityCode + " 不存在");
+        }
 
         // ★ ABAC 行过滤（同列表面：片段与参数成对下推，拒绝态拼 1=0 → 详情按"不存在"处置）
         RlsFilter rls = abacFilter.buildRowFilter(entityCode);
@@ -205,7 +224,9 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
 
         List<Map<String, Object>> rows = objectQueryService.queryForList(
                 "SELECT * FROM " + table + tail, args.toArray());
-        if (rows.isEmpty()) return ApiResponse.notFound(entityCode + " " + id + " 不存在");
+        if (rows.isEmpty()) {
+            throw new NotFoundException(entityCode + " " + id + " 不存在");
+        }
 
         // ★ ABAC 列裁剪
         rows = abacFilter.filterColumns(entityCode, rows);
@@ -325,11 +346,20 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
     @GetMapping("/{entityCode}/schema")
     public ApiResponse<Map<String, Object>> getSchema(@PathVariable String entityCode) {
         String table = ENTITY_TABLE.get(entityCode);
-        if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
+        if (table == null) {
+            throw new NotFoundException("实体 " + entityCode + " 不存在");
+        }
 
+        // D90：列清单必须锁定 search_path 解析到的那一张表。原写法按表名全库扫，
+        // 会把 legacy schema 同名副本的列并进来（demo_customer 曾因此多出 tenant_id），
+        // 前端按此渲染表单 → 提交必然踩「字段不存在」。
         List<Map<String, Object>> columns = objectQueryService.queryForList(
-            "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
-            table);
+            "SELECT column_name, data_type, is_nullable FROM information_schema.columns " +
+            "WHERE (table_schema, table_name) = (" +
+            "  SELECT n.nspname, c.relname FROM pg_class c " +
+            "    JOIN pg_namespace n ON n.oid = c.relnamespace " +
+            "   WHERE c.oid = to_regclass(?)) " +
+            "ORDER BY ordinal_position", table);
 
         List<Map<String, Object>> props = new ArrayList<>();
         for (Map<String, Object> col : columns) {
@@ -406,19 +436,22 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             @PathVariable String entityCode,
             @RequestBody Map<String, Object> body) {
         String table = ENTITY_TABLE.get(entityCode);
-        if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
+        if (table == null) {
+            throw new NotFoundException("实体 " + entityCode + " 不存在");
+        }
 
         // 配额检查：max_storage_mb（admin操作跳过）
-        // TenantAwareQueryService 自动对 ecos_object_data 追加 tenant_id 过滤
         String tenantId = TenantContextHolder.getTenantId();
         if (tenantId != null && !tenantId.isBlank()) {
             try {
                 Long maxStorageMb = objectQueryService.queryForObject(
                     "SELECT max_storage_mb FROM ecos_tenant WHERE id = ?", Long.class, tenantId);
                 if (maxStorageMb != null && maxStorageMb > 0) {
-                    Integer objectCount = objectQueryService.queryForObject(
-                        "SELECT COUNT(*) FROM ecos_object_data", Integer.class);
-                    if (objectCount != null && objectCount.longValue() >= maxStorageMb) {
+                    // D90：COUNT(*) 是 int8，按 Integer 取会抛转换异常并被下方 catch 吞成
+                    // 「配额检查失败，放行」——配额门从未真正生效过（静默 fail-open）。
+                    Long objectCount = objectQueryService.queryForObject(
+                        "SELECT COUNT(*) FROM ecos_object_data", Long.class);
+                    if (objectCount != null && objectCount >= maxStorageMb) {
                         return ApiResponse.error(400, "存储量已达租户配额上限");
                     }
                 }
@@ -427,8 +460,16 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             }
         }
 
-        // ★ 列名白名单校验：只允许 information_schema 中存在的列
+        // ★ 列名白名单校验：只允许物理表真实存在的列
         List<String> validColumns = validateColumns(table, body.keySet());
+
+        // D90：主键由服务端生成。物理表的 id 是 NOT NULL 且无 DROP 默认值，
+        // 前端新建表单不含 id（用户不该手填主键）⇒ 原实现直插 NULL 撞 not-null 约束成 500。
+        if (getAllowedColumns(table).contains("id") && body.get("id") == null) {
+            String generatedId = UUID.randomUUID().toString();
+            body.put("id", generatedId);
+            validColumns.add(0, "id");
+        }
 
         // Ensure status field defaults to Draft
         if (!body.containsKey("status")) {
@@ -489,11 +530,15 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         String table = ENTITY_TABLE.get(entityCode);
-        if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
+        if (table == null) {
+            throw new NotFoundException("实体 " + entityCode + " 不存在");
+        }
 
         List<Map<String, Object>> existing = objectQueryService.queryForList(
             "SELECT * FROM " + table + " WHERE id = ?", id);
-        if (existing.isEmpty()) return ApiResponse.notFound(entityCode + " " + id + " 不存在");
+        if (existing.isEmpty()) {
+            throw new NotFoundException(entityCode + " " + id + " 不存在");
+        }
 
         // ★ 列名白名单校验：只允许 information_schema 中存在的列
         List<String> validColumns = validateColumns(table, body.keySet());
@@ -572,12 +617,16 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         String table = ENTITY_TABLE.get(entityCode);
-        if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
+        if (table == null) {
+            throw new NotFoundException("实体 " + entityCode + " 不存在");
+        }
 
         // Get current object
         List<Map<String, Object>> existing = objectQueryService.queryForList(
             "SELECT * FROM " + table + " WHERE id = ?", id);
-        if (existing.isEmpty()) return ApiResponse.notFound("OBJ-001: " + entityCode + " " + id + " 不存在");
+        if (existing.isEmpty()) {
+            throw new NotFoundException("OBJ-001: " + entityCode + " " + id + " 不存在");
+        }
 
         Object currentStatusObj = existing.get(0).get("status");
         String currentStatus = currentStatusObj != null ? currentStatusObj.toString().trim() : "Draft";
@@ -621,10 +670,14 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             @PathVariable String entityCode,
             @PathVariable String id) {
         String table = ENTITY_TABLE.get(entityCode);
-        if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
+        if (table == null) {
+            throw new NotFoundException("实体 " + entityCode + " 不存在");
+        }
 
         int rows = objectQueryService.update("DELETE FROM " + table + " WHERE id = ?", id);
-        if (rows == 0) return ApiResponse.notFound(entityCode + " " + id + " 不存在");
+        if (rows == 0) {
+            throw new NotFoundException(entityCode + " " + id + " 不存在");
+        }
 
         // ★ Timeline: record deletion
         runtimeService.recordTimeline(id, entityCode, "ObjectDeleted",
@@ -689,31 +742,56 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
     // ═══════════════ 列名安全校验 ═══════════════════
 
     /**
-     * 校验用户传入的列名是否在白名单中。
-     * 从 information_schema.columns 获取表中允许的所有列名，仅返回合法的列名。
-     * 非法列名直接抛 IllegalArgumentException，最终返回 400。
+     * 校验用户传入的列名是否在白名单中（非法字段 → 400，不是 500）。
+     *
+     * <p>D90（2026-11-14 验证批）：原实现抛裸 {@link IllegalArgumentException}，
+     * 落 {@code WorkspaceExceptionHandler} 兜底分支 → HTTP 500「服务内部错误」。
+     * 调用方传了表里没有的字段是<b>请求错误</b>，必须 400 并点名非法字段，
+     * 否则前端只能弹「系统错误」，用户永远不知道是哪个字段写错了。</p>
      */
     private List<String> validateColumns(String table, Set<String> inputKeys) {
         Set<String> allowed = getAllowedColumns(table);
         List<String> valid = new ArrayList<>();
+        List<String> unknown = new ArrayList<>();
         for (String key : inputKeys) {
             if (!allowed.contains(key)) {
-                throw new IllegalArgumentException("非法字段: " + key);
+                unknown.add(key);
+            } else {
+                valid.add(key);
             }
-            valid.add(key);
+        }
+        if (!unknown.isEmpty()) {
+            throw new ActionValidationException(unknown, allowed);
         }
         return valid;
     }
 
     /**
-     * 从缓存或数据库查询 information_schema.columns 获取表的所有列名。
-     * 缓存在 COLUMNS_CACHE 中，首次查询后不再查库。
+     * 取物理表在本库实际存在的列（单一 schema，按 search_path 解析后的那张表）。
+     *
+     * <p>D90（2026-11-14 验证批）：原查询 {@code WHERE table_name = ?} 不限定 schema。
+     * 本库同一张表名可能同时存在于 {@code ecos_control}（权威）与 {@code ecos_sysman}
+     * （knownLegacy 残留副本），列集是<b>跨 schema 的并集</b>——
+     * {@code demo_customer} 的 legacy 副本多一个 {@code tenant_id}，于是白名单「认得」
+     * 这个字段、{@code /schema} 面也把它当可用属性渲染出来，
+     * 而 INSERT 落到 search_path 首位的那张表（{@code ecos_control}）时
+     * PostgreSQL 报 {@code column "tenant_id" does not exist} ⇒ 500。
+     * 写路径与读路径因此长期分歧。</p>
+     *
+     * <p>修法：先用 {@code to_regclass} 让 PG 按 search_path 解析出<b>唯一</b>的真实表，
+     * 再用它的 {@code (schema, relname)} 去 {@code information_schema.columns} 取列。
+     * 表不存在时 {@code to_regclass} 返回 NULL，子查询为空 ⇒ 列集为空 ⇒
+     * 任何字段都被判非法（fail-closed），不会退化成"白名单为空＝全放行"。</p>
      */
     private Set<String> getAllowedColumns(String table) {
         return COLUMNS_CACHE.computeIfAbsent(table, t -> {
             List<Map<String, Object>> rows = objectQueryService.queryForList(
                 "SELECT column_name FROM information_schema.columns " +
-                "WHERE table_name = ? ORDER BY ordinal_position", t);
+                "WHERE (table_schema, table_name) = (" +
+                "  SELECT n.nspname, c.relname FROM pg_class c " +
+                "    JOIN pg_namespace n ON n.oid = c.relnamespace " +
+                "   WHERE c.oid = to_regclass(?)) " +
+                "ORDER BY ordinal_position", t);
             Set<String> columns = new LinkedHashSet<>();
             for (Map<String, Object> row : rows) {
                 columns.add((String) row.get("column_name"));

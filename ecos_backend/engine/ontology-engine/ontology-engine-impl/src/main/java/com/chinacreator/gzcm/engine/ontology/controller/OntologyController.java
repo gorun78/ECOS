@@ -241,19 +241,33 @@ public class OntologyController {
 
     // ═══════════════ Domain-scoped Entity ═══════════════════
 
-    /** 列出指定 domain 下的实体（path 用 domainCode；回退到 listEntities 语义）。 */
+    /**
+     * 列出指定 domain 下的实体（D136）。
+     * <p>path 参数是 <b>domainCode</b>，此前被误当 ontologyId 传给 {@code listEntitiesVO}，
+     * 结果只按 {@code ontology_id = '<域码>'} 过滤（正常实体全查不到）。现按域解析 domain_id 关联；
+     * 域不存在 → 404（不再静默返回空数组）。
+     */
     @GetMapping("/domains/{domainCode}/entities")
     public ApiResponse<List<OntologyEntityVO>> listEntitiesByDomain(@PathVariable String domainCode) {
-        return ApiResponse.success(ontologyService.listEntitiesVO(domainCode));
+        return ontologyService.listEntitiesByDomainVO(domainCode)
+            .map(ApiResponse::success)
+            .orElseGet(() -> ApiResponse.notFound("ONT-008: Domain '" + domainCode + "' not found"));
     }
 
-    /** 在指定 domain 下创建实体。 */
+    /**
+     * 在指定 domain 下创建实体（D136）。
+     * <p>此前 domainCode 被写进 {@code ontology_id}（{@code domain_id} 留空），用"按域查询"查不到；
+     * 现在 {@code domain_id} 落域主键。域不存在 → 404。
+     */
     @PostMapping("/domains/{domainCode}/entities")
     public ApiResponse<OntologyEntityVO> createEntityInDomain(
             @PathVariable String domainCode,
             @RequestBody OntologyEntitySaveDTO dto) {
-        OntologyEntityVO ent = ontologyService.createEntity(domainCode, dto);
-        log.info("Entity created in domain {}: [{}]", domainCode, ent.getCode());
-        return ApiResponse.success(ent);
+        return ontologyService.createEntityInDomain(domainCode, dto)
+            .map(ent -> {
+                log.info("Entity created in domain {}: [{}]", domainCode, ent.getCode());
+                return ApiResponse.success(ent);
+            })
+            .orElseGet(() -> ApiResponse.notFound("ONT-008: Domain '" + domainCode + "' not found"));
     }
 }

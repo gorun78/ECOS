@@ -41,7 +41,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * 本体变更提案 Controller — 管理本体结构的变更提案与审批流转。
  *
- * <p>持久化委托至 {@link OntologyProposalService}（PostgreSQL 表 ecos_ontology_proposals）。
+ * <p>持久化委托至 {@link OntologyProposalService}（PostgreSQL 表 {@code ecos_ontology.ecos_ontology_proposal}，
+ * V174 合规表单数口径；旧复数表 {@code ecos_ontology_proposals} 已停写）。
  * 提案状态机：{@code DRAFT → PENDING → (APPROVED | REJECTED) → EXECUTED}，终态不可回退。</p>
  *
  * <h3>端点：</h3>
@@ -93,16 +94,20 @@ public class OntologyProposalController {
     private static final Set<String> ALLOWED_FOR_EXECUTE = Set.of(STATUS_VERIFIED, STATUS_APPROVED);
 
     /**
-     * IR04 显式列清单（替代旧 {@code SELECT * FROM ecos_ontology_proposals}）。
+     * IR04 显式列清单（替代旧 {@code SELECT *}）。
      * 字段顺序与 {@link #toVO} 读取一致。
+     *
+     * <p>D137：列名取 V174 合规表真名（{@code payload_json} / {@code snapshot_json} /
+     * {@code create_time} / {@code update_time}），别名回旧键面，{@link #toVO} 与发布门禁取键不变。</p>
      */
     private static final String ID_COLUMNS =
-            "id, domain_code, proposal_type, target_entity, payload, snapshot, status, "
+            "id, domain_code, proposal_type, target_entity, "
+                    + "payload_json AS payload, snapshot_json AS snapshot, status, "
                     + "author, reviewer, reviewer_comment, version_id, optimistic_lock_version, "
-                    + "created_at, updated_at";
+                    + "create_time AS created_at, update_time AS updated_at";
 
-    /** 提案表裸表名（Controller 直拼 SQL 用；持久化主力在 {@link OntologyProposalService}）。 */
-    private static final String TABLE = "ecos_ontology_proposals";
+    /** 提案表裸表名（V174 合规表单数口径；旧复数表 {@code ecos_ontology_proposals} 已停写）。 */
+    private static final String TABLE = "ecos_ontology_proposal";
 
     /** 控制域 schema（ST07 / §四附则1）。 */
     private final String schema;
@@ -288,7 +293,7 @@ public class OntologyProposalController {
         }
 
         // 构建更新（按 DTO 字段非空判定 → 拼 SQL；不含 WHERE，委托 updateProposal 统一追加）
-        StringBuilder sql = new StringBuilder("UPDATE " + qualifiedTable() + " SET updated_at=NOW()");
+        StringBuilder sql = new StringBuilder("UPDATE " + qualifiedTable() + " SET update_time=CURRENT_TIMESTAMP");
         List<Object> params = new ArrayList<>();
 
         if (dto.getDomainCode() != null) {
@@ -313,7 +318,7 @@ public class OntologyProposalController {
         }
         if (dto.getPayload() != null) {
             try {
-                sql.append(", payload=?");
+                sql.append(", payload_json=?");
                 Object p = dto.getPayload();
                 params.add(p instanceof String s ? s : MAPPER.writeValueAsString(p));
             } catch (JsonProcessingException e) {
@@ -322,7 +327,7 @@ public class OntologyProposalController {
         }
         if (dto.getSnapshot() != null) {
             try {
-                sql.append(", snapshot=?");
+                sql.append(", snapshot_json=?");
                 Object s = dto.getSnapshot();
                 params.add(s instanceof String str ? str : MAPPER.writeValueAsString(s));
             } catch (JsonProcessingException e) {
@@ -440,7 +445,8 @@ public class OntologyProposalController {
             }
         }
 
-        StringBuilder sql = new StringBuilder("UPDATE " + qualifiedTable() + " SET status=?, updated_at=NOW()");
+        StringBuilder sql = new StringBuilder(
+                "UPDATE " + qualifiedTable() + " SET status=?, update_time=CURRENT_TIMESTAMP");
         List<Object> params = new ArrayList<>();
         params.add(target);
 
@@ -718,26 +724,19 @@ public class OntologyProposalController {
         versionBody.put("publisher", (actor == null || actor.isBlank()) ? "system" : actor);
 
         Map<String, Object> version = versionService.createVersion(domainCode, versionBody);
-        String versionIdStr = String.valueOf(version.get("id"));
+        String draftVersionId = String.valueOf(version.get("id"));
 
         executePayload(domainCode, proposalType, proposal);
 
-        versionService.publishVersion(domainCode, versionIdStr);
+        // D139：version_id 列语义是版本 ID（VARCHAR(64)，关联 ecos_ontology_version.id），
+        // 不是 semver 版本号（旧实现强转 Long 必失败 ⇒ 该列恒空）。
+        // Git 通道发布后会产生新版本记录（Published），故取发布返回体的 id；
+        // 库内通道发布是原地改状态，返回体 id 与草稿 id 相同。
+        Map<String, Object> published = versionService.publishVersion(domainCode, draftVersionId);
+        Object publishedId = published == null ? null : published.get("id");
+        String versionIdStr = publishedId == null ? draftVersionId : String.valueOf(publishedId);
 
-        Long versionNo = null;
-        Object verNo = version.get("versionNo");
-        if (verNo != null) {
-            try {
-                versionNo = Long.valueOf(String.valueOf(verNo));
-            } catch (NumberFormatException nfe) {
-                log.warn("Cannot parse versionNo '{}' for proposal {}", verNo, proposalId);
-            }
-        }
-        if (versionNo != null) {
-            proposalService.markExecutedWithVersion(proposalId, STATUS_EXECUTED, versionNo);
-        } else {
-            proposalService.markExecuted(proposalId, STATUS_EXECUTED);
-        }
+        proposalService.markExecutedWithVersion(proposalId, STATUS_EXECUTED, versionIdStr);
         log.info("Proposal {} executed & published: versionId={}, type={}", proposalId, versionIdStr, proposalType);
         return versionIdStr;
     }
@@ -994,8 +993,8 @@ public class OntologyProposalController {
     }
 
     /**
-     * Map 行（ecos_ontology_proposals 表 SELECT * 直出）→ VO。
-     * 字段名按 DB 下划线 → VO 驼峰。
+     * Map 行（{@code ecos_ontology.ecos_ontology_proposal} 表显式列投影）→ VO。
+     * 字段名按 DB 下划线 → VO 驼峰；{@code payload_json/snapshot_json} 经列别名承 {@code payload/snapshot} 键。
      */
     private OntologyProposalVO toVO(Map<String, Object> row) {
         OntologyProposalVO vo = new OntologyProposalVO();

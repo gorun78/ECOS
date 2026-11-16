@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * R2-B5 buszhi 数据访问收口（架构铁律 §2.5 #1 / IR06）：
@@ -24,13 +23,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TimelineDao extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(TimelineDao.class);
-    private static final AtomicInteger ID_SEQ = new AtomicInteger(1000);
+
+    /**
+     * D91：主键改 UUID。原 {@code "tl-" + ID_SEQ.incrementAndGet()}（起点 1000）是
+     * <b>进程内</b>计数，而 {@code ecos_object_timeline} 是持久表 —— 重启即重号，
+     * 撞 PK 后被本类 catch 吞成一条 WARN，时间线静默丢失。
+     */
+    private String nextId() { return "tl-" + java.util.UUID.randomUUID(); }
 
     public TimelineDao(JdbcTemplate jdbc) {
         this.jdbcTemplate = jdbc;
     }
-
-    private String nextId() { return "tl-" + ID_SEQ.incrementAndGet(); }
 
     public void record(String objectId, String entityCode, String eventType,
                         String summary, String actor, Map<String, Object> details) {

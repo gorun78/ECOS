@@ -9,7 +9,11 @@ import { STATUS_META, emptyColumnForm, type ColumnFormState } from "./constants"
 
 export function useTableMode(
   showToast: (type: "success" | "error", msg: string) => void,
-  t: (key: string, params?: Record<string, string | number>) => string
+  t: (key: string, params?: Record<string, string | number>) => string,
+  // deleteTarget 由 DictManager 单点持有：两个模式 hook 共用同一份删除目标，
+  // 各自私持会出现「table 清空了、dict 那份还在」导致确认模态关不掉。
+  deleteTarget: { type: "table" | "column" | "dictItem"; id: string; name: string } | null,
+  setDeleteTarget: (t: { type: "table" | "column" | "dictItem"; id: string; name: string } | null) => void,
 ) {
   const [tables, setTables] = useState<DictTable[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +32,6 @@ export function useTableMode(
   const [colFormOpen, setColFormOpen] = useState(false);
   const [expandedColId, setExpandedColId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ type: "table" | "column" | "dictItem"; id: string; name: string } | null>(null);
 
   const loadTables = useCallback(async (status?: string) => {
     setLoading(true);

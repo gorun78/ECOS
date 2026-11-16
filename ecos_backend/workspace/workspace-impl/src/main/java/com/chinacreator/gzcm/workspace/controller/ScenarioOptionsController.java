@@ -65,7 +65,8 @@ public class ScenarioOptionsController {
     /** 可用数据集（datanet 数据源）。 */
     @GetMapping("/available/datasets")
     public ApiResponse<?> availableDatasets() {
-        return callRemote(datanetRest, "/datanet/datasource", "datanet", "id", "name");
+        // 投影字段须取 datanet 响应真键（datasourceId/datasourceName）；用 id/name 会投影出空身份项
+        return callRemote(datanetRest, "/datanet/datasource", "datanet", "datasourceId", "datasourceName");
     }
 
     /** 可用本体实体（buszhi ontology entities，按 domain 过滤）。 */
@@ -104,8 +105,8 @@ public class ScenarioOptionsController {
     /**
      * 可用 WAgent（aiming 已发布候选 — 批 B 场景侧接线，2026-11-11 WAgent 三块差距计划）。
      *
-     * <p>探测目标 = {@code GET /api/v1/wagent/candidates?status=PUBLISHED}（wagent-v1 契约
-     * listCandidates，响 应 {@code data.candidates[]}）。只探 PUBLISHED——未发布候选不得
+     * <p>探测目标 = {@code GET /api/v1/wagent/candidates?status=published}（wagent-v1 契约
+     * listCandidates，响 应 {@code data.candidates[]}）。只探 published——未发布候选不得
      * 进入场景绑定选项池（F10-23 发布即 Git 归档 + published_ref 回写，场景只能绑定已归档态）。
      * 投影：{@code candidate_id} → id、{@code candidate_type} → name（候选无 name 字段，
      * 以类型 + 发布引用拼接作展示名）。aiming 不可达返 503（同族铁律 §2.4-6）。</p>
@@ -126,6 +127,9 @@ public class ScenarioOptionsController {
     private static HttpEntity<Void> credentialedEntity() {
         HttpHeaders headers = new HttpHeaders();
         CallerCredentialSource.applyTo(headers);
+        // 跨服务 GET 必须钉 JSON：缺 Accept 时对端按 */* 协商可回 XML，
+        // Map 反序列化会把 data 读成 Map（列表 → 空池），错误体也解析不出 code
+        headers.setAccept(java.util.List.of(org.springframework.http.MediaType.APPLICATION_JSON));
         return new HttpEntity<>(headers);
     }
 
@@ -137,7 +141,8 @@ public class ScenarioOptionsController {
      */
     private ApiResponse<?> callRemoteWagentCandidates() {
         // rootUri 单源（workspaceAimingRest = resolveBase + /api/v1），故相对路径省前缀
-        String path = "/wagent/candidates?status=PUBLISHED";
+        // 词表小写单源（WAgentEnums.CandidateStatus 冻结值 published）；大写会被 listCandidates 判 400 词表越界
+        String path = "/wagent/candidates?status=published";
         try {
             ResponseEntity<Map> resp = aimingRest.exchange(path, HttpMethod.GET,
                     credentialedEntity(), Map.class);

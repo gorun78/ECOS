@@ -3,6 +3,8 @@ package com.chinacreator.gzcm.runtime.llm.security;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract.Verdict;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
+import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.MediaType;
@@ -261,9 +263,11 @@ public class SecurityEngineBridge {
                     .connectTimeout(POLICY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                     .readTimeout(POLICY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
                     .build();
-            Request httpReq = new Request.Builder()
+            Request.Builder reqBuilder = new Request.Builder()
                     .url(baseUrl + PATH_POLICY_EVALUATE)
-                    .header(EcosTraceContext.HEADER_REQUEST_ID, EcosTraceContext.currentTraceId())
+                    .header(EcosTraceContext.HEADER_REQUEST_ID, EcosTraceContext.currentTraceId());
+            trustHeaders(callerId, tenantId).forEach(reqBuilder::header);
+            Request httpReq = reqBuilder
                     .post(RequestBody.create(objectMapper.writeValueAsString(body), JSON_MEDIA_TYPE))
                     .build();
             try (Response resp = client.newCall(httpReq).execute()) {
@@ -281,9 +285,37 @@ public class SecurityEngineBridge {
         }
     }
 
+    /**
+     * 跨 JVM 信任头（D99，2026-11-14）：独立 service 态下 security-engine 的
+     * {@code HeaderAuthInterceptor} 强制要求 {@code X-ECOS-USER} + {@code X-ECOS-TENANT}，
+     * 缺失即 403 ECOS-AUTH-010。本类此前只带 trace 头 ⇒ 微服务部署下<b>每一次</b>
+     * LLM 裁决都是 HTTP 403 → UNEVALUATED → ECOS-AI-503，会话消息永远写不进去
+     * （V-COP-014 第二层阻塞的实证）。gateway 内嵌态因同 JVM 不过 HTTP 而不暴露此缺陷。
+     *
+     * <p><b>2026-11-14 追加（第三层实证）</b>：只补信任头仍 403 —— sysman 的
+     * {@code SecurityConfig} 是 {@code anyRequest().authenticated()} +
+     * {@code JwtAuthenticationFilter}，信任头只供 HandlerInterceptor 读取主体、<b>不参与
+     * Spring Security 认证</b>。实测矩阵：仅信任头 403／仅 JWT 403／<b>两者同时 200</b>。
+     * 故本方法同时中继入口请求的 {@code Authorization}（{@link CallerCredentialSource} 单源，
+     * 与 ai-engine {@code ServicePrincipalTrustHeaders} 同口径）；取不到即不写，由属主 fail-closed。
+     * <b>不注入 {@code X-ECOS-SERVICE}</b>（该头一旦出现即触发 HMAC 验签，无签名反而 403 ECOS-AUTH-011）。</p>
+     */
+    private Map<String, String> trustHeaders(String callerId, String tenantId) {
+        Map<String, String> h = new LinkedHashMap<>();
+        CallerCredentialSource.Carrier carrier = CallerCredentialSource.current();
+        if (carrier != null && carrier.authorization() != null) {
+            h.put("Authorization", carrier.authorization());
+        }
+        h.put(HeaderAuthInterceptor.H_USER,
+                callerId == null || callerId.isBlank() ? "service:llm-gateway" : callerId);
+        h.put(HeaderAuthInterceptor.H_ROLE, "llm-gateway-service");
+        h.put(HeaderAuthInterceptor.H_TENANT,
+                tenantId == null || tenantId.isBlank() ? "default" : tenantId);
+        return h;
+    }
+
     /** 裁决请求体（{@code policy=rbac} + 四段 input，与 security-engine 契约单源一致）。 */
-    private Map<String, Object> evaluateBody(String callerId, String tenantId, String action,
-                                             Map<String, Object> attrs) {
+    private Map<String, Object> evaluateBody(String callerId, String tenantId, String action,                                             Map<String, Object> attrs) {
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("action", action);
         if (attrs != null) input.putAll(attrs);

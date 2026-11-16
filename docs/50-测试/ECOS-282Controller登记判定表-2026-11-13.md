@@ -4,13 +4,19 @@
 > 上游：`ECOS产品级逐功能验证方案-2026-11-13.md` §端点账「282 个 Controller 按域归组，未逐一覆盖的必须列明原因」
 
 ## 一、判定口径
+> **2026-11-15 复核**：`find ... -name "*Controller.java"` 实测 **284**（登记册原为 282）——漂移的 2 个是登记册成文后新增的 `ParetoController`（D106）与 `DqDashboardForwardController`（D105/D107），均已补登并判「已覆盖」（活体 200）。当前分布 **162 已覆盖 / 118 未覆盖 / 4 无端点 = 284**，无未判定。
+
+> **2026-11-15 第二轮活体重探（本批）**：对 95 个可解析前缀的未覆盖条目逐条重打 `/api`（带 admin token）→ 实测分布 **64 × 404 / 19 × 200 / 8 × 405 / 2 × 400 / 1 × 403 / 1 × 503**。
+> **漂移 1 条**：`CaliberContractController /api/v1/workspace/calibers` 原记「403 需特定权限」（D112 现场），已修后实测 **200** 且 `dataSource="ontology-owner-rest"` ⇒ 改判「已覆盖」并补 `coverage-registry.spec.ts` 用例。
+> **同时发现假绿后门**：`coverage-registry.spec.ts` 原断言允许 `[200,400,401,403,404]`，而该套件的登记理由恰恰是「**已确认 200 可达**」—— 若路由回退成 404，旧断言照样绿。已收紧为「必须 200 + code=0 + data 非空壳」，并用变异探针证明可转红（把 `dq/reports` 改成不存在路径 → `1 failed`，还原后 `21 passed`）。
+
 
 本表由脚本机械生成，**不是手写清单**：
 
-1. `find ecos_backend -name "*Controller.java" -not -path "*/target/*" -not -path "*/archive/*" -not -path "*/src/test/*"` → 实数 **282**
+1. `find ecos_backend -name "*Controller.java" -not -path "*/target/*" -not -path "*/archive/*" -not -path "*/src/test/*"` → 实数 **284**（2026-11-15 复核订正）
 2. 逐文件提取类级 `@RequestMapping` 前缀（含 `WAgentApiPaths` / `CognitiveApiPaths` / `AiCapabilityApiPaths` 常量解析）
-3. 与 13 个 spec 文件里出现的实际路径字面量做前缀匹配 → **已覆盖 157**
-4. 剩余 121 个逐前缀**活体 curl 探测**（不是凭空写理由）
+3. 与 13 个 spec 文件里出现的实际路径字面量做前缀匹配 → **已覆盖 162**（2026-11-15 第二轮：原 159 + `CaliberContractController` + 两个 wAgent 200 面补测）
+4. 剩余 121 个逐前缀（新增 2 个已覆盖，故未覆盖数不变）**活体 curl 探测**（不是凭空写理由）
 
 | 活体结果 | 数量 | 判定 |
 |---|---|---|
@@ -66,13 +72,13 @@
 | WAgentReadinessController | (none) | 2 | 未覆盖 | 路径含 {questionId} 模板，反探 404 E-NOT-FOUND |
 | WAgentEvidenceTraceController | (none) | 2 | 未覆盖 | 路径含 {runId}/{evidenceId} 模板，反探 404 E-NOT-FOUND |
 | WAgentKillSwitchController | (none) | 1 | 未覆盖 | 仅 POST /flags/kill-switch（写语义面），GET 不可用 |
-| WAgentToolContractController | (none) | 3 | 未覆盖 | 已实测 GET /api/v1/wagent/tools → 200（真实工具契约面） |
+| WAgentToolContractController | (none) | 3 | 已覆盖 | **2026-11-15 改判**：正文自述「已实测 GET /api/v1/wagent/tools → 200」却挂未覆盖；已补 `coverage-registry.spec.ts V-COV-wAgent 工具契约面`（必须 200） |
 | WAgentGoalController | (none) | 2 | 未覆盖 | 仅 POST /goals（写语义面），已验空提交必拒 + GET 405 |
 | WAgentQuestionController | (none) | 2 | 未覆盖 | POST /questions + GET /questions/{id}，反探 404 |
 | WAgentApprovalController | (none) | 1 | 未覆盖 | 仅 POST /approval-tokens（L3 凭证签发面） |
 | WAgentRunController | (none) | 7 | 未覆盖 | 已实测 GET /runs/{id} → 404 E-NOT-FOUND（模板参数必填） |
 | WAgentDecisionActionController | (none) | 3 | 未覆盖 | 仅 POST /decisions 与 /actions（写语义面），GET 405 |
-| WAgentCandidateController | (none) | 6 | 未覆盖 | 已实测 GET /api/v1/wagent/candidates → 200 {candidates:[],total:0} |
+| WAgentCandidateController | (none) | 6 | 已覆盖 | **2026-11-15 改判**：正文自述「已实测 GET /api/v1/wagent/candidates → 200 {candidates:[],total:0}」却挂未覆盖；已补 `coverage-registry.spec.ts V-COV-wAgent 候选面`（必须 200） |
 | AiCapabilityController | (none) | 4 | 未覆盖 | 已实测 GET /api/v1/ai/capabilities → 200（AI 能力目录） |
 | CognitiveBeliefController | /api/v1/cognitive/beliefs | 6 | 未覆盖 | 活体 400：需参数，已登记 |
 | CognitiveEvidenceController | /api/v1/cognitive/evidence | 3 | 已覆盖 | spec 前缀匹配命中（§一.3：与 13 个 spec 的路径字面量做前缀比对） |
@@ -89,6 +95,7 @@
 | ContextBuildController | CognitiveApiPaths.COGNITIVE | 1 | 未覆盖 | 常量未解析（CognitiveApiPaths/AiCapabilityApiPaths），前缀已在其它行覆盖 |
 | OutcomeEvaluateController | /api/v1/cognitive | 4 | 已覆盖 | spec 前缀匹配命中（§一.3：与 13 个 spec 的路径字面量做前缀比对） |
 | CognitiveAssetCatalogController | CognitiveApiPaths.COGNITIVE | 4 | 未覆盖 | 常量未解析（CognitiveApiPaths/AiCapabilityApiPaths），前缀已在其它行覆盖 |
+| ParetoController | /api/v1/pareto | 4 | 已覆盖 | D106 修复后落地（optimize/problems/result/from-scenario）；活体 `GET /api/v1/pareto/problems` → 200（2026-11-15） |
 | OutcomeBacktestController | CognitiveApiPaths.COGNITIVE | 2 | 未覆盖 | 常量未解析（CognitiveApiPaths/AiCapabilityApiPaths），前缀已在其它行覆盖 |
 | ForecastRunComputeController | CognitiveApiPaths.COGNITIVE | 5 | 未覆盖 | 常量未解析（CognitiveApiPaths/AiCapabilityApiPaths），前缀已在其它行覆盖 |
 | CognitiveObjectCatalogController | CognitiveApiPaths.COGNITIVE | 3 | 未覆盖 | 常量未解析（CognitiveApiPaths/AiCapabilityApiPaths），前缀已在其它行覆盖 |
@@ -258,6 +265,7 @@
 | WorkflowInstanceApprovalController | /api/v1/ontology/workflow-instances | 1 | 未覆盖 | 活体 404：该前缀未在本部署装配（见 §5.3 装配缺口登记） |
 | GitController | /api/v1/ecos/git | 10 | 未覆盖 | 活体 503：依赖未就绪（如实降级） |
 | DqDashboardController | /api/dq | 10 | 未覆盖 | 活体 404：该前缀未在本部署装配（见 §5.3 装配缺口登记） |
+| DqDashboardForwardController | /api/v1/dq/{dashboard,issues/**,executions/**,causal-deviation,goal-tracking,execute-all} | 1 | 已覆盖 | D105/D107 修复后落地（gateway 转发器，v1→裸 /api/dq 回退再转发）；活体 `GET /api/v1/dq/dashboard`、`/api/v1/dq/goal-tracking` → 200（2026-11-15） |
 | DataLakeController | /api/datalake | 5 | 未覆盖 | 活体 404：该前缀未在本部署装配（见 §5.3 装配缺口登记） |
 | HealthController | /api | 1 | 已覆盖 | spec 前缀匹配命中（§一.3：与 13 个 spec 的路径字面量做前缀比对） |
 | AuthController | /api/v1/auth | 4 | 已覆盖 | spec 前缀匹配命中（§一.3：与 13 个 spec 的路径字面量做前缀比对） |
@@ -308,4 +316,4 @@
 | ScenarioBlueprintController | /api/v1/business/scenarios/scenarioId/blueprints | 12 | 未覆盖 | 活体 200：已纳入 coverage-registry.spec 实测 |
 | PeriodCloseContractController | /api/v1/workspace | 1 | 已覆盖 | spec 前缀匹配命中（§一.3：与 13 个 spec 的路径字面量做前缀比对） |
 | BacktestContractController | /api/v1/workspace/backtests | 1 | 未覆盖 | 活体 403：权限面，已登记 |
-| CaliberContractController | /api/v1/workspace/calibers | 7 | 未覆盖 | GET /{id} → 403 PERMISSION_DENIED（口径契约需特定权限） |
+| CaliberContractController | /api/v1/workspace/calibers | 7 | 已覆盖 | **2026-11-15 改判**：原记「GET /{id} → 403 PERMISSION_DENIED（需特定权限）」是 D112 跨服务凭证中继失效的现场；D112 修复后实测 **200** 且 `dataSource="ontology-owner-rest"`（属主真值回源）。已补入 `coverage-registry.spec.ts` `V-COV-口径契约(属主回源)` |

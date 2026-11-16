@@ -104,24 +104,26 @@ public class OntologyDao extends JdbcTemplateDaoSupport {
         return prefix + ((max == null ? 500L : max) + 1L);
     }
 
+    // D135（2026-11-16）：软删行（is_deleted = 1）不得再出现在读面。
     public List<OntologyEntity> findEntitiesByOntology(String ontologyId) {
         return jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_entity WHERE ontology_id = ? ORDER BY sort_order",
+            "SELECT * FROM ecos_ontology_entity WHERE ontology_id = ? AND is_deleted = 0 ORDER BY sort_order",
             ENTITY_MAPPER, ontologyId);
     }
 
     public Optional<OntologyEntity> findEntityById(String id) {
         List<OntologyEntity> list = jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_entity WHERE id = ?", ENTITY_MAPPER, id);
+            "SELECT * FROM ecos_ontology_entity WHERE id = ? AND is_deleted = 0", ENTITY_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     public int insertEntity(OntologyEntity entity) {
         return jdbcTemplate.update("""
-            INSERT INTO ecos_ontology_entity (id, ontology_id, code, name, description, entity_type, sort_order, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            INSERT INTO ecos_ontology_entity (id, ontology_id, code, name, description, entity_type, sort_order, domain_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             """, entity.getId(), entity.getOntologyId(), entity.getCode(),
-            entity.getName(), entity.getDescription(), entity.getEntityType(), entity.getSortOrder());
+            entity.getName(), entity.getDescription(), entity.getEntityType(), entity.getSortOrder(),
+            entity.getDomainId());
     }
 
     public int updateEntity(String id, String code, String name, String description, String entityType) {
@@ -150,7 +152,7 @@ public class OntologyDao extends JdbcTemplateDaoSupport {
 
     public Optional<OntologyProperty> findPropertyById(String id) {
         List<OntologyProperty> list = jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_property WHERE id = ?", PROP_MAPPER, id);
+            "SELECT * FROM ecos_ontology_property WHERE id = ? AND is_deleted = 0", PROP_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
@@ -197,17 +199,19 @@ public class OntologyDao extends JdbcTemplateDaoSupport {
 
     public List<OntologyRelationship> findRelationshipsByEntity(String entityId) {
         return jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_relationship WHERE source_entity_id = ? OR target_entity_id = ?",
+            "SELECT * FROM ecos_ontology_relationship WHERE (source_entity_id = ? OR target_entity_id = ?) "
+                + "AND is_deleted = 0",
             REL_MAPPER, entityId, entityId);
     }
 
     public List<OntologyRelationship> findAllRelationships() {
-        return jdbcTemplate.query("SELECT * FROM ecos_ontology_relationship", REL_MAPPER);
+        return jdbcTemplate.query(
+            "SELECT * FROM ecos_ontology_relationship WHERE is_deleted = 0", REL_MAPPER);
     }
 
     public Optional<OntologyRelationship> findRelationshipById(String id) {
         List<OntologyRelationship> list = jdbcTemplate.query(
-            "SELECT * FROM ecos_ontology_relationship WHERE id = ?", REL_MAPPER, id);
+            "SELECT * FROM ecos_ontology_relationship WHERE id = ? AND is_deleted = 0", REL_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
@@ -219,16 +223,18 @@ public class OntologyDao extends JdbcTemplateDaoSupport {
             rel.getCode(), rel.getName(), rel.getRelationshipType());
     }
 
+    // D134（2026-11-16）：关系表的时间列是 update_time，没有 updated_at
+    // （V327 只给 ecos_control 镜像补了 create_time/update_time；实体表才有 updated_at）。
     public int deleteRelationship(String id) {
         return jdbcTemplate.update(
             "UPDATE ecos_ontology_relationship SET is_deleted = 1, status = 'ARCHIVED', " +
-            "updated_at = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
+            "update_time = now(), update_by = 'system' WHERE id = ? AND is_deleted = 0", id);
     }
 
     public int deleteRelationshipsByEntity(String entityId) {
         return jdbcTemplate.update(
             "UPDATE ecos_ontology_relationship SET is_deleted = 1, status = 'ARCHIVED', " +
-            "updated_at = now(), update_by = 'system' " +
+            "update_time = now(), update_by = 'system' " +
             "WHERE (source_entity_id = ? OR target_entity_id = ?) AND is_deleted = 0",
             entityId, entityId);
     }
@@ -271,13 +277,14 @@ public class OntologyDao extends JdbcTemplateDaoSupport {
     public List<OntologyEntity> findEntitiesByDomain(String domainCode) {
         return jdbcTemplate.query(
             "SELECT e.* FROM ecos_ontology_entity e " +
-            "INNER JOIN ecos_ontology_domain d ON e.domain_id = d.id " +
-            "WHERE d.code = ? ORDER BY e.sort_order",
+            "INNER JOIN ecos_ontology.ecos_domain d ON e.domain_id = d.id " +
+            "WHERE d.code = ? AND e.is_deleted = 0 ORDER BY e.sort_order",
             ENTITY_MAPPER, domainCode);
     }
 
     public List<OntologyEntity> findAllEntities() {
-        return jdbcTemplate.query("SELECT * FROM ecos_ontology_entity ORDER BY sort_order", ENTITY_MAPPER);
+        return jdbcTemplate.query(
+            "SELECT * FROM ecos_ontology_entity WHERE is_deleted = 0 ORDER BY sort_order", ENTITY_MAPPER);
     }
 
     public int updateEntityDomain(String entityId, String domainId) {
@@ -294,15 +301,17 @@ public class OntologyDao extends JdbcTemplateDaoSupport {
             m.put("code", rs.getString("code"));
             return m;
         };
-        return jdbcTemplate.query("SELECT source_entity_id, target_entity_id, code FROM ecos_ontology_relationship", mapper);
+        return jdbcTemplate.query(
+            "SELECT source_entity_id, target_entity_id, code FROM ecos_ontology_relationship WHERE is_deleted = 0",
+            mapper);
     }
 
     // ═══════════════ Ontology CRUD (ecos_ontology 表 —— V200 已 DROP) ═══════════════════
-    // V200 治理把旧的本体主表 ecos_ontology 并入 ecos_ontology_domain（域表）。
+    // V200 治理把旧的本体主表 ecos_ontology 并入域表 ecos_ontology.ecos_domain（D132）。
     // 前端 (OntologyWorkbenchLayout / useOntologyData) 在 T8 已把 /ecos/ontologies
     // 降级为「域兜底源」，权威域源是 /api/v1/ontology/domains。此主表 CRUD 无实存读源，
     // 读路径返回空以保页面健康（不抛 relation-does-not-exist 500），写路径 no-op。
-    // 组世代：如后续需单体业务能力，应改读 ecos_ontology_domain 或回 = E fetchOntologies 路径。
+    // 组世代：如后续需单体业务能力，应改读 ecos_ontology.ecos_domain 或回 = E fetchOntologies 路径。
 
     public List<Map<String, Object>> findAllOntologies() {
         // V200: 表已 DROP，无实存源 —— 返回空列表（前端仅作域兜底，权威域源见 /ontology/domains）
@@ -333,7 +342,7 @@ public class OntologyDao extends JdbcTemplateDaoSupport {
         String sql = "SELECT r.id, r.source_entity_id, r.target_entity_id, r.code, r.name, r.relationship_type, r.created_at " +
                      "FROM ecos_ontology_relationship r " +
                      "JOIN ecos_ontology_entity se ON r.source_entity_id = se.id " +
-                     "WHERE se.ontology_id = ? " +
+                     "WHERE se.ontology_id = ? AND se.is_deleted = 0 AND r.is_deleted = 0 " +
                      "ORDER BY r.created_at DESC";
         return jdbcTemplate.queryForList(sql, ontologyId);
     }

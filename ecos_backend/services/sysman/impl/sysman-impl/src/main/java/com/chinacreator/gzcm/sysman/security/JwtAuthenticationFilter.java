@@ -191,6 +191,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         context.setTenantId(tenantId);
         // 保留 UserContext 同步（供 ClearanceInterceptor 用）
         UserContext.setCurrent(context);
+        // D112（2026-11-15 活体实证）：把已认证身份写进**请求属性**，供同进程内的
+        // 出站凭证中继（CallerCredentialSource）使用。此前唯一写入点是 gateway
+        // EcosTrustHeaderFilter，但它在 MIN_VALUE+20（Spring Security 链 -100 之外层），
+        // 无论前置还是 finally 重注入，控制器执行期都拿不到 SecurityContext ⇒ 属性恒空。
+        // 本过滤器恰在认证完成后、控制器之前，且已持有三要素，是最小正确写入点。
+        // 属性名与 EcosTrustHeaderFilter.ATTR_INJECTED_USER/TENANT 保持同值（跨模块常量
+        // 不可直引：sysman-impl 不依赖 gateway；两侧字面量对齐由
+        // CallerCredentialSourceSingleSourceTest 的 D112 回落用例与
+        // JwtInjectedAttributeTest 双向守门）。
+        request.setAttribute("ECOS_INJECTED_USER", userId);
+        request.setAttribute("ECOS_INJECTED_TENANT", tenantId);
         log.debug("JWT authenticated: userId={}, tenant={} (source={}), authorities={}",
                 userId, tenantId, tenantSource, allAuthorities);
 

@@ -77,6 +77,26 @@ public class DictService implements IDictService {
 
     @Override
     public SysDict createDictItem(SysDict dict) {
+        // 删除是逻辑删除（status→inactive），但唯一索引含 inactive 行：
+        // 同一定义键若只判 active 就 INSERT，必然撞 sys_dict_dict_type_dict_code_key → 500。
+        // 故先查任意状态：inactive 行就地复活（同键复用），仅真不存在时才 INSERT。
+        SysDict anyStatus = dao.findAnyStatus(dict.getDictType(), dict.getDictCode());
+        if (anyStatus != null) {
+            if ("active".equals(anyStatus.getStatus())) {
+                return anyStatus;
+            }
+            if (dict.getSortOrder() == 0) {
+                Integer maxOrder = dao.maxSortOrder(dict.getDictType());
+                dict.setSortOrder(maxOrder != null ? maxOrder + 1 : 1);
+            }
+            if (dict.getStatus() == null) {
+                dict.setStatus("active");
+            }
+            dao.revive(dict, dict.getDictType(), dict.getDictCode());
+            refreshDictType(dict.getDictType());
+            return getDictItem(dict.getDictType(), dict.getDictCode());
+        }
+
         if (dict.getId() == null || dict.getId().isEmpty()) {
             dict.setId(UUID.randomUUID().toString().replace("-", ""));
         }

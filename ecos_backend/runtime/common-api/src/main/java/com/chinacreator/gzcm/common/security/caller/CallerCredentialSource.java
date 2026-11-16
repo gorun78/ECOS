@@ -103,12 +103,34 @@ public final class CallerCredentialSource {
             return Carrier.EMPTY;
         }
         HttpServletRequest request = servletAttrs.getRequest();
-        return new Carrier(
+        Carrier fromHeaders = new Carrier(
                 header(request, HttpHeaders.AUTHORIZATION),
                 header(request, HeaderAuthInterceptor.H_USER),
                 header(request, HeaderAuthInterceptor.H_ROLE),
                 header(request, HeaderAuthInterceptor.H_TENANT),
                 header(request, HeaderAuthInterceptor.H_DOMAIN));
+        // D112（2026-11-15 活体实证）：信任头按字段回落，**不能**整包短路。
+        // 原实现 `present()` 为真即原样返回——但认证请求几乎总带 Authorization，
+        // 于是 user/tenant 两枚永不走到回落，出站 rls/apply 恒缺信任头（403 ECOS-AUTH-010）。
+        // 剥离开销由入口保证：X-ECOS-* 只会被 EcosTrustHeaderFilter 剥离（伪造面），
+        // Authorization 不在剥离集合内 ⇒ 它是真实入口凭证，逐字中继安全。
+        // 身份写入点见 sysman JwtAuthenticationFilter（认证后、控制器前）；属性名两侧字面量对齐。
+        String attrUser = attribute(request, "ECOS_INJECTED_USER");
+        String attrTenant = attribute(request, "ECOS_INJECTED_TENANT");
+        if (attrUser == null && attrTenant == null) {
+            return fromHeaders;
+        }
+        return new Carrier(
+                fromHeaders.authorization(),
+                fromHeaders.user() != null ? fromHeaders.user() : attrUser,
+                fromHeaders.role(),
+                fromHeaders.tenant() != null ? fromHeaders.tenant() : attrTenant,
+                fromHeaders.domain());
+    }
+
+    private static String attribute(HttpServletRequest request, String name) {
+        Object v = request.getAttribute(name);
+        return v == null ? null : trimToNull(String.valueOf(v));
     }
 
     /**

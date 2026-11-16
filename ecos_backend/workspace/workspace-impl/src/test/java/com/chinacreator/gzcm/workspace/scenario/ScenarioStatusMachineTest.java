@@ -99,4 +99,58 @@ class ScenarioStatusMachineTest {
 
         assertEquals("jwt-user-42", seen.get(), "守卫只消费 JWT 主体，请求体 userId 无影响");
     }
+
+    // ── D110（2026-11-15）：三段式顺序 —— 结构非法边优先于权限，带载荷前置留在权限后 ──
+
+    @Test
+    @DisplayName("D110：未授权主体对「本就非法的边」拿到 409（而非 403），不再误导去申请不存在的权限")
+    void structurallyIllegalEdgeWinsOverDeniedPermission() {
+        ScenarioStatusMachine machine = new ScenarioStatusMachine(DENY_ALL);
+        TransitionContext ctx = TransitionContext.builder().build();
+
+        IllegalScenarioTransitionException ex = assertThrows(IllegalScenarioTransitionException.class,
+                () -> machine.assertTransition(ScenarioStatus.DRAFT, ScenarioStatus.SUSPENDED, ctx),
+                "DRAFT→SUSPENDED 本就是非法边；DENY_ALL 下仍必须 409，否则用户按 403 去申请一个不存在的权限");
+        assertEquals(409, ex.getHttpStatus());
+        assertEquals("ILLEGAL_TRANSITION", ex.getCode());
+
+        IllegalScenarioTransitionException terminal = assertThrows(IllegalScenarioTransitionException.class,
+                () -> machine.assertTransition(ScenarioStatus.COMPLETED, ScenarioStatus.ACTIVE, ctx));
+        assertEquals("TERMINAL_STATE", terminal.getCode());
+    }
+
+    @Test
+    @DisplayName("D110 反证：带孤岛载荷的前置判定仍受权限保护 —— 未授权主体拿 403 而非孤岛明细")
+    void islandPayloadStillGatedByPermission() {
+        ScenarioStatusMachine machine = new ScenarioStatusMachine(DENY_ALL);
+        TransitionContext islanded = TransitionContext.builder()
+                .islands(Collections.singletonList(
+                        new CompletenessReport.IslandView("kb-1", "机密知识库", "KNOWLEDGE_BASE", "NO_REACHABLE_EDGE")))
+                .build();
+
+        ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
+                () -> machine.assertTransition(ScenarioStatus.DRAFT, ScenarioStatus.ACTIVE, islanded),
+                "DRAFT→ACTIVE 是结构合法边，必须过权限闸门；若先跑 assertActivate 就会把孤岛明细泄露给未授权主体");
+        assertEquals(403, ex.getHttpStatus());
+        assertEquals("scenario:activate", ex.getDetails().get("permission"));
+
+        ForbiddenOperationException resume = assertThrows(ForbiddenOperationException.class,
+                () -> machine.assertTransition(ScenarioStatus.SUSPENDED, ScenarioStatus.ACTIVE, islanded),
+                "SUSPENDED→ACTIVE 同样携带孤岛载荷，必须权限先于载荷");
+        assertEquals(403, resume.getHttpStatus());
+    }
+
+    @Test
+    @DisplayName("D110 正向：授权主体仍能拿到完整的 409 孤岛载荷（修复没有牺牲可诊断性）")
+    void authorizedSubjectStillGetsIslandPayload() {
+        ScenarioStatusMachine machine = new ScenarioStatusMachine(ALLOW_ALL);
+        TransitionContext islanded = TransitionContext.builder()
+                .islands(Collections.singletonList(
+                        new CompletenessReport.IslandView("kb-1", "孤儿", "KNOWLEDGE_BASE", "NO_REACHABLE_EDGE")))
+                .build();
+
+        IslandBindingException ex = assertThrows(IslandBindingException.class,
+                () -> machine.assertTransition(ScenarioStatus.DRAFT, ScenarioStatus.ACTIVE, islanded));
+        assertEquals(409, ex.getHttpStatus());
+    }
 }

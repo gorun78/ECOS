@@ -59,7 +59,8 @@ class UserControllerWireShapeTest {
 
     private static UserController controller(IUserService users, UserQueryService queries) {
         return new UserController(users, queries, mock(PermissionCacheService.class),
-                mock(IPermissionCheckService.class));
+                mock(IPermissionCheckService.class),
+                mock(com.chinacreator.gzcm.sysman.iam.service.impl.LoginCredentialService.class));
     }
 
     private static UserAccount account() {

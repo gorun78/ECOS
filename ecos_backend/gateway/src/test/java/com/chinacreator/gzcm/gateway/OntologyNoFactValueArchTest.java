@@ -160,7 +160,12 @@ class OntologyNoFactValueArchTest {
             "V294__fc_predictivity_tables_and_demo_subjects.sql",
             // D3 修复（2026-11-13 验证批）：V330 给 ecos_control.ecos_business_scenario 新增
             // budget_amount NUMERIC(18,2)（MC01 金额列红线），属业务域金额面，按本门口径登记。
-            "V330__scenario_budget_amount_numeric.sql");
+            "V330__scenario_budget_amount_numeric.sql",
+            // 2026-11-15 世界模型承流批 D108：V336 把 ecos_control.ecos_business_scenario 的
+            // **从零建库**建表语句补进单源（此前该表只由 search_path 落库，单源里没有 CREATE）。
+            // 该 CREATE 里的 budget_amount 就是 V330 已登记的那一列 —— 同一张表、同一列、
+            // 同一金额面，V336 不新增金额语义，只是把「已存在的列」写进建表脚本。
+            "V336__ecos_control_business_scenario.sql");
 
     /** 数值度量类型（金额/浮点一律禁入本域；整数类枚举/开关列不在禁列，见 {@link #MONEY_NAME_TOKENS} 的语义列名判据）。 */
     private static final Pattern NUMERIC_TYPE = Pattern.compile(

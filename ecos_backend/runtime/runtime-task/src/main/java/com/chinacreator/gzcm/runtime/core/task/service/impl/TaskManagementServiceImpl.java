@@ -493,26 +493,55 @@ public class TaskManagementServiceImpl implements ITaskManagementService {
     public Map<String, Object> getTaskStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
         int running = 0, pending = 0, succeeded = 0, failed = 0, cancelled = 0;
-        
-        for (TaskStatus s : statuses.values()) {
-            if (s.getStatus() == null) continue;
-            switch (s.getStatus()) {
-                case RUNNING: running++; break;
-                case PENDING: pending++; break;
-                case SUCCEEDED: succeeded++; break;
-                case FAILED: failed++; break;
-                case CANCELLED: cancelled++; break;
-                default: break;
+        Integer total = null;
+
+        // D119（2026-11-15）：列表已走 PG（D115 打开持久化），统计若仍数内存 map，
+        // 两个端点就是两套口径 —— 实测列表 total=20 / 统计 total=9，交叉对账必红。
+        // 这里统一到同一个库口径；仅当持久化不可用时才退回内存。
+        if (persistenceService instanceof com.chinacreator.gzcm.runtime.core.task.persistence.impl.JdbcTaskPersistenceService jdbc) {
+            try {
+                Map<String, Integer> byStatus = jdbc.countStatusByCategory();
+                running = byStatus.getOrDefault("RUNNING", 0);
+                pending = byStatus.getOrDefault("PENDING", 0);
+                succeeded = byStatus.getOrDefault("SUCCEEDED", 0);
+                failed = byStatus.getOrDefault("FAILED", 0);
+                cancelled = byStatus.getOrDefault("CANCELLED", 0);
+                total = jdbc.countTasks(null);
+            } catch (Exception e) {
+                logger.warn("getTaskStats: PG 统计失败，退回内存口径", e);
+                total = null;
             }
         }
-        
-        stats.put("total", statuses.size());
+
+        if (total == null) {
+            for (TaskStatus s : statuses.values()) {
+                if (s.getStatus() == null) continue;
+                switch (s.getStatus()) {
+                    case RUNNING: running++; break;
+                    case PENDING: pending++; break;
+                    case SUCCEEDED: succeeded++; break;
+                    case FAILED: failed++; break;
+                    case CANCELLED: cancelled++; break;
+                    default: break;
+                }
+            }
+            total = statuses.size();
+        }
+
+        stats.put("total", total);
         stats.put("running", running);
         stats.put("pending", pending);
         stats.put("succeeded", succeeded);
         stats.put("failed", failed);
         stats.put("cancelled", cancelled);
         return stats;
+    }
+
+    @Override
+    public int countTasks(Map<String, Object> condition) throws TaskManagementException {
+        // 与 queryTasks 同一数据源与过滤逻辑：取全量后按条件过滤再计数，
+        // 保证「列表 total」与「列表实际能翻出来的行数」恒等（D119）。
+        return queryTasks(condition, 0, Integer.MAX_VALUE).size();
     }
 
     @Override

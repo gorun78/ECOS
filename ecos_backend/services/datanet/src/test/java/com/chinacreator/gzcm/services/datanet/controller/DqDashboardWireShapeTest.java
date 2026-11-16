@@ -73,7 +73,7 @@ class DqDashboardWireShapeTest {
             // 因果链 SQL 同时含 ecos_wm_goal（JOIN），须先判更具体的片段
             for (String key : List.of("ecos_dq_execution_result", "FROM ecos_dq_issue",
                     "FROM ecos_dq_rule", "ecos_wm_causal_link", "ecos_goal_tracking",
-                    "ecos_wm_goal", "GROUP BY severity", "GROUP BY issue_type")) {
+                    "ecos_wm_goal", "GROUP BY severity", "split_part(asset_id")) {
                 if (sql.contains(key) && lists.containsKey(key)) {
                     return lists.get(key);
                 }
@@ -146,6 +146,8 @@ class DqDashboardWireShapeTest {
 
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", "r-1");
+        // D107：SQL 已按真实列取数，enabled 是真实存在的列（status 不存在），mapper 读它做 ACTIVE/DISABLED 映射
+        row.put("enabled", Boolean.TRUE);
         row.put("created_at", Timestamp.valueOf("2026-01-02 03:04:05"));
         row.put("updated_at", Timestamp.valueOf("2026-01-02 03:04:06"));
         DqDashboardController.DqRuleRow mapped = mapper.mapRow(fakeResultSet(row), 0);
@@ -153,6 +155,7 @@ class DqDashboardWireShapeTest {
         assertEquals("2026-01-02T03:04:05", mapped.createdAt());
         assertEquals(Timestamp.valueOf("2026-01-02 03:04:06"), mapped.updatedAt(),
                 "updated_at 旧实现即原始 Timestamp，本批不改语义");
+        assertEquals("ACTIVE", mapped.status(), "enabled=true 映射为 ACTIVE（真实表无 status 列）");
     }
 
     @Test
@@ -160,11 +163,11 @@ class DqDashboardWireShapeTest {
     void dashboardKeys() {
         FakeService service = new FakeService()
                 .list("GROUP BY severity", List.of(new DqDashboardController.SeverityCount("HIGH", 4L)))
-                .list("GROUP BY issue_type", List.of(new DqDashboardController.IssueTypeCount("NULL_RATE", 6L)))
+                .list("split_part(asset_id", List.of(new DqDashboardController.IssueTypeCount("Customer", 6L)))
                 .count("ecos_dq_rule", 5)
-                .count("status = 'ACTIVE'", 3)
-                .count("ecos_dq_issue", 7)
-                .count("status = 'OPEN'", 2);
+                .count("enabled = true", 3)
+                .count("FROM ecos_dq_issue", 7)
+                .count("lower(status) = 'open'", 2);
         DqDashboardController controller = new DqDashboardController(service);
 
         DqDashboardController.DqDashboardVO vo = controller.dashboard().getData();

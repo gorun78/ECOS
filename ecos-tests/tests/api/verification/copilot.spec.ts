@@ -101,10 +101,17 @@ test.describe('Copilot 对话（核心：真调 vs 伪造）', () => {
       token,
       data: { agentId: 'agent-data', message: 'how many data sources are there' },
     });
-    expect(status, 'chat 应 200（业务结果在 data.success 里）').toBe(200);
-    expect(json?.code).toBe(0);
+    // D63①（2026-11-14 修复）：失败态不再压成 HTTP 200 —— 状态行必须与信封一致。
+    // 成功 ⇒ 200 + code 0；被护栏拦截 ⇒ 4xx/5xx（403 家族），信封字段不变。
+    expect([200, 400, 401, 403, 422, 429, 500, 502, 503, 504],
+      `chat 状态行必须是「200 成功」或「明确的失败码」，实得 ${status}`).toContain(status);
+    if (status === 200) {
+      expect(json?.code, '成功态信封 code 必须为 0').toBe(0);
+    } else {
+      expect(status >= 400, `失败态必须 ≥400，实得 ${status}`).toBe(true);
+    }
     const d = json?.data as any;
-    expect(d, 'chat 必须返回结果体').toBeTruthy();
+    expect(d, 'chat 必须返回结果体（成功或失败都要可读）').toBeTruthy();
     // 可追溯性：主通道应暴露 agent/engine/工具白名单/traceId 之一
     const traceable = Boolean(d?.agentId) || Boolean(d?.engine) || Boolean(d?.traceId)
       || Boolean(d?.sessionId) || Array.isArray(d?.tools) || Array.isArray(d?.toolCalls);

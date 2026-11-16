@@ -45,6 +45,15 @@ public class UserDaoImpl implements UserDao {
     }
 
     @Override
+    public void updatePassword(UserAccount user) throws Exception {
+        try {
+            databaseAccess.executeUpdateFromConfigWithEntity(SQL_CONFIG_PATH, "updatePassword", user);
+        } catch (ISystemDatabaseAccess.DatabaseAccessException e) {
+            throw new Exception("更新口令失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public void delete(String userId) throws Exception {
         try {
             Map<String, Object> params = new HashMap<>();

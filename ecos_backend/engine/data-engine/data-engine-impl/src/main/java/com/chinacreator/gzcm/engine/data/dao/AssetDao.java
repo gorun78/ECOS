@@ -112,9 +112,15 @@ public class AssetDao extends JdbcTemplateDaoSupport {
             assetId);
     }
 
-    /** findAssetRows — 未登记资产的详情兜底（与 listPhysicalFallback 同源同列）。 */
-    public List<DataAssetVO> findPhysicalFallbackById(String assetId) {
-        return jdbcTemplate.query(
+    /**
+     * 物理层兜底列清单（详情腿与列表腿共用；两处各写一份会让方言面成倍膨胀）。
+     *
+     * <p>{@code 0::bigint} 与 {@code '1'::text} 两枚字面量占位不是装饰：
+     * {@code assetRowMapper} 无条件按 {@code Long} 读 {@code confirmed_field_count}、
+     * 按 {@code String} 读 {@code version_no}，而 {@code td_data_resource} 两列皆无
+     * ——不显式定型会让物理层兜底整体抛转换异常。</p>
+     */
+    private static final String PHYSICAL_FALLBACK_SELECT =
             "SELECT r.resource_id AS asset_id, r.resource_id, r.resource_name AS asset_name, " +
             "  r.resource_name, r.resource_type, r.datasource_id, NULL::text AS business_desc, " +
             "  NULL::text AS owner, NULL::text AS owner_org, 'SOURCE'::text AS data_grain, " +
@@ -125,7 +131,12 @@ public class AssetDao extends JdbcTemplateDaoSupport {
             "  COALESCE(r.field_count, 0) AS field_count, COALESCE(r.record_count, -1) AS record_count, " +
             "  COALESCE(NULLIF(r.layer, ''), 'CURATED')::text AS layer, r.zone, r.last_sync_time, " +
             "  0::bigint AS confirmed_field_count, '1'::text AS version_no " +
-            "FROM td_data_resource r WHERE r.resource_id = ?",
+            "FROM td_data_resource r WHERE TRUE";
+
+    /** findAssetRows — 未登记资产的详情兜底（与 listPhysicalFallback 同源同列）。 */
+    public List<DataAssetVO> findPhysicalFallbackById(String assetId) {
+        return jdbcTemplate.query(
+            PHYSICAL_FALLBACK_SELECT + " AND r.resource_id = ?",
             assetRowMapper(),
             assetId);
     }
@@ -209,23 +220,7 @@ public class AssetDao extends JdbcTemplateDaoSupport {
 
     /** listPhysicalFallback — 物理层占位视图 */
     public List<DataAssetVO> listPhysicalFallback(DataAssetQueryDTO q) {
-        StringBuilder sql = new StringBuilder(
-            "SELECT r.resource_id AS asset_id, r.resource_id, r.resource_name AS asset_name, " +
-            "  r.resource_name, r.resource_type, r.datasource_id, NULL::text AS business_desc, " +
-            "  NULL::text AS owner, NULL::text AS owner_org, 'SOURCE'::text AS data_grain, " +
-            "  NULL::text AS category_id, NULL::text AS category_name, 'L2'::text AS sensitivity_level, " +
-            "  '内部'::text AS level_name, 'PENDING'::text AS category_status, " +
-            "  NULL::text AS last_tagged_by, NULL::timestamp AS last_tagged_at, " +
-            "  'default'::text AS domain, r.description, " +
-            "  COALESCE(r.field_count, 0) AS field_count, COALESCE(r.record_count, -1) AS record_count, " +
-            // 字面量 0 是 int4，而 assetRowMapper 统一按 Long 取该列（其余分支是 COUNT(*) 的 int8）
-            // ⇒ 不显式转 bigint 会抛「conversion to class java.lang.Long from int4 not supported」，
-            // 物理层兜底列表整体 409。
-            "  COALESCE(NULLIF(r.layer, ''), 'CURATED')::text AS layer, r.zone, r.last_sync_time, 0::bigint AS confirmed_field_count, " +
-            // 兜底分支与主分支共用 assetRowMapper，后者无条件读 version_no；td_data_resource
-            // 无该列，补字面量占位（物理层资源不参与乐观锁版本语义）。
-            "  '1'::text AS version_no " +
-            "FROM td_data_resource r WHERE TRUE");
+        StringBuilder sql = new StringBuilder(PHYSICAL_FALLBACK_SELECT);
         List<Object> params = new ArrayList<>();
         if (q.getZone() != null && !q.getZone().isBlank())   { sql.append(" AND r.zone = ?");  params.add(q.getZone()); }
         if (q.getDatasourceId() != null && !q.getDatasourceId().isBlank()) { sql.append(" AND r.datasource_id = ?"); params.add(q.getDatasourceId()); }

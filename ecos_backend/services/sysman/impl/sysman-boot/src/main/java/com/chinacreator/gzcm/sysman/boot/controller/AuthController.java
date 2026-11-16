@@ -97,7 +97,7 @@ public class AuthController {
         }
 
         // ── 密码比对 ──
-        if (!passwordEncoder.matches(password, passwordHash)) {
+        if (!matchesPassword(password, passwordHash)) {
             // ── T1-2: 密码错误 — 增加失败计数 ──
             int failedAttempts = user.get("failed_attempts") != null
                     ? ((Number) user.get("failed_attempts")).intValue() : 0;
@@ -445,6 +445,49 @@ public class AuthController {
     }
 
     // ── 工具方法 ──────────────────────────────────────────
+
+    /**
+     * 口令比对（支持两种存量形态）。
+     *
+     * <p>登录表历史行是 BCrypt（{@code $2a$}/{@code $2b$}/{@code $2y$}），
+     * 而 IAM 主数据侧产出的是 PBKDF2（{@code pbkdf2$iter$salt$hash}，
+     * 见 {@code UserServiceImpl} 的 {@code PasswordHasher}）。用户管理的写面已经镜像到登录表并统一写 BCrypt，
+     * 但历史账号仍可能是 PBKDF2，若不识别就永远 401「用户名或密码错误」。</p>
+     */
+    private boolean matchesPassword(String raw, String stored) {
+        if (stored == null || stored.isEmpty()) {
+            return false;
+        }
+        if (stored.startsWith("pbkdf2$")) {
+            return matchesPbkdf2(raw, stored);
+        }
+        return passwordEncoder.matches(raw, stored);
+    }
+
+    /** 门禁用入口（包内可见，避免为测试放宽生产方法的可见性语义）。 */
+    boolean matchesPasswordForTest(String raw, String stored) {
+        return matchesPassword(raw, stored);
+    }
+
+    private boolean matchesPbkdf2(String raw, String stored) {
+        String[] parts = stored.split("\\$");
+        if (parts.length != 4) {
+            return false;
+        }
+        try {
+            int iterations = Integer.parseInt(parts[1]);
+            byte[] salt = java.util.Base64.getDecoder().decode(parts[2]);
+            byte[] expected = java.util.Base64.getDecoder().decode(parts[3]);
+            javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(
+                    raw.toCharArray(), salt, iterations, expected.length * 8);
+            byte[] actual = javax.crypto.SecretKeyFactory
+                    .getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();
+            return java.security.MessageDigest.isEqual(expected, actual);
+        } catch (Exception e) {
+            log.warn("PBKDF2 口令比对失败（按不匹配处理）: {}", e.getMessage());
+            return false;
+        }
+    }
 
     /**
      * 解析 roles 字段（JSON 数组字符串 → List&lt;String&gt;）。

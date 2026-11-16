@@ -75,7 +75,8 @@ public class ObjectTimelineController {
             @PathVariable int ver) {
         Map<String, Object> version = runtimeService.getVersion(entityCode, id, ver);
         if (version == null) {
-            return ApiResponse.notFound("版本 v" + ver + " 不存在");
+            throw new com.chinacreator.gzcm.common.exception.NotFoundException(
+                    "版本 v" + ver + " 不存在");
         }
         return ApiResponse.success(version);
     }
