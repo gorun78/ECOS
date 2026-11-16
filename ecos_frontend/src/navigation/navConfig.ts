@@ -126,7 +126,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // 2026-10-14 用户裁决：场景工作台入口指向 L1「我的场景」（#/workbench，详设-07），
   // 非 /project_workbench 高级技术视图（ScenarioManagementView，保留可达，不在本组出项）。
   { id: "workbench", route: "/workbench", labelKey: "app.tab.workbench", group: "workspaces", descKey: "sidebar.desc.workbench", icon: Briefcase, tabbable: true },
-  { id: "cognitive-workbench", route: "/cognitive-workbench", labelKey: "app.tab.cognitive_workbench", tabbable: true },
   { id: "agent_studio", route: "/agent_studio", labelKey: "app.tab.ai_workbench", group: "workspaces", descKey: "sidebar.desc.agent_studio", icon: Cpu, tabbable: true, palette: p("agent_studio", CAT.cognitive), searchTypes: ["Agent"] },
   { id: "knowledge_view", route: "/knowledge_view", labelKey: "app.tab.knowledge_view", group: "workspaces", descKey: "sidebar.desc.knowledge_view", icon: BookOpen, tabbable: true },
   { id: "ontology_workbench", route: "/ontology_workbench", labelKey: "app.tab.ontology_workbench", group: "workspaces", descKey: "sidebar.desc.ontology_workbench", icon: Network, tabbable: true },
@@ -299,6 +298,7 @@ export const DELIBERATELY_UNLINKED: Readonly<Record<string, string>> = {
   case_library: "口径 C 硬孤岛：案例库仅从认知页跳转进入；待产品定档是否升为一级导航",
   domain_designer: "口径 C 硬孤岛：main.tsx 仅剩 Navigate 重定向兼容；待后续 Wave 清理",
   domains: "旧重定向兼容路由（Navigate → ontology_workbench），非页面根；保留至重定向下线",
+  "cognitive-workbench": "旧兼容路由重定向到 /decision/cognition；场景认知闭环归属经营决策，不建立并行顶级入口",
   "scenario-sandbox": "沙箱演练页：由场景详情动作进入，天然不该有全局入口",
   project_workbench:
     "2026-10-14 用户裁决：侧栏场景工作台入口改指 /workbench（工作区组成项）；" +
