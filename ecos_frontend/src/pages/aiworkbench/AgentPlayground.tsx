@@ -22,7 +22,7 @@ import type { AIPAgent, AIPModel } from '../../types/aiworkbench';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import SessionList from '../../components/aiworkbench/playground/SessionList';
-import MessageBubble, { OagProgress, OAG_NODES, type OagStepState, type PlaygroundMsg } from '../../components/aiworkbench/playground/MessageBubble';
+import MessageBubble, { OagProgress, OAG_NODES, normalizeOagNode, type OagStepState, type PlaygroundMsg } from '../../components/aiworkbench/playground/MessageBubble';
 
 interface AgentPlaygroundProps {
   /** 由 index.tsx 注入的 Agent 数据（可选 — 组件会用 fetchManagedAgents 自行拉取） */
@@ -168,21 +168,22 @@ export default function AgentPlayground({ agents: agentsFromProps, models: model
     setMessages((prev) => prev.map((m) => {
       if (m.id !== agentMsgId) return m;
       const arr = m.oagSteps || [];
+      // 后端 name() 是类单名（IntentClassifierNode），节点表用短键 —— 先归一化再比对，
+      // 否则每一步都匹配不上，会被当成未知节点追加成第 9、10 项。
+      const nodeKey = normalizeOagNode(step.node);
       let idx = -1;
       for (let i = 0; i < OAG_NODES.length; i++) {
-        if (arr[i] && arr[i].node === step.node) { idx = i; break; }
+        if (arr[i] && normalizeOagNode(arr[i].node) === nodeKey) { idx = i; break; }
       }
-      if (idx === -1) {
-        if (step.node) idx = OAG_NODES.findIndex((n) => n.key === step.node);
-        if (idx === -1) idx = arr.length;
-      }
+      if (idx === -1 && nodeKey) idx = OAG_NODES.findIndex((n) => n.key === nodeKey);
+      if (idx === -1) idx = OAG_NODES.length - 1;
       if (idx < 0) return m;
       const next = [...arr];
       while (next.length < idx) {
         const s = OAG_NODES[next.length];
         next.push({ node: s?.key || '', stepState: 'pending' });
       }
-      const cur = next[idx] || { node: step.node || OAG_NODES[idx].key || '', stepState: 'pending' as const };
+      const cur = next[idx] || { node: OAG_NODES[idx].key, stepState: 'pending' as const };
       const toState: OagStepState = {
         ...cur,
         ...step,

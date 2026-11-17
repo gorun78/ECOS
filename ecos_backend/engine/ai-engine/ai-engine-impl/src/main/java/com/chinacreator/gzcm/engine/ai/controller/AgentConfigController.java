@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ai.audit.AiSecurityEngineAuditInterceptor;
 import com.chinacreator.gzcm.engine.ai.config.AgentConfigService;
 import com.chinacreator.gzcm.engine.ai.config.AgentConfigService.AgentRow;
 import com.chinacreator.gzcm.engine.ai.config.AgentConfigService.AgentTestResponse;
@@ -101,8 +104,11 @@ public class AgentConfigController {
     // ═══════════════ 创建 ═══════════════
 
     @PostMapping
-    public ApiResponse<AgentRow> createAgent(@RequestBody Map<String, Object> body) {
+    public ApiResponse<AgentRow> createAgent(@RequestBody Map<String, Object> body,
+                                             HttpServletRequest request) {
         AgentRow agent = agentConfigService.createAgent(body);
+        // 创建的主键由服务端生成、路径里没有；审计锚点据此把 entity_id 落库（V-AI-095）
+        request.setAttribute(AiSecurityEngineAuditInterceptor.ATTR_ENTITY_ID, agent.id());
         log.info("Agent created via DB: {} [{}]", agent.id(), agent.name());
         return ApiResponse.success(agent);
     }

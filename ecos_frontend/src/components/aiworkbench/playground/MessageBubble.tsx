@@ -35,6 +35,15 @@ export type OagStepState = OagStepEvent & {
 };
 
 /**
+ * 后端 OagNode.name() 返回的是类单名（IntentClassifierNode），
+ * 前端节点表用去后缀的短键 —— 比对前统一裁掉 `Node` 后缀。
+ */
+export function normalizeOagNode(raw?: string): string {
+  const s = (raw || '').trim();
+  return s.endsWith('Node') ? s.slice(0, -4) : s;
+}
+
+/**
  * OagProgress — 8 节点进度条，hover 显示 step name + elapsedMs。
  */
 export function OagProgress({ steps, hasError }: { steps: OagStepState[]; hasError: boolean }) {
@@ -66,13 +75,17 @@ export function OagProgress({ steps, hasError }: { steps: OagStepState[]; hasErr
 
       <div className="flex items-center gap-0.5">
         {steps.map((s, idx) => {
-          const meta = OAG_NODES.find((n) => n.key === s.node) || OAG_NODES[idx];
+          // 第 9 项起没有对应节点元数据（后端节点集扩展/未知节点）——按序号回退到末位元数据，
+          // 保证图标与标题恒有值，不让一条未知帧打崩整棵消息树。
+          const meta = OAG_NODES.find((n) => n.key === normalizeOagNode(s.node))
+            || OAG_NODES[idx]
+            || OAG_NODES[OAG_NODES.length - 1];
           const IconComp = meta.icon;
           const isDone = s.stepState === 'done';
           const isRunning = s.stepState === 'running';
           const isError = s.stepState === 'error';
           return (
-            <React.Fragment key={meta.key}>
+            <React.Fragment key={`${meta.key}-${idx}`}>
               {idx > 0 && (
                 <div
                   className={`flex-1 h-px ${isDone || isError ? styles.accentBorder : styles.cardBorder} border-t`}

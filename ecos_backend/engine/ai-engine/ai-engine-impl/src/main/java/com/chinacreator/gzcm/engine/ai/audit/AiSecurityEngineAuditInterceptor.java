@@ -12,6 +12,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -86,6 +87,14 @@ public class AiSecurityEngineAuditInterceptor implements HandlerInterceptor, Web
         }
     }
 
+    /**
+     * 创建类端点回填对象主键的请求属性名（#147BB / V-AI-095）。
+     *
+     * <p>POST 创建的对象 id 由服务端生成，路径里没有；控制器在成功后写入本属性，
+     * 拦截器据此把 {@code entity_id} 落库。缺属性即留空——禁在拦截器里猜 id。</p>
+     */
+    public static final String ATTR_ENTITY_ID = "ecos.audit.entityId";
+
     /** 审计载荷（键集固定为 {@link #auditPayloadKeyWhitelist()}，只带 ID 与摘要，禁请求/响应原文）。 */
     public Map<String, Object> buildAuditEvent(HttpServletRequest request, int statusCode,
                                                Exception ex, String resource) {
@@ -95,17 +104,87 @@ public class AiSecurityEngineAuditInterceptor implements HandlerInterceptor, Web
         event.put("module", "ai-engine");
         event.put("traceId", AiTraceSupport.currentTraceId());
         event.put("userId", resolveUserId(request));
+        event.put("username", resolveUsername());
+        event.put("operation", resolveOperation(request.getMethod()));
+        event.put("entityType", resolveEntityType(resource));
+        event.put("entityId", resolveEntityId(request));
         event.put("action", request.getMethod() + " " + request.getRequestURI());
         event.put("resource", resource);
         event.put("result", statusCode < 400 && ex == null ? "OK" : "FAIL");
         event.put("statusCode", statusCode);
+        event.put("ipAddress", resolveIp(request));
         return event;
     }
 
     /** 载荷键白名单（traceId 必在：批D 三类拒单需与 CLI 输出同源可对账）。 */
     public static List<String> auditPayloadKeyWhitelist() {
-        return List.of("eventId", "timestamp", "module", "traceId", "userId",
-                "action", "resource", "result", "statusCode");
+        return List.of("eventId", "timestamp", "module", "traceId", "userId", "username",
+                "operation", "entityType", "entityId",
+                "action", "resource", "result", "statusCode", "ipAddress");
+    }
+
+    /**
+     * 动作类别（与 sysman {@code AuditAspect} 的 CREATE/UPDATE/DELETE 同一分类，
+     * 便于跨引擎按 operation 汇总）。
+     */
+    static String resolveOperation(String httpMethod) {
+        if ("POST".equals(httpMethod)) return "CREATE";
+        if ("PUT".equals(httpMethod) || "PATCH".equals(httpMethod)) return "UPDATE";
+        if ("DELETE".equals(httpMethod)) return "DELETE";
+        return null;
+    }
+
+    /** 对象类型 = 控制器简名去 {@code Controller} 后缀（{@code AgentConfigController#createAgent} → {@code AgentConfig}）。 */
+    static String resolveEntityType(String resource) {
+        if (resource == null || resource.isBlank()) return null;
+        int hash = resource.indexOf('#');
+        String bean = hash > 0 ? resource.substring(0, hash) : resource;
+        return bean.endsWith("Controller") ? bean.substring(0, bean.length() - "Controller".length()) : bean;
+    }
+
+    /**
+     * 对象主键：控制器回填的属性优先（POST 创建），其次取 URI 模板变量 {@code id}
+     * （PUT/DELETE/PATCH 的路径参数）。两处皆无即 null——不编造。
+     */
+    static String resolveEntityId(HttpServletRequest request) {
+        Object attr = request.getAttribute(ATTR_ENTITY_ID);
+        if (attr != null && !String.valueOf(attr).isBlank()) {
+            return String.valueOf(attr);
+        }
+        Object vars = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+        if (vars instanceof Map<?, ?> m) {
+            Object id = m.get("id");
+            if (id != null && !String.valueOf(id).isBlank()) {
+                return String.valueOf(id);
+            }
+        }
+        return null;
+    }
+
+    /** 展示名（{@code UserContext.getCurrentUsername()}，反射取；不可得即 null，不回填 id 冒充）。 */
+    private static String resolveUsername() {
+        try {
+            Class<?> uc = Class.forName("com.chinacreator.gzcm.sysman.iam.context.UserContext");
+            Object name = uc.getMethod("getCurrentUsername").invoke(null);
+            if (name != null && !String.valueOf(name).isBlank()) return String.valueOf(name);
+        } catch (Throwable ignored) {
+            // sysman 不在 classpath
+        }
+        return null;
+    }
+
+    /** 客户端 IP：X-Forwarded-For 首跳 → X-Real-IP → 直连地址。 */
+    static String resolveIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            int comma = forwarded.indexOf(',');
+            String first = (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
+            if (!first.isEmpty()) return first;
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) return realIp.trim();
+        String remote = request.getRemoteAddr();
+        return remote == null || remote.isBlank() ? null : remote;
     }
 
     private void publishAuditEvent(Map<String, Object> event) {

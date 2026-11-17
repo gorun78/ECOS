@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.ai.oag;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource.Carrier;
 import com.chinacreator.gzcm.common.stream.OagSseFrameContract;
 import com.chinacreator.gzcm.engine.ai.oag.dto.OagChatRequest;
 import com.chinacreator.gzcm.engine.ai.oag.dto.OagChatResponse;
@@ -151,11 +153,16 @@ public class OagController {
     public SseEmitter chatStream(@RequestBody Map<String, Object> body) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         OagSseFrames frames = new OagSseFrames(sinkOf(emitter));
+        // D148（2026-11-16 活体实证）：凭证只能在请求线程取。CompletableFuture 的池线程
+        // 没有 RequestContextHolder，管道节点里出站 rls/apply 于是不带任何信任头，
+        // security-engine 回 403 —— 而 403 被折成「不可用」，界面把"没身份"报成
+        // "安全服务挂了"。取一次、带进池线程、作用域退出即清。
+        Carrier caller = CallerCredentialSource.current();
 
-        CompletableFuture.runAsync(() -> {
+        CompletableFuture.runAsync(() -> CallerCredentialSource.runWith(caller, () -> {
             streamChannel(frames, body);
             emitter.complete();
-        });
+        }));
 
         emitter.onCompletion(() -> log.debug("[OAG] SSE stream completed, 已出帧={}", frames.emittedNames()));
         emitter.onTimeout(() -> log.warn("[OAG] SSE stream timed out after {}ms", SSE_TIMEOUT_MS));
