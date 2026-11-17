@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.workspace.knowledge.service;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.workspace.knowledge.dto.KnowledgeEngineConfigVO;
 import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
+import com.chinacreator.gzcm.workspace.security.CallerCredentialRelay;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -115,6 +116,8 @@ public class KnowledgeConfigAggregator {
         }
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        // D150：写面同读面 —— 无凭据 PUT 同样被网关按匿名 403（原表现是 500「PUT failed」）。
+        CallerCredentialRelay.applyTo(headers);
         List<Map<String, String>> reqBody = toBody(entries);
         HttpEntity<List<Map<String, String>>> entity = new HttpEntity<>(reqBody, headers);
 
@@ -155,7 +158,13 @@ public class KnowledgeConfigAggregator {
     private Map<String, String> remoteGetConfigRows(RestTemplate restTemplate, String path, String label) {
         Map<String, String> map = new LinkedHashMap<>();
         try {
-            ResponseEntity<Map> resp = restTemplate.exchange(path, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
+            // D150：原为 HttpEntity.EMPTY 裸调 ⇒ gateway 按匿名拒绝 403 XML，并因降级语义被
+            // 折叠成 _remote_failed ⇒ 知识工作台「引擎配置」三 scope 全部读不到真值。
+            // 中继入口请求的 Authorization + 四信任头（单源 CallerCredentialSource）。
+            HttpHeaders headers = new HttpHeaders();
+            CallerCredentialRelay.applyTo(headers);
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    path, HttpMethod.GET, new HttpEntity<>(headers), Map.class);
             Map<String, Object> body = resp.getBody();
             Object data = body == null ? null : body.get("data");
             if (!(data instanceof List<?> list)) {

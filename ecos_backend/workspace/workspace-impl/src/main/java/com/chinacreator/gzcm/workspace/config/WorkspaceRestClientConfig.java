@@ -230,6 +230,13 @@ public class WorkspaceRestClientConfig {
         factory.setConnectTimeout(Math.max(1000, timeoutMs));
         factory.setReadTimeout(Math.max(1000, timeoutMs));
         RestTemplate template = new RestTemplate(factory);
+        // D150：剔除 XML 转换器。否则 RestTemplate 会按已注册转换器把 application/xml 拼进
+        // Accept 头，网关内容协商回 application/xml；MappingJackson2XmlHttpMessageConverter 抢答后
+        // 用 XmlMapper 反序列化无类型 Map，把信封里所有数字叶子值（code/updated）字符串化 ⇒
+        // KnowledgeConfigAggregator.extractUpdated 的 instanceof Number 恒 false，写面上报恒 0。
+        // 与 ai-engine AiRestClientConfig / cognitive CognitiveRestClientConfig 同款收口。
+        template.getMessageConverters().removeIf(c ->
+                c instanceof org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter);
         template.setUriTemplateHandler(new DefaultUriBuilderFactory(base));
         template.setInterceptors(List.of(new TraceIdClientInterceptor()));
         return template;
