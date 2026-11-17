@@ -1,38 +1,26 @@
-# 50-db_script — 数据库脚本资产归档
+# 50-db_script — DDL 迁移脚本唯一单源
 
-> 生命周期分类：**50-数据库**（2026-10-01 整理，V200 治理后更新）
-> 来源：原 `ecos-sql/`、`gateway/src/main/resources/db/`、`ecos_backend/database/`、`ecos_backend/scripts/` 等多处散落位置
+> 来源: docs 整理批（2026-11-17），用户裁决「归档非单源子目录」 | 责任人: 文档整理 Agent
+> 宪法依据: `.trae/rules/架构铁律.md` **v2.2 §3.1**（2026-10-11 卷09 H-7 用户裁决订正）
 
-## 目录结构
+## 唯一权威
 
-| 目录 | 内容 | 文件数 |
-|------|------|--------|
-| `01-ddl-多方言/` | 三方言 DDL（PostgreSQL/MySQL/Oracle）+ schema 合并脚本 | 28 |
-| `02-flyway-migration/gateway/` | Flyway 迁移脚本（V1→V260，已禁用，仅历史参考）+ **V200__schema_governance.sql**（V200 彻底治理） | ~203 |
-| `03-seed/` | 种子数据 | 6 |
-| `04-engine/` | 引擎专属 SQL（ai-engine / ontology-engine） | 2 |
-| `05-service/sysman/` | Sysman 服务迁移子集 + seed | 20 |
-| `06-docker-infra/` | Docker 初始化 SQL + pgvector 扩展 | 5 |
-| `07-ops-scripts/` | 运维/修复/回滚脚本 | 6 |
-| `08-database-util/` | V150 schema unify + rollback | 3 |
+**`02-flyway-migration/gateway/` 是全仓 DDL 迁移脚本的唯一单源**（2026-11-17 实扫 **293** 枚 `V*.sql`，最新 V344）。
 
-## 核心报告
+- 新迁移脚本**只写这里**，V 号顺延（下一号以 `40-实现/DDL迁移脚本落地登记-2026-09-30.md` + gateway `MigrationVersionUniquenessTest` 钉值为准，两处同批改）。
+- `ecos_backend/gateway/src/main/resources/db/migration/` 是空目录，**不写入**（历史误记落点）。
+- Flyway 运行时禁用（`spring.flyway.enabled: false`），脚本**落文件不实跑**；对 dev 库实跑属授权动作，须先事务空跑验证（见 `90-归档` 外的经验教训）。
+- 命名与红线遵循 `.trae/rules/数据库访问规范.md`（IR/DR/EN/ST/MC 30 条）；种子幂等写法用 `WHERE NOT EXISTS` / DELETE+INSERT，**不得** `ON CONFLICT`（MC03 + 规范 §seed 订正注）。
 
-- [ECOS数据库现状盘点与交叉验证报告-2026-10-01.md](./ECOS数据库现状盘点与交叉验证报告-2026-10-01.md)
-- [ECOS-Schema彻底治理方案-2026-10-01.md](./ECOS-Schema彻底治理方案-2026-10-01.md)（V200 执行方案 + 结果报告）
+## ⚠ 历史漂移警示（为什么其余子目录被归档）
 
-## V200 治理成果（2026-10-01）
+以下子目录已整体迁至 `../90-归档/50-db_script/`，**它们不再是权威**，引用其中任何建表都会造成漂移误判：
 
-| 指标 | 治理前 | 治理后 |
-|------|--------|--------|
-| Schema 数 | 15 | **8**（ecos_control/ecos_data/ecos_ontology/ecos_knowledge/ecos_ai/ecos_cognitive/ecos_infra/ecos_dw） |
-| 表总数 | 238 | **201** |
-| 消灭 schema | — | public(→ecos_control) / ecos_identity / ecos_agent / ecos_dq + 7 空壳 |
-| outbox_event | 11 个分散 | **1 个统一**（ecos_infra） |
+| 已归档子目录 | 漂移风险（实测案例） |
+|:--|:--|
+| `01-ddl-多方言/` | postgresql/00~08 建的是 V200 治理**之前**的旧 schema 形态，与现行 8 schema 封闭枚举不符 |
+| `05-service/sysman/`（V1~V41） | 旧 V 号序列与单源 V 号**撞号**；dev 库部分表（demo_customer 等）即由此手建、从未进单源 |
+| `04-engine/`、`03-seed/`、`06-docker-infra/`、`07-ops-scripts/`、`08-database-util/` | 历史手建产物；与单源并存时无法判断"哪个才是真身" |
+| 根部 `V200__schema_governance.sql` | V200 **已收录进单源序列**（`02-flyway-migration/gateway/` 内同名 V200 为权威），根部这枚是历史副本 |
 
-## 注意事项
-
-1. Flyway 已全局禁用（`spring.flyway.enabled: false`），迁移脚本仅作为 DDL 历史参考
-2. ST07 权威 schema 定义见 `01-ddl-多方言/postgresql/00_init_database.sql`（8 schema 封闭枚举）
-3. **新 DDL 迁移脚本单源目录** = `docs/50-db_script/02-flyway-migration/gateway/`（见《数据库访问规范》v1.4 §八）
-4. 实际 PG 实例已与 ST07 对齐（V200 治理完成，2026-10-01）
+**实证教训（D123-2，2026-11-17）**：单源外的 V111 建 `ecos_dq.dq_*`，而 DQ DAO 读写 `ecos_data.dq_*` —— 两套并存导致"全新库建不出 DAO 要的表"误判数周。任何表结构争议，**只认单源 + 活库实查**，不认归档件。
