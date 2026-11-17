@@ -1,1 +1,0 @@
-{"code":0,"message":"ok","data":{"logs":[{"severity":"NORMAL","event":"CREATE","details":"action=CREATE, resource=Compare, result=SUCCESS, detail={\"method\":\"CausalController.compare(..)\"}","timestamp":"2026-11-13 20:05:45.509652"}]},"timestamp":1794653714849,"success":true}

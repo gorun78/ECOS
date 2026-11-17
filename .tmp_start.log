@@ -1,7 +1,0 @@
-[OK] JWT_PRIVATE_KEY loaded (1624 chars, base64-der)
-[OK] JWT_PUBLIC_KEY loaded (392 chars, base64-der)
-[WARN] env file missing: C:\Users\guorongxiao\.hermes\profiles\gorunkol\.env
-[WARN] env file missing: D:\workspace\javaprojects\ECOS\.env
-[OK] gateway listening on :8080 (log: D:\workspace\javaprojects\ECOS\_win_tasks\logs\gateway-stdout.log)
-[OK] datanet listening on :18082 (log: D:\workspace\javaprojects\ECOS\_win_tasks\logs\datanet-stdout.log)
-[OK] sysman listening on :18081 (log: D:\workspace\javaprojects\ECOS\_win_tasks\logs\sysman-stdout.log)

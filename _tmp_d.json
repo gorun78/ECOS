@@ -1,1 +1,0 @@
-{"code":0,"message":"ok","data":{"success":true,"message":"Schema 漂移检测：近 1h 0 条质量检查记录均未发现问题，无漂移。","dataSource":"ecos_data.dq_rule_check (recent 1h) + ecos_pipeline_task","simulationState":{"isSchemaDriftActive":false,"isSlaBreachActive":false},"attribution":[],"checkedAt":"2026-11-14T10:55:17.982+00:00"},"timestamp":1794653718300,"success":true}
