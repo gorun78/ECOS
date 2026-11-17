@@ -12,7 +12,7 @@
 | `ecos-docker/` | Docker Compose | `docker-compose.yml` | 仅基础设施 8 容器：PG 16, Neo4j 5, MinIO, OPA, Kafka/ZK + 一次性 kafka-init（建 topic）+ Grafana。v1 legacy 应用容器拆离至 `docker-compose.app-v1-legacy.yml`（默认不跑） |
 | `ecos-tests/` | **Playwright 工程**（`@playwright/test` 1.63 + TS） | `playwright.config.ts`（project `api` / `app`）→ `tests/{api,e2e}/*.spec.ts` | 2026-09-30 按裁决建成：原 3 个 `.mjs` 冒烟已迁移为 11 条用例并**删除、不留双轨**（裁决见 `docs/20-需求/需求检视报告-2026-09-28.md` §十二 补记）。跑法 `cd ecos-tests && npx playwright test`（凭据仅从 `ecos-tests/.env` 读 `ECOS_USER`/`ECOS_PASS`，禁写入用例；模板 `.env.example`）。首跑实测 **10 passed / 1 failed**，失败项 = 管道 execute 因 OPA 无策略 fail-closed，见报告 §14.6 |
 | `_win_tasks/` | PowerShell 运维脚本 | `preflight.ps1` / `start-backend.ps1` / `stop-backend.ps1` / `start-frontend.ps1` | 开发环境启停入口（2026-09-28 重建；工作树实存 9 个脚本文件 = 4 入口 + 5 治理辅助，见下表。旧 WSL 脚本在 `_legacy_wsl/`；旧 `ecos_backend/_win_tasks/` 已移出仓库） |
-| `docs/` | Markdown | README.md | Lifecycle taxonomy: 10-架构 / 20-需求 / 30-设计 / 40-实现 / 50-测试 + migration map (legacy dirs purged 2026-09-28) |
+| `docs/` | Markdown | README.md | 生命周期六类：10-架构 / 20-需求 / 30-设计 / 40-实现 / 50-db_script / 50-测试 + 90-归档（唯一权威件体系见 docs/README.md v2.0） |
 | `ecos-git-repos/` | Git data dirs | — | `.gitkeep` placeholders for pipeline/ontology data |
 
 启动命令（PowerShell 一行式，**不创建临时脚本**）：
@@ -172,7 +172,6 @@ ECOS/（Windows D:\workspace\javaprojects\ECOS）
 │  ├─ runtime/            器·横切底座 7 模块：common-api / runtime-core / runtime-access / runtime-task / runtime-monitor / runtime-event / llm-gateway
 │  ├─ services/           v2 五微服务：sysman:18081 / datanet:18082 / buszhi:18083 / aiming:18084 / dccheng:18086（sysman/impl、buszhi/impl 为 P8 内阁目录；`agent-service` 经 PMO-74 H11-T2 挂回根 reactor，不再是遗留；api-gateway/identity-service/ontology-service 三个幽灵 pom 经 Q3 批次 A 归档至 `ecos_backend/archive/legacy/services-ghost/`）
 │  ├─ workspace/          场景层 :18090（workspace-impl + workspace-service）
-│  ├─ service/            四转化 API 文档占位 {ge,zhi,cheng,ming}（非 Maven，仅 AGENTS.md）
 │  ├─ database/           seed.sql + V150 schema 统一/回滚脚本
 │  ├─ scripts/            迁移/校验辅助脚本（sh/py/sql）
 │  ├─ archive/legacy/     归档遗留（Dockerfile/deploy.sh 等）
@@ -185,7 +184,7 @@ ECOS/（Windows D:\workspace\javaprojects\ECOS）
 ├─ _legacy_wsl/    WSL 时代遗留脚本（已归档，不再使用）
 ├─ ecos-tests/     Playwright 测试工程（`package.json` + `playwright.config.ts` + `tests/{api,e2e}/*.spec.ts`，11 用例；原 3 个 `.mjs` 已迁移并删除，裁决见需求检视报告 §十二 补记，落地与首跑证据见 §14.6）
 ├─ tools/          仓根独立工具（Q4 裁决 2026-09-28 落位）：`ecos-mcp-server.py` 从 `ecos_backend/engine/` 移出，不再混入引擎源码树
-├─ docs/           生命周期五类：10-架构 / 20-需求 / 30-设计 / 40-实现 / 50-测试 + 迁移映射表（导航 docs/README.md）
+├─ docs/           生命周期六类：10-架构 / 20-需求 / 30-设计 / 40-实现 / 50-db_script / 50-测试 + 90-归档（导航 docs/README.md v2.0）
 └─ ecos-git-repos/ pipeline/ontology 数据 git 占位
 
 后端模块基线（Q5 裁决可枚举口径，2026-09-28 实测，同日 PMO-74 H11-T2 后更新，2026-09-29 Q3 批次 A 后再更新）= **7 个部署 JAR**（gateway + services/{sysman,datanet,buszhi,aiming,dccheng} + workspace/workspace-service）+ **49 个根 reactor 构建模块**；全仓 `find ecos_backend -name pom.xml -not -path "*/target/*"` 实数 53 = 根聚合 1 + reactor 49 + 已归档遗留 3（`archive/legacy/services-ghost/{api-gateway,identity-service,ontology-service}`）。**该命令含 `archive/`，故排除归档后才是 50**：加 `-not -path "*/archive/*"` → **50**。复现命令 `mvn -o validate | grep -c '^\[INFO\] Building '`（= 50 行，含根聚合；Q3 归档前后各实测一次均为 50 / BUILD SUCCESS）。不加新 Maven 模块（门禁双处：`_win_tasks/check-legacy-modules.ps1` `baselineCount = 12` 与 `ArchitectureTest.baselineModules = 12`，二者必须同批改）；Docker 容器基线已定（compose 实数 8 容器，不加新容器）。
