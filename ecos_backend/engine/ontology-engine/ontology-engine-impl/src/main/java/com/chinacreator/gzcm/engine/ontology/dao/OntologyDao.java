@@ -239,39 +239,133 @@ public class OntologyDao extends JdbcTemplateDaoSupport {
             entityId, entityId);
     }
 
-    // ═══════════════ OntologyAction CRUD (ecos_ontology_action 表 —— V200 已 DROP) ═══════════════════
-    // V200：实体级动作表 ecos_ontology_action 已删除（幸存的动作形态见 action_definition，
-    // 已由 ActionTypeDao 承接）。此处保签名 no-op：读返回空 / Optional.empty，写返回 0，
-    // 避免 relation-does-not-exist 500（对象详情「动作」区会读本表）。
+    // ═══════════ OntologyAction CRUD —— 落 action_definition（V200 形态）═══════════
+    // 2026-11-17 D125：这七个方法原为「V200 已 DROP ecos_ontology_action ⇒ 保签名 no-op」
+    // 的空桩（读返空 / 写返 0）。后果是**写入假成功**：OntologyActionService 不看返回值，
+    // 接口一律 200 而库中零行（实测 ecos_ontology.action_definition = 0 行，
+    // 而 ecos_control.ecos_ontology_action 残留 3 行旧数据）。
+    //
+    // V200 的目标形态是 action_definition(id, code, name, type, config jsonb, created_at)，
+    // 已由 ActionTypeDao 写入过。本类这些方法改为**真读写同一张表**，字段映射：
+    //   code        ←→ code
+    //   name        ←→ name
+    //   actionType  ←→ type        （V200 的 type 是 action 类型槽）
+    //   entityId / description / preconditions / effects / ruleJson / strategy / status
+    //               ──→ 无独立列，序列化进 config jsonb（保留全量语义，不静默丢弃）
+    // 反向读出时把这些键还原到 POJO，保证写进去什么读出来就是什么。
+
+    private static final String ACTION_COLUMNS = "id, code, name, type, config, created_at";
+
+    /** JSON 序列化（action_definition.config 的扩展键读写）。 */
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** action_definition 行 → OntologyAction（config 里的扩展键还原到 POJO）。 */
+    private static final RowMapper<OntologyAction> ACTION_ROW_MAPPER = (rs, rowNum) -> {
+        OntologyAction a = new OntologyAction();
+        a.setId(rs.getString("id"));
+        a.setCode(rs.getString("code"));
+        a.setName(rs.getString("name"));
+        a.setActionType(rs.getString("type"));
+        Timestamp created = rs.getTimestamp("created_at");
+        if (created != null) a.setCreatedAt(created.toLocalDateTime());
+        String config = rs.getString("config");
+        if (config != null && !config.isBlank()) {
+            try {
+                Map<String, Object> cfg = MAPPER.readValue(config, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                a.setEntityId(str(cfg.get("entityId")));
+                a.setDescription(str(cfg.get("description")));
+                a.setPreconditions(str(cfg.get("preconditions")));
+                a.setEffects(str(cfg.get("effects")));
+                a.setRuleJson(str(cfg.get("ruleJson")));
+                a.setStrategy(str(cfg.get("strategy")));
+                a.setStatus(str(cfg.get("status")));
+            } catch (Exception ignore) {
+                // config 非本类写入的形态（如 ActionTypeDao 存的纯 preconditions JSON）——
+                // 不当错误处理，读出的扩展字段留空即可（读不崩 > 读得全）。
+            }
+        }
+        return a;
+    };
+
+    private static String str(Object o) {
+        return o == null ? null : String.valueOf(o);
+    }
 
     public List<OntologyAction> findActionsByEntity(String entityId) {
-        return java.util.Collections.emptyList();
+        // entityId 无独立列 —— 在 config jsonb 内按 ->>'entityId' 过滤
+        return jdbcTemplate.query(
+                "SELECT " + ACTION_COLUMNS + " FROM ecos_ontology.action_definition "
+                        + "WHERE config ->> 'entityId' = ? ORDER BY created_at DESC",
+                ACTION_ROW_MAPPER, entityId);
     }
 
     public List<OntologyAction> findAllActions() {
-        return java.util.Collections.emptyList();
+        return jdbcTemplate.query(
+                "SELECT " + ACTION_COLUMNS + " FROM ecos_ontology.action_definition ORDER BY created_at DESC",
+                ACTION_ROW_MAPPER);
     }
 
     public Optional<OntologyAction> findActionById(String id) {
-        return Optional.empty();
+        return jdbcTemplate.query(
+                "SELECT " + ACTION_COLUMNS + " FROM ecos_ontology.action_definition WHERE id = ?",
+                ACTION_ROW_MAPPER, id).stream().findFirst();
     }
 
     public int insertAction(OntologyAction action) {
-        return 0;
+        if (action == null || action.getId() == null || action.getId().isBlank()) {
+            return 0;
+        }
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("entityId", action.getEntityId());
+        cfg.put("description", action.getDescription());
+        cfg.put("preconditions", action.getPreconditions());
+        cfg.put("effects", action.getEffects());
+        cfg.put("ruleJson", action.getRuleJson());
+        cfg.put("strategy", action.getStrategy());
+        cfg.put("status", action.getStatus());
+        cfg.values().removeIf(java.util.Objects::isNull);
+        return jdbcTemplate.update(
+                "INSERT INTO ecos_ontology.action_definition (id, code, name, type, config, created_at) "
+                        + "VALUES (?, ?, ?, ?, ?::jsonb, NOW())",
+                action.getId(), action.getCode(), action.getName(),
+                action.getActionType() == null ? "CUSTOM" : action.getActionType(),
+                toJson(cfg));
     }
 
     public int updateAction(String id, String code, String name, String actionType,
                             String description, String preconditions, String effects,
                             String ruleJson, String strategy, String status) {
-        return 0;
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("description", description);
+        cfg.put("preconditions", preconditions);
+        cfg.put("effects", effects);
+        cfg.put("ruleJson", ruleJson);
+        cfg.put("strategy", strategy);
+        cfg.put("status", status);
+        cfg.values().removeIf(java.util.Objects::isNull);
+        return jdbcTemplate.update(
+                "UPDATE ecos_ontology.action_definition SET code = COALESCE(?, code), "
+                        + "name = COALESCE(?, name), type = COALESCE(?, type), "
+                        + "config = config || ?::jsonb WHERE id = ?",
+                code, name, actionType, toJson(cfg), id);
     }
 
     public int deleteAction(String id) {
-        return 0;
+        return jdbcTemplate.update("DELETE FROM ecos_ontology.action_definition WHERE id = ?", id);
     }
 
     public int deleteActionsByEntity(String entityId) {
-        return 0;
+        return jdbcTemplate.update(
+                "DELETE FROM ecos_ontology.action_definition WHERE config ->> 'entityId' = ?", entityId);
+    }
+
+    private static String toJson(Map<String, Object> m) {
+        try {
+            return MAPPER.writeValueAsString(m);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     public List<OntologyEntity> findEntitiesByDomain(String domainCode) {

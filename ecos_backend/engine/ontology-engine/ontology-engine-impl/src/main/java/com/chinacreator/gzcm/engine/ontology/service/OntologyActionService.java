@@ -75,7 +75,11 @@ public class OntologyActionService {
         action.setRuleJson(dto.getRuleJson() != null ? dto.getRuleJson() : "");
         action.setStrategy(dto.getStrategy() != null ? dto.getStrategy() : "SYNC");
         action.setStatus(dto.getStatus() != null ? dto.getStatus() : "ACTIVE");
-        repository.insertAction(action);
+        // D125（2026-11-17）：旧代码忽略返回值，而 Dao 当时是 return 0 的空桩 ⇒
+        // 接口恒 200 而库中零行（写入假成功）。现在零影响行即视为失败并抛错。
+        if (repository.insertAction(action) <= 0) {
+            throw new IllegalStateException("动作定义写入未生效: id=" + id + " entity=" + entityId);
+        }
         log.info("Ontology action created: {} [{}] for entity {}", id, action.getCode(), entityId);
         return toVO(action);
     }
@@ -182,7 +186,10 @@ public class OntologyActionService {
         action.setRuleJson(String.valueOf(body.getOrDefault("ruleJson", "")));
         action.setStrategy(String.valueOf(body.getOrDefault("strategy", "SYNC")));
         action.setStatus(String.valueOf(body.getOrDefault("status", "ACTIVE")));
-        repository.insertAction(action);
+        // D125：同 Map 版写入口，零影响行即失败（禁假成功）。
+        if (repository.insertAction(action) <= 0) {
+            throw new IllegalStateException("动作定义写入未生效: id=" + id + " entity=" + entityId);
+        }
         log.info("Ontology action created: {} [{}] for entity {}", id, action.getCode(), entityId);
         return actionToMap(action);
     }
