@@ -26,9 +26,12 @@ public class ActionHookAuditDao extends JdbcTemplateDaoSupport {
      */
     public void insertAuditLog(String logId, String eventType, String userId,
                                String resource, String action, String result, String details) {
+        // D143（2026-11-17）：与 sysman 的 AuditLog-sql.xml 同批统一到 ecos_audit_log。
+        // 此前本处写 td_audit_log，而列表读源已切 ecos_audit_log ⇒ 若不同改，
+        // 本体动作钩子的审计会落进「没人读的表」，重新制造 D143 的双源分裂。
         jdbcTemplate.update(
-            "INSERT INTO td_audit_log (log_id, event_type, timestamp, user_id, resource, action, result, details) " +
-            "VALUES (?, ?, NOW(), ?, ?, ?, ?, ?)",
+            "INSERT INTO ecos_audit_log (id, event_type, user_id, resource, action, result, detail, created_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, NOW())",
             logId,
             eventType,
             userId,

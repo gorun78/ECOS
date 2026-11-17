@@ -47,39 +47,25 @@ public class AuditLogDaoImpl implements AuditLogDao {
     @Override
     public List<AuditLog> query(AuditLog condition, int offset, int limit) throws Exception {
         try {
-            StringBuilder sqlBuilder = new StringBuilder("SELECT * FROM td_audit_log WHERE 1=1");
-            List<Object> paramList = new java.util.ArrayList<>();
+            // D143（2026-11-17）：本方法原为手写 StringBuilder 拼 SQL、硬编码 td_audit_log
+            // （SELECT * FROM td_audit_log WHERE 1=1 ... ORDER BY timestamp DESC），
+            // 完全绕开 AuditLog-sql.xml。而同类的带时间范围重载走 xml —— 于是同一个 Dao
+            // 出现「详情读 ecos_audit_log（xml 已改）、列表读 td_audit_log（硬编码未改）」
+            // 的分裂，正是 D143 的复现路径（实测：详情传 bigint id 返 200 真数据，
+            // 列表首行 eventId 仍是 UUID，只可能来自旧表）。
+            //
+            // 改为与带范围重载同构：走 xml 的 queryAuditLog，列名对齐与表名切换都在
+            // mapper 内单点完成，本类不再持有任何表名。
+            Map<String, Object> params = new java.util.HashMap<>();
             if (condition != null) {
-                if (condition.getUserId() != null) { sqlBuilder.append(" AND user_id = ?"); paramList.add(condition.getUserId()); }
-                if (condition.getTenantId() != null) { sqlBuilder.append(" AND tenant_id = ?"); paramList.add(condition.getTenantId()); }
-                if (condition.getEventType() != null) { sqlBuilder.append(" AND event_type = ?"); paramList.add(condition.getEventType()); }
-                if (condition.getResource() != null) { sqlBuilder.append(" AND resource LIKE ?"); paramList.add("%" + condition.getResource() + "%"); }
-                if (condition.getResult() != null) { sqlBuilder.append(" AND result = ?"); paramList.add(condition.getResult()); }
+                params.put("userId", condition.getUserId());
+                params.put("tenantId", condition.getTenantId());
+                params.put("resource", condition.getResource());
+                params.put("eventType", condition.getEventType());
+                params.put("result", condition.getResult());
             }
-            sqlBuilder.append(" ORDER BY timestamp DESC");
-            
-            List<Map<String, Object>> rows = databaseAccess.executeQuery(sqlBuilder.toString(), paramList.toArray());
-            List<AuditLog> all = new java.util.ArrayList<>();
-            for (Map<String, Object> row : rows) {
-                AuditLog log = new AuditLog();
-                log.setLogId((String) row.get("log_id"));
-                log.setUserId((String) row.get("user_id"));
-                log.setTenantId((String) row.get("tenant_id"));
-                log.setAction((String) row.get("action"));
-                log.setEventType((String) row.get("event_type"));
-                log.setResource((String) row.get("resource"));
-                log.setResult((String) row.get("result"));
-                log.setIpAddress((String) row.get("ip_address"));
-                log.setUserAgent((String) row.get("user_agent"));
-                log.setRequestId((String) row.get("request_id"));
-                log.setDetails((String) row.get("details"));
-                Object dur = row.get("duration");
-                if (dur instanceof Number) log.setDuration(((Number) dur).intValue());
-                Object ts = row.get("timestamp");
-                if (ts instanceof java.sql.Timestamp) log.setTimestamp(((java.sql.Timestamp) ts).toLocalDateTime());
-                else if (ts instanceof java.time.LocalDateTime) log.setTimestamp((java.time.LocalDateTime) ts);
-                all.add(log);
-            }
+            List<AuditLog> all = databaseAccess.queryListFromConfig(
+                    SQL_CONFIG_PATH, "queryAuditLog", AuditLog.class, params);
             if (all == null || all.isEmpty()) {
                 return new java.util.ArrayList<>();
             }
@@ -87,7 +73,7 @@ public class AuditLogDaoImpl implements AuditLogDao {
             int toIndex = Math.min(offset + limit, all.size());
             return all.subList(fromIndex, toIndex);
         } catch (ISystemDatabaseAccess.DatabaseAccessException e) {
-            throw new Exception("鏌ヨ瀹¤鏃ュ織鍒楄〃澶辫触: " + e.getMessage(), e);
+            throw new Exception("查询审计日志列表失败: " + e.getMessage(), e);
         }
     }
 

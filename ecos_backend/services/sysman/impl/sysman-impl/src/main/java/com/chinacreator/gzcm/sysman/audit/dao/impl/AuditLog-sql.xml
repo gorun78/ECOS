@@ -1,70 +1,128 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sqlMap namespace="AuditLog">
+    <!--
+      D143（2026-11-17，用户裁决「列表改读 ecos_audit_log」）
+
+      背景：审计存在两套表且字段不同 ——
+        td_audit_log    (log_id, event_type, timestamp, user_id, tenant_id, resource,
+                         action, result, ip_address, user_agent, request_id, duration, details)
+        ecos_audit_log  (id, event_type, user_id, username, operation, action, resource,
+                         entity_type, entity_id, detail, ip_address, result, created_at,
+                         prev_hash, curr_hash, ... trace_id)
+
+      此前：列表/详情走 IAuditLogService → 本 mapper 读 td_audit_log（实测 192 行），
+      而 security 通道（AuditKafkaConsumer）往 ecos_audit_log 写了 31380 行 —— 
+      security 产生的审计在列表页永远看不到，点进详情的 id 在列表里也查不到。
+
+      本批：读写双向统一到 ecos_audit_log。列名对齐用 SELECT 别名完成，
+      Java 侧 AuditLog 模型与既有接口契约（logId/timestamp/details 等）不变 —— 没有第二套真值。
+        读别名：id→log_id, created_at→timestamp, detail→details, operation→event_type(兜底)
+        写映射：logId→id, timestamp→created_at, details→detail
+      tenant_id / user_agent / request_id / duration 在新表无对应列，读出恒 NULL（前端已按可空处理）。
+    -->
     <insert id="insertAuditLog">
         <![CDATA[
-        INSERT INTO td_audit_log (
-            log_id, event_type, timestamp, user_id, tenant_id, resource, action, 
-            result, ip_address, user_agent, request_id, duration, details
+        INSERT INTO ecos_audit_log (
+            id, event_type, user_id, action, resource, result,
+            detail, ip_address, created_at
         ) VALUES (
-            #[logId], #[eventType], #[timestamp], #[userId], #[tenantId], #[resource], 
-            #[action], #[result], #[ipAddress], #[userAgent], #[requestId], #[duration], #[details]
+            #[logId], #[eventType], #[userId], #[action], #[resource], #[result],
+            #[details], #[ipAddress], #[timestamp]
         )
         ]]>
     </insert>
 
     <select id="findById">
         <![CDATA[
-        SELECT * FROM td_audit_log WHERE log_id = ?
+        SELECT id            AS log_id,
+               COALESCE(event_type, operation) AS event_type,
+               created_at    AS timestamp,
+               user_id,
+               NULL          AS tenant_id,
+               resource,
+               action,
+               result,
+               ip_address,
+               NULL          AS user_agent,
+               NULL          AS request_id,
+               NULL          AS duration,
+               detail        AS details
+          FROM ecos_audit_log
+         WHERE id = ?
         ]]>
     </select>
 
     <select id="queryAuditLog">
         <![CDATA[
-        SELECT * FROM td_audit_log WHERE 1 = 1
+        SELECT id            AS log_id,
+               COALESCE(event_type, operation) AS event_type,
+               created_at    AS timestamp,
+               user_id,
+               NULL          AS tenant_id,
+               resource,
+               action,
+               result,
+               ip_address,
+               NULL          AS user_agent,
+               NULL          AS request_id,
+               NULL          AS duration,
+               detail        AS details
+          FROM ecos_audit_log
+         WHERE 1 = 1
         #if($userId) AND user_id = #[userId] #end
-        #if($tenantId) AND tenant_id = #[tenantId] #end
         #if($resource) AND resource LIKE CONCAT('%', #[resource], '%') #end
-        #if($eventType) AND event_type = #[eventType] #end
+        #if($eventType) AND COALESCE(event_type, operation) = #[eventType] #end
         #if($result) AND result = #[result] #end
-        ORDER BY timestamp DESC
+        ORDER BY created_at DESC
         ]]>
     </select>
 
     <select id="queryAuditLogWithTimeRange">
         <![CDATA[
-        SELECT * FROM td_audit_log WHERE 1 = 1
+        SELECT id            AS log_id,
+               COALESCE(event_type, operation) AS event_type,
+               created_at    AS timestamp,
+               user_id,
+               NULL          AS tenant_id,
+               resource,
+               action,
+               result,
+               ip_address,
+               NULL          AS user_agent,
+               NULL          AS request_id,
+               NULL          AS duration,
+               detail        AS details
+          FROM ecos_audit_log
+         WHERE 1 = 1
         #if($userId) AND user_id = #[userId] #end
-        #if($tenantId) AND tenant_id = #[tenantId] #end
         #if($resource) AND resource LIKE CONCAT('%', #[resource], '%') #end
-        #if($eventType) AND event_type = #[eventType] #end
+        #if($eventType) AND COALESCE(event_type, operation) = #[eventType] #end
         #if($result) AND result = #[result] #end
-        #if($startTime) AND timestamp >= #[startTime] #end
-        #if($endTime) AND timestamp <= #[endTime] #end
-        ORDER BY timestamp DESC
+        #if($startTime) AND created_at >= #[startTime] #end
+        #if($endTime) AND created_at <= #[endTime] #end
+        ORDER BY created_at DESC
         ]]>
     </select>
 
     <select id="countAuditLog">
         <![CDATA[
-        SELECT COUNT(*) FROM td_audit_log WHERE 1 = 1
+        SELECT COUNT(*) FROM ecos_audit_log WHERE 1 = 1
         #if($userId) AND user_id = #[userId] #end
-        #if($tenantId) AND tenant_id = #[tenantId] #end
         #if($resource) AND resource LIKE CONCAT('%', #[resource], '%') #end
-        #if($eventType) AND event_type = #[eventType] #end
+        #if($eventType) AND COALESCE(event_type, operation) = #[eventType] #end
         #if($result) AND result = #[result] #end
         ]]>
     </select>
 
     <select id="countAuditLogWithTimeRange">
         <![CDATA[
-        SELECT COUNT(*) FROM td_audit_log WHERE 1 = 1
+        SELECT COUNT(*) FROM ecos_audit_log WHERE 1 = 1
         #if($userId) AND user_id = #[userId] #end
-        #if($tenantId) AND tenant_id = #[tenantId] #end
         #if($resource) AND resource LIKE CONCAT('%', #[resource], '%') #end
-        #if($eventType) AND event_type = #[eventType] #end
+        #if($eventType) AND COALESCE(event_type, operation) = #[eventType] #end
         #if($result) AND result = #[result] #end
-        #if($startTime) AND timestamp >= #[startTime] #end
-        #if($endTime) AND timestamp <= #[endTime] #end
+        #if($startTime) AND created_at >= #[startTime] #end
+        #if($endTime) AND created_at <= #[endTime] #end
         ]]>
     </select>
 </sqlMap>
