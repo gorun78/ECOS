@@ -29,6 +29,13 @@ import java.util.Map;
  * <p><b>缺口说明</b>：ontology-engine 当前没有与 ceos_new 风格本体映射对应的真实端点
  * （OntologyMappingController 走 /api/v1/ontology/mappings，schema 不同）。
  * 此处保留空壳避免前端 404，真实实现待后续补齐。</p>
+ *
+ * <p><b>v1 别名（D34，2026-11-16）</b>：原仅挂 {@code /api/ontology}（无 v1），而前端
+ * {@code OperationalApps.tsx} 调 {@code /api/v1/ontology/entities/{type}/instances} ⇒ 404。
+ * 类级 {@code @RequestMapping} 并列挂 {@code /api/v1/ontology}（与 {@code VersionDiffController}
+ * 同法，只增不改），使 v1 路径可达。注意：{@code instances} 仍返回空列表（无 mock 数据），
+ * 本表无实体实例存储（{@code ecos_ontology.ecos_object_data} 为 0 行，{@code demo_customer}
+ * 15 行缺 revenue/isActive/churn_risk 三字段，接上即编造），故页面呈现「无数据」空态而非报错。</p>
  */
 @RestController
 @RequestMapping("/api/ontology")
@@ -88,6 +95,7 @@ public class OntologyCompatController {
 
     // ════════════════════════════════════════════
     // API: GET /api/ontology/entities/{entityType}/instances
+    //      （v1 别名见 OntologyEntityInstanceCompatController — D34）
     // ════════════════════════════════════════════
     @GetMapping("/entities/{entityType}/instances")
     public ApiResponse<List<Map<String, Object>>> getEntityInstances(@PathVariable String entityType) {
