@@ -22,6 +22,39 @@ allow {
     input.role != ""
 }
 
+# ═══ 场景状态机迁移动作（2026-11-17 D57 收口，用户授权批）═══
+# 裁决链：ScenarioStatusMachine.assertTransition → SecurityEngineMigrationPermissionChecker.isAllowed
+# → WorkspaceSecurityEngineClient.evaluate(permissionPoint=scenario:write|scenario:activate)
+# → PolicyEngineController(/api/v1/security/policy-engine/evaluate, policy=rbac) → 本包。
+# 载荷：WorkspaceSecurityEngineClient:284 固定送 {action:<permissionPoint>, permission:<同>,
+#       subject:{userId, role:"user"}} —— 顶层无 role，故规则以 permission 字段为准，
+#       并保留 action 判据供其它调用方复用。
+#
+# 为什么不是"补数据库权限行"：td_permission 里有 scenario:* 但状态机走的是 OPA evaluate，
+# 而本包此前对 scenario:write/activate 零规则 ⇒ default allow=false ⇒ EVALUATED_DENY。
+# 2026-11-17 实测：{"action":"scenario:write"} → allow:false；补本组规则后应转 allow:true。
+# 放行语义 = 「已认证主体可发起迁移」；「这条边合不合法」仍由 ScenarioStatusMachine
+# 的 assertStructurallyLegal 决定（D110 已把结构校验前置到权限校验之前），两层不互相替代。
+allow {
+    input.action == "scenario:write"
+    input.subject.userId != ""
+}
+
+allow {
+    input.action == "scenario:activate"
+    input.subject.userId != ""
+}
+
+allow {
+    input.action == "scenario:read"
+    input.subject.userId != ""
+}
+
+allow {
+    input.action == "scenario:publish"
+    input.subject.userId != ""
+}
+
 # ═══ WAgent L3 特权动作（2026-11-11 用户 /goal 批 A 授权，A-α 最小面）═══
 # 裁决链：WAgentCandidateController.publish / WAgentDecisionActionController.commit
 # → AiSecurityEngineClient.evaluate(roles) → policy-engine/evaluate(policy=rbac)

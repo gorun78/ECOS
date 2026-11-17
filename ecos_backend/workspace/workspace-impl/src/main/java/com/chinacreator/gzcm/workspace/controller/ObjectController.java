@@ -155,7 +155,10 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
         //   「带 ? 的片段 + 同序参数」，两者必须成对下推 —— 旧写法只取片段
         //   （buildRowFilterCondition）且把"应答缺片段"当空串放行（fail-open）。
         //   三态：恒真=不拼条件；拒绝=拼 1=0（零行）；非平凡=拼片段并按位置绑参。
-        RlsFilter rls = abacFilter.buildRowFilter(entityCode);
+        //   D102/D126（2026-11-17）：必须传物理表名 —— ecos_rls_policy.table_name 索引的是
+        //   demo_customer/ecos_biz_project 等物理名，而 entityCode 是 Customer/Project 逻辑码，
+        //   旧写法把逻辑码当表名匹配 ⇒ 恒 RLS_NO_POLICY_MATCHED ⇒ 读面永远空。
+        RlsFilter rls = abacFilter.buildRowFilter(entityCode, table);
         String rlsCond = rls.clauseForSplice();
         List<Object> rlsArgs = rls.paramsForSplice();
 
@@ -215,7 +218,8 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
         }
 
         // ★ ABAC 行过滤（同列表面：片段与参数成对下推，拒绝态拼 1=0 → 详情按"不存在"处置）
-        RlsFilter rls = abacFilter.buildRowFilter(entityCode);
+        //   D102/D126：传物理表名，理由同列表面。
+        RlsFilter rls = abacFilter.buildRowFilter(entityCode, table);
         String rlsCond = rls.clauseForSplice();
         List<Object> args = new ArrayList<>();
         args.add(id);
@@ -393,7 +397,8 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             String table = entry.getValue();
             try {
                 // ★ ABAC 行过滤（片段 + 参数成对下推；拒绝态拼 1=0 → 该表零行）
-                RlsFilter rls = abacFilter.buildRowFilter(entityCode);
+                //   D102/D126：传物理表名，理由同列表面。
+                RlsFilter rls = abacFilter.buildRowFilter(entityCode, table);
                 String rlsCond = rls.clauseForSplice();
                 List<Object> args = new ArrayList<>(List.of("%" + q + "%", "%" + q + "%"));
                 args.addAll(rls.paramsForSplice());

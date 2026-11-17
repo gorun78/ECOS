@@ -193,12 +193,41 @@ public class AbacQueryFilter {
      *         security-engine 进程不可用 → 503 {@code ECOS-SEC-501} 上抛（与"策略拒绝"分态）
      */
     public RlsFilter buildRowFilter(String entityCode) {
-        RlsFilter filter = securityEngineClient.applyRlsFilter(entityCode, entityCode, Map.of());
+        return buildRowFilter(entityCode, entityCode);
+    }
+
+    /**
+     * 构建行过滤执行契约 —— <b>实体码与物理表名分离</b>的重载（D102/D126 2026-11-17）。
+     *
+     * <p><b>为什么必须分离</b>：{@code ecos_rls_policy.table_name} 索引的是<b>物理表名</b>
+     * （{@code demo_customer}、{@code ecos_biz_project}），而对象面控制器的入参是<b>逻辑实体码</b>
+     * （{@code Customer}、{@code Project}）。旧实现把两者压成同一个值
+     * （{@code applyRlsFilter(entityCode, entityCode, ...)}），逻辑实体码被当成表名送去匹配
+     * ⇒ 策略永远命中不了 ⇒ {@code RLS_NO_POLICY_MATCHED} ⇒ {@code whereClause="1=0"} ⇒ 读面恒空。</p>
+     *
+     * <p>2026-11-17 实测证据：{@code GET /ecos/objects/Customer} → {@code {"data":[],"total":0}}，
+     * 而 {@code SELECT count(*) FROM ecos_control.demo_customer} → 15；
+     * 直接 {@code POST /security/rls/apply {tableName:"demo_customer"}} → {@code whereClause:"(1=1)"}。</p>
+     *
+     * <p>单参重载保持不变 —— 场景域（{@code ScenarioReadGuard}）与 ObjectQL 面的入参本就是表名
+     * （{@code scenario_graph} 等），语义一致。只有同时持有"逻辑码 → 物理表"映射的一方
+     * （{@code ObjectController.ENTITY_TABLE}）才需要调用本重载。</p>
+     *
+     * @param entityType 逻辑实体编码（用于裁决上下文与日志追溯）
+     * @param tableName  物理表名（{@code ecos_rls_policy.table_name} 的匹配键）
+     */
+    public RlsFilter buildRowFilter(String entityType, String tableName) {
+        if (tableName == null || tableName.isBlank()) {
+            log.warn("ABAC行过滤 DENY（物理表名缺失，逻辑码={}）", entityType);
+            return RlsFilter.deny(RlsFilter.DRIFT_ABSENT + " entity=" + entityType
+                    + "（物理表名缺失，策略无法匹配）", true, List.of());
+        }
+        RlsFilter filter = securityEngineClient.applyRlsFilter(entityType, tableName, Map.of());
         if (filter == null) {
             // 客户端未返回裁决载体＝形态漂移（不是"无策略"），归一为拒绝态。
             // 这里不抛 NPE：500 会把内部堆栈外泄，且把一个可解释的 DENY 变成不可解释的崩溃。
-            log.warn("ABAC行过滤 DENY（客户端未返回裁决载体）: entity={}", entityCode);
-            return RlsFilter.deny(RlsFilter.DRIFT_ABSENT + " entity=" + entityCode
+            log.warn("ABAC行过滤 DENY（客户端未返回裁决载体）: entity={} table={}", entityType, tableName);
+            return RlsFilter.deny(RlsFilter.DRIFT_ABSENT + " entity=" + entityType
                     + "（客户端未返回裁决载体）", true, List.of());
         }
         return filter;
