@@ -25,6 +25,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -284,7 +285,7 @@ public class WorkspaceSecurityEngineClient {
             Map<String, Object> input = new LinkedHashMap<>();
             input.put("action", action);
             if (attrs != null) input.putAll(attrs);
-            input.put("subject", Map.of("userId", currentUserId(), "role", "user"));
+            input.put("subject", subjectPayload());
             body.put("input", input);
             Map<String, Object> resp = postJson("/api/v1/security/policy-engine/evaluate", body);
             // 裁决读数走单源：本类此前只认历史别名 result，而现契约（OpaPolicyService）
@@ -394,6 +395,59 @@ public class WorkspaceSecurityEngineClient {
             return ctx.getUserId();
         }
         return "anonymous";
+    }
+
+    /**
+     * 送 OPA 的 subject 载荷（2026-11-17，D57 角色级收紧）。
+     *
+     * <p>此前这里硬编码 {@code Map.of("userId", currentUserId(), "role", "user")} ——
+     * 角色恒为字面量 {@code "user"}，OPA 侧无论怎么判角色都只能看到这一个值，
+     * 于是规则只能写「只要有 userId 就放行」，等于「已认证即授权」。
+     * 本方法改为送 SecurityContext 里的真实角色。</p>
+     *
+     * <p>形态设计：</p>
+     * <ul>
+     *   <li>{@code userId}：主体标识，匿名时为 {@code "anonymous"}</li>
+     *   <li>{@code role}：取真实角色列表的<b>首个</b>值，兼容只读单值的既有规则
+     *       （{@code input.role == "admin"} 等）；无可读角色时退 {@code "user"}，
+     *       保持与旧载荷相同的降级形态</li>
+     *   <li>{@code roles}：完整角色列表，供需要多角色判定的新规则用</li>
+     * </ul>
+     *
+     * <p>取不到角色时<b>不抛</b>：身份已由 {@link #currentUserId()} 判定，
+     * 角色缺失应当由 OPA 规则拒绝（fail-closed），而不是在这里提前崩。</p>
+     */
+    private Map<String, Object> subjectPayload() {
+        String userId = currentUserId();
+        List<String> roles = currentRoles();
+        Map<String, Object> subject = new LinkedHashMap<>();
+        subject.put("userId", userId);
+        subject.put("role", roles.isEmpty() ? "user" : roles.get(0));
+        subject.put("roles", roles);
+        return subject;
+    }
+
+    /** 当前主体的角色列表（去 ROLE_ 前缀前的原样值，与 JWT claims 一致）。 */
+    private List<String> currentRoles() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && auth.getAuthorities() != null) {
+                List<String> roles = new ArrayList<>();
+                for (var authority : auth.getAuthorities()) {
+                    if (authority != null && authority.getAuthority() != null
+                            && !authority.getAuthority().isBlank()) {
+                        roles.add(authority.getAuthority());
+                    }
+                }
+                if (!roles.isEmpty()) {
+                    return roles;
+                }
+            }
+        } catch (Exception ignored) {
+            log.debug("WorkspaceSecurityEngineClient: 读取角色失败，退空列表交 OPA fail-closed: {}",
+                    ignored.getMessage());
+        }
+        return List.of();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

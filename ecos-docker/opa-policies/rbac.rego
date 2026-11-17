@@ -1,5 +1,10 @@
 package ecos.rbac
 
+# OPA 0.63.0 上 `some r in ...` 需要显式导入 future 关键字（Rego v1 之前不是默认语法）。
+# 本轮加 is_scenario_admin 时才用到该表达式；若不加此行，容器会以
+# rego_parse_error 崩溃重启（实测：load error 直接拒绝整个 bundle）。
+import future.keywords.in
+
 default allow = false
 
 allow {
@@ -33,16 +38,43 @@ allow {
 # 为什么不是"补数据库权限行"：td_permission 里有 scenario:* 但状态机走的是 OPA evaluate，
 # 而本包此前对 scenario:write/activate 零规则 ⇒ default allow=false ⇒ EVALUATED_DENY。
 # 2026-11-17 实测：{"action":"scenario:write"} → allow:false；补本组规则后应转 allow:true。
-# 放行语义 = 「已认证主体可发起迁移」；「这条边合不合法」仍由 ScenarioStatusMachine
-# 的 assertStructurallyLegal 决定（D110 已把结构校验前置到权限校验之前），两层不互相替代。
+#
+# ── 2026-11-17 第二轮：从「已认证即放行」收紧到角色级 ──
+# 首版四规则判据是 input.subject.userId != ""，实测 DEPT_USER 调 scenario:write 也返
+# allow:true —— 等于「任何登录用户都能改场景状态」。用户裁决「收紧到角色级」。
+#
+# 配套改动（同批）：WorkspaceSecurityEngineClient.evaluate 此前把 subject 硬编码为
+# {userId, role:"user"}，角色恒为字面量 "user"，OPA 侧根本判不出角色。现改为送真实
+# 角色：role = 首个角色、roles = 完整列表（值取自 JWT claims，形如
+# ["ROLE_SUPER_ADMIN","admin","SECURITY_AUDITOR"]）。
+#
+# 分级：
+#   写类（write / activate / publish）→ 需管理角色
+#   读类（read）                     → 已认证即可（读面不属于越权风险面）
+# 管理角色同时认两套命名：既有规则里 input.role == "admin" 与 =="ROLE_SUPER_ADMIN" 并存。
+is_scenario_admin {
+    input.subject.role == "admin"
+}
+is_scenario_admin {
+    input.subject.role == "ROLE_SUPER_ADMIN"
+}
+is_scenario_admin {
+    some r in input.subject.roles
+    r == "admin"
+}
+is_scenario_admin {
+    some r in input.subject.roles
+    r == "ROLE_SUPER_ADMIN"
+}
+
 allow {
     input.action == "scenario:write"
-    input.subject.userId != ""
+    is_scenario_admin
 }
 
 allow {
     input.action == "scenario:activate"
-    input.subject.userId != ""
+    is_scenario_admin
 }
 
 allow {
@@ -52,7 +84,7 @@ allow {
 
 allow {
     input.action == "scenario:publish"
-    input.subject.userId != ""
+    is_scenario_admin
 }
 
 # ═══ WAgent L3 特权动作（2026-11-11 用户 /goal 批 A 授权，A-α 最小面）═══
