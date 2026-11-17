@@ -67,3 +67,11 @@ ecos_backend/_win_tasks/
 /ecos_frontend/src/logs/
 /ecos-tests/logs/
 /.fixtmp/
+
+# 2026-11-17 清理：根目录 .tmp-* 探针/日志暂存
+# 历史教训：此前 288 个 .tmp-* 散落在仓库根，git status 每次刷一屏，且与本会话产物混在一起难以区分。
+# 例外：.tmp-matrix-lib.cjs 是验证方案的官方计数脚本（docs/50-测试/ 下 29 处引用）；
+#      .tmp-d142/ 被缺陷台账 D142 条目当作实跑证据引用，二者必须保留。
+/.tmp-*
+!/.tmp-matrix-lib.cjs
+!/.tmp-d142/
