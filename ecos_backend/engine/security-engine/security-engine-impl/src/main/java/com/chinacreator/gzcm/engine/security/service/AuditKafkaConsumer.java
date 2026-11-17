@@ -25,9 +25,11 @@ import java.util.Map;
  * 等价，多库分支待 MC03 阶段收口）：同一 {@code id} 重放不产生重复行。</p>
  *
  * <p><b>列形态与既有 {@link SecurityAuditService#asyncWrite} 写入保持一致</b>
- * （id/user_id/username/action/resource/result/detail/ip_address），避免与 {@code AuditHashChainService}
- * 使用的长整型 id 群组列（operation/entity_type/entity_id）相互干扰——后者的链式哈希
- * 落列是它所在部署形态的既有约定，本消费者不重复戳链（戳链动作仍由直接写者触发）。</p>
+ * （id/user_id/username/action/resource/result/detail/ip_address），幂等 INSERT 只写这 8 列。
+ * {@code operation}/{@code entity_type}/{@code entity_id} 三个主体描述列走<b>落库后补写</b>
+ * （{@link AuditDao#fillSubjectColumns}），条件里带 {@code curr_hash IS NULL}——
+ * 这三列是 {@code AuditHashChainService} 的哈希输入，已戳记行一律不动，
+ * 且本消费者不戳链（戳链动作仍由直接写者触发）。</p>
  */
 @Component
 public class AuditKafkaConsumer {
@@ -103,6 +105,16 @@ public class AuditKafkaConsumer {
             id = deriveIdFromEventId(eventId);
             log.warn("AuditKafkaConsumer: 审计事件缺 id，按 eventId 派生确定性主键 id={} action={}（请让发布端补 id）",
                     id, evt.get("action"));
+        } else if (!isNumericId(id)) {
+            // #147D142：ecos_audit_log.id 是 bigint（序列主键），而 security-engine 三个发布端
+            // （impersonate / SecurityAuditController / CryptoKeyAdminController）发的是 32 位十六进制
+            // UUID ⇒ 幂等 INSERT 绑参即报 invalid input syntax for type bigint，退化路径再撞一次，
+            // 最终只落一条 ERROR 日志、审计证据整条丢失（冒充/密钥轮换的二次确认审计因此从未落库）。
+            // 消费端统一改写：非数值 id ⇒ 同 eventId 派生规则（同原值恒得同 PK，重放幂等不破）。
+            String rawId = id;
+            id = deriveNumericId(rawId);
+            log.warn("AuditKafkaConsumer: 审计事件 id 非数值，改写为确定性数值主键 rawId={} id={} action={}（ecos_audit_log.id 为 bigint，请让发布端直接给数值 id）",
+                    rawId, id, evt.get("action"));
         }
         String userId = asStr(evt.get("userId"));
         String username = asStr(evt.get("username"));
@@ -119,6 +131,7 @@ public class AuditKafkaConsumer {
             } else {
                 log.debug("AuditKafkaConsumer: 落库 id={} action={}", id, action);
             }
+            fillSubject(id, evt);
             fillGovernance(id, evt);
             fillTraceId(id, evt);
         } catch (org.springframework.dao.DataAccessException e) {
@@ -130,6 +143,7 @@ public class AuditKafkaConsumer {
                 } else {
                     auditDao.insertAuditLog(id, userId, username, action, resource, result, detail, ip);
                 }
+                fillSubject(id, evt);
                 fillGovernance(id, evt);
                 fillTraceId(id, evt);
             } catch (Exception inner) {
@@ -151,6 +165,30 @@ public class AuditKafkaConsumer {
             auditDao.updateTraceId(id, traceId);
         } catch (RuntimeException e) {
             log.warn("AuditKafkaConsumer: trace_id 回填失败 id={} traceId={}: {}", id, traceId, e.getMessage());
+        }
+    }
+
+    /**
+     * 主体描述列回填（{@code operation} / {@code entity_type} / {@code entity_id}）。
+     *
+     * <p>事件面键名是驼峰（{@code operation} / {@code entityType} / {@code entityId}），
+     * 而幂等 INSERT 只写固定 8 列；此前这三个键在消费端被直接丢弃，
+     * 于是审计行只剩 {@code action}（HTTP 动词 + URI），回答不了"做了什么、对哪个对象"。</p>
+     *
+     * <p>不能用 {@link #fillGovernance} 代办：那条路径只认契约蛇形键
+     * （{@code object_type}/{@code object_id} 是治理面语义），驼峰键进去会被丢弃。</p>
+     */
+    private void fillSubject(String id, Map<String, Object> evt) {
+        String operation = asStr(evt.get("operation"));
+        String entityType = asStr(evt.get("entityType"));
+        String entityId = asStr(evt.get("entityId"));
+        if (operation == null && entityType == null && entityId == null) {
+            return;
+        }
+        try {
+            auditDao.fillSubjectColumns(id, operation, entityType, entityId);
+        } catch (RuntimeException e) {
+            log.warn("AuditKafkaConsumer: 主体列回填失败 id={}: {}", id, e.getMessage());
         }
     }
 
@@ -188,6 +226,29 @@ public class AuditKafkaConsumer {
             h *= 0x100000001b3L;
         }
         return "9" + String.format("%017d", (h & Long.MAX_VALUE) % 100_000_000_000_000_000L);
+    }
+
+    /**
+     * 主键能否直接绑到 {@code ecos_audit_log.id}（bigint）。
+     *
+     * <p>判据用 {@link Long#parseLong} 而非正则：bigint 上界即 {@code Long.MAX_VALUE}，
+     * 位数够但数值越界的 id（如 19 位 99…）正则会放过、绑参照样报错。</p>
+     */
+    public static boolean isNumericId(String id) {
+        if (id == null || id.isEmpty()) {
+            return false;
+        }
+        try {
+            Long.parseLong(id);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /** 非数值 id ⇒ 确定性数值主键：同一原值恒得同一 id，重放幂等不因改写而失效。 */
+    public static String deriveNumericId(String rawId) {
+        return deriveIdFromEventId(rawId);
     }
 
     /** 暴露给单元测试（@VisibleForTesting）。 */

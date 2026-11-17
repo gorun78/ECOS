@@ -172,9 +172,14 @@ class MigrationVersionUniquenessTest {
      * 的 sb001/sb002 target_ref 从虚构数据集 ds_flight_schedules/ds_passenger_feedback 改指真实资源
      * res-dw-doc/res-dw-doc-chunk；只 UPDATE 不改结构、幂等）落地
      * ⇒ 按实测订正 336→337 / 下一号 337→338。
+     * 2026-11-16 D142（冒充审计留痕丢失）：V338（{@code ecos_audit_log.result} 16→64 位加宽——
+     * security-engine 两发布端写 REJECTED_CONFIRM_REQUIRED(25)/REJECTED_MASTER_KEY_MISSING(27)，
+     * 16 位装不下导致消费者落库报 value too long、拒绝类审计整条丢失；public 与 ecos_control
+     * 两处同名表都加宽，to_regclass 守卫；只加宽不删列、幂等）落地
+     * ⇒ 按实测订正 337→338 / 下一号 338→339。
      */
-    private static final int MAX_BASELINE_VERSION = 337;
-    private static final int NEXT_FREE_VERSION = 338;
+    private static final int MAX_BASELINE_VERSION = 338;
+    private static final int NEXT_FREE_VERSION = 339;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

@@ -112,6 +112,32 @@ public class AuditDao extends JdbcTemplateDaoSupport {
     }
 
     /**
+     * 补写主体描述列（{@code operation} / {@code entity_type} / {@code entity_id}）。
+     *
+     * <p>事件面生产者带的是驼峰键（{@code operation} / {@code entityType} / {@code entityId}），
+     * 而 {@link #fillGovernanceColumns} 只认契约蛇形键（{@code object_type} / {@code object_id}
+     * 是治理面语义，不是主体描述面），两者不能互借——驼峰载荷从这里落列，不猜键、不改列名。</p>
+     *
+     * <p><b>只在为空时补</b>（{@code COALESCE(NULLIF(col,''), ?)}）：重放不覆盖既有值，
+     * 也不覆盖哈希链已戳记行（{@code AuditHashChainService} 的 6 字段哈希输入含
+     * {@code operation}/{@code entity_type}/{@code entity_id}，改写已戳行会让链验签失败）。
+     * 三值全空即返回 0，不打无谓 UPDATE。</p>
+     */
+    public int fillSubjectColumns(String id, String operation, String entityType, String entityId) {
+        if (id == null || id.isBlank()
+                || (operation == null && entityType == null && entityId == null)) {
+            return 0;
+        }
+        return jdbcTemplate.update(
+            "UPDATE " + AUDIT_LOG + " SET "
+                + "operation = COALESCE(NULLIF(operation, ''), ?), "
+                + "entity_type = COALESCE(NULLIF(entity_type, ''), ?), "
+                + "entity_id = COALESCE(NULLIF(entity_id, ''), ?) "
+                + "WHERE id = ? AND curr_hash IS NULL",
+            operation, entityType, entityId, id);
+    }
+
+    /**
      * 补写治理审计列（R7 §2.9.4③；#147M）。
      *
      * <p><b>列名单固定</b>（与 V303 的 20 列逐一同名），仅接受

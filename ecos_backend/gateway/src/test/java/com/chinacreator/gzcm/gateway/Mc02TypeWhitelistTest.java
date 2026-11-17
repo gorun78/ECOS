@@ -169,7 +169,10 @@ class Mc02TypeWhitelistTest {
     // 2026-11-15：V337（D89 修 sc001 DATASET 绑定）落地后本锚漏改，实测 287 ≠ 286 而恒红；
     // 同批订正 286→287（Mc02/Mc03/Dr 三枚 SCRIPT_FLOOR 同步；MigrationVersionUniquenessTest 走
     // MAX_BASELINE_VERSION=337 口径，不参与本锚）。
-    private static final int SCRIPT_FLOOR = 287;
+    // 2026-11-16 D142：V338（ecos_audit_log.result VARCHAR(16)→VARCHAR(64) 纯 ALTER 加宽）落地
+    // ⇒ 按实测订正 287→288（四枚同批锚）。本枚对类型白名单零新增：ALTER COLUMN ... TYPE VARCHAR(64)
+    // 只改宽度，类型头仍为白名单内的 VARCHAR。
+    private static final int SCRIPT_FLOOR = 288;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。
