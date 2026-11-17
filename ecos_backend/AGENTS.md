@@ -2,10 +2,10 @@
 
 > Java 17 + Spring Boot 3.2.2 + MyBatis + PostgreSQL | Maven multi-module | **微服务 v2 (7 独立 JAR)**
 > 代码路径 (Windows): `D:\workspace\javaprojects\ECOS\ecos_backend\` (2026-09-09 起)
-> 架构宪法: `.trae/rules/架构铁律.md` v2.0 (2026-09-28) + `docs/40-实现/legacy-plans/current-plan.md` v1.4（历史目标结构，Phase 8 批次再对齐）+ 铁律 附录 A
+> 架构宪法: `.trae/rules/架构铁律.md` v2.0 (2026-09-28) + `docs/90-归档/40-实现/legacy-plans/current-plan.md` v1.4（历史目标结构，Phase 8 批次再对齐）+ 铁律 附录 A
 > 数据库规范: `.trae/rules/数据库访问规范.md` v1.2 (2026-09-28, IR/DR/EN/ST/MC 共 30 条红线 + ST03-A 列级加密豁免登记)
 > 数据湖规范: `.trae/rules/数据湖存储分层规范.md` v2.0 (数据域二分 + 五层 + 知识层双形态 + 版本×分层矩阵)
-> 需求基线: `docs/20-需求/PRD-00-ECOS平台需求规格说明书-2026-09-28.md`（84 项 REQ）+ `docs/20-需求/需求检视报告-2026-09-28.md` §十二（Q1~Q14 用户裁决，约束性输入）
+> 需求基线: `docs/20-需求/ECOS需求规格说明书-全新合并版-2026-10-12.md`（v2.1-R12 唯一总入口，139 基线 + R6~R11 增量）+ `docs/20-需求/需求检视报告-2026-09-28.md` §十二/§十四（Q1~Q14 用户裁决 + R-1~R-72 批量批准，约束性输入）。PRD-00~10 旧分册已归档至 `docs/90-归档/20-需求/PRD-分册/`
 
 ## 产品定位
 
@@ -73,7 +73,6 @@ ecos_backend/
 │   ├── workspace-impl/
 │   └── workspace-service/     :18090 (场景层)
 ├── gateway/                   (顶层, :8080, 组织/认证 facade)
-└── service/{ge,zhi,cheng,ming}/   (四转化 API 文档占位, 非 Maven)
 ```
 
 ### Phase 8 — 模块结构调整 (2026-09-11 启动, 按 `docs/plans/cleanup-checklist.md` Sprint)
@@ -187,4 +186,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 
 - **文件额外说明**: `services/sysman/impl/sysman-boot/`（P8-C 后路径，原顶层 `sysman/sysman-boot/`）保留作 library，被 `engine/security-engine-impl` + `engine/ontology-engine-impl` POM 依赖，**不删除**
 - **`services/agent-service`** 保留作 aiming 双容器隔离被 AimingServiceApplication `excludeFilters` 引用，**不删除**
-- **`service/{ge,zhi,cheng,ming}`** 是四转化 API 文档占位 (每个只有 `AGENTS.md` 不含 `pom.xml`)，**不删除**，全局 API 目标见 `ecos_backend/docs/four-transformations/`
+- **`service/{ge,zhi,cheng,ming}`** 已删除（2026-11-17 用户裁决"当时架构生成的，直接删掉"；四转化概念本体见铁律 §0.2，全局 API 目标见 `ecos_backend/docs/four-transformations/`）
