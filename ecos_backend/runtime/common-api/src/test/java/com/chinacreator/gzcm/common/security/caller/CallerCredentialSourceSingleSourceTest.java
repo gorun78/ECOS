@@ -319,6 +319,87 @@ class CallerCredentialSourceSingleSourceTest {
         assertNull(c.tenant());
     }
 
+    // ── 一·C、D148 作用域投递：异步腿唯一合法的跨线程通道 ──────────────────────
+
+    @Test
+    @DisplayName("D148：工作线程在 runWith 作用域内取到的是请求线程带进来的载体")
+    void scopedCarrierIsVisibleOnAThreadWithoutRequestContext() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HeaderAuthInterceptor.H_USER, "u-1001");
+        request.addHeader(HeaderAuthInterceptor.H_TENANT, "tenant-A");
+        bind(request);
+        Carrier caller = CallerCredentialSource.current();
+
+        // 模拟池线程：本线程没有请求上下文，只有 runWith 作用域
+        Carrier[] seen = new Carrier[1];
+        Thread worker = new Thread(() -> CallerCredentialSource.runWith(
+                caller, () -> seen[0] = CallerCredentialSource.current()));
+        worker.start();
+        joinUninterruptibly(worker);
+
+        assertEquals("u-1001", seen[0].user(),
+                "作用域内必须取到请求线程带来的身份；取到 EMPTY 即 D148 复现（出站 rls/apply 缺信任头 403）");
+        assertEquals("tenant-A", seen[0].tenant());
+    }
+
+    @Test
+    @DisplayName("D148：作用域退出即清——同一线程随后取到 EMPTY，池线程复用不得串号")
+    void scopeIsClearedWhenItEndsSoPoolReuseCannotLeakSubjects() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HeaderAuthInterceptor.H_USER, "u-1001");
+        bind(request);
+        Carrier caller = CallerCredentialSource.current();
+        // 工作线程没有请求上下文，只有作用域
+        RequestContextHolder.resetRequestAttributes();
+
+        Carrier[] inside = new Carrier[1];
+        Carrier[] after = new Carrier[1];
+        Thread worker = new Thread(() -> {
+            CallerCredentialSource.runWith(caller, () -> inside[0] = CallerCredentialSource.current());
+            after[0] = CallerCredentialSource.current();
+        });
+        worker.start();
+        joinUninterruptibly(worker);
+
+        assertEquals("u-1001", inside[0].user());
+        assertFalse(after[0].present(),
+                "作用域退出后同一线程仍取到上一任务的主语 ⇒ 池线程把 A 的凭证泄给 B（比取不到更严重）");
+    }
+
+    @Test
+    @DisplayName("D148：异常路径同样清理，且嵌套作用域恢复上一层")
+    void scopeClearsOnThrowAndRestoresNestedLayer() {
+        RequestContextHolder.resetRequestAttributes();
+        Carrier outer = new Carrier("Bearer outer", "u-outer", null, "t-outer", null);
+        Carrier inner = new Carrier("Bearer inner", "u-inner", null, "t-inner", null);
+
+        assertThrows(IllegalStateException.class, () -> CallerCredentialSource.runWith(outer, () -> {
+            throw new IllegalStateException("worker blew up");
+        }), "异常必须原样抛给调用方（吞掉就变成静默失败）");
+        assertFalse(CallerCredentialSource.current().present(),
+                "异常路径没清作用域 ⇒ 池线程带着死人凭证继续跑下一任务");
+
+        Carrier[] innerSeen = new Carrier[1];
+        Carrier[] restored = new Carrier[1];
+        CallerCredentialSource.runWith(outer, () -> {
+            CallerCredentialSource.runWith(inner, () -> innerSeen[0] = CallerCredentialSource.current());
+            restored[0] = CallerCredentialSource.current();
+        });
+        assertEquals("u-inner", innerSeen[0].user(), "内层必须盖住外层");
+        assertEquals("u-outer", restored[0].user(), "内层退出后必须恢复外层，而不是直接清空");
+        assertFalse(CallerCredentialSource.current().present());
+    }
+
+    private static void joinUninterruptibly(Thread t) {
+        try {
+            t.join(10_000L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            fail("等待工作线程被中断");
+        }
+        assertFalse(t.isAlive(), "工作线程 10s 内未结束，用例无法判定");
+    }
+
     // ── 二、实现面归零（差距本体） ─────────────────────────────────────────────
 
     @Test

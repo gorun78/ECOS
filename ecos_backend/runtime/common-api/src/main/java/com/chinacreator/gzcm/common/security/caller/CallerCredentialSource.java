@@ -35,10 +35,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *
  * <p><b>载体本身仍是线程绑定的请求上下文</b>：{@link RequestContextHolder} 只在同步请求线程
  * 上有值，异步／{@code @Async}／定时／SSE 执行线程取不到 ⇒ 一律 {@code EMPTY} ⇒ 属主端默认 DENY。
- * 这是<b>有意保留的 fail-closed</b>，不是漏判：跨线程传递身份需要一个新的可继承载体
- * （{@code InheritableThreadLocal}／ScopedValue），线程池复用会让上一位调用方的凭证
- * 泄给下一位——那比"异步腿取不到凭证"严重得多。要打通异步腿的身份，属主侧需要显式
- * 任务凭证（服务凭证签名，见 {@code EcosServiceCredentialSigner}），另批处置。</p>
+ * 这是<b>有意保留的 fail-closed</b>，不是漏判；要打通异步腿的身份，只有一条路：
+ * 请求线程用 {@link #current()} 取一次，工作线程在 {@link #runWith} 的作用域内执行，
+ * <b>作用域关闭即清</b>。刻意<b>不</b>做线程继承（{@code InheritableThreadLocal}）：
+ * 线程池复用会让上一位调用方的凭证泄给下一位任务，比"异步腿取不到凭证"严重得多。</p>
  *
  * <p><b>面外登记（不在本单源覆盖内，理由逐条）</b>：入站认证器（sysman
  * {@code JwtAuthenticationFilter}）读 {@code Authorization} 是<b>验签入口</b>而非中继，
@@ -93,11 +93,46 @@ public final class CallerCredentialSource {
     }
 
     /**
-     * 从<b>当前线程绑定的</b>请求上下文取调用方凭证。
+     * 工作线程上的显式载体作用域（唯一的跨线程传递通道）。
      *
-     * @return 载体；无请求上下文（异步／定时／SSE 线程）返回 {@link Carrier#EMPTY}，<b>绝不返回 {@code null}</b>
+     * <p>只在 {@link #runWith} 的作用域内非空，且作用域退出时<b>必清</b>
+     * （含异常路径）。不用 {@code InheritableThreadLocal}：池线程被复用时上一位调用方的
+     * 凭证会泄给下一位任务。</p>
+     */
+    private static final ThreadLocal<Carrier> SCOPED = new ThreadLocal<>();
+
+    /**
+     * 在指定载体的作用域内执行一段无返回值的工作（异步腿的唯一正确用法）。
+     *
+     * <p><b>用法纪律</b>：载体必须在<b>请求线程</b>用 {@link #current()} 取，
+     * 再传进工作线程——工作线程自己取只会得到 {@link Carrier#EMPTY}。
+     * 作用域结束即恢复上一层的值（支持嵌套），不给池线程留残留。</p>
+     */
+    public static void runWith(Carrier carrier, Runnable action) {
+        Carrier previous = SCOPED.get();
+        SCOPED.set(carrier == null ? Carrier.EMPTY : carrier);
+        try {
+            action.run();
+        } finally {
+            if (previous == null) {
+                SCOPED.remove();
+            } else {
+                SCOPED.set(previous);
+            }
+        }
+    }
+
+    /**
+     * 从<b>当前线程绑定的</b>请求上下文取调用方凭证；若本线程已被 {@link #runWith}
+     * 绑定了显式载体，则以该载体为准（工作线程无请求上下文可读）。
+     *
+     * @return 载体；无请求上下文（且未绑定作用域）返回 {@link Carrier#EMPTY}，<b>绝不返回 {@code null}</b>
      */
     public static Carrier current() {
+        Carrier scoped = SCOPED.get();
+        if (scoped != null) {
+            return scoped;
+        }
         RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
         if (!(attrs instanceof ServletRequestAttributes servletAttrs)) {
             return Carrier.EMPTY;
