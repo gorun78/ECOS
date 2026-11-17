@@ -196,6 +196,11 @@ class BacktestMetricCalculatorTest {
         assertTrue(r.warnings().stream().anyMatch(w -> w.contains("LOW_SAMPLE_SUPPRESSED")
                 && w.contains("withheld from conclusion")));
         assertTrue(s.getLowSampleReason().contains("measured=1 < min_samples=5"));
+        // 来源串 = "source=" + 键名（已配置态），不得自我拼接成 key=key
+        assertTrue(s.getLowSampleReason().contains("(source=" + K_MIN_SAMPLES + ")"),
+                "守卫原因须既可核验又不得退化：" + s.getLowSampleReason());
+        assertFalse(s.getLowSampleReason().contains(K_MIN_SAMPLES + "=" + K_MIN_SAMPLES),
+                "来源标注不得自我拼接成 key=key：" + s.getLowSampleReason());
         // 计算器仍如实回显候选越限（供审计），只是不作为结论
         assertEquals(2, r.breaches().size());
     }

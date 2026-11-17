@@ -50,6 +50,7 @@ class BacktestReviewRouterTest {
     private final CognitiveObservability observability = mock(CognitiveObservability.class);
 
     private static final String K_MAPE = "ecos.fc.backtest.review_threshold.mape_ratio";
+    private static final String K_MIN_SAMPLES = "ecos.fc.backtest.review_threshold.min_samples";
 
     @SuppressWarnings("unchecked")
     private BacktestReviewRouter routerWith(BacktestReviewRoleDecider bean) {
@@ -76,9 +77,8 @@ class BacktestReviewRouterTest {
                 null, null, null, true));
         Map<String, String> src = new LinkedHashMap<>();
         src.put(K_MAPE, K_MAPE);
-        src.put("ecos.fc.backtest.review_threshold.min_samples",
-                minSamples.value == null ? "ecos.fc.backtest.review_threshold.min_samples(UNSET)"
-                        : "ecos.fc.backtest.review_threshold.min_samples");
+        src.put(K_MIN_SAMPLES,
+                minSamples.value == null ? K_MIN_SAMPLES + "(UNSET)" : K_MIN_SAMPLES);
         return BacktestMetricCalculator.compute(rows, 1,
                 new BacktestMetricCalculator.Thresholds(null, new BigDecimal("0.15"),
                         minSamples.value, null, null, src), new BigDecimal("0.30"));
@@ -103,6 +103,8 @@ class BacktestReviewRouterTest {
         assertNull(r.getTaskId());
         assertTrue(r.getWarnings().stream().anyMatch(w -> w.contains("NO_REVIEW_TASK_CREATED")));
         assertTrue(r.getWarnings().stream().anyMatch(w -> w.startsWith("LOW_SAMPLE: ")));
+        assertTrue(r.getWarnings().stream().noneMatch(w -> w.startsWith("LOW_SAMPLE: LOW_SAMPLE:")),
+                "守卫原因只应带一次前缀，禁渲染成 LOW_SAMPLE: LOW_SAMPLE:：" + r.getWarnings());
         verifyNoInteractions(taskService, decider);
         verify(observability).audit(org.mockito.ArgumentMatchers.eq("cognitiveBacktest.reviewRoute"),
                 org.mockito.ArgumentMatchers.eq("outcome_evaluation"),
@@ -183,7 +185,12 @@ class BacktestReviewRouterTest {
         assertEquals(1, r.getBreachedItems().size());
         assertTrue(r.getBreachedItems().get(0).startsWith("MAX_MAPE measured=0.30 threshold=0.15"));
         assertEquals(r.getBreachedItems(), r.getMeasuredValues(), "越限项与实测值同源同序");
-        assertTrue(r.getThresholdSources().contains(K_MAPE + "=" + K_MAPE));
+        // 来源标注 = 键名 + 状态（已配置 ⇒ 仅键名；未配置 ⇒ key(UNSET)），禁再拼 key= 造成 "key=key(UNSET)"
+        assertTrue(r.getThresholdSources().contains(K_MAPE), "已配置阈值的来源标注应为键名本身：" + r.getThresholdSources());
+        assertFalse(r.getThresholdSources().contains(K_MAPE + "=" + K_MAPE),
+                "来源标注不得自我拼接成 key=key：" + r.getThresholdSources());
+        assertTrue(r.getThresholdSources().stream().noneMatch(x -> x.contains(K_MAPE + "=")),
+                "任何来源标注都不得以 key= 形式出现：" + r.getThresholdSources());
 
         ArgumentCaptor<TaskDescription> cap = ArgumentCaptor.forClass(TaskDescription.class);
         verify(taskService).submitTask(cap.capture());

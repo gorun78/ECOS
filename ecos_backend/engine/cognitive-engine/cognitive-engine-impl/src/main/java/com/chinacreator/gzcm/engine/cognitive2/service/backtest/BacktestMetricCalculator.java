@@ -357,10 +357,16 @@ public final class BacktestMetricCalculator {
                 + " P10/P90 must come from existing run detail, interpolation forbidden (R-62 ①)";
     }
 
+    /**
+     * 阈值定位串（{@code <key>} / {@code <key>(UNSET)} / {@code <key>(INVALID)}，即 sources 里的来源标注原样）。
+     *
+     * <p>标注已含键名与状态，故<b>禁</b>再拼 {@code key=}：那会产出 {@code key=key(UNSET)}，
+     * 读者看不出阈值到底取自何处（fail-loud 串变成自己指自己）。</p>
+     */
     private static String keyOrPlaceholder(Thresholds t, String leaf) {
         for (Map.Entry<String, String> e : t.sourcesOrEmpty().entrySet()) {
             if (e.getKey() != null && e.getKey().endsWith(leaf)) {
-                return e.getValue() == null ? e.getKey() : e.getKey() + "=" + e.getValue();
+                return e.getValue() == null ? e.getKey() : e.getValue();
             }
         }
         return "ecos.fc.backtest.review_threshold." + leaf + "(UNSET)";

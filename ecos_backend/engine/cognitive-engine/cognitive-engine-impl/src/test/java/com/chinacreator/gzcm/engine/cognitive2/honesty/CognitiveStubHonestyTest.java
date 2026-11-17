@@ -121,7 +121,7 @@ class CognitiveStubHonestyTest {
         WorldModelController controller = new WorldModelController();
         List<ResponseEntity<ApiResponse<Map<String, Object>>>> responses = List.of(
                 controller.getCurrentState(),
-                controller.simulate(new Scenario()),
+                controller.simulate(),
                 controller.recommendStrategy("reduce-churn"),
                 controller.getCausalGraph());
 

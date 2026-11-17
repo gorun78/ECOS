@@ -1,11 +1,9 @@
 package com.chinacreator.gzcm.engine.cognitive2.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.engine.cognitive2.model.Scenario;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,8 +28,13 @@ public class WorldModelController {
         return CognitiveStubResponses.notImplemented();
     }
 
+    /**
+     * 零参 = 不绑定请求体。桩面一旦绑定刚性 DTO（曾为 {@code @RequestBody Scenario}），
+     * 真实前端载荷（{@code assumptions} 为数组、{@code type} 为字符串）会先被 Jackson 判成
+     * 400 参数错误，设计要求的「未实现」占位永远出不来（F05-16 / DG-9）。
+     */
     @PostMapping("/scenarios")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> simulate(@RequestBody Scenario scenario) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> simulate() {
         return CognitiveStubResponses.notImplemented();
     }
 

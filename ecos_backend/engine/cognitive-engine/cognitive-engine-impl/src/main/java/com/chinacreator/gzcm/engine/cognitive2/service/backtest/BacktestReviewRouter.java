@@ -86,7 +86,7 @@ public class BacktestReviewRouter {
         if (s.lowSample()) {
             r.setOutcome(BacktestReviewRouteOutcome.SUPPRESSED_BY_LOW_SAMPLE.name());
             r.setRouted(false);
-            warnings.add("LOW_SAMPLE: " + s.lowSampleReason());
+            warnings.add(s.lowSampleReason());
             warnings.add("NO_REVIEW_TASK_CREATED: breached assertions were suppressed by the guard,"
                     + " routing on them would fabricate a finding");
             observability.audit("cognitiveBacktest.reviewRoute", "outcome_evaluation",
@@ -148,10 +148,16 @@ public class BacktestReviewRouter {
         return r;
     }
 
-    /** 阈值来源清单（形如 {@code key=value} / {@code key=(UNSET)}，逐枚可核验，供响应与任务参数共用）。 */
+    /**
+     * 阈值来源清单（逐枚为<b>来源标注原样</b>：{@code <key>} = 已配置生效，{@code <key>(UNSET)} /
+     * {@code <key>(INVALID)} = fail-closed 两种成因），供响应与任务参数共用。
+     *
+     * <p>标注本身就是"键名 + 状态"，不可再拼一次 {@code key=}：那会渲染成 {@code key=key(UNSET)}，
+     * 读者无法判断阈值取自哪条配置（DG-9 定位串退化）。</p>
+     */
     private static List<String> thresholdSourceLines(BacktestMetricSummaryish s) {
         List<String> out = new ArrayList<>();
-        s.thresholdSources().forEach((k, v) -> out.add(k + "=" + v));
+        s.thresholdSources().forEach((k, v) -> out.add(v == null || v.isBlank() ? k : v));
         return out;
     }
 

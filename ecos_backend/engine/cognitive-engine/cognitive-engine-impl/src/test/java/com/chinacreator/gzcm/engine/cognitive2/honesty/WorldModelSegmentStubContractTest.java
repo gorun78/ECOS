@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.io.IOException;
@@ -292,6 +293,17 @@ class WorldModelSegmentStubContractTest {
         assertEquals(Boolean.TRUE, legacyData.get("stub"));
         assertNull(legacyData.get("segment"), "旧面不得被本批顺带塞入 segment");
         assertNull(legacyData.get("missing"), "旧面不得被本批顺带塞入 missing");
+
+        // 桩面不得绑定请求体：一旦出现 @RequestBody DTO，前端真实载荷会被 Jackson 先判 400，
+        // 设计要求的「未实现」占位永远出不来（POST /scenarios 的 assumptions 数组即实例）。
+        for (Method m : WorldModelController.class.getDeclaredMethods()) {
+            for (Annotation[] pas : m.getParameterAnnotations()) {
+                for (Annotation a : pas) {
+                    assertTrue(!(a instanceof RequestBody),
+                            m.getName() + "：桩面禁绑定请求体（改零参），否则真实载荷先 400 后 501");
+                }
+            }
+        }
     }
 
     // ── ⑥ 偏差继续在册：契约段名 ≠ legacy 名 ─────────────────────────
