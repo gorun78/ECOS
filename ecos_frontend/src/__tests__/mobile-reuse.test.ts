@@ -27,14 +27,13 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
  * - 存量违规：pages/platform/AlertsPage.tsx:746/:750 自建 matchMedia 监听，
  *   应改用 useMediaQuery —— 属主 W200（档随 R-55② 渐进收口，当前登记）。
  * - window.innerWidth 浮层位置钳制（§八.2 允许用途）：
- *   pages/data-workbench/CatalogContextMenu.tsx、pages/ontology/CanvasContextMenu.tsx
+ *   pages/ontology/CanvasContextMenu.tsx
  */
 const MATCH_MEDIA_BASELINE = new Set([
   'hooks/useMediaQuery.ts',
   'pages/platform/AlertsPage.tsx',
 ]);
 const INNER_WIDTH_BASELINE = new Set([
-  'pages/data-workbench/CatalogContextMenu.tsx',
   'pages/ontology/CanvasContextMenu.tsx',
 ]);
 

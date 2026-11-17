@@ -47,13 +47,16 @@ import { DATA_ENGINE_SETTINGS_BASE, ENGINE_DATA_PIPELINE_RUNS_BASE } from '../..
 
 const DOMAIN_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
-/** 本批改动的 9 文件 + 各自到 httpClient 的正确相对路径（目录深度不同，写错即编译不过）。 */
+/**
+ * 本批改动的 6 文件 + 各自到 httpClient 的正确相对路径（目录深度不同，写错即编译不过）。
+ *
+ * <p>2026-11-17：原 9 文件中的 `pipeline-editor/CopilotPanel.tsx`、`GitCommitDialog.tsx`、
+ * `PipelineExecutionMonitor.tsx` 属死代码（零生产引用）已整体删除，其面值同步从快照剪除；
+ * 这不是"剪腿换绿"——被剪的是**代码本身不存在了**，不是请求被改小。</p>
+ */
 const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
-  { rel: 'pipeline-editor/CopilotPanel.tsx', importPath: "../../../services/httpClient" },
-  { rel: 'pipeline-editor/GitCommitDialog.tsx', importPath: "../../../services/httpClient" },
   { rel: 'pipeline-editor/GitVersionPanel.tsx', importPath: "../../../services/httpClient" },
   { rel: 'pipeline-editor/NodePalette.tsx', importPath: "../../../services/httpClient" },
-  { rel: 'pipeline-editor/PipelineExecutionMonitor.tsx', importPath: "../../../services/httpClient" },
   { rel: 'pipeline-editor/PropertyPanel.tsx', importPath: "../../../services/httpClient" },
   { rel: 'pipeline-editor/UdfBuilderPanel.tsx', importPath: "../../../services/httpClient" },
   { rel: 'pipelineDebugApi.ts', importPath: "../../services/httpClient" },
@@ -62,11 +65,8 @@ const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
 
 /** 本批每文件应还原出的派生态条数（实跑读出，防「剪一处漏一处」）。 */
 const SITES_PER_FILE: Readonly<Record<string, number>> = {
-  'pipeline-editor/CopilotPanel.tsx': 1,
-  'pipeline-editor/GitCommitDialog.tsx': 3,
   'pipeline-editor/GitVersionPanel.tsx': 1,
   'pipeline-editor/NodePalette.tsx': 1,
-  'pipeline-editor/PipelineExecutionMonitor.tsx': 1,
   'pipeline-editor/PropertyPanel.tsx': 1,
   'pipeline-editor/UdfBuilderPanel.tsx': 2,
   'pipelineDebugApi.ts': 2,
@@ -177,19 +177,16 @@ function faceValues(src: string): string[] {
 }
 
 /**
- * 改前裸形态快照（16 条，带定界符原样收录，便于人工逐条核对）：
- * CopilotPanel 1 + GitCommitDialog 3 + GitVersionPanel 1 + NodePalette 1 +
- * PipelineExecutionMonitor 1 + PropertyPanel 1 + UdfBuilderPanel 2 +
+ * 改前裸形态快照（11 条，带定界符原样收录，便于人工逐条核对）：
+ * GitVersionPanel 1 + NodePalette 1 + PropertyPanel 1 + UdfBuilderPanel 2 +
  * pipelineDebugApi 2 + DataEngineConfigPanel 4。
+ *
+ * <p>2026-11-17：原 16 条中 CopilotPanel 1 + GitCommitDialog 3 + PipelineExecutionMonitor 1
+ * 共 5 条随死代码文件整体删除（零生产引用），非快照剪腿。</p>
  */
 const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
-  "'/api/v1/engine/data/copilot/chat'",
-  '`/api/v1/engine/data/pipeline/git/branches?pipelineId=${encodeURIComponent(pipelineId)}`',
-  '`/api/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/status`',
-  '`/api/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/commit`',
   '`/api/v1/engine/data/pipeline/git/versions/${encodeURIComponent(pipelineId)}`',
   "'/api/v1/pipeline/node-types'",
-  '`/api/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}`',
   "'/api/v1/engine/data/udf/list'",
   "'/api/v1/engine/data/udf/convert'",
   "`/api/v1/engine/data/udf/test`",
@@ -208,16 +205,16 @@ describe('pages/data-workbench 页面域基址单源 — 私设基址清零 (#14
     expect(API_BASE).toBe('/api');
   });
 
-  it('整域 77 个生产文件代码行零私设基址（递归扫，注释里的端点说明不计；78→77 系 #142/B4-3e-76 删 LucideIcon 桥）', () => {
+  it('整域 60 个生产文件代码行零私设基址（递归扫，注释里的端点说明不计；77→60 系 2026-11-17 死代码清理删 17 文件）', () => {
     const prodFiles = walk(DOMAIN_ROOT, []);
-    expect(prodFiles.length, '生产文件面漂移：新增/删除样本文件须同步本门判据').toBe(77);
+    expect(prodFiles.length, '生产文件面漂移：新增/删除样本文件须同步本门判据').toBe(60);
     for (const rel of prodFiles) {
       const hits = codeLines(read(rel)).filter((l) => HARDCODED_RE.test(l));
       expect(hits, `${rel} 仍有 ${hits.length} 处代码行 "/api 字面量`).toEqual([]);
     }
   });
 
-  it('九文件至多 1 条 API_BASE 导入且来源为 httpClient（相对路径随目录深度正确）；已零 API_BASE 来源的文件必须恰有一条族单源导入腿 (#143/B5-22 / #145/B6-15)', () => {
+  it('六文件至多 1 条 API_BASE 导入且来源为 httpClient（相对路径随目录深度正确）；已零 API_BASE 来源的文件必须恰有一条族单源导入腿 (#143/B5-22 / #145/B6-15)', () => {
     for (const { rel, importPath } of FILES) {
       const imports = codeLines(read(rel)).filter((l) => l.trimStart().startsWith('import '));
       const apiImports = imports.filter((l) => /\bAPI_BASE\b/.test(l));
@@ -239,7 +236,8 @@ describe('pages/data-workbench 页面域基址单源 — 私设基址清零 (#14
         codeLines(read(rel)).some((l) => l.trimStart().startsWith('import ') && l.includes(name))
       ).map((f) => f.rel);
     expect(movedOf('DATA_ENGINE_SETTINGS_BASE')).toEqual(['DataEngineConfigPanel.tsx']);
-    expect(movedOf('ENGINE_DATA_PIPELINE_RUNS_BASE')).toEqual(['pipeline-editor/PipelineExecutionMonitor.tsx']);
+    // `ENGINE_DATA_PIPELINE_RUNS_BASE` 原唯一导入方 PipelineExecutionMonitor.tsx 已随死代码删除 ⇒ 本域零导入方
+    expect(movedOf('ENGINE_DATA_PIPELINE_RUNS_BASE')).toEqual([]);
   });
 
   it('派生形态唯一：解析表内常量后必接 /（防漏段），九文件零 /api/api 双前缀', () => {
@@ -252,14 +250,14 @@ describe('pages/data-workbench 页面域基址单源 — 私设基址清零 (#14
     }
   });
 
-  it('面值逐字不变：还原后的 16 条 URL 多重集 = 改前快照，且逐文件条数吻合', () => {
+  it('面值逐字不变：还原后的 11 条 URL 多重集 = 改前快照，且逐文件条数吻合', () => {
     const all: string[] = [];
     for (const { rel } of FILES) {
       const vals = faceValues(read(rel));
       expect(vals.length, `${rel} 面值面条数不符`).toBe(SITES_PER_FILE[rel]);
       all.push(...vals);
     }
-    expect(all.length).toBe(16);
+    expect(all.length).toBe(11);
     expect([...all].sort()).toEqual([...PRE_BATCH_URL_LITERALS].sort());
   });
 
@@ -273,23 +271,17 @@ describe('pages/data-workbench 页面域基址单源 — 私设基址清零 (#14
     expect(nonImportCodeLines(src).filter((l) => FAM_SITE_RE.test(l)).length).toBe(1);
   });
 
-  it('#145/B6-15 属主常量面值等价：ENGINE_DATA_PIPELINE_RUNS_BASE 取值 = 改前那枚族根，轮询腿带插值尾段仍计 1 条', () => {
-    // 同上：等价性是「16 条快照不剪腿」的唯一根据。这枚常量拼出来的是**含插值尾段**的完整腿面值，
-    // 与改前 `${API_BASE}/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}` 逐字相同。
+  it('#145/B6-15 属主常量面值等价：ENGINE_DATA_PIPELINE_RUNS_BASE 取值 = 改前那枚族根', () => {
+    // 2026-11-17：原唯一导入方 `pipeline-editor/PipelineExecutionMonitor.tsx` 已随死代码删除，
+    // 本域不再有消费腿；此处只保留常量面值等价断言，防该常量被误改。
     expect(ENGINE_DATA_PIPELINE_RUNS_BASE).toBe('/api/v1/engine/data/pipeline/runs');
-    const src = read('pipeline-editor/PipelineExecutionMonitor.tsx');
-    expect(derivedValues(src)).toEqual(['/api/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}']);
-    expect(faceValues(src).length).toBe(1);
-    // 该文件已把唯一一枚基址腿上收 ⇒ 全文件不得再有任何 `/api` 裸面或 API_BASE 派生
-    expect(codeLines(src).filter((l) => HARDCODED_RE.test(l))).toEqual([]);
-    expect(codeLines(src).filter((l) => /\bAPI_BASE\b/.test(l))).toEqual([]);
   });
 
-  it('快照自身可校验：16 条 = 10 单引号 + 6 反引号 + 0 双引号且全部以 /api/ 开头（防快照清空成恒真）', () => {
-    expect(RAW_PRE_BATCH_URL_LITERALS.length).toBe(16);
+  it('快照自身可校验：11 条 = 9 单引号 + 2 反引号 + 0 双引号且全部以 /api/ 开头（防快照清空成恒真）', () => {
+    expect(RAW_PRE_BATCH_URL_LITERALS.length).toBe(11);
     expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith('"')).length).toBe(0);
-    expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith("'")).length).toBe(10);
-    expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith('`')).length).toBe(6);
+    expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith("'")).length).toBe(9);
+    expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith('`')).length).toBe(2);
     for (const v of PRE_BATCH_URL_LITERALS) expect(v.startsWith('/api/')).toBe(true);
   });
 

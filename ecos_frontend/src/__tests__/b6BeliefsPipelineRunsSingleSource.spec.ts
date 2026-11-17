@@ -44,13 +44,11 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const BELIEFS_OWNER = 'services/cognitiveClient.ts';
 const RUNS_OWNER = 'api/dataClient.ts';
 
-/** 四枚消费腿：两条页面列表腿 + 两条轮询腿；导入路径按目录深度各不相同，必须逐条钉住。 */
+/** 三枚消费腿：两条页面列表腿 + 一条 api 层轮询腿；导入路径按目录深度各不相同，必须逐条钉住。 */
 const CONSUMERS: ReadonlyArray<{ rel: string; importPath: string; name: string }> = [
   { rel: 'pages/scenario/OverrideTab.tsx', importPath: '../../services/cognitiveClient', name: 'COGNITIVE_BELIEFS_BASE' },
   { rel: 'pages/scenario/ReplayTab.tsx', importPath: '../../services/cognitiveClient', name: 'COGNITIVE_BELIEFS_BASE' },
   { rel: 'pages/data-workbench/api/pipeline.ts', importPath: '../../../api/dataClient', name: 'ENGINE_DATA_PIPELINE_RUNS_BASE' },
-  // 组件层经 `src/api.ts` 门面取值（先例 `pages/data-engine/DataEngineConfigPanel.tsx`）
-  { rel: 'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx', importPath: '../../../api', name: 'ENGINE_DATA_PIPELINE_RUNS_BASE' },
 ];
 
 const OWNERS: ReadonlyArray<{ rel: string; name: string; root: string }> = [
@@ -224,14 +222,11 @@ const HEAD_FAM_FACES: Readonly<Record<string, readonly string[]>> = Object.freez
   'pages/scenario/OverrideTab.tsx': ['/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}'],
   'pages/scenario/ReplayTab.tsx': ['/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}'],
   'pages/data-workbench/api/pipeline.ts': ['/api/v1/engine/data/pipeline/runs/${encodeURIComponent(runId)}'],
-  'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx': [
-    '/api/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}',
-  ],
 });
-const HEAD_FAM_TOTAL = 4;
+const HEAD_FAM_TOTAL = 3;
 
 /**
- * 改前快照 ②（含同根子路径腿 6 条）：比 ① 多出的 2 条正是本批刻意留在行内的 override／replay 腿。
+ * 改前快照 ②（含同根子路径腿 5 条）：比 ① 多出的 2 条正是本批刻意留在行内的 override／replay 腿。
  * ①⊂② 的包含关系由末腿按文件逐条对账，两张表任何一张被清空都会在那里先红。
  */
 const HEAD_SCOPED_FACES: Readonly<Record<string, readonly string[]>> = Object.freeze({
@@ -246,11 +241,8 @@ const HEAD_SCOPED_FACES: Readonly<Record<string, readonly string[]>> = Object.fr
     '/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}',
   ],
   'pages/data-workbench/api/pipeline.ts': ['/api/v1/engine/data/pipeline/runs/${encodeURIComponent(runId)}'],
-  'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx': [
-    '/api/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}',
-  ],
 });
-const HEAD_SCOPED_TOTAL = 6;
+const HEAD_SCOPED_TOTAL = 5;
 
 describe('重复族 /v1/cognitive/beliefs?domain={} + /v1/engine/data/pipeline/runs/{} 基址单源 — (#145/B6-15 关账批)', () => {
   it('前提：两枚族根常量面值单源，且「常量 + 行内尾巴」归一化后逐字等于棘轮族键', () => {
@@ -347,15 +339,11 @@ describe('重复族 /v1/cognitive/beliefs?domain={} + /v1/engine/data/pipeline/r
     }
   });
 
-  it('API_BASE 导入命运分态：三条消费腿保留（服务别的族），monitor 整条撤除（该文件除注释外零 token）', () => {
+  it('API_BASE 导入命运分态：三条消费腿保留（服务别的族）', () => {
     for (const rel of ['pages/scenario/OverrideTab.tsx', 'pages/scenario/ReplayTab.tsx', 'pages/data-workbench/api/pipeline.ts']) {
       const imports = declLines(read(rel)).filter((l) => l.trimStart().startsWith('import ') && /\bAPI_BASE\b/.test(l));
       expect(imports.length, `${rel} 仍有同根子路径腿 ⇒ API_BASE 导入应恰 1 条，整删即把别的族一起关掉`).toBe(1);
     }
-    const mon = read('pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx');
-    expect(codeLines(mon).filter((l) => /\bAPI_BASE\b/.test(l)), 'monitor 的两轮询腿是本族唯一腿 ⇒ 代码行不得残留 API_BASE').toEqual([]);
-    expect(declLines(mon).filter((l) => l.trimStart().startsWith('import ') && /\bAPI_BASE\b/.test(l)).length).toBe(0);
-    expect(declLines(mon).some((l) => l.includes("from '../../../api'") && l.includes('ENGINE_DATA_PIPELINE_RUNS_BASE')), 'monitor 须经 src/api.ts 门面取族根').toBe(true);
   });
 
   it('判据能变红：第二属主裸拼、尾巴退回派生态、面值漂移、别名自声明、查询串并进基址各造违例且被对应腿吃出', () => {
@@ -415,12 +403,12 @@ describe('重复族 /v1/cognitive/beliefs?domain={} + /v1/engine/data/pipeline/r
     }
   });
 
-  it('快照自身可校验：4 = 两族各 2 枚写手、6 = 4 + 留在行内的 2 条子路径腿，且 ①⊂②', () => {
+  it('快照自身可校验：3 = beliefs 两枚写手 + runs 单枚写手、5 = 3 + 留在行内的 2 条子路径腿，且 ①⊂②', () => {
     const flatFam = SCOPED.flatMap((rel) => [...HEAD_FAM_FACES[rel]]);
     const flatScoped = SCOPED.flatMap((rel) => [...HEAD_SCOPED_FACES[rel]]);
     expect(flatFam.length).toBe(HEAD_FAM_TOTAL);
     expect(flatScoped.length).toBe(HEAD_SCOPED_TOTAL);
-    expect(SCOPED.length).toBe(6);
+    expect(SCOPED.length).toBe(5);
     expect(HEAD_FAM_FACES[BELIEFS_OWNER].length).toBe(0);
     expect(HEAD_FAM_FACES[RUNS_OWNER].length).toBe(0);
     expect(HEAD_SCOPED_FACES[BELIEFS_OWNER].length).toBe(0);
@@ -428,16 +416,19 @@ describe('重复族 /v1/cognitive/beliefs?domain={} + /v1/engine/data/pipeline/r
     expect(HEAD_FAM_FACES['pages/scenario/OverrideTab.tsx'].length).toBe(1);
     expect(HEAD_FAM_FACES['pages/scenario/ReplayTab.tsx'].length).toBe(1);
     expect(HEAD_FAM_FACES['pages/data-workbench/api/pipeline.ts'].length).toBe(1);
-    expect(HEAD_FAM_FACES['pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx'].length).toBe(1);
     for (const v of [...flatFam, ...flatScoped]) expect(v.startsWith('/api/v1/')).toBe(true);
     expect(CLOSED_FAMS.every((f) => f.startsWith('/v1/'))).toBe(true);
     for (const rel of SCOPED) {
       for (const v of HEAD_FAM_FACES[rel]) expect(HEAD_SCOPED_FACES[rel], `${rel} 的 ① 级面值不在 ② 级里`).toContain(v);
     }
-    // 每枚族键在快照里恰有 2 个生产方＝改前的 dupBoth 属主数（快照被改成 1 或 3 都说明本批口径漂了）
+    // 每枚族键在快照里的生产方数＝改前 dupBoth 属主数（runs 族旧 monitor 属主已随死文件删除，剩单写手）
+    const EXPECTED_PRODUCERS: Readonly<Record<string, number>> = Object.freeze({
+      [CLOSED_FAMS[0]]: 2,
+      [CLOSED_FAMS[1]]: 1,
+    });
     for (const fam of CLOSED_FAMS) {
       const producers = SCOPED.filter((rel) => HEAD_FAM_FACES[rel].some((v) => normalize(v).replace(/^\/api/, '') === fam));
-      expect(producers.length, `${fam} 的改前属主数不是 2 ⇒ 与棘轮 dupBoth 4 族 / 8 属主对不上`).toBe(2);
+      expect(producers.length, `${fam} 的改前属主数与快照登记不符`).toBe(EXPECTED_PRODUCERS[fam]);
     }
   });
 });

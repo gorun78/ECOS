@@ -126,9 +126,6 @@ const HEAD_FACES: Record<string, readonly string[]> = {
     '/api/v1/guardrails/policies/${encodeURIComponent(policy.id)}/compile',
     '/api/v1/guardrails/policies/${encodeURIComponent(policy.id)}/preview',
   ],
-  '/api/v1/guardrails/policies|pages/aiworkbench/AgentStudioView.tsx': [
-    '/api/v1/guardrails/policies/preview',
-  ],
 };
 
 /** 逐箱允许的差额，每条都必须落到具体名字上（无归属的增减即红）。 */
@@ -489,7 +486,7 @@ describe('b6AgentMeshGuardrailsSingleSource — 两族单源化取证 (#145/B6-1
     expect(read('pages/GuardrailsView.tsx')).toMatch(/from '\.\/Guardrails\/constants'/);
   });
 
-  it('面值逐字不变：八箱逐箱 = 改前 29 条 ± 三处有名字归属的差额，总数 29→28', () => {
+  it('面值逐字不变：七箱逐箱 = 改前 28 条 ± 三处有名字归属的差额，总数 28→27', () => {
     let headTotal = 0;
     let gotTotal = 0;
     let delta = 0;
@@ -503,18 +500,18 @@ describe('b6AgentMeshGuardrailsSingleSource — 两族单源化取证 (#145/B6-1
         if (adj.kind === 'net-new-decl') want.push(adj.body);
         else want.splice(want.indexOf(adj.body), 1);
       }
-      // 一箱只吃本族作用域内的腿（`pages/aiworkbench/api.ts` 同文件跨两族，8 箱 7 文件靠这条分开）
+      // 一箱只吃本族作用域内的腿（`pages/aiworkbench/api.ts` 同文件跨两族，7 箱 6 文件靠这条分开）
       const got = facesOf(rel).filter((v) => v === body || v.startsWith(`${body}/`)).sort();
       expect(got, `${rel} 在族 ${body} 的面值分箱漂移`).toEqual(want.sort());
       headTotal += HEAD_FACES[key].length;
       gotTotal += got.length;
     }
-    expect(headTotal, '改前快照总面位不是实跑的 29 条 ⇒ 快照被剪过').toBe(29);
+    expect(headTotal, '改前快照总面位不是实跑的 28 条 ⇒ 快照被剪过').toBe(28);
     expect(delta, '三处差额的净效应必须是 −1（两处族根声明上收、一处属主声明净新增）').toBe(-1);
-    expect(gotTotal, '本批后面值总面位须等于 29 加净差额 −1').toBe(28);
+    expect(gotTotal, '本批后面值总面位须等于 28 加净差额 −1').toBe(27);
     expect(FACE_ADJUSTMENTS.length).toBe(3);
-    expect(BIN_KEYS.length).toBe(8);
-    expect(FILES_IN_BINS.length).toBe(7);
+    expect(BIN_KEYS.length).toBe(7);
+    expect(FILES_IN_BINS.length).toBe(6);
   });
 
   it('可见性：单属主更细的腿刻意保持 `${API_BASE}` 行内形态（族索引面不因本批关掉）', () => {
@@ -600,10 +597,11 @@ describe('b6AgentMeshGuardrailsSingleSource — 两族单源化取证 (#145/B6-1
       "import { GUARDRAILS_POLICIES_BASE } from './services/cognitiveEngineApi';",
       'const W = apiCall(GUARDRAILS_POLICIES_BASE);',
     ].join('\n'))).toEqual(['/api/v1/guardrails/policies']);
-    // 面值漂移：改一条腿必须被逐箱等式吃出
-    expect(facesOf('pages/aiworkbench/AgentStudioView.tsx')).toEqual(['/api/v1/guardrails/policies/preview']);
-    expect(facesOf('pages/aiworkbench/AgentStudioView.tsx', read('pages/aiworkbench/AgentStudioView.tsx')
-      .replace('/v1/guardrails/policies/preview', '/v1/guardrails/policie/preview'))).toEqual([]);
+    // 面值漂移：常量值一改，同一行源码必须读成另一枚面值（合成自声明，不锚死任何具体文件）
+    const DRIFT_OK = ['const G_BASE = `/api/v1/guardrails/policies`;', 'const u = `${G_BASE}/preview`;'].join('\n');
+    expect(facesOf('fixture.ts', DRIFT_OK)).toEqual(['/api/v1/guardrails/policies', '/api/v1/guardrails/policies/preview']);
+    const DRIFT_MUTATED = DRIFT_OK.replace('/v1/guardrails/policies`', '/v1/guardrails/policie`');
+    expect(facesOf('fixture.ts', DRIFT_MUTATED), '常量面值一旦漂移，原面值必须消失').toEqual([]);
     // 两级别名链 + CRLF 必须同时被解析器吃掉，否则 monitor 式隐形在两棵树上口径不一
     const CRLF_SRC = [
       'const WM_BASE = `${API_BASE}/v1/agent-mesh`;',

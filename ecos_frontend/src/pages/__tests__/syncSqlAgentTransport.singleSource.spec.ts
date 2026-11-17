@@ -10,6 +10,8 @@
  *      `'/api/v1/engine/data/query/execute'`，头写 `{'Content-Type': ..., Authorization: ...}`；
  *   3) `pages/aiworkbench/AgentStudioView.tsx` — 改前 POST
  *      `${API_BASE}/v1/guardrails/policies/preview`，头写 `authHeaders()`。
+ *      ⚠ 2026-11-17：该文件属旧 Agent Studio 死代码（零生产引用），已整体删除；
+ *      本门禁只保留"基线不得回流"的字符串护栏，不再对其读文件断言。
  *
  * 「头集合逐键不变」按腿分别成立，是本批唯一的硬约束，也是三条腿写法不同的原因：
  *   · `rawAuthedUrlFetch` 的单源底头**只有 Authorization**（该通道刻意不设 Content-Type，
@@ -49,8 +51,10 @@ const read = (relFromSrc: string): string => readFileSync(join(SRC_ROOT, ...relF
 
 const SYNC_TAB = 'pages/knowledge/tabs/SyncTab.tsx';
 const SQL_CONSOLE = 'pages/data-workbench/tabs/connections/InlineSqlConsole.tsx';
-const AGENT_STUDIO = 'pages/aiworkbench/AgentStudioView.tsx';
-const TARGETS = [SYNC_TAB, SQL_CONSOLE, AGENT_STUDIO];
+// 第三条腿 `pages/aiworkbench/AgentStudioView.tsx` 已随旧 Agent Studio 死代码整体删除
+// （2026-11-17 清理，零生产引用），此处只保留"基线不得回流"的字符串护栏。
+const AGENT_STUDIO_REMOVED = 'pages/aiworkbench/AgentStudioView.tsx';
+const TARGETS = [SYNC_TAB, SQL_CONSOLE];
 
 const RATCHET_GATE = '__tests__/privateTransportRatchet.test.ts';
 const APIBASE_GATE = '__tests__/api-base-single-source.test.ts';
@@ -121,9 +125,8 @@ describe('A 源码形态取证（#143/B5-11h）', () => {
     }
     // SyncTab：改前只发 Authorization ⇒ 不补 Content-Type（补了就是给 GET 换头集合）
     expect(countAll(read(SYNC_TAB), /Content-Type/g)).toBe(0);
-    // 另两条改前经 authHeaders()/显式字面量发 Content-Type ⇒ 逐腿补回，避免 POST 415
+    // SQL_CONSOLE 改前经 authHeaders() 发 Content-Type ⇒ 逐腿补回，避免 POST 415
     expect(countAll(read(SQL_CONSOLE), /'Content-Type':\s*'application\/json'/g)).toBe(1);
-    expect(countAll(read(AGENT_STUDIO), /'Content-Type':\s*'application\/json'/g)).toBe(1);
   });
 
   it('A5 合流后不得再留 token 读取能力（防「留着 import 继续私拼」）', () => {
@@ -134,7 +137,7 @@ describe('A 源码形态取证（#143/B5-11h）', () => {
     }
   });
 
-  it('A6 基址单源：零 /api 字面量 + 三枚模板串逐字可追', () => {
+  it('A6 基址单源：零 /api 字面量 + 两枚模板串逐字可追', () => {
     for (const rel of TARGETS) {
       expect(countInCode(read(rel), HARDCODED_RE), `${rel} 仍有 /api 字面量`).toBe(0);
     }
@@ -142,7 +145,6 @@ describe('A 源码形态取证（#143/B5-11h）', () => {
     expect(read('services/httpClient.ts')).toMatch(/export const API_BASE = ['"]\/api['"]/);
     expect(codeOnly(read(SYNC_TAB))).toContain('`${API_BASE}/integration/metadata`');
     expect(codeOnly(read(SQL_CONSOLE))).toContain('`${API_BASE}/v1/engine/data/query/execute`');
-    expect(codeOnly(read(AGENT_STUDIO))).toContain('`${API_BASE}/v1/guardrails/policies/preview`');
   });
 
   it('A7 两份门禁基线同批剪除本批文件，且棘轮元门禁声明 = 基线自身实数', () => {
@@ -150,7 +152,7 @@ describe('A 源码形态取证（#143/B5-11h）', () => {
       const src = read(gate);
       expect(src).not.toContain(`'${SYNC_TAB}'`);
       expect(src).not.toContain(`'${SQL_CONSOLE}'`);
-      expect(src).not.toContain(`'${AGENT_STUDIO}'`);
+      expect(src).not.toContain(`'${AGENT_STUDIO_REMOVED}'`);
     }
     const ratchet = read(RATCHET_GATE);
     const declaredCount = Number(/expect\(entries\.length\)\.toBe\((\d+)\)/.exec(ratchet)?.[1] ?? -1);
@@ -161,7 +163,7 @@ describe('A 源码形态取证（#143/B5-11h）', () => {
     expect(entries.length).toBe(declaredCount);
     expect(entries.reduce((n, [, , c]) => n + Number(c), 0)).toBe(declaredSum);
     // 收口到此批为止只剩流式/域内错误分类族：本批剪掉的 4 枚不得回到基线
-    for (const pruned of [SYNC_TAB, SQL_CONSOLE, AGENT_STUDIO, 'services/engineProbeApi.ts']) {
+    for (const pruned of [SYNC_TAB, SQL_CONSOLE, AGENT_STUDIO_REMOVED, 'services/engineProbeApi.ts']) {
       expect(ratchet).not.toContain(`'${pruned}'`);
     }
   });

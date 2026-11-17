@@ -45,8 +45,6 @@ const SCAN_DIRS = ['pages', 'components'];
 const REPAIRED_FILES = [
   'pages/aiworkbench/ChatbotStudioView.tsx',
   'pages/aiworkbench/DashboardView.tsx',
-  'pages/aiworkbench/AgentStudioView.tsx',
-  'pages/aiworkbench/agent-studio/agentStudioHelpers.ts',
   'components/copilot/useAipAutomation.ts',
 ];
 
