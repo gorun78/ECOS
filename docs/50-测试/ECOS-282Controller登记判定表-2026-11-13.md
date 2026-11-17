@@ -4,7 +4,9 @@
 > 上游：`ECOS产品级逐功能验证方案-2026-11-13.md` §端点账「282 个 Controller 按域归组，未逐一覆盖的必须列明原因」
 
 ## 一、判定口径
-> **2026-11-15 复核**：`find ... -name "*Controller.java"` 实测 **284**（登记册原为 282）——漂移的 2 个是登记册成文后新增的 `ParetoController`（D106）与 `DqDashboardForwardController`（D105/D107），均已补登并判「已覆盖」（活体 200）。当前分布 **162 已覆盖 / 118 未覆盖 / 4 无端点 = 284**，无未判定。
+> **2026-11-17 复核（当前真值 = 287）**：`find ... -name "*Controller.java"` 实测 **287**（登记册原为 282）。漂移三次：2026-11-15 的 `ParetoController`（D106）与 `DqDashboardForwardController`（D105/D107）→ 284；2026-11-16~17 的 `BizDashboardController`（D33）、`CognitiveBlueprintController`（D151）、`OntologyEntityInstanceCompatController`（D34）→ **287**。当前分布 **165 已覆盖 / 118 未覆盖 / 4 无端点 = 287**，无未判定。
+
+> **2026-11-15 复核**：`find ... -name "*Controller.java"` 实测 **284**（登记册原为 282）——漂移的 2 个是登记册成文后新增的 `ParetoController`（D106）与 `DqDashboardForwardController`（D105/D107），均已补登并判「已覆盖」（活体 200）。当时分布 **162 已覆盖 / 118 未覆盖 / 4 无端点 = 284**。
 
 > **2026-11-15 第二轮活体重探（本批）**：对 95 个可解析前缀的未覆盖条目逐条重打 `/api`（带 admin token）→ 实测分布 **64 × 404 / 19 × 200 / 8 × 405 / 2 × 400 / 1 × 403 / 1 × 503**。
 > **漂移 1 条**：`CaliberContractController /api/v1/workspace/calibers` 原记「403 需特定权限」（D112 现场），已修后实测 **200** 且 `dataSource="ontology-owner-rest"` ⇒ 改判「已覆盖」并补 `coverage-registry.spec.ts` 用例。
@@ -317,3 +319,6 @@
 | PeriodCloseContractController | /api/v1/workspace | 1 | 已覆盖 | spec 前缀匹配命中（§一.3：与 13 个 spec 的路径字面量做前缀比对） |
 | BacktestContractController | /api/v1/workspace/backtests | 1 | 未覆盖 | 活体 403：权限面，已登记 |
 | CaliberContractController | /api/v1/workspace/calibers | 7 | 已覆盖 | **2026-11-15 改判**：原记「GET /{id} → 403 PERMISSION_DENIED（需特定权限）」是 D112 跨服务凭证中继失效的现场；D112 修复后实测 **200** 且 `dataSource="ontology-owner-rest"`（属主真值回源）。已补入 `coverage-registry.spec.ts` `V-COV-口径契约(属主回源)` |
+| BizDashboardController | /api/v1/cognitive/biz-dashboard | 1 | 已覆盖 | **2026-11-17 补登**（D33 修复产物）：活体 gateway 200，`ecos-tests/tests/e2e/biz-ops-dashboard-live.spec.ts` 2 passed |
+| CognitiveBlueprintController | /api/v1/cognitive/blueprint | 1 | 已覆盖 | **2026-11-17 补登**（D151 修复产物）：活体 gateway 200，`CognitiveBlueprintServiceTest` 4 绿 + `cognitive-blueprint-degraded.spec.ts` 2 passed |
+| OntologyEntityInstanceCompatController | /api/v1/ontology | 1 | 已覆盖 | **2026-11-17 补登**（D34 修复产物）：`/api/v1/ontology/entities/{type}/instances` 活体 200，`ontology-instances-v1-alias.spec.ts` 3 passed |
