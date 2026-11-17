@@ -202,7 +202,7 @@ class Mc02TypeWhitelistTest {
     // 2026-11-16 D142：V338（ecos_audit_log.result VARCHAR(16)→VARCHAR(64) 纯 ALTER 加宽）落地
     // ⇒ 按实测订正 287→288（四枚同批锚）。本枚对类型白名单零新增：ALTER COLUMN ... TYPE VARCHAR(64)
     // 只改宽度，类型头仍为白名单内的 VARCHAR。
-    private static final int SCRIPT_FLOOR = 291;
+    private static final int SCRIPT_FLOOR = 293;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。

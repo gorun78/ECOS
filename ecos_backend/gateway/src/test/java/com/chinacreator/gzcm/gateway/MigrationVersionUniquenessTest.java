@@ -178,8 +178,8 @@ class MigrationVersionUniquenessTest {
      * 两处同名表都加宽，to_regclass 守卫；只加宽不删列、幂等）落地
      * ⇒ 按实测订正 337→338 / 下一号 338→339。
      */
-    private static final int MAX_BASELINE_VERSION = 342;
-    private static final int NEXT_FREE_VERSION = 343;
+    private static final int MAX_BASELINE_VERSION = 344;
+    private static final int NEXT_FREE_VERSION = 345;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

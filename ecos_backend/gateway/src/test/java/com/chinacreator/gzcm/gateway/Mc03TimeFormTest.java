@@ -171,7 +171,7 @@ class Mc03TimeFormTest {
     // 2026-11-16 D142：V338（ecos_audit_log.result 加宽，纯 ALTER + to_regclass 守卫）落地
     // ⇒ 按实测订正 287→288（四枚同批锚）。本枚对 PG 方言名录零贡献（无 ::/ON CONFLICT/RETURNING
     // /gen_random_uuid/JSON 运算符）。
-    private static final int SCRIPT_FLOOR = 291;
+    private static final int SCRIPT_FLOOR = 293;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：

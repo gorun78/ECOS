@@ -62,11 +62,30 @@ public class KbOntologySnapshotDao extends JdbcTemplateDaoSupport {
                 ontologyId, versionId);
     }
 
-    /** 幂等 upsert（UNIQUE (ontology_id, snap_version, is_deleted)，V179）。 */
-    public void upsertSnapshot(String ontologyId, String versionId,
-                               String entitiesJson, String relationshipsJson,
-                               String schemaHash, String createdByName) {
-        jdbcTemplate.update(
+    /**
+     * 幂等 upsert（UNIQUE (ontology_id, snap_version, is_deleted)，V179）。
+     *
+     * <p><b>D71 乐观锁（2026-11-17）</b>：原写法无条件 {@code schema_hash = EXCLUDED.schema_hash}，
+     * 两个 JVM 同时消费同一发布事件时，同一行的摘要由「谁最后写」决定 —— 而两者算出的
+     * 摘要若不同（例如一侧拉到的是发布中途的 schema），下游会依据一个随机到达的摘要
+     * 判断「本体是否变了」。现在 {@code DO UPDATE ... WHERE} 把更新限定为
+     * 「原值为空 或 与原值相同」：</p>
+     * <ul>
+     *   <li>重复消费（同摘要）→ 照常刷新其余字段，幂等不变</li>
+     *   <li>首次填充（原值为空）→ 正常写入</li>
+     *   <li>两个不同摘要竞争 → <b>先写者胜</b>，后到者的 UPDATE 被 WHERE 挡掉（零行影响），
+     *       不覆盖已有的非空摘要。后到者可据此发现竞争并记日志。</li>
+     * </ul>
+     *
+     * <p>注意 COALESCE 与 NULLIF 的组合：{@code schema_hash} 列为 NOT NULL 时不会为空，
+     * 此处用 {@code NULLIF(schema_hash,'')} 把空串视同「未填」，兼容历史空串行。</p>
+     *
+     * @return 实际影响行数（1=写入或刷新；0=被乐观锁挡下，说明已有不同摘要先行写入）
+     */
+    public int upsertSnapshot(String ontologyId, String versionId,
+                              String entitiesJson, String relationshipsJson,
+                              String schemaHash, String createdByName) {
+        return jdbcTemplate.update(
                 "INSERT INTO " + schema + ".ecos_kb_ontology_snapshot " +
                 "(id, ontology_id, snap_version, entity_codes_json, relationship_codes_json, " +
                 " schema_hash, create_by, is_deleted) " +
@@ -76,7 +95,9 @@ public class KbOntologySnapshotDao extends JdbcTemplateDaoSupport {
                 "  relationship_codes_json = EXCLUDED.relationship_codes_json, " +
                 "  schema_hash = EXCLUDED.schema_hash, " +
                 "  create_by = EXCLUDED.create_by, " +
-                "  update_time = NOW()",
+                "  update_time = NOW() " +
+                "WHERE NULLIF(" + schema + ".ecos_kb_ontology_snapshot.schema_hash, '') IS NULL " +
+                "   OR " + schema + ".ecos_kb_ontology_snapshot.schema_hash = EXCLUDED.schema_hash",
                 UUID.randomUUID().toString(), ontologyId, versionId, entitiesJson, relationshipsJson,
                 schemaHash, createdByName == null ? "system" : createdByName);
     }

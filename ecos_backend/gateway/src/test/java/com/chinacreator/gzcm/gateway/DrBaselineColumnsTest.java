@@ -191,7 +191,7 @@ class DrBaselineColumnsTest {
     // MAX_BASELINE_VERSION=337 口径，不参与本锚）。
     // 2026-11-16 D142：V338（ecos_audit_log.result 加宽，纯 ALTER、零建表）落地
     // ⇒ 按实测订正 287→288（四枚同批锚）；对治理表名录零贡献。
-    private static final int SCRIPT_FLOOR = 291;
+    private static final int SCRIPT_FLOOR = 293;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
     // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。

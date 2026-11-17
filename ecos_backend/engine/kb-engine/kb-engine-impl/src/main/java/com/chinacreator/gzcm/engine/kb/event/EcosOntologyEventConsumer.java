@@ -256,8 +256,14 @@ public class EcosOntologyEventConsumer {
         }
 
         // 幂等 upsert（UNIQUE (ontology_id, version)，冲突更新 codes/hash/by/ts + is_deleted=0）
-        dao.upsertSnapshot(ontologyId, versionId, entitiesJson, relationshipsJson, hash,
+        // D71：返回 0 表示已有不同摘要先行写入，本次被乐观锁挡下 —— 记 WARN 供排查双 JVM 竞争，
+        // 不重试、不覆盖（先写者胜是刻意选择：抢先写入的那个才是先完成 schema 拉取的）。
+        int affected = dao.upsertSnapshot(ontologyId, versionId, entitiesJson, relationshipsJson, hash,
                 publishedBy);
+        if (affected == 0) {
+            log.warn("upsertSnapshot: 摘要竞争被挡下（已有不同 schema_hash 先行写入）"
+                    + " ontology={} version={} 本次hash={}", ontologyId, versionId, hash);
+        }
     }
 
     private String buildAuditJson(OntologyPublishedEvent evt) {
