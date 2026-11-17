@@ -109,7 +109,12 @@ class Mc03TimeFormTest {
             Map.entry("V311__cognitive_framework_registry.sql", 8),
             // 2026-11-07 P0 批次：V316（agent registry knowledge carrier，在途批已落库）
             // 1 处 PG 类型转换面；同批登记进待收口名录，禁再增。
-            Map.entry("V316__agent_registry_knowledge_carrier.sql", 1));
+            Map.entry("V316__agent_registry_knowledge_carrier.sql", 1),
+            // 2026-11-17 D123 第二面：V342 为 pg_dump 导出的 11 张 DQ 表建表脚本，
+            // 含 PG 专有形态（jsonb 列定义 / ::regclass / jsonb_build_object 等）。
+            // 这批表是 dev 历史手建的真身，改写成方言无关形态会与真身分叉（IR01）。
+            // 按 V311/V316 同族入待收口名录；收口 = 授权追加迁移改型，本批只登记。
+            Map.entry("V342__ecos_data_dq_tables.sql", 33));
 
     /**
      * 存量段计数钉死（键={@code 桶|规则}，值=命中数，实测 2026-10-15；只登记非零项）。
@@ -166,7 +171,7 @@ class Mc03TimeFormTest {
     // 2026-11-16 D142：V338（ecos_audit_log.result 加宽，纯 ALTER + to_regclass 守卫）落地
     // ⇒ 按实测订正 287→288（四枚同批锚）。本枚对 PG 方言名录零贡献（无 ::/ON CONFLICT/RETURNING
     // /gen_random_uuid/JSON 运算符）。
-    private static final int SCRIPT_FLOOR = 288;
+    private static final int SCRIPT_FLOOR = 291;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：

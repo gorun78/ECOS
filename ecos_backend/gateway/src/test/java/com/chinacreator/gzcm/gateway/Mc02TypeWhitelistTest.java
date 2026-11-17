@@ -140,7 +140,37 @@ class Mc02TypeWhitelistTest {
             // ⇒ 改 TEXT 会让写端断、改 JSON 会与真身分叉。按 V295「存量真身锚定」同族入待收口名录，
             // 收口去向仍属 144-c 需授权追加迁移，本批只登记不假装合规。
             "V336__ecos_control_business_scenario.sql#ecos_control.ecos_business_scenario"
-                    + ".metrics:JSONB");
+                    + ".metrics:JSONB",
+            // 2026-11-17 D123 第二面：V342 把数据质量 11 张表按 dev 真身落进单源。
+            // 这批表从来不由本仓 DDL 建（dev 是历史手建），列型固定为 JSONB/DOUBLE/BOOLEAN；
+            // 改 TEXT 会断 DAO 的 ?::jsonb 写端、改 NUMERIC 会与真身分叉（IR01）。
+            // 按 V295/V336「存量真身锚定」同族入待收口名录；收口=授权追加迁移，本批只登记。
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_alert_record.notify_channels:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_alert_record.payload:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_knowledge_entry.entity_json:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_knowledge_entry.score_hint:DOUBLE",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_report.avg_score:DOUBLE",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_rule.is_deleted:BOOLEAN",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_rule.parameters:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_rule_check.pass_rate:DOUBLE",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_rule_check.passed:BOOLEAN",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_rule_check.sample_failures:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_rule_version.snapshot:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_schedule.enabled:BOOLEAN",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_schedule.is_deleted:BOOLEAN",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_schedule.rule_ids:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_score_asset.is_deleted:BOOLEAN",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_score_asset.overall_score:DOUBLE",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_score_asset.rolled_up_scores:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_score_snapshot.metadata:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_score_snapshot.score_value:DOUBLE",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_score_snapshot.weight:DOUBLE",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_work_order.is_deleted:BOOLEAN",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_work_order.preventive_actions:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_work_order.rca_confidence:DOUBLE",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_work_order.rca_result:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_work_order.repair_log:JSONB",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_work_order.verify_pass:BOOLEAN");
 
     /** GOVERNED 段建表/列解析数下限（实测口径由本类首跑钉死，只增不减）。 */
     private static final int GOVERNED_TABLE_FLOOR = 60;
@@ -172,7 +202,7 @@ class Mc02TypeWhitelistTest {
     // 2026-11-16 D142：V338（ecos_audit_log.result VARCHAR(16)→VARCHAR(64) 纯 ALTER 加宽）落地
     // ⇒ 按实测订正 287→288（四枚同批锚）。本枚对类型白名单零新增：ALTER COLUMN ... TYPE VARCHAR(64)
     // 只改宽度，类型头仍为白名单内的 VARCHAR。
-    private static final int SCRIPT_FLOOR = 288;
+    private static final int SCRIPT_FLOOR = 291;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。

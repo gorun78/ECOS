@@ -113,7 +113,32 @@ class DrBaselineColumnsTest {
             // 2026-11-13 产品级逐功能验证批实测补登记：V329 建 ecos_ai.ecos_aip_pipeline 时缺 domain
             // （DR07）。该脚本已入库、按「老脚本不改」口径不返工建表语句，
             // 收口 = 追加迁移补列（属授权实跑项），本批只登记、不假装合规。
-            "V329__aip_pipeline.sql#ecos_ai.ecos_aip_pipeline->domain");
+            "V329__aip_pipeline.sql#ecos_ai.ecos_aip_pipeline->domain",
+            // 2026-11-17 D123 第二面：V342 把数据质量 11 张表按 dev 真实结构落进单源。
+            // 这批表从来就不是本仓 DDL 建的（dev 是历史手建），故初始结构里没有治理列；
+            // 本批只做「让全新库能建出与 DAO 对齐的表」，不擅自改型补列
+            // （改型＝IR01 违例，补列＝与 dev 真身分叉）。按既有口径入名录待收口：
+            // 收口 = 追加迁移补治理列（属授权实跑项）。dq_rule 七列齐全，不入名录。
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_rule_version"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_rule_check"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_alert_record"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_work_order"
+                    + "->create_by,create_time,domain,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_score_asset"
+                    + "->create_by,create_time,domain,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_score_snapshot"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_schedule"
+                    + "->create_by,create_time,domain,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_throttle"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_report"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            "V342__ecos_data_dq_tables.sql#ecos_data.dq_knowledge_entry"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no");
 
     /**
      * 存量段计数钉死（键={@code 桶|列名}，值=缺该列的建表数，实测 2026-10-15 取证）。
@@ -166,7 +191,7 @@ class DrBaselineColumnsTest {
     // MAX_BASELINE_VERSION=337 口径，不参与本锚）。
     // 2026-11-16 D142：V338（ecos_audit_log.result 加宽，纯 ALTER、零建表）落地
     // ⇒ 按实测订正 287→288（四枚同批锚）；对治理表名录零贡献。
-    private static final int SCRIPT_FLOOR = 288;
+    private static final int SCRIPT_FLOOR = 291;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
     // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。
