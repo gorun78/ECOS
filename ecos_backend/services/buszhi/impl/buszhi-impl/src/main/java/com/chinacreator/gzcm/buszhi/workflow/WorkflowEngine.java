@@ -56,6 +56,15 @@ public class WorkflowEngine {
      * @return a structured execution result with steps and timing
      */
     public WorkflowExecutionResult execute(WorkflowEntity workflowEntity, Map<String, Object> input) {
+        return execute(workflowEntity, input, null);
+    }
+
+    /**
+     * D155（2026-11-16）：带 instanceId 的执行入口。原双参版一路传到 {@code executeNode(node, ctx)}
+     * 双参重载（instanceId=null），导致 userTask 建出的任务挂在占位实例 {@code test-inst} 上，
+     * 真实实例 pi* 与任务脱钩。
+     */
+    public WorkflowExecutionResult execute(WorkflowEntity workflowEntity, Map<String, Object> input, String instanceId) {
         Instant start = Instant.now();
 
         // 1. Parse nodes and edges
@@ -98,9 +107,9 @@ public class WorkflowEngine {
         List<ExecutionStep> steps = new ArrayList<>();
 
         if ("parallel".equals(mode)) {
-            steps = executeParallel(nodes, edges, nodeMap, adjacency, inDegree, input);
+            steps = executeParallel(nodes, edges, nodeMap, adjacency, inDegree, input, instanceId);
         } else {
-            steps = executeSequential(nodes, edges, nodeMap, adjacency, inDegree, input);
+            steps = executeSequential(nodes, edges, nodeMap, adjacency, inDegree, input, instanceId);
         }
 
         Duration totalTime = Duration.between(start, Instant.now());
@@ -122,7 +131,8 @@ public class WorkflowEngine {
             Map<String, WorkflowNode> nodeMap,
             Map<String, List<String>> adjacency,
             Map<String, Integer> inDegree,
-            Map<String, Object> input) {
+            Map<String, Object> input,
+            String instanceId) {
 
         List<ExecutionStep> steps = new ArrayList<>();
         Map<String, Integer> currentInDegree = new LinkedHashMap<>(inDegree);
@@ -140,7 +150,7 @@ public class WorkflowEngine {
             WorkflowNode node = nodeMap.get(nodeId);
             if (node == null) continue;
 
-            ExecutionStep step = executeNode(node, input);
+            ExecutionStep step = executeNode(node, input, instanceId);
             steps.add(step);
 
             for (String neighbor : adjacency.getOrDefault(nodeId, Collections.emptyList())) {
@@ -163,7 +173,8 @@ public class WorkflowEngine {
             Map<String, WorkflowNode> nodeMap,
             Map<String, List<String>> adjacency,
             Map<String, Integer> inDegree,
-            Map<String, Object> input) {
+            Map<String, Object> input,
+            String instanceId) {
 
         List<ExecutionStep> steps = new ArrayList<>();
         Map<String, Integer> currentInDegree = new LinkedHashMap<>(inDegree);
@@ -186,7 +197,7 @@ public class WorkflowEngine {
                 WorkflowNode node = nodeMap.get(nodeId);
                 if (node == null) continue;
 
-                ExecutionStep step = executeNode(node, input);
+                ExecutionStep step = executeNode(node, input, instanceId);
                 steps.add(step);
                 executed.add(nodeId);
 

@@ -62,7 +62,17 @@ public class WorkflowInstanceService {
                                       @JsonProperty("definition") WorkflowDefinitionRef definition) {
     }
 
-    private String nextId() { return "pi" + ID_SEQ.incrementAndGet(); }
+    private String nextId() {
+        // D154（2026-11-16）：ID_SEQ 进程内计数（初值 1000），重启即从 1001 重来 ⇒ 撞已有 pi1001+。
+        // 兜底：自增直到库中不存在（保留 pi<number> 形态，零撞库）。
+        for (int i = 0; i < 10_000; i++) {
+            String candidate = "pi" + ID_SEQ.incrementAndGet();
+            if (instanceRepo.findById(candidate).isEmpty()) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("无法分配唯一实例 id（pi 序号池耗尽）");
+    }
 
     /**
      * 启动工作流实例。
@@ -104,7 +114,9 @@ public class WorkflowInstanceService {
 
         // 执行工作流
         try {
-            WorkflowEngine.WorkflowExecutionResult result = workflowEngine.execute(wf, body != null ? body : Map.of());
+            // D155（2026-11-16）：传真实 instanceId，否则 userTask 建出的任务挂 test-inst 占位实例。
+            WorkflowEngine.WorkflowExecutionResult result = workflowEngine.execute(
+                    wf, body != null ? body : Map.of(), instanceId);
             instanceRepo.updateCurrentNodes(instanceId, toJson(result.getActiveNodes() != null
                 ? result.getActiveNodes() : Collections.emptyList()));
 

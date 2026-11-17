@@ -36,7 +36,16 @@ public class WorkflowApprovalService {
         this.objectMapper = objectMapper;
     }
 
-    private String nextId() { return "appr" + ID_SEQ.incrementAndGet(); }
+    private String nextId() {
+        // D154（2026-11-16）：ID_SEQ 进程内计数（初值 4000），重启即从 4001 重来 ⇒ 撞已有 appr4001+。
+        for (int i = 0; i < 10_000; i++) {
+            String candidate = "appr" + ID_SEQ.incrementAndGet();
+            if (approvalRepo.findById(candidate).isEmpty()) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("无法分配唯一审批 id（appr 序号池耗尽）");
+    }
 
     /**
      * 审批通过。

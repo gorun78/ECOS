@@ -33,7 +33,16 @@ public class WorkflowTaskService {
         this.objectMapper = objectMapper;
     }
 
-    private String nextId() { return "task" + ID_SEQ.incrementAndGet(); }
+    private String nextId() {
+        // D154（2026-11-16）：ID_SEQ 进程内计数（初值 3000），重启即从 3001 重来 ⇒ 撞已有 task3001+。
+        for (int i = 0; i < 10_000; i++) {
+            String candidate = "task" + ID_SEQ.incrementAndGet();
+            if (taskRepo.findById(candidate).isEmpty()) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("无法分配唯一任务 id（task 序号池耗尽）");
+    }
 
     // ── 我的任务列表 ──
 

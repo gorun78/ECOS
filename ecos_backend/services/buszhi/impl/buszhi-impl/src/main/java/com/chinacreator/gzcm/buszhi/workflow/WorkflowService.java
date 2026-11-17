@@ -86,7 +86,16 @@ public class WorkflowService {
     }
 
     private String nextId() {
-        return "wf" + ID_SEQ.incrementAndGet();
+        // D154（2026-11-16）：ID_SEQ 是进程内计数器（初值 200），进程重启即从 201 重来，
+        // 而库里已有 wf201+ ⇒ 新建必撞 ecos_workflow_pkey（实测 409）。
+        // 兜底：自增直到库中不存在该 id（保留既有 wf<number> 形态，零撞库）。
+        for (int i = 0; i < 10_000; i++) {
+            String candidate = "wf" + ID_SEQ.incrementAndGet();
+            if (repository.findById(candidate).isEmpty()) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("无法分配唯一工作流 id（wf 序号池耗尽）");
     }
 
     public List<WorkflowRow> listWorkflows(int pageSize) {
@@ -111,8 +120,11 @@ public class WorkflowService {
         entity.setDescription(String.valueOf(body.getOrDefault("description", "")));
         entity.setStatus("draft");
         entity.setMode(String.valueOf(body.getOrDefault("mode", "sequential")));
-        entity.setNodes(String.valueOf(body.getOrDefault("nodes", "[]")));
-        entity.setEdges(String.valueOf(body.getOrDefault("edges", "[]")));
+        // D153（2026-11-16）：原 String.valueOf(List) 会把 JSON 存成 Java Map.toString
+        //（[{id=n1, type=start}]），WorkflowEngine.parseNodes 用 Jackson 解析必失败 ⇒ 节点空
+        // ⇒ 实例秒变 completed、零任务。与 updateWorkflow 一致改用 Jackson 序列化。
+        entity.setNodes(toJsonString(body.getOrDefault("nodes", "[]")));
+        entity.setEdges(toJsonString(body.getOrDefault("edges", "[]")));
         repository.insert(entity);
         log.info("Workflow created: {} [{}]", id, entity.getName());
         return toRow(entity);
