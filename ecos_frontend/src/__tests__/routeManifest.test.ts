@@ -23,7 +23,11 @@ import {
   type RouteManifestEntry,
 } from "../../config/route-manifest";
 
-/** 迁移前 vite.config.ts 的 21 条代理 key（冻结基线，逐条等价迁移） */
+/**
+ * 迁移前 vite.config.ts 的 21 条代理 key（冻结基线，逐条等价迁移）。
+ * D145（2026-11-16）后 /api/v1/ecos 整根已转 gateway 宿主（见 GATEWAY_HOSTED_ECOS_ROOT_KEY），
+ * 该 key 仍在此基线内（vite 表键不变），但 target 断言移至 GATEWAY_HOSTED 组。
+ */
 const PRE_MIGRATION_VITE_KEYS = [
   "/api/v1/agent-loop",
   "/api/v1/agent-mesh",
@@ -48,7 +52,7 @@ const PRE_MIGRATION_VITE_KEYS = [
   "/cases",
 ];
 
-/** 迁移前 vite 表 target → 端口映射（冻结基线） */
+/** 迁移前 vite 表 target → 端口映射（冻结基线；不含已转 gateway 宿主的 /api/v1/ecos 整根与 /api/v1/world-model） */
 const PRE_MIGRATION_VITE_TARGETS: Record<string, number> = {
   "/api/v1/agent-loop": 18084,
   "/api/v1/agent-mesh": 18084,
@@ -62,10 +66,8 @@ const PRE_MIGRATION_VITE_TARGETS: Record<string, number> = {
   "/api/v1/data-permission": 18081,
   "/api/v1/policy-engine": 18081,
   "/api/v1/engine/data": 18082,
-  "/api/v1/ecos": 18083,
   "/api/v1/workspace": 18090,
   "/api/v1/cognitive": 18084,
-  "/api/v1/world-model": 18089,
   "/api/v1/rules": 18086,
   "/api/v1/kb": 18086,
   "/api": 8080,
@@ -85,10 +87,26 @@ const GATEWAY_HOSTED_KNOWLEDGE_KEYS = [
   "/api/v1/knowledge/health",
 ];
 
-// D62（2026-11-14）：vite 前缀首中生效，/api/v1/ecos 整根归 ontology :18083，
+// D145（2026-11-16 live 实证）：/api/v1/ecos 整根属主不唯一——gateway route-manifest.json
+// 第 12 行明文「禁把整根判给单一属主」。实测该前缀下至少四类属主并存（ontology :18083 /
+// sysman :18081 / data :18082 / workspace :18090），原 directInDev→:18083 使 dev :3000
+// 对 world-model-graph、monitoring、dq、entity-table-mappings 等族一律 500（同路径 gateway 200）。
+// 故整根条目与 knowledge 三端点同款：只生成 dev vite 兜底条目指向 gateway（Authorization 透传），
+// 生产侧不变（BFF `/api` catch-all → gateway）。
+const GATEWAY_HOSTED_ECOS_ROOT_KEY = "/api/v1/ecos";
+
+// D146（2026-11-16 live 实证）：/api/v1/world-model 原 directInDev→:18089 指向 cognitive-boot
+// 调试制品（start-backend.ps1 的 -boot 模块才起，7 JAR 常规启动恒不监听），dev :3000 对该前缀
+// 恒 500 ECONNREFUSED，而同路径 gateway :8080 返 501 桩面。gateway route-manifest.json 第 20 行
+// owner=aiming / ports.service=18084 / route=monolith，reason 明文「cognitive-boot :18089 是调试制品、
+// 从未独立承流」。故与 D145 同款：只生成 dev vite 兜底条目指向 gateway（Authorization 透传），
+// 生产侧不变（BFF `/api` catch-all → gateway）。
+const GATEWAY_HOSTED_WORLD_MODEL_KEY = "/api/v1/world-model";
+
+// D62（2026-11-14）：vite 前缀首中生效，/api/v1/ecos 整根已转 gateway 宿主，
 // 但 objects / state-machine 子族实际属 workspace :18090（GatewayApplication 整包排除
-// workspace.controller，故这两族只能走 :18090）。三条更具体的子族条目必须先于父前缀登记。
-// 属主口径与 gateway route-manifest 的三条 workspace 条目严格一致。
+// workspace.controller，故这两族只能走 :18090）。三条更具体的子族条目必须先于整根条目登记。
+// 属主口径与 gateway route-manifest 的 workspace 条目严格一致。
 const WORKSPACE_ECOS_SUBFAMILY_KEYS = [
   "/api/v1/ecos/objects",
   "/api/v1/ecos/state-machine",
@@ -110,7 +128,9 @@ describe("bff › route manifest single source (W194/C176)", () => {
     expect(serverSrc).not.toMatch(/app\.use\(\s*["']\/api\/(dq|datalake|v1\/ecos\/git)["']/);
 
     // 1) dev 侧：vite 表 = 迁移前 21 条基线 + 3 条 gateway 宿主 knowledge 子路径
-    //    + 3 条 workspace 的 ecos 子族（D62），target 逐条等价
+    //    + 3 条 workspace 的 ecos 子族（D62），target 逐条等价。
+    //    D145 不新增 key（/api/v1/ecos 本就在基线内），只把该条的 target 从 :18083 改为 gateway。
+    //    D146 同理：/api/v1/world-model 的 key 仍在基线内，target 由 :18089（调试制品）改为 gateway。
     const table = buildViteDevProxyTable({});
     expect(Object.keys(table).sort()).toEqual(
       [...PRE_MIGRATION_VITE_KEYS, ...GATEWAY_HOSTED_KNOWLEDGE_KEYS, ...WORKSPACE_ECOS_SUBFAMILY_KEYS].sort(),
@@ -121,6 +141,20 @@ describe("bff › route manifest single source (W194/C176)", () => {
     for (const prefix of GATEWAY_HOSTED_KNOWLEDGE_KEYS) {
       expect(table[prefix]?.target, `vite target of ${prefix}`).toBe("http://localhost:8080");
     }
+    // D146：/api/v1/world-model 转 gateway 宿主（:18089 是 cognitive-boot 调试制品，从未独立承流）
+    expect(table[GATEWAY_HOSTED_WORLD_MODEL_KEY]?.target, "D146: world-model 必须回落 gateway")
+      .toBe("http://localhost:8080");
+    expect(typeof table[GATEWAY_HOSTED_WORLD_MODEL_KEY]?.configure, "D146: world-model 必须保留 Authorization 透传")
+      .toBe("function");
+    expect(table[GATEWAY_HOSTED_WORLD_MODEL_KEY]?.headers, "D146: gateway 条目不得注入引擎信任头")
+      .toBeUndefined();
+    // D145：/api/v1/ecos 整根转 gateway 宿主（属主不唯一，禁判给单一引擎）
+    expect(table[GATEWAY_HOSTED_ECOS_ROOT_KEY]?.target, "D145: ecos 整根必须回落 gateway")
+      .toBe("http://localhost:8080");
+    expect(typeof table[GATEWAY_HOSTED_ECOS_ROOT_KEY]?.configure, "D145: ecos 整根必须保留 Authorization 透传")
+      .toBe("function");
+    expect(table[GATEWAY_HOSTED_ECOS_ROOT_KEY]?.headers, "D145: gateway 条目不得注入引擎信任头")
+      .toBeUndefined();
     for (const prefix of WORKSPACE_ECOS_SUBFAMILY_KEYS) {
       expect(table[prefix]?.target, `vite target of ${prefix}`).toBe("http://localhost:18090");
     }
@@ -130,8 +164,9 @@ describe("bff › route manifest single source (W194/C176)", () => {
     for (const prefix of GATEWAY_HOSTED_KNOWLEDGE_KEYS) {
       expect(prefixes.indexOf(prefix), `${prefix} 必须早于 /api/v1/knowledge`).toBeLessThan(knowledgeIdx);
     }
-    // D62 同一不变式：ecos 子族必须先于 /api/v1/ecos 父前缀（否则被 ontology :18083 截胡）
-    const ecosIdx = prefixes.indexOf("/api/v1/ecos");
+    // D62/D145 同一不变式：更具体的 ecos 子族必须先于整根条目
+    // （否则整根 gateway 兜底条目按首中生效会把 objects/state-machine 一并吞给 gateway）
+    const ecosIdx = prefixes.indexOf(GATEWAY_HOSTED_ECOS_ROOT_KEY);
     for (const prefix of WORKSPACE_ECOS_SUBFAMILY_KEYS) {
       expect(prefixes.indexOf(prefix), `${prefix} 必须早于 /api/v1/ecos`).toBeLessThan(ecosIdx);
     }

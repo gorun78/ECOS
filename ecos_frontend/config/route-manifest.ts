@@ -27,7 +27,6 @@ export type EngineKey =
   | "ontology"
   | "ai"
   | "kb"
-  | "cognitive"
   | "workspace";
 
 export interface RouteManifestEntry {
@@ -64,7 +63,6 @@ export const ENGINE_ENV_VARS: Record<EngineKey, string> = {
   ontology: "ONTOLOGY_URL",
   ai: "AIMING_URL",
   kb: "KB_URL",
-  cognitive: "COGNITIVE_URL",
   workspace: "WORKSPACE_URL",
 };
 
@@ -89,16 +87,20 @@ export const AIMING_DEV_TRUST_HEADERS: Readonly<Record<string, string>> = Object
 
 /**
  * 唯一事实源。条目集合 = server.ts 显式路由(2)+开关分支(5)+catch-all(1)
- * 与 vite.config.ts 代理表(18 直连 + 3 gateway 宿主的 knowledge 子路径 + 3 兜底) 的并集，
- * 共 29 条（24 条进 vite 表）。
+ * 与 vite.config.ts 代理表(19 直连 + 5 gateway 宿主的更具体前缀 + 3 兜底) 的并集，
+ * 共 32 条（27 条进 vite 表）。
  * 顺序即 vite proxy 对象的 key 插入顺序（vite 按前缀匹配，首中生效 ⇒ 更具体前缀必须先于父前缀）。
+ *
+ * gateway 宿主的 5 条更具体前缀 = knowledge 三端点（stats/engine-config/health，:18086 无此路径）
+ * + /api/v1/ecos 整根（属主不唯一，禁判给单一引擎，见下方 D145 注释）
+ * + /api/v1/world-model（:18089 是 cognitive-boot 调试制品，见下方 D146 注释）。
  */
 export const ROUTE_MANIFEST: readonly RouteManifestEntry[] = Object.freeze([
   // ── BFF 显式 gateway 路由（不进 vite 表：dev 下由 server.ts 先于 vite 注册）──
   { prefix: "/api/monitor", engine: "gateway", port: 8080, directInDev: false, directWhenFlag: false, alwaysGateway: true, streaming: false },
   { prefix: "/api/twins", engine: "gateway", port: 8080, directInDev: false, directWhenFlag: false, alwaysGateway: true, streaming: false },
 
-  // ── vite dev 引擎直连表（18 条，等价迁移自旧 vite.config.ts:24-43）──
+  // ── vite dev 引擎直连表（19 条：旧表 18 条 − /api/v1/ecos 整根转 gateway 宿主 + D62 三条 workspace 子族 − /api/v1/world-model 转 gateway 宿主）──
   { prefix: "/api/v1/agent-loop", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true },
   { prefix: "/api/v1/agent-mesh", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true, devRewrite: ["^/api/v1/", "/api/"] },
   { prefix: "/api/v1/agent", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true },
@@ -124,11 +126,30 @@ export const ROUTE_MANIFEST: readonly RouteManifestEntry[] = Object.freeze([
   { prefix: "/api/v1/ecos/objects", engine: "workspace", port: 18090, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/ecos/state-machine", engine: "workspace", port: 18090, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/ecos/statemachine", engine: "workspace", port: 18090, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
-  { prefix: "/api/v1/ecos", engine: "ontology", port: 18083, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
+  // D145（2026-11-16 live 实证）：/api/v1/ecos 整根**不直接连任何单一引擎**，回落 gateway。
+  // 原先 directInDev=true→:18083 违反 gateway route-manifest.json 第 12 行明文
+  // 「/api/v1/ecos 整根属主不唯一 …… 禁把整根判给单一属主」——实测该前缀下并存四类属主：
+  //   ontology/buszhi :18083（ontologies/entities/versions/domains/mappings/rules/actions/relationships/workflows/tasks/approvals）
+  //   sysman :18081（monitoring/entity-table-mappings/world-model-graph）
+  //   data :18082（dq）
+  //   workspace :18090（objects/state-machine，见上方 D62 三条）
+  // 单选任一端点承流都必然让其余族落空：2026-11-16 实测 dev :3000 对下列路径一律 500，
+  // 而同路径 gateway :8080 全部 200 —— violations 直接来自「整根送 :18083 而它没起」。
+  // 故与 knowledge 子路径同款：只生成 dev vite 兜底条目指向 gateway（Authorization 透传），
+  // 生产侧不变（BFF `/api` catch-all → gateway）。
+  { prefix: "/api/v1/ecos", engine: "gateway", port: 8080, directInDev: false, directWhenFlag: false, alwaysGateway: false, streaming: false, viteFallback: true },
   // PMO-60：workspace 独立 :18090；cognitive 并入 aiming :18084。两者同时是 BFF 开关分支条目。
   { prefix: "/api/v1/workspace", engine: "workspace", port: 18090, directInDev: true, directWhenFlag: true, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/cognitive", engine: "ai", port: 18084, directInDev: true, directWhenFlag: true, alwaysGateway: false, streaming: true },
-  { prefix: "/api/v1/world-model", engine: "cognitive", port: 18089, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
+  // D146（2026-11-16 live 实证）：原 directInDev=true→:18089 指向 cognitive-boot 调试制品，
+  // 该端口只在 `start-backend.ps1 -Modules cognitive-boot` 时存在（boot 端口 +1000），
+  // 7 JAR 常规启动下恒不监听 ⇒ dev :3000 对该前缀恒 500（ECONNREFUSED），而同路径
+  // gateway :8080 正常承流。gateway route-manifest.json 第 20 行 owner=aiming、
+  // ports.service=18084、route=monolith，reason 明文「宿主=gateway+aiming（详设-05 Cg-11：
+  // cognitive-boot :18089 是调试制品、从未独立承流）… 实测订正原误登 owner=buszhi/service=18089」。
+  // 故按后端权威口径改为 gateway 宿主兜底（与 D145 同款）：dev 与 prod 都落 gateway，
+  // 待 world-model 真正切流到 aiming service 时再改回 directInDev→:18084。
+  { prefix: "/api/v1/world-model", engine: "gateway", port: 8080, directInDev: false, directWhenFlag: false, alwaysGateway: false, streaming: false, viteFallback: true },
   { prefix: "/api/v1/rules", engine: "kb", port: 18086, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/kb", engine: "kb", port: 18086, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
 
@@ -169,7 +190,8 @@ export function resolveLocalDirectFlag(
  * target 必填——清单派生项一律给出上游地址） */
 export type ViteProxyEntryLike = ProxyOptions & { target: string };
 
-/** 由清单派生 vite dev 代理表（24 条：18 引擎直连 + 3 条 gateway 宿主的 knowledge 子路径
+/** 由清单派生 vite dev 代理表（27 条：19 引擎直连 + 5 条 gateway 宿主的更具体前缀
+ * （knowledge stats/engine-config/health 三条 + /api/v1/ecos 整根 + /api/v1/world-model）
  * + /api|/datanet|/cases gateway 兜底）。
  * gateway 兜底条目一律带 Authorization 透传 configure（等价旧 vite.config.ts:48-54 的 /api 面）。 */
 export function buildViteDevProxyTable(

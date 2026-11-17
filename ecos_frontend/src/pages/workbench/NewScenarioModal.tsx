@@ -190,8 +190,15 @@ export default function NewScenarioModal({
           <p className={`mt-1.5 ${styles.cardTextMuted} text-[10px]`}>{t('workspace.create.tpl_hint')}</p>
         </div>
         <div>
-          <label className={labelCls}>{t('workspace.create.caliber')}</label>
-          <input className={`${inputCls} font-mono opacity-80`} value={TEMPLATE_PRESETS[tpl].caliber} readOnly />
+          <label className={labelCls} htmlFor="new-scenario-caliber">
+            {t('workspace.create.caliber')}
+          </label>
+          <input
+            id="new-scenario-caliber"
+            className={`${inputCls} font-mono opacity-80`}
+            value={TEMPLATE_PRESETS[tpl].caliber}
+            readOnly
+          />
         </div>
         <p className={tipCls}>
           <Lightbulb size={12} />

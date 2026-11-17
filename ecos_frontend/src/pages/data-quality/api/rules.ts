@@ -16,6 +16,7 @@
  */
 
 import { apiFetchData } from "../../../api";
+import { ApiRequestError } from "../../../services/httpClient";
 import { DQ_GOV_BASE, DQ_LEGACY_BASE, recordDqFallback } from "./_base";
 import type {
   DqRuleVO,
@@ -146,7 +147,12 @@ export async function fetchDqGovernanceRuleDetail(id: string): Promise<DqRuleDet
   }
 }
 
-/** 6 维度注册表(T3 端点) */
+/** 6 维度注册表(T3 端点)。
+ *
+ * D152：只把「端点未实现(404/501)」折叠成 null（UI 显示「后端 T3 未返回」占位）；
+ * 其余（500/超时/权限/网络）原样上抛，让 DimensionTab 的错误分支显示真实原因，
+ * 不再把任意故障误导为「后端未实现」。
+ */
 export async function fetchDqDimensionRegistry(): Promise<DqDimensionRegistryVO[] | null> {
   try {
     const resp = await apiFetchData<DqDimensionRegistryVO[] | { data?: DqDimensionRegistryVO[] }>(
@@ -155,8 +161,11 @@ export async function fetchDqDimensionRegistry(): Promise<DqDimensionRegistryVO[
     if (Array.isArray(resp)) return resp;
     return resp?.data ?? null;
   } catch (e) {
-    // 端点未就绪/权限异常 → 占位, UI 显示 placeholder
-    return null;
+    const status = e instanceof ApiRequestError ? e.httpStatus : undefined;
+    if (status === 404 || status === 501) {
+      return null;
+    }
+    throw e;
   }
 }
 

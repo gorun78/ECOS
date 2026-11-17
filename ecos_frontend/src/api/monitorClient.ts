@@ -265,8 +265,11 @@ export async function runSystemDiagnostics(): Promise<{ database: { status: stri
 
 
 // ── Biz Dashboard ──────────────────────────────────────────
+// D33（2026-11-16）：原 /v1/ecos/biz/dashboard 后端从未实现（live 404）。
+// 改指 cognitive 前缀下的真实聚合端点（BizDashboardController 读
+// ecos_cognitive.ecos_biz_* + td_organization，biz/ops 两页共用本函数）。
 export async function fetchBizDashboard(): Promise<any> {
-  return apiFetchData(`${API_BASE}/v1/ecos/biz/dashboard`);
+  return apiFetchData(`${API_BASE}/v1/cognitive/biz-dashboard`);
 }
 
 // ── Goal Tracking ────────────────────────────────────────
