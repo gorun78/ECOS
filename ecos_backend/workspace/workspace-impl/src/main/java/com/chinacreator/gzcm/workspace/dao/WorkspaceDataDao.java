@@ -249,6 +249,14 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             if (PLAIN_AMOUNT.matcher(plain).matches()) {
                 return new java.math.BigDecimal(plain).setScale(2, java.math.RoundingMode.HALF_UP);
             }
+            // RT#14/V344（2026-11-17）：补中文数字百万级形态（"约五百万"/"三百万"等）。
+            // 存量 33 行"约五百万"全因此前不认中文数字而漏解析，V344 已在库内回填；
+            // 这里补齐解析口径，避免新写入继续漏。中文数字只覆盖一到九 + 百万量级，
+            // 更复杂的（"一千二百万"等）仍返回 null，由巡检发现而非瞎猜。
+            java.math.BigDecimal cn = parseChineseMillion(text);
+            if (cn != null) {
+                return cn;
+            }
         } catch (RuntimeException e) {
             return null;
         }
@@ -259,6 +267,30 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             java.util.regex.Pattern.compile("^([0-9]+(?:\\.[0-9]+)?)\\s*万(?:元)?$");
     private static final java.util.regex.Pattern PLAIN_AMOUNT =
             java.util.regex.Pattern.compile("^[0-9]+(?:\\.[0-9]+)?$");
+
+    /** 中文数字 → 数值（一到九）。 */
+    private static final java.util.Map<Character, Integer> CN_DIGIT = java.util.Map.of(
+            '一', 1, '二', 2, '三', 3, '四', 4, '五', 5,
+            '六', 6, '七', 7, '八', 8, '九', 9);
+
+    /**
+     * 解析「[约]&lt;中文数字&gt;百万」形态（RT#14/V344）。
+     *
+     * <p>只认单字中文数字 + "百万"，不解析"一千二百万"这类复合中文数词 —— 那需要完整
+     * 中文数字文法，超出展示列回填的必要范围，遇到就返回 null 留给巡检发现。</p>
+     */
+    private static java.math.BigDecimal parseChineseMillion(String text) {
+        String s = text.startsWith("约") ? text.substring(1) : text;
+        if (!s.endsWith("百万") || s.length() != 3) {
+            return null;
+        }
+        Integer d = CN_DIGIT.get(s.charAt(0));
+        if (d == null) {
+            return null;
+        }
+        return new java.math.BigDecimal(d).multiply(new java.math.BigDecimal("1000000"))
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+    }
 
     /** 动态更新场景（SQL 与参数由调用方按非 null 字段组装，此处仅透传执行）。 */
     public int updateScenarioDynamic(String sql, Object[] args) {
