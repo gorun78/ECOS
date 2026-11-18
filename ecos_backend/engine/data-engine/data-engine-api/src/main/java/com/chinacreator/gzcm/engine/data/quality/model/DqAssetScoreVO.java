@@ -11,11 +11,11 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
- * DQ 资产级评分 VO — 对齐 {@code ecos_dq.dq_score_asset} 主表字段（PMO-48-B T8）。
+ * DQ 资产级评分 VO — 对齐 {@code ecos_data.dq_score_asset} 主表字段（PMO-48-B T8）。
  *
  * <p>聚合 6 维度评分 + 加权汇总 + 等级。落表 SQL：</p>
  * <pre>
- *   INSERT INTO ecos_dq.dq_score_asset (asset_type, asset_id, overall_score,
+ *   INSERT INTO ecos_data.dq_score_asset (asset_type, asset_id, overall_score,
  *       rolled_up_scores, last_evaluated_at, is_deleted)
  *   VALUES (?, ?, ?, ?, NOW(), FALSE)
  *   ON CONFLICT (asset_type, asset_id) DO UPDATE

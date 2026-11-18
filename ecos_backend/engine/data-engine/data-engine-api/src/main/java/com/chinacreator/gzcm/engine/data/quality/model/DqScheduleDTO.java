@@ -7,7 +7,7 @@ import lombok.Data;
 /**
  * DQ 监控调度计划入参 DTO — 创建/更新共用（PMO-48-C T11）。
  *
- * <p>字段语义与 {@code ecos_dq.dq_schedule} 对齐：</p>
+ * <p>字段语义与 {@code ecos_data.dq_schedule} 对齐：</p>
  * <ul>
  *   <li>{@code triggerType} 三类触发: SCHEDULE(定时) / EVENT(Pipeline 事件) / MANUAL(仅手动)</li>
  *   <li>{@code ruleIds} 关联的 dq_rule.id 列表（JSONB 数组），批内规则需为 ACTIVE</li>

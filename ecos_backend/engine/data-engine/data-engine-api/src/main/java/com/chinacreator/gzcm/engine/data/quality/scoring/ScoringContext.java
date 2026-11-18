@@ -21,7 +21,7 @@ import lombok.Data;
  *   <li>{@code ruleId / scopeType / scopeId} — 评估上下文定位</li>
  *   <li>{@code parameters} — 规则参数 JSON 反序列化的 Map（如 min/max/regex/enum 列表）</li>
  *   <li>{@code connectionConfig} — 数据源连接配置引用（不存敏感字段，敏感字段在落库前由 {@code DqSecurityService} mask）</li>
- *   <li>{@code sampleFailures / totalRows / failedRows} — 来自 {@code ecos_dq.dq_rule_check} 行的诊断位</li>
+ *   <li>{@code sampleFailures / totalRows / failedRows} — 来自 {@code ecos_data.dq_rule_check} 行的诊断位</li>
  *   <li>{@code executedAt} — 评估触发时间（用于 FRESHNESS）</li>
  * </ul>
  *

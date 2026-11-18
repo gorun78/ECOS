@@ -22,8 +22,8 @@ import lombok.Data;
  *
  * <p>SQL：</p>
  * <pre>
- *   SELECT AVG(overall_score) FROM ecos_dq.dq_score_asset WHERE is_deleted = FALSE
- *   SELECT dimension, AVG(score_value) FROM ecos_dq.dq_score_snapshot
+ *   SELECT AVG(overall_score) FROM ecos_data.dq_score_asset WHERE is_deleted = FALSE
+ *   SELECT dimension, AVG(score_value) FROM ecos_data.dq_score_snapshot
  *     WHERE evaluated_at &gt;= NOW() - interval '1 day'
  *     GROUP BY dimension
  * </pre>

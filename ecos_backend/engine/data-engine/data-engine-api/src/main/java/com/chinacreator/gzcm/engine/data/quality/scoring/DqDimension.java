@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * <p>每个维度携带它映射的 rule_type 列表（{@link #getRuleTypes()})
  * 与默认权重（{@link #getDefaultWeight()})。权重用于
  * {@code Σ(维度分×权重) / Σ(权重)} 加权汇总，计算入
- * {@code ecos_dq.dq_score_asset.overall_score}。</p>
+ * {@code ecos_data.dq_score_asset.overall_score}。</p>
  *
  * <p>JSON 序列化走枚举 name（前/后端一致），参见
  * {@code Phase 1 T3 DqGovernanceController#dimension-registry}。</p>

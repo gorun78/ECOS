@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
- * DQ 规则列表摘要 VO — 对应 {@code ecos_dq.dq_rule} 主表字段（驼峰）。
+ * DQ 规则列表摘要 VO — 对应 {@code ecos_data.dq_rule} 主表字段（驼峰）。
  *
  * @author PMO-48-A T3
  */
