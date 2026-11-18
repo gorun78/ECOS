@@ -481,7 +481,13 @@ class OntologyNoFactValueArchTest {
         return parts;
     }
 
-    /** 剥注释：块注释 + 整行 {@code --} + <b>逐行首个 {@code --} 到行尾</b>（D-15 教训）。 */
+    /**
+     * 剥注释与字符串字面量：块注释 + 整行 {@code --} + 逐行首个 {@code --} 到行尾（D-15 教训）
+     * + <b>单引号字符串字面量</b>（2026-11-18 补：V344 的
+     * {@code COMMENT ON COLUMN ... IS '…numeric(18,2)…'} 曾把注释文本误判成金额列定义）。
+     *
+     * <p>字面量按 SQL 标准处理：{@code ''} 是转义的单引号，不出串；跨行字面量按未闭合处理到行尾。</p>
+     */
     private static String stripComments(String sql) {
         StringBuilder sb = new StringBuilder();
         boolean inBlock = false;
@@ -509,9 +515,39 @@ class OntologyNoFactValueArchTest {
             }
             int d = cur.indexOf("--");
             if (d >= 0) cur = cur.substring(0, d);
+            cur = stripStringLiterals(cur);
             sb.append(cur).append('\n');
         }
         return sb.toString();
+    }
+
+    /** 剥掉单引号字符串字面量（含 {@code ''} 转义），保留定界符外的内容。 */
+    private static String stripStringLiterals(String s) {
+        StringBuilder out = new StringBuilder();
+        int i = 0;
+        while (i < s.length()) {
+            char ch = s.charAt(i);
+            if (ch != '\'') {
+                out.append(ch);
+                i++;
+                continue;
+            }
+            // 进入字面量：吃掉直到未转义的收尾单引号
+            i++;
+            while (i < s.length()) {
+                if (s.charAt(i) == '\'') {
+                    if (i + 1 < s.length() && s.charAt(i + 1) == '\'') {
+                        i += 2;   // '' 转义，仍在串内
+                        continue;
+                    }
+                    i++;          // 收尾
+                    break;
+                }
+                i++;
+            }
+            out.append(' ');
+        }
+        return out.toString();
     }
 
     /** 一条本体域建表记录。 */
