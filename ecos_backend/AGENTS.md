@@ -111,7 +111,8 @@ workspace → (REST) → services/* → (Maven dep) → engine-impl → engine-a
 - `services/datanet/src/main/java/.../DatanetServiceApplication.java` — :18082
 - `workspace/workspace-service/src/main/java/.../WorkspaceServiceApplication.java` — :18090
 - `runtime/common-api/` — 核心契约 (P8-A 迁入)
-- `../docs/50-db_script/02-flyway-migration/gateway/` — **迁移脚本单源目录（铁律 v2.2 §3.1）**，Flyway 禁用，脚本仅落文件不实跑
+- `../docs/50-db_script/02-flyway-migration/gateway/` — **迁移脚本活单源目录（铁律 v2.4 §3.1）**，Flyway 禁用，脚本仅落文件不实跑；2026-11-18 阶段5 起**只承载 V350+ 新脚本**（下一枚 V350）
+- `../docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/` — V1~V349 共 **298 枚**历史脚本归档（只读存证，**不是第二 DDL 源、禁写入**）。**门禁/lint 扫描面 = 活单源 ∪ 归档**，点名取单脚本按「活单源优先、归档兜底」
 - `gateway/src/main/resources/db/migration/` — 空目录，v2.2 起不再写入（历史误记落点）
 
 ## Build
@@ -144,7 +145,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 
 - **PostgreSQL 16**，库 `sys_man`，本地 `postgres/postgres`
 - **MyBatis**（Hibernate/JPA auto-config 已排除）
-- **Flyway 已禁用** (`spring.flyway.enabled: false`)；迁移脚本单源目录 = `../docs/50-db_script/02-flyway-migration/gateway/`（铁律 **v2.2** §3.1，2026-10-11 卷09 H-7 用户裁决订正；禁分域另立目录。本仓 `gateway/src/main/resources/db/migration/` 为空目录、不再写入）
+- **Flyway 已禁用** (`spring.flyway.enabled: false`)；迁移脚本**活单源**目录 = `../docs/50-db_script/02-flyway-migration/gateway/`（铁律 **v2.4** §3.1，2026-10-11 卷09 H-7 用户裁决订正落点 + 2026-11-18 阶段5 归档二分；禁分域另立目录。本仓 `gateway/src/main/resources/db/migration/` 为空目录、不再写入）。V1~V349 共 298 枚历史脚本已归档至 `../docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/`，**门禁扫描面 = 活单源 ∪ 归档**（漏任一侧即空集假绿），新脚本自 **V350** 起落活单源
 - Mapper XMLs: `classpath*:mapper/*.xml`
 - **Schema 归属（ST07 权威口径，取代"Phase 4-2 按 service 切流"旧路线）**：控制域只有 **5 引擎 schema**（`ecos_data`/`ecos_ontology`/`ecos_knowledge`/`ecos_ai`/`ecos_cognitive`）+ **主控制 schema**（现 `public`，目标 `ecos_control`）；业务域五层数据落 `ecos_dw`（+ MinIO / Doris∨ClickHouse）。
   - 存量 `ecos_sysman`/`ecos_datanet`/`ecos_buszhi`/`ecos_dccheng`/`ecos_aiming`/`ecos_security`/`ecos_infra`/`ecos_dq` = **knownLegacy**：**只停写、不迁不删**（R9）；新表一律按 ST07 落 5 引擎或主控制 schema。
