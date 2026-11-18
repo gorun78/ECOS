@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>基准选取（诚实说明）</b>：附件一册 §5 的"K 12 类"原文未入库，且 PRD-04 §6.1 明确
  * "12 类为候选集、是否全数采纳随 R-46（本册不预设已批准）"⇒ 仓内<b>不存在</b>可对的 K 类型代码单源。
- * 本测试因此以<b>仓内 K 层权威载体单源</b>（迁移脚本中 {@code ecos_knowledge} schema 的建表语句）
+ * 本测试因此以<b>仓内 K 层权威载体单源</b>（迁移扫描面 = 活单源 ∪ 归档目录中 {@code ecos_knowledge} schema 的建表语句）
  * 反推 K 对象名集，并另证更强的两条：C 物理载体零寄生 {@code ecos_knowledge}、C 类型名与 K 表名去前缀后不相交。
  * R-46 落定 K 白名单入码后，本测试的 K 集应改读该代码单源（届时只换数据源、断言不变）。</p>
  */
@@ -67,13 +68,16 @@ class KCBoundaryWhitelistTest {
         }
     }
 
-    /** 从迁移脚本单源目录读 K 层表名并去前缀。 */
+    /** 从迁移扫描面（活单源 ∪ 归档）读 K 层表名并去前缀。 */
     private Set<String> readKLayerTypes() throws IOException {
         Path dir = CogScope.REPO.resolve("docs/50-db_script/02-flyway-migration/gateway");
         assertTrue(Files.isDirectory(dir), "迁移单源目录不存在：" + dir);
+        // 并集扫描：K 层建表集中在已归档的 V1~V349，只扫活目录会把 K 集扫空（假绿/假红）
+        Path legacy = CogScope.REPO.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
         Set<String> types = new LinkedHashSet<>();
-        try (var walk = Files.walk(dir, 1)) {
-            for (Path p : walk.filter(f -> f.toString().endsWith(".sql")).toList()) {
+        try (Stream<Path> live = Files.walk(dir, 1);
+             Stream<Path> archived = Files.isDirectory(legacy) ? Files.walk(legacy, 1) : Stream.<Path>empty()) {
+            for (Path p : Stream.concat(live, archived).filter(f -> f.toString().endsWith(".sql")).toList()) {
                 Matcher m = KB_TABLE.matcher(readUtf8(p));
                 while (m.find()) {
                     types.add(stripPrefix(m.group(1).toLowerCase(Locale.ROOT)));

@@ -33,8 +33,7 @@ class UserControllerPasswordPolicyStatusTest {
 
     private static UserController controller(IUserService users) {
         return new UserController(users, mock(UserQueryService.class), mock(PermissionCacheService.class),
-                mock(IPermissionCheckService.class),
-                mock(com.chinacreator.gzcm.sysman.iam.service.impl.LoginCredentialService.class));
+                mock(IPermissionCheckService.class));
     }
 
     @Test

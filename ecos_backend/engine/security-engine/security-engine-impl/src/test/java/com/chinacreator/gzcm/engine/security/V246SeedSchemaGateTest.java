@@ -135,7 +135,7 @@ class V246SeedSchemaGateTest {
         Path cur = Paths.get("").toAbsolutePath();
         for (int i = 0; i < 8 && cur != null; i++) {
             Path canonical = cur.resolve(
-                    "docs/50-db_script/02-flyway-migration/gateway/V246__security_policy_seed.sql");
+                    "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V246__security_policy_seed.sql");
             if (Files.isRegularFile(canonical)) {
                 return Files.readString(canonical);
             }

@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   <li><b>声明单源</b>：全仓生产源只准一处 {@code enum CognitiveModelType} 声明，
  *       且枚举常量 CM_01~CM_07 的<b>集合</b>必须与 PRD-05 冻结的 7 类逐一对应
  *       （数量 7、编码连续）——新增/删除类型先改需求单源再改契约；</li>
- *   <li><b>DDL 无枚举 CHECK</b>：迁移单源目录（gateway）内所有 SQL 对
+ *   <li><b>DDL 无枚举 CHECK</b>：迁移扫描面 = 活单源 ∪ 归档目录（gateway）内所有 SQL 对
  *       {@code cognitive_model_type / registry_state / gate_*} 不得建 CHECK 约束
  *       （V261 头注：枚举单源在 Java 契约层，禁 DDL 建 CHECK，R-15 同纪律；
  *       只判 CHECK 语句，注释里的"禁建 CHECK"声明不算违例——CHECK 正则要求
@@ -45,6 +45,9 @@ class CognitiveModelTypeSingleSourceTest {
     private static final Path BACKEND = CogScope.REPO.resolve("ecos_backend");
     private static final Path MIGRATIONS = CogScope.REPO.resolve(
             "docs/50-db_script/02-flyway-migration/gateway");
+    /** V1~V349 历史脚本已归档；扫描面 = 活单源 ∪ 归档，覆盖面不缩减（V350+ 落活目录）。 */
+    private static final Path LEGACY_MIGRATIONS = CogScope.REPO.resolve(
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
 
     private static final String SINGLE_SOURCE_FILE = "CognitiveModelType.java";
 
@@ -112,13 +115,16 @@ class CognitiveModelTypeSingleSourceTest {
     }
 
     @Test
-    @DisplayName("DDL 侧禁枚举 CHECK：迁移单源目录对 5 个枚举列零 CHECK 约束")
+    @DisplayName("DDL 侧禁枚举 CHECK：迁移扫描面（活单源 ∪ 归档）对 5 个枚举列零 CHECK 约束")
     void migrationsDeclareNoEnumCheckConstraints() throws IOException {
         assertTrue(Files.isDirectory(MIGRATIONS),
                 "迁移单源目录缺失：" + MIGRATIONS + "（门禁失效即红，禁静默跳过）");
         List<String> offenders = new ArrayList<>();
-        try (Stream<Path> sqls = Files.list(MIGRATIONS)) {
-            for (Path sql : sqls.filter(p -> p.toString().endsWith(".sql")).sorted().toList()) {
+        // 并集扫描：只指活目录会漏掉已归档的 V1~V349，只指归档会让 V350+ 新脚本脱离门禁
+        try (Stream<Path> live = Files.list(MIGRATIONS);
+             Stream<Path> archived = legacyScripts()) {
+            for (Path sql : Stream.concat(live, archived)
+                    .filter(p -> p.toString().endsWith(".sql")).sorted().toList()) {
                 String text = Files.readString(sql);
                 Matcher m = ENUM_CHECK_CONSTRAINT.matcher(text);
                 while (m.find()) {
@@ -133,6 +139,11 @@ class CognitiveModelTypeSingleSourceTest {
     }
 
     // ── helpers ──
+
+    /** 归档目录脚本流（目录不存在则空流，同 DdlShapeScanner 口径）。 */
+    private static Stream<Path> legacyScripts() throws IOException {
+        return Files.isDirectory(LEGACY_MIGRATIONS) ? Files.list(LEGACY_MIGRATIONS) : Stream.empty();
+    }
 
     private record Src(Path file, String text) {}
 

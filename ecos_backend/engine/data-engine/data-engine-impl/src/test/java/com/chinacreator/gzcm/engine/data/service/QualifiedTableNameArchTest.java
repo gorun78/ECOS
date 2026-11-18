@@ -65,9 +65,16 @@ class QualifiedTableNameArchTest {
      * {@code migration} 模式在 V241 落地前曾吞掉该目录全部脚本，单一源曾因此失明）。
      * 该门 2026-10-25 据此改为守真实单源（#142/B4-3e-69 台账同行登记既有红处置）；
      * 判定模式（PUBLIC_BUCKET_WRITE / UNQUALIFIED_CREATE）与第一案零改动，判据不放宽。</p>
+     *
+     * <p>2026-11-18 归档批：V1~V349 历史脚本移入
+     * {@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway}；
+     * 扫描面 = 活单源 ∪ 归档，文件集合与搬迁前一致，判据不放宽。</p>
      */
     private static final String MIGRATION_REL =
             "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 历史脚本归档目录（2026-11-18）；与活单源做并集扫描。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     @Test
     @DisplayName("Mapper XML 数据域表名必须 schema 限定 + 禁 public 桶")
@@ -111,8 +118,11 @@ class QualifiedTableNameArchTest {
         Path migrationDir = findRepoRoot().resolve(MIGRATION_REL);
         assertTrue(Files.isDirectory(migrationDir), "缺迁移目录: " + migrationDir);
         List<String> violations = new ArrayList<>();
-        try (Stream<Path> files = Files.list(migrationDir)) {
-            for (Path f : (List<Path>) files.filter(p -> p.toString().endsWith(".sql")).toList()) {
+        // 扫描面 = 活单源 ∪ 归档（V1~V349 已归档），文件集合与搬迁前一致
+        try (Stream<Path> live = Files.list(migrationDir);
+             Stream<Path> archived = legacyScripts()) {
+            for (Path f : (List<Path>) Stream.concat(live, archived)
+                    .filter(p -> p.toString().endsWith(".sql")).toList()) {
                 List<String> lines = Files.readAllLines(f, StandardCharsets.UTF_8);
                 int lin = 0;
                 for (String raw : lines) {
@@ -134,6 +144,12 @@ class QualifiedTableNameArchTest {
         assertTrue(violations.isEmpty(),
                 "F02-08/W49/MC06：数据域表 DDL 必须限定到引擎 schema，禁裸名/禁 public 桶：\n"
                         + String.join("\n", violations));
+    }
+
+    /** 归档目录脚本流；目录不存在则空流（与 DdlShapeScanner 同口径）。 */
+    private static Stream<Path> legacyScripts() throws IOException {
+        Path legacy = findRepoRoot().resolve(LEGACY_MIGRATION_REL);
+        return Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
     }
 
     static Path findRepoRoot() {

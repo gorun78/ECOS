@@ -171,7 +171,19 @@ class Mc03TimeFormTest {
     // 2026-11-16 D142：V338（ecos_audit_log.result 加宽，纯 ALTER + to_regclass 守卫）落地
     // ⇒ 按实测订正 287→288（四枚同批锚）。本枚对 PG 方言名录零贡献（无 ::/ON CONFLICT/RETURNING
     // /gen_random_uuid/JSON 运算符）。
-    private static final int SCRIPT_FLOOR = 293;
+    // 2026-11-17 数据库脚本整理阶段 1：V345 + V346（public 独有表归位）落地，两枚只有
+    // DO/RAISE NOTICE/ALTER ... SET SCHEMA 与 psql \if 开关，无 ::/ON CONFLICT/RETURNING
+    // /gen_random_uuid/JSON 运算符 ⇒ 对 PG 方言名录零贡献；本锚为精确钉值，同批订正 293→295。
+// 2026-11-17 登录权威归一（用户裁决「迁登录到 td_user，消灭 users」）：V347（td_user 补 5 列登录安全字段
+// + 超管码隶属 + 从 users 回填锁态）与 V348（补回 admin 的 SECURITY_AUDITOR 隶属）落地
+// ⇒ 单源实测 297 枚，本锚为精确钉值，同批订正 295→297（Mc02/Mc03/Dr 三枚同步）。
+// V347 的 5 列类型头 INTEGER/TIMESTAMP/BOOLEAN/TEXT 全在白名单内，BOOLEAN 列带 is_ 前缀（DR05）、
+// JSON 语义列带 _json 后缀（DR04）⇒ 对类型白名单零新增违例。
+// 2026-11-17 阶段3「无争议面」清理：V349（DROP 23 张 public 死壳 + users + ecos_sysman/ecos_security
+// 两 legacy schema，术语关系外键改指权威副本）落地 ⇒ 单源实测 298 枚，同批订正 297→298（三枚同步）。
+// V349 只用 DO/RAISE NOTICE/ALTER ... DROP|ADD CONSTRAINT 与 psql \if 开关，无 ::/ON CONFLICT/RETURNING
+// /gen_random_uuid/JSON 运算符 ⇒ 对 PG 方言名录零贡献。
+    private static final int SCRIPT_FLOOR = 298;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：

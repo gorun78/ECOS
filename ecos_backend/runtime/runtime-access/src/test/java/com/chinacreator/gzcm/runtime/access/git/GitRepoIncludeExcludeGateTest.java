@@ -70,7 +70,7 @@ class GitRepoIncludeExcludeGateTest {
         assertTrue(daoText.contains("include_paths"), "DAO 读列缺 include_paths");
         assertTrue(daoText.contains("exclude_paths"), "DAO 读列缺 exclude_paths");
 
-        Path ddl = repoRoot().resolve("docs/50-db_script/02-flyway-migration/gateway/"
+        Path ddl = repoRoot().resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/"
                 + "V304__git_repo_include_exclude_paths.sql");
         assertTrue(Files.isRegularFile(ddl), "V304 不在位");
         String sql = Files.readString(ddl, StandardCharsets.UTF_8);
@@ -86,7 +86,7 @@ class GitRepoIncludeExcludeGateTest {
      */
     @Test
     void v307SeedsExcludePathsForAllSixRepositoriesAndItActuallyFilters() throws IOException {
-        Path seed = repoRoot().resolve("docs/50-db_script/02-flyway-migration/gateway/"
+        Path seed = repoRoot().resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/"
                 + "V307__git_repo_exclude_paths_seed.sql");
         assertTrue(Files.isRegularFile(seed), "V307 数据面脚本不在位（列有载体、数据为空＝红线无载体）");
         String sql = Files.readString(seed, StandardCharsets.UTF_8);

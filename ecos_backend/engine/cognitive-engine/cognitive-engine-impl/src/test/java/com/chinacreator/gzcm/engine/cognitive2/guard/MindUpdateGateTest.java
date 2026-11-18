@@ -54,8 +54,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MindUpdateGateTest {
 
     private static final Path REPO = Path.of("..", "..", "..", "..").toAbsolutePath().normalize();
+    // V292 属 V1~V349 历史批，已随 DDL 归档搬迁（2026-11-18）
     private static final Path V292 = REPO.resolve(
-            "docs/50-db_script/02-flyway-migration/gateway/V292__cognitive_mind_r4_aggregate.sql");
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V292__cognitive_mind_r4_aggregate.sql");
 
     private static final Path IMPL_MAIN = REPO.resolve(
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2");

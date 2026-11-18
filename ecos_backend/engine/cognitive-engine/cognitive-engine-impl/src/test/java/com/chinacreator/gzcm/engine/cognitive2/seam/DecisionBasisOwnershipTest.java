@@ -80,8 +80,11 @@ class DecisionBasisOwnershipTest {
         // 规格 1：表族定性为 C 层资产 ⇒ 本批不得出现"改表/改名/DROP"形态（只增不改 + IR03）。
         List<String> ddlTampering = new ArrayList<>();
         Path migration = CogScope.REPO.resolve("docs/50-db_script/02-flyway-migration/gateway");
-        try (Stream<Path> walk = Files.walk(migration, 1)) {
-            for (Path p : walk.filter(f -> f.toString().endsWith(".sql")).toList()) {
+        // 并集扫描：V1~V349 已归档，只扫一侧会让另一侧的 DROP/改名脱离门禁
+        Path legacy = CogScope.REPO.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
+        try (Stream<Path> live = Files.walk(migration, 1);
+             Stream<Path> archived = Files.isDirectory(legacy) ? Files.walk(legacy, 1) : Stream.<Path>empty()) {
+            for (Path p : Stream.concat(live, archived).filter(f -> f.toString().endsWith(".sql")).toList()) {
                 String code = CogScope.stripComments(readUtf8(p));
                 Matcher m = Pattern.compile("(?i)\\b(DROP\\s+TABLE|RENAME\\s+TO)\\s+([a-z0-9_.]*"
                         + FAMILY + ")\\b").matcher(code);

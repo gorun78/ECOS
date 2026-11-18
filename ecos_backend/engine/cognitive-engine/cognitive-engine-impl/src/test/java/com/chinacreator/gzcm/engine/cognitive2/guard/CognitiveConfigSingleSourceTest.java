@@ -137,8 +137,9 @@ class CognitiveConfigSingleSourceTest {
     @Test
     @DisplayName("E.5-6 库侧种子面：V263 声明全部四枚键（只落文件，实跑属 §14.4 未授权项 ⇒ 该半项「未执行」）")
     void seedMigrationDeclaresAllFourKeys() throws IOException {
+        // V263 属 V1~V349 历史批，已随 DDL 归档搬迁（2026-11-18）
         Path seed = CogScope.REPO.resolve(
-                "docs/50-db_script/02-flyway-migration/gateway/V263__cognitive_sys_config_seed.sql");
+                "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V263__cognitive_sys_config_seed.sql");
         assertTrue(Files.isRegularFile(seed), "配置种子脚本缺失（四枚键无可改面）：" + seed);
         String sql = readUtf8(seed);
         for (String key : E5_KEYS) {

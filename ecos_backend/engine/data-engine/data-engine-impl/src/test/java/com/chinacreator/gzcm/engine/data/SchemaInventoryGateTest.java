@@ -59,6 +59,9 @@ class SchemaInventoryGateTest {
 
     private static final Path MIGRATION_DIR = Path.of(
             "docs/50-db_script/02-flyway-migration/gateway");
+    /** V1~V349 历史脚本已归档（2026-11-18）；扫描面 = 活单源 ∪ 归档，白名单判定不缩减。 */
+    private static final Path LEGACY_MIGRATION_DIR = Path.of(
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
     private static final Pattern CREATE_SCHEMA = Pattern.compile(
             "CREATE\\s+SCHEMA\\s+(IF\\s+NOT\\s+EXISTS\\s+)?([A-Za-z_][\\w]*)",
             Pattern.CASE_INSENSITIVE);
@@ -70,8 +73,9 @@ class SchemaInventoryGateTest {
         assertTrue(Files.isDirectory(dir), "迁移目录缺: " + dir);
         // schema → 首次出现的文件（便于断言信息）
         Map<String, String> found = new LinkedHashMap<>();
-        try (Stream<Path> walk = Files.walk(dir)) {
-            for (Path f : walk.filter(Files::isRegularFile)
+        try (Stream<Path> live = Files.walk(dir);
+             Stream<Path> archived = legacyWalk()) {
+            for (Path f : Stream.concat(live, archived).filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().matches("V[^/]*\\.sql$"))
                     .toList()) {
                 String text = Files.readString(f, StandardCharsets.UTF_8);
@@ -104,8 +108,9 @@ class SchemaInventoryGateTest {
     void st07EngineSchemasAreReferenced() throws IOException {
         Path dir = repoRoot().resolve(MIGRATION_DIR);
         Set<String> created = new LinkedHashSet<>();
-        try (Stream<Path> walk = Files.walk(dir)) {
-            for (Path f : walk.filter(Files::isRegularFile)
+        try (Stream<Path> live = Files.walk(dir);
+             Stream<Path> archived = legacyWalk()) {
+            for (Path f : Stream.concat(live, archived).filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().matches("V[^/]*\\.sql$"))
                     .toList()) {
                 String text = Files.readString(f, StandardCharsets.UTF_8);
@@ -116,6 +121,12 @@ class SchemaInventoryGateTest {
         assertTrue(created.contains("ecos_data") && created.contains("ecos_knowledge")
                         && created.contains("ecos_dq") && created.contains("ecos_dw"),
                 "ST07 权威 + 业务/DQ schema 应被显式 CREATE；实际: " + created);
+    }
+
+    /** 归档目录脚本流；目录不存在则空流（与 DdlShapeScanner 同口径）。 */
+    private static Stream<Path> legacyWalk() throws IOException {
+        Path legacy = repoRoot().resolve(LEGACY_MIGRATION_DIR);
+        return Files.isDirectory(legacy) ? Files.walk(legacy) : Stream.empty();
     }
 
     private static Path repoRoot() {

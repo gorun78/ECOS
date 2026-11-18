@@ -28,7 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code RunQualityCheckTool} 此前各在 agent 进程里执行一条 {@code jdbcTemplate.update("INSERT INTO ...")}
  * ——前者写 data-engine 属主的真实运行台账 {@code ecos_pipeline_run}（违反铁律约束 5：写通道与台账归属主），
  * 后者写一张 <b>DDL 单源里根本不存在的幽灵表</b> {@code ecos_quality_check}（{@code CREATE TABLE ... ecos_quality_check}
- * 在 {@code docs/50-db_script/02-flyway-migration/} 全量 {@code V*.sql} 中实扫 0 枚），
+ * 在活单源 {@code docs/50-db_script/02-flyway-migration/} ∪ 归档
+ * {@code docs/90-归档/50-db_script/02-flyway-migration-legacy/} 全量 {@code V*.sql} 中实扫 0 枚），
  * 两支都<b>无条件</b>回 {@code status="triggered"}。于是属主的只读冲突（409）、已下线（410）、
  * 拒绝（403）、护栏不可用（503）四种不同事实在机读面上全长成「已触发」＝假执行面。</p>
  *
@@ -380,7 +381,7 @@ class AgentToolOwnerWriteChannelSingleSourceTest {
     }
 
     private static Path seedSource() {
-        Path p = repoRoot().resolve("docs/50-db_script/02-flyway-migration/gateway/V55__ecos_tool_seed.sql");
+        Path p = repoRoot().resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V55__ecos_tool_seed.sql");
         assertTrue(Files.isRegularFile(p), "V55 工具种子不存在，写腿端点的在册依据消失: " + p);
         return p;
     }

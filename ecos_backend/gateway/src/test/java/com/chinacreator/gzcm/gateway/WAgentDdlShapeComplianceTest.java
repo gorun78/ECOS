@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +68,9 @@ class WAgentDdlShapeComplianceTest {
 
     private static final String MIGRATION_REL =
             "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 已归档（2026-11-18 阶段5）；扫描面 = 活单源 ∪ 归档，否则 V350+ 新脚本脱离门禁。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** 19 条 wagent 单源脚本（文件名含 wagent；V265/V266/V270 为 seed/ALTER-only，无 CREATE TABLE）。 */
     private static final Set<String> PINNED_SCRIPTS = Set.of(
@@ -217,7 +221,7 @@ class WAgentDdlShapeComplianceTest {
 
         List<String> missing = new ArrayList<>();
         for (String s : new TreeSet<>(PINNED_SCRIPTS)) {
-            if (!Files.isRegularFile(dir.resolve(s))) missing.add(s);
+            if (!Files.isRegularFile(scriptPath(dir, s))) missing.add(s);
         }
         assertTrue(missing.isEmpty(), "wagent DDL 单源脚本缺失（DDL 单源漂移）：\n" + String.join("\n", missing));
 
@@ -268,7 +272,7 @@ class WAgentDdlShapeComplianceTest {
 
         // 逐行剥离行尾注释必须真的生效（否则 V283:98 的 "不落 JSONB" 会造出假红）
         String stripped = stripComments(Files.readString(
-                repoRoot().resolve(MIGRATION_REL).resolve("V283__ecos_wagent_decision_action_loop.sql"),
+                scriptPath(repoRoot().resolve(MIGRATION_REL), "V283__ecos_wagent_decision_action_loop.sql"),
                 StandardCharsets.UTF_8));
         assertTrue(stripped.contains("backtest_ref_text"), "V283 列定义不应被误剥");
         assertTrue(!Pattern.compile("\\bjsonb\\b", Pattern.CASE_INSENSITIVE).matcher(stripped).find(),
@@ -345,7 +349,7 @@ class WAgentDdlShapeComplianceTest {
         Path dir = repoRoot().resolve(MIGRATION_REL);
         List<String> violations = new ArrayList<>();
         for (String script : new TreeSet<>(PINNED_SCRIPTS)) {
-            String stripped = stripComments(Files.readString(dir.resolve(script), StandardCharsets.UTF_8));
+            String stripped = stripComments(Files.readString(scriptPath(dir, script), StandardCharsets.UTF_8));
             String[] lines = stripped.split("\n", -1);
             // 逐类红线做「行级」定位（partial index 需跨行，单独整文件判定）
             for (Map.Entry<String, Pattern> e : FORBIDDEN_FORMS.entrySet()) {
@@ -474,7 +478,7 @@ class WAgentDdlShapeComplianceTest {
                 Pattern.CASE_INSENSITIVE);
         List<TableShape> out = new ArrayList<>();
         for (String script : new TreeSet<>(PINNED_SCRIPTS)) {
-            String sql = stripComments(Files.readString(dir.resolve(script), StandardCharsets.UTF_8));
+            String sql = stripComments(Files.readString(scriptPath(dir, script), StandardCharsets.UTF_8));
             Matcher m = create.matcher(sql);
             while (m.find()) {
                 int open = sql.indexOf('(', m.end() - 1);
@@ -556,8 +560,23 @@ class WAgentDdlShapeComplianceTest {
         return s.toUpperCase().replaceAll("\\s*,\\s*", ",").replaceAll("\\s+", " ").trim();
     }
 
+    /** 活单源 ∪ 归档目录的脚本流（调用方负责 close）。 */
+    private static Stream<Path> scripts(Path liveDir) throws IOException {
+        Path legacy = repoRoot().resolve(LEGACY_MIGRATION_REL);
+        Stream<Path> live = Files.list(liveDir);
+        Stream<Path> archived = Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
+        return Stream.concat(live, archived);
+    }
+
+    /** 按名取脚本：活单源优先，回落归档（历史脚本已搬走）。 */
+    private static Path scriptPath(Path liveDir, String fileName) throws IOException {
+        Path live = liveDir.resolve(fileName);
+        return Files.isRegularFile(live) ? live
+                : repoRoot().resolve(LEGACY_MIGRATION_REL).resolve(fileName);
+    }
+
     private static List<String> listWagentScriptNames(Path dir) throws IOException {
-        try (var stream = Files.list(dir)) {
+        try (Stream<Path> stream = scripts(dir)) {
             return stream.filter(Files::isRegularFile)
                     .map(p -> p.getFileName().toString())
                     .filter(n -> n.contains("wagent"))

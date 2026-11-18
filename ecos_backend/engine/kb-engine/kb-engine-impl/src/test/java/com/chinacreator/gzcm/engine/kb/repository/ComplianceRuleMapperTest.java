@@ -278,9 +278,9 @@ class ComplianceRuleMapperTest {
         return null;
     }
 
-    /** 从 Flyway 单源目录读一枚迁移脚本全文。 */
+    /** 从归档目录读一枚历史迁移脚本全文（点名版本均 ≤V349，已随 2026-11-18 归档批搬迁）。 */
     private static String readDdl(String fileName) throws IOException {
-        Path ddl = repoRoot().resolve("docs/50-db_script/02-flyway-migration/gateway").resolve(fileName);
+        Path ddl = repoRoot().resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway").resolve(fileName);
         assertTrue(Files.isRegularFile(ddl), "DDL 单源脚本缺失：" + ddl);
         return Files.readString(ddl, StandardCharsets.UTF_8);
     }

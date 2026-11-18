@@ -60,6 +60,9 @@ import org.junit.jupiter.api.Test;
 class WAgentEvidenceChainComplianceTest {
 
     private static final String MIGRATION_REL = "docs/50-db_script/02-flyway-migration/gateway";
+    /** V240 属历史脚本，已随 V1~V349 归档（2026-11-18 阶段5）。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
     private static final String SCRIPT = "V240__wagent_evidence_claim.sql";
 
     private static final String EVIDENCE_TABLE = "ecos_ai.ecos_wagent_evidence";
@@ -370,6 +373,9 @@ class WAgentEvidenceChainComplianceTest {
     /** V240 三表表体（已剥注释、括号配平）。 */
     private static Map<String, String> chainTableBodies() throws IOException {
         Path file = repoRoot().resolve(MIGRATION_REL).resolve(SCRIPT);
+        if (!Files.isRegularFile(file)) {
+            file = repoRoot().resolve(LEGACY_MIGRATION_REL).resolve(SCRIPT);
+        }
         assertTrue(Files.isRegularFile(file), "缺 V240 证据三表脚本（DDL 单源漂移，铁律 v2.2 §3.1）: " + file);
         String sql = stripComments(Files.readString(file, StandardCharsets.UTF_8));
         Pattern create = Pattern.compile(

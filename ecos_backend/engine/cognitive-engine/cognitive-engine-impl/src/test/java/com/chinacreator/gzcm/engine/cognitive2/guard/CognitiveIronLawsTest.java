@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,7 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       （静态半区 = 禁写推理结果载体族；库侧调用前后 count 比对需实跑 ecos-postgres
  *       ⇒ 需求检视报告 §14.4 未授权项，记「未执行」并显式打印，禁静默当已验）；</li>
  *   <li><b>不新增业务事实表</b> → {@code #cognitiveDomainMayNotCreateTablesOutsideFour}
- *       （扫 DDL 单源目录 {@code docs/50-db_script/02-flyway-migration/gateway}，
+ *       （扫 DDL 活单源 ∪ 归档目录，V1~V349 历史脚本已归档至
+ *       {@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway}，
  *       认知域表白名单外零容忍 + 白名单虚条目判 FAIL）；</li>
  *   <li><b>不引入规则引擎</b> → {@code CognitiveDependencyAuditTest#noRuleEngineOnClasspath}；</li>
  *   <li><b>禁 LLM 直接承担推理职责</b> → {@code CognitiveNoLlmNumbersTest#chainsContributionScoreNeverFromLlmResponse}；</li>
@@ -138,9 +140,12 @@ class CognitiveIronLawsTest {
                 + "需对 ecos-postgres 实跑 ⇒ 需求检视报告 §14.4 未授权项，本批只钉静态面。");
     }
 
-    /** DDL 单源目录（铁律 v2.0 §3.1 权威落点，非 gateway/src/main/resources/db/migration）。 */
+    /** DDL 活单源目录（铁律 v2.0 §3.1 权威落点，非 gateway/src/main/resources/db/migration）。 */
     private static final Path MIGRATION_DIR =
             CogScope.REPO.resolve("docs/50-db_script/02-flyway-migration/gateway");
+    /** V1~V349 历史脚本已归档；扫描面 = 活单源 ∪ 归档，白名单与虚条目判定覆盖面不缩减。 */
+    private static final Path LEGACY_MIGRATION_DIR =
+            CogScope.REPO.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
 
     private static final Pattern CREATE_ON_COGNITIVE = Pattern.compile(
             "(?i)\\bCREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(ecos_cognitive\\.[a-z0-9_]+)");
@@ -178,25 +183,28 @@ class CognitiveIronLawsTest {
             "ecos_cognitive.ecos_cognitive_framework");              // V311 建（详细设计-认知引擎 v1.0 §5/§9.1 Framework Registry 版本化治理元数据；非业务事实表）
 
     @Test
-    @DisplayName("认知域 DDL 白名单外零新表（REQ-COG-05 守护项 2，ArchUnit 面 = DDL 单源目录扫描）")
+    @DisplayName("认知域 DDL 白名单外零新表（REQ-COG-05 守护项 2，ArchUnit 面 = DDL 活单源 ∪ 归档扫描）")
     void cognitiveDomainMayNotCreateTablesOutsideFour() throws IOException {
         assertTrue(Files.isDirectory(MIGRATION_DIR),
                 "DDL 单源目录缺失，白名单门禁失去比较对象：" + MIGRATION_DIR);
 
         List<String> unregistered = new ArrayList<>();
         List<String> registeredSeen = new ArrayList<>();
-        try (var walk = Files.walk(MIGRATION_DIR, 1)) {
-            List<Path> sqls = walk.filter(f -> f.toString().endsWith(".sql")).toList();
-            for (Path sql : sqls) {
-                String code = stripSqlComments(Files.readString(sql));
-                var m = CREATE_ON_COGNITIVE.matcher(code);
-                while (m.find()) {
-                    String table = m.group(1).toLowerCase();
-                    if (REGISTERED_COGNITIVE_TABLES.contains(table)) {
-                        registeredSeen.add(table);
-                    } else {
-                        unregistered.add(sql.getFileName() + " :: " + table);
-                    }
+        // 并集扫描：白名单含 V163~V311 历史建表，只扫活目录会把已归档脚本判成「虚条目」假红
+        List<Path> sqls;
+        try (Stream<Path> live = Files.walk(MIGRATION_DIR, 1);
+             Stream<Path> archived = legacySqls()) {
+            sqls = Stream.concat(live, archived).filter(f -> f.toString().endsWith(".sql")).toList();
+        }
+        for (Path sql : sqls) {
+            String code = stripSqlComments(Files.readString(sql));
+            var m = CREATE_ON_COGNITIVE.matcher(code);
+            while (m.find()) {
+                String table = m.group(1).toLowerCase();
+                if (REGISTERED_COGNITIVE_TABLES.contains(table)) {
+                    registeredSeen.add(table);
+                } else {
+                    unregistered.add(sql.getFileName() + " :: " + table);
                 }
             }
         }
@@ -207,7 +215,13 @@ class CognitiveIronLawsTest {
         List<String> phantom = new ArrayList<>(REGISTERED_COGNITIVE_TABLES);
         phantom.removeAll(registeredSeen);
         assertTrue(phantom.isEmpty(),
-                "白名单存在 DDL 单源目录里查无此表的虚条目（应删登记）：" + phantom);
+                "白名单存在 DDL 扫描面（活单源 ∪ 归档）里查无此表的虚条目（应删登记）：" + phantom);
+    }
+
+    /** 归档目录脚本流（目录不存在则空流，同 DdlShapeScanner 口径）。 */
+    private static Stream<Path> legacySqls() throws IOException {
+        return Files.isDirectory(LEGACY_MIGRATION_DIR)
+                ? Files.walk(LEGACY_MIGRATION_DIR, 1) : Stream.empty();
     }
 
     /** SQL 行注释剥离（{@code --} 到行尾），使头注里的历史性表名/形态描述不进入判定。 */

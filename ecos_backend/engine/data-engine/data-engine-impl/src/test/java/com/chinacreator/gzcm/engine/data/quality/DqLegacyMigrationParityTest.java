@@ -32,9 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("F02-08 / W45：V166 dq_rule legacy 迁移字段映射逐列断言")
 class DqLegacyMigrationParityTest {
 
-    // V200 治理后 DDL 单源目录（数据库访问规范 v1.4 §八），仓库根相对
+    // V166 属 V1~V349 历史脚本，已随 2026-11-18 归档批移入归档目录，仓库根相对
     private static final Path MIGRATION_V166 = Path.of(
-            "docs/50-db_script/02-flyway-migration/gateway/V166__dq_rule_legacy_migration.sql");
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V166__dq_rule_legacy_migration.sql");
 
     @Test
     @DisplayName("V166 含 INSERT INTO 治理表 SELECT FROM legacy 源的批量迁移（≥1 条）")

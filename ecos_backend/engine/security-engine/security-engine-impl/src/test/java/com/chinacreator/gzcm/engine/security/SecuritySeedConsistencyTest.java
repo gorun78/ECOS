@@ -177,8 +177,8 @@ class SecuritySeedConsistencyTest {
     private Path resolveSeedFile() throws IOException {
         Path cur = Paths.get("").toAbsolutePath();
         for (int i = 0; i < 8 && cur != null; i++) {
-            // V200 治理后 DDL 单源目录（见数据库访问规范 v1.4 §八），优先新路径，旧 gateway 路径保留兼容
-            Path canonical = cur.resolve("docs/50-db_script/02-flyway-migration/gateway/V246__security_policy_seed.sql");
+            // V246 属历史脚本，已归档至 90-归档 目录；旧 gateway 路径保留兼容
+            Path canonical = cur.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V246__security_policy_seed.sql");
             if (Files.isRegularFile(canonical)) return canonical;
             Path candidate = cur.resolve("gateway/src/main/resources/db/migration/V246__security_policy_seed.sql");
             if (Files.isRegularFile(candidate)) return candidate;

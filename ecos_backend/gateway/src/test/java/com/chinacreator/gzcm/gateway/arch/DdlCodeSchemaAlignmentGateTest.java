@@ -55,6 +55,9 @@ import org.junit.jupiter.api.io.TempDir;
 class DdlCodeSchemaAlignmentGateTest {
 
     private static final String DDL_DIR = "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 已归档（2026-11-18 阶段5）；DDL 面 = 活单源 ∪ 归档，否则 MIN_SQL_SCRIPTS 空转。 */
+    private static final String LEGACY_DDL_DIR =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** DDL 面下限（防扫描根漂移把门变成空转）：实存 260+ 枚脚本。 */
     private static final int MIN_SQL_SCRIPTS = 250;
@@ -191,11 +194,14 @@ class DdlCodeSchemaAlignmentGateTest {
 
     private static AnalyzeResult analyzeRepo(Path root) throws IOException {
         Map<String, String> ddl = new LinkedHashMap<>();
-        Path ddlDir = root.resolve(DDL_DIR);
         List<Path> scripts = new ArrayList<>();
-        if (Files.isDirectory(ddlDir)) {
-            try (Stream<Path> s = Files.list(ddlDir)) {
-                scripts = s.filter(p -> p.getFileName().toString().endsWith(".sql")).toList();
+        for (String rel : new String[]{DDL_DIR, LEGACY_DDL_DIR}) {
+            Path dir = root.resolve(rel);
+            if (!Files.isDirectory(dir)) {
+                continue;
+            }
+            try (Stream<Path> s = Files.list(dir)) {
+                scripts.addAll(s.filter(p -> p.getFileName().toString().endsWith(".sql")).toList());
             }
         }
         for (Path p : scripts) {

@@ -41,9 +41,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class HypothesisWriteWhitelistGateTest {
 
     private static final Path REPO = CogScope.REPO;
-    private static final Path MIGRATIONS = REPO.resolve("docs/50-db_script/02-flyway-migration/gateway");
-    private static final Path V191 = MIGRATIONS.resolve("V191__cognitive_converge_belief_hypo_evidence.sql");
-    private static final Path V299 = MIGRATIONS.resolve("V299__cognitive_hypothesis_status_default_proposed.sql");
+    // V191/V299 属 V1~V349 历史批，已随 DDL 归档搬迁（2026-11-18）；本门只按名取单文件，不扫目录
+    private static final Path LEGACY_MIGRATIONS =
+            REPO.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
+    private static final Path V191 = LEGACY_MIGRATIONS.resolve("V191__cognitive_converge_belief_hypo_evidence.sql");
+    private static final Path V299 = LEGACY_MIGRATIONS.resolve("V299__cognitive_hypothesis_status_default_proposed.sql");
     private static final Path DAO = CogScope.MAIN.resolve("com/chinacreator/gzcm/engine/cognitive2/dao/HypothesisDao.java");
     private static final Path STATUS = REPO.resolve(
             "ecos_backend/engine/cognitive-engine/cognitive-engine-api/src/main/java"

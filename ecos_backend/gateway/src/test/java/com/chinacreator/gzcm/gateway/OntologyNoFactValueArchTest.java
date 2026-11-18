@@ -69,6 +69,9 @@ class OntologyNoFactValueArchTest {
 
     private static final String MIGRATION_REL =
             "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 已归档（2026-11-18 阶段5）；扫描面 = 活单源 ∪ 归档，否则 V350+ 新脚本脱离门禁。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** 本体域三 schema（ST07 控制域内本体侧；outbox 事件表亦属本域写通道）。 */
     private static final Set<String> ONTOLOGY_SCHEMAS = Set.of(
@@ -300,7 +303,7 @@ class OntologyNoFactValueArchTest {
     void moneyScaleNumericSurfaceIsPinnedAndNeverOntological() throws IOException {
         Set<String> scripts = new TreeSet<>();
         Path dir = migrationDir();
-        try (Stream<Path> s = Files.list(dir)) {
+        try (Stream<Path> s = scripts(dir)) {
             s.filter(p -> p.getFileName().toString().matches("V.*\\.sql"))
                     .forEach(p -> {
                         try {
@@ -331,7 +334,7 @@ class OntologyNoFactValueArchTest {
     private static List<TableShape> ontologyTables() throws IOException {
         Path dir = migrationDir();
         List<String> scripts;
-        try (Stream<Path> s = Files.list(dir)) {
+        try (Stream<Path> s = scripts(dir)) {
             scripts = s.map(p -> p.getFileName().toString())
                     .filter(n -> n.matches("V.*\\.sql"))
                     .sorted()
@@ -345,7 +348,7 @@ class OntologyNoFactValueArchTest {
                 Pattern.CASE_INSENSITIVE);
         List<TableShape> out = new ArrayList<>();
         for (String script : scripts) {
-            String sql = stripComments(Files.readString(dir.resolve(script), StandardCharsets.UTF_8));
+            String sql = stripComments(Files.readString(scriptPath(dir, script), StandardCharsets.UTF_8));
             for (int[] pass = {0}; pass[0] < 2; pass[0]++) {
                 Matcher m = (pass[0] == 0 ? qualified : bare).matcher(sql);
                 while (m.find()) {
@@ -386,6 +389,21 @@ class OntologyNoFactValueArchTest {
         return repoRoot().resolve(MIGRATION_REL);
     }
 
+    /** 活单源 ∪ 归档目录的脚本流（调用方负责 close）。 */
+    private static Stream<Path> scripts(Path liveDir) throws IOException {
+        Path legacy = repoRoot().resolve(LEGACY_MIGRATION_REL);
+        Stream<Path> live = Files.list(liveDir);
+        Stream<Path> archived = Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
+        return Stream.concat(live, archived);
+    }
+
+    /** 按名取脚本：活单源优先，回落归档（历史脚本已搬走）。 */
+    private static Path scriptPath(Path liveDir, String fileName) throws IOException {
+        Path live = liveDir.resolve(fileName);
+        return Files.isRegularFile(live) ? live
+                : repoRoot().resolve(LEGACY_MIGRATION_REL).resolve(fileName);
+    }
+
     private static Path repoRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();
         while (p != null) {
@@ -405,12 +423,12 @@ class OntologyNoFactValueArchTest {
                 Pattern.CASE_INSENSITIVE);
         int hits = 0;
         List<String> scripts;
-        try (Stream<Path> s = Files.list(dir)) {
+        try (Stream<Path> s = scripts(dir)) {
             scripts = s.map(p -> p.getFileName().toString()).filter(n -> n.matches("V.*\\.sql"))
                     .sorted().toList();
         }
         for (String script : scripts) {
-            String sql = stripComments(Files.readString(dir.resolve(script), StandardCharsets.UTF_8));
+            String sql = stripComments(Files.readString(scriptPath(dir, script), StandardCharsets.UTF_8));
             Matcher m = money.matcher(sql);
             while (m.find()) hits++;
         }

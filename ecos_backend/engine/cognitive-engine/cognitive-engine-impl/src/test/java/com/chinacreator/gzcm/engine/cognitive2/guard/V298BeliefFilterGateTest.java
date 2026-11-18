@@ -41,9 +41,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class V298BeliefFilterGateTest {
 
     private static final Path REPO = CogScope.REPO;
-    private static final Path MIGRATIONS = REPO.resolve("docs/50-db_script/02-flyway-migration/gateway");
-    private static final Path V262 = MIGRATIONS.resolve("V262__cognitive_belief_probability.sql");
-    private static final Path V298 = MIGRATIONS.resolve("V298__cognitive_belief_mind_subject_cols.sql");
+    // V262/V298 属 V1~V349 历史批，已随 DDL 归档搬迁（2026-11-18）；本门只按名取单文件，不扫目录
+    private static final Path LEGACY_MIGRATIONS =
+            REPO.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
+    private static final Path V262 = LEGACY_MIGRATIONS.resolve("V262__cognitive_belief_probability.sql");
+    private static final Path V298 = LEGACY_MIGRATIONS.resolve("V298__cognitive_belief_mind_subject_cols.sql");
     private static final Path READER = CogScope.MAIN.resolve("com/chinacreator/gzcm/engine/cognitive2/dao/BeliefReader.java");
     private static final Path SCORER = CogScope.MAIN.resolve("com/chinacreator/gzcm/engine/cognitive2/dao/BeliefScorer.java");
 

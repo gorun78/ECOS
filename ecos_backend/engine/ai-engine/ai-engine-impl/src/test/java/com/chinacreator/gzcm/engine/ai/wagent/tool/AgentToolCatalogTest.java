@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 在本批之前<b>全仓不存在</b>（差距分析 B5 行登记的"验收缺失"项）。</p>
  *
  * <p><b>无 DB 静态判据</b>（与 gateway {@code WAgentDdlShapeComplianceTest} 同族）：
- * 直接解析单源迁移目录里的 V266 seed 文本，把 INSERT 元组按列名还原成行 Map 后判定。
+ * 直接解析 V266 seed 文本（历史脚本已归档至 90-归档 目录），把 INSERT 元组按列名还原成行 Map 后判定。
  * 选静态而非 DB 取数的理由：本验收断言的是<b>登记内容</b>（哪些工具进了目录、指向哪里），
  * 该内容单源就是迁移脚本；连库反而引入"库被运维改过 ⇒ 验收随环境漂移"的第二真值。</p>
  *
@@ -43,8 +43,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AgentToolCatalogTest {
 
-    /** 单源迁移目录里的首批工具契约 seed（铁律 v2.2 §3.1 单源目录口径）。 */
+    /** 首批工具契约 seed（V266 属历史脚本，已归档；按名取数活目录优先）。 */
     private static final String SEED_SCRIPT = "V266__wagent_tool_contract_seed.sql";
+
+    /** DDL 活单源目录相对路径（铁律 v2.2 §3.1；V350+ 新脚本落此目录）。 */
+    private static final String MIGRATION_REL = "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 历史脚本归档目录（2026-11-18 阶段5）。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     private static final String TABLE = "ecos_ai.ecos_wagent_tool_contract";
 
@@ -189,7 +195,7 @@ class AgentToolCatalogTest {
 
     /** 解析 seed 的 INSERT 语句：列名 → 值，NULL 折成 {@code null}，单引号 {@code ''} 转义还原。 */
     private static List<Map<String, String>> seedRows() throws IOException {
-        String sql = stripSqlComments(Files.readString(migrationDir().resolve(SEED_SCRIPT)));
+        String sql = stripSqlComments(Files.readString(scriptPath(SEED_SCRIPT)));
         int insertAt = sql.indexOf("INSERT INTO " + TABLE);
         assertTrue(insertAt >= 0, "seed 里找不到目标表 INSERT: " + TABLE);
         int colsStart = sql.indexOf('(', insertAt);
@@ -329,14 +335,20 @@ class AgentToolCatalogTest {
         return out.toString();
     }
 
-    /** DDL 单源目录（铁律 v2.2 §3.1）：上溯到含该目录的仓根，禁写本机绝对路径。 */
-    private static Path migrationDir() {
+    /** 上溯到含 DDL 活单源目录的仓根（该目录保留为空，V350+ 落此），禁写本机绝对路径。 */
+    private static Path repoRoot() {
         Path cur = Paths.get("").toAbsolutePath();
         while (cur != null) {
-            Path dir = cur.resolve("docs/50-db_script/02-flyway-migration/gateway");
-            if (Files.isDirectory(dir)) return dir;
+            if (Files.isDirectory(cur.resolve(MIGRATION_REL))) return cur;
             cur = cur.getParent();
         }
-        throw new IllegalStateException("定位不到 DDL 单源目录 docs/50-db_script/02-flyway-migration/gateway");
+        throw new IllegalStateException("定位不到 DDL 单源目录 " + MIGRATION_REL);
+    }
+
+    /** 同名脚本活单源优先（V350+ 落活目录，历史落归档）。 */
+    private static Path scriptPath(String fileName) {
+        Path live = repoRoot().resolve(MIGRATION_REL).resolve(fileName);
+        return Files.isRegularFile(live) ? live
+                : repoRoot().resolve(LEGACY_MIGRATION_REL).resolve(fileName);
     }
 }

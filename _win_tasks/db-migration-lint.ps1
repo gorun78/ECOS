@@ -68,7 +68,10 @@ $sqlRoots = @(
     (Join-Path $ProjectRoot 'workspace'),
     # v2.2 铁律 §3.1 / 卷09 H-7（2026-10-11 用户裁决）：迁移脚本权威单源在仓根 docs 目录，
     # 原六根全部指向 ecos_backend，导致 227 个 V 脚本从未入扫描集（假绿根因）。
-    (Join-Path (Split-Path -Parent $ProjectRoot) 'docs\50-db_script\02-flyway-migration')
+    (Join-Path (Split-Path -Parent $ProjectRoot) 'docs\50-db_script\02-flyway-migration'),
+    # 2026-11-18 阶段5（用户授权）：V1~V349 历史脚本整体归档至 90-归档，活单源只留 V350+。
+    # 扫描面 = 活单源 ∪ 归档，否则 298 枚历史脚本脱离 lint（假绿根因同 H-7）。
+    (Join-Path (Split-Path -Parent $ProjectRoot) 'docs\90-归档\50-db_script\02-flyway-migration-legacy')
 )
 
 $allSql = @()

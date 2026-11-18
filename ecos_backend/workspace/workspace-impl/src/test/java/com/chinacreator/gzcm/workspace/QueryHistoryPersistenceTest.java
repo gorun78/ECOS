@@ -149,8 +149,16 @@ class QueryHistoryPersistenceTest {
         String jdbc = read("repository/JdbcQueryHistoryRepository.java");
         assertTrue(jdbc.contains("LIMIT ?") && jdbc.contains("OFFSET ?"),
                 "持久化实现的读取必须是 SQL 分页，而不是取全量再截断");
-        assertTrue(jdbc.contains("INSERT INTO public.ecos_scenario_query_history"),
-                "落库表必须按 V212 显式命名（含控制域 schema 前缀，禁 currentSchema 兜底）");
+        // 2026-11-17：落库表由 public 归位 ecos_control（ST07 workspace 层归主控制 schema），
+        // schema 改经配置注入；但仍必须显式拼 schema 前缀，禁靠 currentSchema 兜底。
+        assertTrue(jdbc.contains("ecos_scenario_query_history"),
+                "落库表必须按 V212 显式命名");
+        assertTrue(jdbc.contains("@Value(\"${ecos.db.control-schema:ecos_control}\")"),
+                "schema 必须经 ecos.db.control-schema 注入且默认 ecos_control");
+        assertTrue(jdbc.contains("INSERT INTO \" + table"),
+                "INSERT 必须拼注入后的 schema 前缀，禁 currentSchema 兜底");
+        assertFalse(jdbc.contains("public."),
+                "public schema 硬编码已归位，不得回流");
     }
 
     @Test

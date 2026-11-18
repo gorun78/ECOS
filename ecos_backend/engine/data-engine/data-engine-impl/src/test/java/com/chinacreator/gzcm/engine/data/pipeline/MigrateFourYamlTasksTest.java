@@ -124,8 +124,8 @@ class MigrateFourYamlTasksTest {
         Path cur = dir;
         while (cur != null) {
             if (Files.isRegularFile(cur.resolve(".git")) || Files.isDirectory(cur.resolve(".git"))) {
-                // V200 治理后 DDL 单源目录（数据库访问规范 v1.4 §八）
-                Path canonical = cur.resolve("docs/50-db_script/02-flyway-migration/gateway/V168__migrate_yaml_pipeline_task.sql");
+                // V168 属 V1~V349 历史脚本，已随 2026-11-18 归档批移入归档目录
+                Path canonical = cur.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V168__migrate_yaml_pipeline_task.sql");
                 if (Files.isRegularFile(canonical)) return canonical;
                 return cur.resolve("ecos_backend/gateway/src/main/resources/db/migration/V168__migrate_yaml_pipeline_task.sql");
             }

@@ -81,7 +81,7 @@ class VectorFormDegradationTest {
         assertNotNull(ddlDir, "找不到 docs/50-db_script/02-flyway-migration/gateway 目录");
 
         // 形态 A：V137 定义了 embedding_vec vector(1536)
-        Path v137 = ddlDir.resolve("V137__knowledge_embedding_vector_column.sql");
+        Path v137 = scriptPath(ddlDir, "V137__knowledge_embedding_vector_column.sql");
         assertTrue(Files.exists(v137), "V137 迁移脚本必须存在: " + v137);
         String v137Text = Files.readString(v137);
         assertTrue(v137Text.contains("embedding_vec"),
@@ -90,7 +90,7 @@ class VectorFormDegradationTest {
                 "V137 须含 vector(1536)（pgvector 1536 维）");
 
         // 形态 B：V185 在 ecos_dw 定义 TEXT 降级载体
-        Path v185 = ddlDir.resolve("V185__dw_vector_carrier_form.sql");
+        Path v185 = scriptPath(ddlDir, "V185__dw_vector_carrier_form.sql");
         assertTrue(Files.exists(v185), "V185 迁移脚本必须存在: " + v185);
         String v185Text = Files.readString(v185);
         // C.3.6 红线索（BusinessDomainWriteArchTest）扫非 data-engine 文件的 ecos_dw. 限定名字面量；
@@ -112,5 +112,14 @@ class VectorFormDegradationTest {
             dir = dir.getParent();
         }
         return null;
+    }
+
+    /** 点名脚本活单源优先、归档兜底（V137/V185 属 V1~V349 历史脚本，2026-11-18 已归档）。 */
+    private static Path scriptPath(Path liveDir, String fileName) {
+        Path live = liveDir.resolve(fileName);
+        if (Files.isRegularFile(live)) return live;
+        // liveDir = <根>/docs/50-db_script/02-flyway-migration/gateway，上溯 3 级到 docs/
+        Path docs = liveDir.getParent().getParent().getParent();
+        return docs.resolve("90-归档/50-db_script/02-flyway-migration-legacy/gateway").resolve(fileName);
     }
 }

@@ -60,7 +60,7 @@ class SecretScanGateTest {
             "ecos-docker/soak-72h.sh",
             "docs/50-db_script/05-service/sysman/seed.sql",
             "docs/50-db_script/08-database-util/seed.sql",
-            "docs/50-db_script/02-flyway-migration/gateway/V16__ecos_role_password_fix.sql",
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V16__ecos_role_password_fix.sql",
             ".qoder/skills/pm-auto-deploy/scripts/verify_api.py",
             ".trae/skills/pm-auto-deploy/scripts/verify_api.py",
             // 扫描器自身：本文件承载全部匹配模式字面量与合成反证样例，必然自命中

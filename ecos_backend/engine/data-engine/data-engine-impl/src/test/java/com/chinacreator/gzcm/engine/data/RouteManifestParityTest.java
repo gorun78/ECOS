@@ -39,8 +39,10 @@ class RouteManifestParityTest {
 
     private static final Path MANIFEST = Path.of(
             "gateway/src/main/resources/route-manifest.json");
+    // 2026-11-18：本册随「历史件全量归档」批（commit 1c5b2840）移入 90-归档，basename 未变。
+    // C.2.1 前缀收敛表仍是 route-manifest 的规格单源，故门禁随件改指归档位，不复制回 30-设计。
     private static final Path DESIGN_DOC = Path.of(
-            "docs/30-设计/详细设计-02-数据域-data-engine与datanet-2026-09-28.md");
+            "docs/90-归档/30-设计/详细设计-分册/详细设计-02-数据域-data-engine与datanet-2026-09-28.md");
 
     /** C.2.1 表内 "被合并的现状前缀" 列的 legacy 前缀（每组都带 兼容期/deprecated 答语）。 */
     private static final String[] LEGACY_PREFIX_GROUPS = {
