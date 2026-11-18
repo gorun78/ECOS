@@ -404,6 +404,10 @@ COMMENT ON COLUMN ecos_data.dq_schedule.max_runtime_seconds IS '单次执行超�
 --
 
 -- dq_score_asset (TABLE)
+-- ✅ 权威侧（2026-11-18 用户裁决）：生产代码 5 处真 SQL 全读写本表
+--   （DqScoreDao 的 SELECT/INSERT/AVG/COUNT 与 DqReportDao 的 AVG）。
+--   同族另有一张 ecos_dq_score_asset（V165.1 建，14 列，0 行 0 引用）见本文件下方，
+--   那是未执行完的命名收口计划留下的历史遗留，非权威。
 CREATE TABLE ecos_data.dq_score_asset (
     asset_type character varying(16) NOT NULL,
     asset_id character varying(64) NOT NULL,
@@ -947,6 +951,11 @@ ALTER SEQUENCE ecos_data.ecos_dq_rule_v2_id_seq OWNED BY ecos_data.ecos_dq_rule_
 --
 
 -- ecos_dq_score_asset (TABLE)
+-- ⚠ 历史遗留（2026-11-18 用户裁决「裸名 dq_score_asset 为权威」）：
+--   V165.1 依 DR02 前缀规范建了本表（14 列），头部原计划是「消费侧 Mapper 切限定名」，
+--   但那批业务改造从未执行 —— 生产代码 5 处真 SQL 全读裸名 ecos_data.dq_score_asset（6 列），
+--   本表实测 0 行、零代码引用。保留建表只为「从零建库与当前活库一致」，不是权威表。
+--   V165.1:9 明写「如需回滚禁 DROP（IR03）」⇒ 不清退，只停写。
 CREATE TABLE ecos_data.ecos_dq_score_asset (
     id character varying(36) NOT NULL,
     asset_type character varying(20) NOT NULL,
