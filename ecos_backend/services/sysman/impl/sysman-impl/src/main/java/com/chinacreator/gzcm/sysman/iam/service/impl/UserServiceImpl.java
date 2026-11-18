@@ -30,7 +30,6 @@ public class UserServiceImpl implements IUserService {
     private final UserDao userDao;
     private final SysConfigService sysConfigService;
     private final UserLookupDao userLookupDao;
-    private final LoginCredentialService loginCredentialService;
     private final PasswordHasher passwordHasher = new PasswordHasher();
 
     /**
@@ -51,18 +50,11 @@ public class UserServiceImpl implements IUserService {
     // 简单失败计数（可替换为Redis）
     private final Map<String, Integer> failedAttempts = new HashMap<>();
 
-    /** 测试用便捷构造（不起登录表镜像）。 */
-    public UserServiceImpl(UserDao userDao, SysConfigService sysConfigService, UserLookupDao userLookupDao) {
-        this(userDao, sysConfigService, userLookupDao, null);
-    }
-
     @Autowired
-    public UserServiceImpl(UserDao userDao, SysConfigService sysConfigService, UserLookupDao userLookupDao,
-                           LoginCredentialService loginCredentialService) {
+    public UserServiceImpl(UserDao userDao, SysConfigService sysConfigService, UserLookupDao userLookupDao) {
         this.userDao = userDao;
         this.sysConfigService = sysConfigService;
         this.userLookupDao = userLookupDao;
-        this.loginCredentialService = loginCredentialService;
     }
 
     @Override
@@ -87,8 +79,6 @@ public class UserServiceImpl implements IUserService {
             user.setUpdatedBy(operator);
             userDao.insert(user);
             evictProfileCache(user.getUserId());
-            // 登录只读 ecos_control.users：不同步过去，新账号永远 401「用户名或密码错误」。
-            mirrorProvision(user, rawPassword);
             return userDao.findById(user.getUserId());
         } catch (UserException e) {
             throw e;
@@ -117,12 +107,6 @@ public class UserServiceImpl implements IUserService {
             existing.setUpdatedTime(LocalDateTime.now());
             userDao.update(existing);
             evictProfileCache(existing.getUserId());
-            // 登录表 roles 会原样进 JWT，不同步则改完资料/角色后端权限仍是旧的
-            if (loginCredentialService != null) {
-                loginCredentialService.syncProfile(existing.getUserId(), existing.getUsername(),
-                        existing.getRealName(), !"INACTIVE".equalsIgnoreCase(existing.getStatus())
-                                && !"DELETED".equalsIgnoreCase(existing.getStatus()));
-            }
 
             // 更新用户-组织关联（td_user_organization）
             if (user.getOrgId() != null) {
@@ -153,10 +137,6 @@ public class UserServiceImpl implements IUserService {
             }
             userDao.delete(userId);
             evictProfileCache(userId);
-            // 逻辑删只在 td_user 打 DELETED 标记；登录表不跟着停用，已删账号还能登录。
-            if (loginCredentialService != null) {
-                loginCredentialService.revoke(existing.getUserId(), existing.getUsername());
-            }
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -284,9 +264,6 @@ public class UserServiceImpl implements IUserService {
             user.setUpdatedTime(LocalDateTime.now());
             userDao.update(user);
             evictProfileCache(user.getUserId());
-            if (loginCredentialService != null) {
-                loginCredentialService.syncLocked(user.getUserId(), user.getUsername(), true);
-            }
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -306,9 +283,6 @@ public class UserServiceImpl implements IUserService {
             failedAttempts.remove(userId);
             userDao.update(user);
             evictProfileCache(user.getUserId());
-            if (loginCredentialService != null) {
-                loginCredentialService.syncLocked(user.getUserId(), user.getUsername(), false);
-            }
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -329,10 +303,6 @@ public class UserServiceImpl implements IUserService {
             // 否则接口回 200 但库里口令不变，用户以为改了其实没改。
             userDao.updatePassword(user);
             evictProfileCache(user.getUserId());
-            // 登录校验的是 ecos_control.users.password_hash，不回写这里口令等于"改了但登不进"。
-            if (loginCredentialService != null) {
-                loginCredentialService.syncPassword(user.getUserId(), user.getUsername(), newPassword);
-            }
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -378,28 +348,11 @@ public class UserServiceImpl implements IUserService {
             user.setUpdatedTime(LocalDateTime.now());
             userDao.update(user);
             evictProfileCache(user.getUserId());
-            // 登录看的是 users.enabled，不是 td_user.status：不同步则停用账号仍能登录。
-            if (loginCredentialService != null) {
-                if ("ACTIVE".equalsIgnoreCase(status)) {
-                    loginCredentialService.syncProfile(user.getUserId(), user.getUsername(),
-                            user.getRealName(), true);
-                } else {
-                    loginCredentialService.revoke(user.getUserId(), user.getUsername());
-                }
-            }
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
             throw new UserException("更新状态失败: " + e.getMessage(), e);
         }
-    }
-
-    private void mirrorProvision(UserAccount user, String rawPassword) {
-        if (loginCredentialService == null) {
-            return;
-        }
-        loginCredentialService.provision(user.getUserId(), user.getUsername(), rawPassword,
-                user.getRealName());
     }
 
     private void validatePasswordPolicy(String rawPassword) throws UserException {

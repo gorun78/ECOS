@@ -69,7 +69,7 @@ public class QueryPhysicalTableTool implements ToolExecutor {
      * <p>路径单源在此，族→属主映射（{@code /api/v1/engine/data} → {@code datanet}）由
      * {@code AgentToolPathReachabilityTest} 按 route-manifest 校验可达性。
      * 本工具在 V55 种子目录里登记的端点即为这一条
-     * （{@code docs/50-db_script/02-flyway-migration/gateway/V55__ecos_tool_seed.sql}），
+     * （{@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V55__ecos_tool_seed.sql}），
      * 收口前的实现反而没有走它 —— 这是本批裁决的依据之一。</p>
      */
     static final String PATH_DATA_QUERY_EXECUTE = "/api/v1/engine/data/query/execute";

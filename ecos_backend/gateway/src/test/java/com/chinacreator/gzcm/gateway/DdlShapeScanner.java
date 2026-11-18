@@ -50,6 +50,9 @@ import java.util.stream.Stream;
 final class DdlShapeScanner {
 
     private static final String MIGRATION_REL = "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 历史脚本已归档（2026-11-18 阶段5）；扫描面 = 活单源 ∪ 归档，覆盖面不缩减。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     private static final Pattern CREATE_TABLE = Pattern.compile(
             "(?i)CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?([A-Za-z0-9_.\"]+)\\s*\\(");
@@ -161,21 +164,34 @@ final class DdlShapeScanner {
         return new Scan(tables, filesByBucket, List.of());
     }
 
-    /** 单源目录内全部 .sql 的注释剥离正文（文件名 → 正文），按文件名字典序。 */
+    /** 单源 ∪ 归档目录内全部 .sql 的注释剥离正文（文件名 → 正文），按文件名字典序。 */
     static Map<String, String> sources() throws IOException {
         Map<String, String> out = new LinkedHashMap<>();
         List<String> names;
-        try (Stream<Path> s = Files.list(repoRoot().resolve(MIGRATION_REL))) {
-            names = s.filter(p -> p.getFileName().toString().endsWith(".sql"))
+        try (Stream<Path> live = Files.list(repoRoot().resolve(MIGRATION_REL));
+             Stream<Path> archived = legacyScripts()) {
+            names = Stream.concat(live, archived)
+                    .filter(p -> p.getFileName().toString().endsWith(".sql"))
                     .map(p -> p.getFileName().toString())
                     .sorted()
                     .toList();
         }
         for (String n : names) {
-            out.put(n, stripLineComments(Files.readString(
-                    repoRoot().resolve(MIGRATION_REL).resolve(n))));
+            out.put(n, stripLineComments(Files.readString(scriptPath(n))));
         }
         return out;
+    }
+
+    private static Stream<Path> legacyScripts() throws IOException {
+        Path legacy = repoRoot().resolve(LEGACY_MIGRATION_REL);
+        return Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
+    }
+
+    /** 同名脚本活单源优先（V350+ 落活目录，历史落归档）。 */
+    private static Path scriptPath(String fileName) {
+        Path live = repoRoot().resolve(MIGRATION_REL).resolve(fileName);
+        return Files.isRegularFile(live) ? live
+                : repoRoot().resolve(LEGACY_MIGRATION_REL).resolve(fileName);
     }
 
     static int scriptCount() throws IOException {
@@ -192,7 +208,7 @@ final class DdlShapeScanner {
      * 门禁据此做反向对照：同一文件原文须能命中、剥离后须不命中 ⇒ 剥离面是活的。</p>
      */
     static String rawSource(String fileName) throws IOException {
-        return Files.readString(repoRoot().resolve(MIGRATION_REL).resolve(fileName));
+        return Files.readString(scriptPath(fileName));
     }
 
     /** DDL 单源目录相对路径（铁律 v2.2 §3.1 权威口径，失败消息引用用）。 */

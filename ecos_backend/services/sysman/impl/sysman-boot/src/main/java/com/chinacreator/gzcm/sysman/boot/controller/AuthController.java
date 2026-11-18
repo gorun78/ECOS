@@ -87,7 +87,22 @@ public class AuthController {
         Map<String, Object> user = users.get(0);
         String passwordHash = (String) user.get("password_hash");
 
-        // ── T1-1: 检查账户是否被锁定 ──
+        // ── 不可登录账号：种子数据用 NOLOGIN: 哨兵占位（如企业经营管控的 12 个演示账号）──
+        // 显式拒绝且不计失败次数：这类账号本就没有口令，计次会把哨兵串当口令去比对，
+        // 达阈值后还给它写爆破锁，属无意义写面。
+        if (passwordHash == null || passwordHash.startsWith("NOLOGIN:")) {
+            log.warn("Login rejected — non-loginable account: {}", username);
+            return ResponseEntity.status(401).body(ApiResponse.unauthorized("用户名或密码错误"));
+        }
+
+        // ── T1-1: 检查账户是否被锁定（两种锁语义都认，见 AuthDao 类注）──
+        // 管理锁：locked='1'，无到期，只能由 UserServiceImpl.unlockUser 解除。
+        if ("1".equals(user.get("locked"))) {
+            log.warn("Login blocked — account locked by administrator: {}", username);
+            return ResponseEntity.status(423)
+                    .body(ApiResponse.error(423, "ACCOUNT_LOCKED", "账户已被管理员锁定，请联系管理员解锁"));
+        }
+        // 爆破锁：locked_until 到期自动放行。
         Timestamp lockedUntil = (Timestamp) user.get("locked_until");
         if (lockedUntil != null && lockedUntil.toInstant().isAfter(Instant.now())) {
             log.warn("Login blocked — account locked until {}: {}", lockedUntil, username);
@@ -178,8 +193,8 @@ public class AuthController {
         // ── 正常登录：重置失败计数 ──
         authService.resetFailedAttempts(userId);
 
-        // 提取用户信息
-        List<String> roles = parseRoles((String) user.get("roles"));
+        // 提取用户信息（角色单源 = td_user_role → td_role，超管码置首，见 AuthDao.findRoleCodes）
+        List<String> roles = authService.findRoleCodes(userId);
 
         // 查询租户ID
         Map<String, Object> extraClaims = new java.util.HashMap<>();
@@ -242,7 +257,7 @@ public class AuthController {
             if (!users.isEmpty()) {
                 Map<String, Object> user = users.get(0);
                 username = (String) user.get("username");
-                roles = parseRoles((String) user.get("roles"));
+                roles = authService.findRoleCodes(userId);
             } else {
                 // fallback: 使用 token 中的信息
                 username = userId;
@@ -321,7 +336,7 @@ public class AuthController {
                 // 取最近 N 条进行检查
                 int checkCount = Math.min(historyCount, historyHashes.size());
                 for (int i = historyHashes.size() - checkCount; i < historyHashes.size(); i++) {
-                    if (passwordEncoder.matches(newPassword, historyHashes.get(i))) {
+                    if (matchesPassword(newPassword, historyHashes.get(i))) {
                         return ResponseEntity.status(400)
                                 .body(ApiResponse.badRequest("新密码不能与最近使用的" + historyCount + "个密码相同"));
                     }
@@ -423,10 +438,10 @@ public class AuthController {
                 return ResponseEntity.status(401).body(ApiResponse.unauthorized("Refresh Token不匹配"));
             }
 
-            // 签发新的 Access Token
-            @SuppressWarnings("unchecked")
-            List<String> roles = claims.get("roles", List.class);
-            if (roles == null) roles = List.of();
+            // 签发新的 Access Token。角色取隶属表现值，不取 refresh token 的 claims：
+            // createRefreshToken 从不写 roles claim，从 claims 取恒为空表（D157），
+            // 且即便透传也只是把签发时的旧角色续命，撤权在令牌生命周期内不生效。
+            List<String> roles = authService.findRoleCodes(userId);
             String newAccessToken = jwtTokenProvider.createAccessToken(userId, roles);
 
             // 可选：轮换 Refresh Token（签发新的，使旧的失效）
@@ -449,10 +464,12 @@ public class AuthController {
     /**
      * 口令比对（支持两种存量形态）。
      *
-     * <p>登录表历史行是 BCrypt（{@code $2a$}/{@code $2b$}/{@code $2y$}），
-     * 而 IAM 主数据侧产出的是 PBKDF2（{@code pbkdf2$iter$salt$hash}，
-     * 见 {@code UserServiceImpl} 的 {@code PasswordHasher}）。用户管理的写面已经镜像到登录表并统一写 BCrypt，
-     * 但历史账号仍可能是 PBKDF2，若不识别就永远 401「用户名或密码错误」。</p>
+     * <p>权威表 {@code td_user.password} 有两个写方，各产出一种形态：用户管理侧
+     * {@code UserServiceImpl.resetPassword} 写 PBKDF2（{@code pbkdf2$iter$salt$hash}，
+     * 见 {@code PasswordHasher}），本控制器 change-password 写 BCrypt
+     * （{@code $2a$}/{@code $2b$}/{@code $2y$}）。两种都必须识别，否则其中一路改过口令的账号
+     * 永远 401「用户名或密码错误」。V347 之前登录读的是镜像表 {@code users}，
+     * 现统一读 td_user，故这里同时是历史行与新增行的比对面。</p>
      */
     private boolean matchesPassword(String raw, String stored) {
         if (stored == null || stored.isEmpty()) {
@@ -486,21 +503,6 @@ public class AuthController {
         } catch (Exception e) {
             log.warn("PBKDF2 口令比对失败（按不匹配处理）: {}", e.getMessage());
             return false;
-        }
-    }
-
-    /**
-     * 解析 roles 字段（JSON 数组字符串 → List&lt;String&gt;）。
-     */
-    private List<String> parseRoles(String rolesJson) {
-        if (rolesJson == null || rolesJson.isBlank()) {
-            return Collections.emptyList();
-        }
-        try {
-            return objectMapper.readValue(rolesJson, new TypeReference<List<String>>() {});
-        } catch (Exception e) {
-            log.warn("Failed to parse roles JSON: {}", rolesJson, e);
-            return Collections.emptyList();
         }
     }
 
