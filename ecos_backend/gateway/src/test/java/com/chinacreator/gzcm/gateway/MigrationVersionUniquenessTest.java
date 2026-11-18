@@ -199,9 +199,14 @@ class MigrationVersionUniquenessTest {
      * 事后复核：public 剩 7 张挂起待裁定独有表、零外键指向 public、td_user 18 行保全、
      * 重名表族 48→26。引擎侧 0 行副本**刻意不在本批清退**（可能是逐族裁定的迁移目标）。
      * ⇒ 按实测订正 348→349 / 下一号 349→350。
+     * 2026-11-18 DQ 并入数据引擎（用户裁决「数据质量 dq 属于数据引擎的内容，应该并入 dataengine」）：
+     * V350 落地，清退 ecos_dq schema（V111~V114 建的 11 张 dq_* 早已由 V342 在 ecos_data 重建，
+     * 活库 ecos_dq 实测 0 对象、零 FK、零依赖；规范 §二 一直记着「已消灭」但从未执行）。
+     * 临时库从零建库实测：ecos_dq 表 0 / schema 0，ecos_data.dq_* 11 张保全。
+     * ⇒ 按实测订正 349→350 / 下一号 350→351。
      */
-    private static final int MAX_BASELINE_VERSION = 349;
-    private static final int NEXT_FREE_VERSION = 350;
+    private static final int MAX_BASELINE_VERSION = 350;
+    private static final int NEXT_FREE_VERSION = 351;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

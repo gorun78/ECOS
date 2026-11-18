@@ -257,25 +257,49 @@ if ($noVersion.Count -gt 0) {
     Add-Check 'DR07 version_no 列' 'PASS' '所有新表都有 version_no' 'PASS'
 }
 
-# 8. 禁 DROP/ALTER (IR03) - 除 V126 PMO-58 ghost 表清理
+# 8. 禁 DROP/ALTER (IR03)
+# 豁免机制（2026-11-18 用户裁决改为标记制，替代原「文件名白名单」）：
+#   脚本**头部注释**必须含 `IR03-EXEMPT:` 标记才豁免。理由：文件名白名单每来一次
+#   授权清退都要改本脚本（撞「只增不改」），且把授权事实埋在 lint 里、离脚本很远；
+#   标记制让授权依据跟着脚本走，审查脚本时一眼可见。
+#   兼容保留：V126（PMO-58 ghost 表清理，R9 授权）历史例外仍按文件名认。
 $dg = @()
 $dropRe = [regex]'^\s*(DROP\s+TABLE|DROP\s+COLUMN|ALTER\s+TABLE.+DROP)'
 $commentRe = [regex]'^\s*--'
+$exemptRe = [regex]'IR03-EXEMPT:'
 foreach ($f in $allSql) {
     $lines = Get-Content -LiteralPath $f.FullName
+    # 头部标记：只扫前 40 行（脚本头注释区），避免正文里偶然出现该字符串即误豁免
+    $headEnd = [Math]::Min(40, $lines.Count) - 1
+    $hasExemptMark = $false
+    for ($h = 0; $h -le $headEnd; $h++) {
+        if ($exemptRe.IsMatch($lines[$h])) { $hasExemptMark = $true; break }
+    }
+    $isLegacyExempt = $f.Name -match 'V126'
+    if ($hasExemptMark -or $isLegacyExempt) { continue }
     for ($i = 0; $i -lt $lines.Count; $i++) {
         if ($dropRe.IsMatch($lines[$i]) -and -not $commentRe.IsMatch($lines[$i])) {
             $dg += "$(Split-Path $f.FullName -Parent):$($f.Name):$($i+1): $($lines[$i])"
         }
     }
 }
-# 已知例外: V126 PMO-58 ghost 表清理已 R9 授权
-$dgAllowed = @($dg | Where-Object { $_ -match 'V126' })
-$dgBad = @($dg | Where-Object { $_ -notmatch 'V126' })
+# 统计豁免面（供 WARN 呈现，不参与 FAIL 判定）
+$dgExemptCount = 0
+foreach ($f in $allSql) {
+    $lines = Get-Content -LiteralPath $f.FullName
+    $headEnd = [Math]::Min(40, $lines.Count) - 1
+    $marked = $false
+    for ($h = 0; $h -le $headEnd; $h++) { if ($exemptRe.IsMatch($lines[$h])) { $marked = $true; break } }
+    if (-not ($marked -or ($f.Name -match 'V126'))) { continue }
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($dropRe.IsMatch($lines[$i]) -and -not $commentRe.IsMatch($lines[$i])) { $dgExemptCount++ }
+    }
+}
+$dgBad = @($dg)
 if ($dgBad.Count -gt 0) {
     Add-Check 'IR03 禁 DROP/ALTER (rename 除外)' 'FAIL' "$(Select-Object -First 3 $dgBad) 等 $($dgBad.Count) 处 (R9 只加不删)" 'FAIL'
-} elseif ($dgAllowed.Count -gt 0) {
-    Add-Check 'IR03 禁 DROP/ALTER (rename 除外)' 'WARN' "V126 PMO-58 ghost 表清理 ($($dgAllowed.Count) 行 DROP, 授权 R9 例外)" 'WARN'
+} elseif ($dgExemptCount -gt 0) {
+    Add-Check 'IR03 禁 DROP/ALTER (rename 除外)' 'WARN' "$dgExemptCount 行 DROP 属已授权清退 (IR03-EXEMPT 标记 / V126 历史例外)" 'WARN'
 } else {
     Add-Check 'IR03 禁 DROP/ALTER (rename 除外)' 'PASS' '全部 V*.sql 无 DROP/ALTER' 'PASS'
 }

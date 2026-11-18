@@ -201,8 +201,9 @@ class DrBaselineColumnsTest {
 // JSON 语义列带 _json 后缀（DR04）⇒ 对类型白名单零新增违例。
 // 2026-11-17 阶段3「无争议面」清理：V349（DROP 23 张 public 死壳 + users + ecos_sysman/ecos_security
 // 两 legacy schema，术语关系外键改指权威副本）落地 ⇒ 单源实测 298 枚，同批订正 297→298（三枚同步）。
+    // 2026-11-18 DQ 并入数据引擎：V350 清退 ecos_dq schema 落地 ⇒ 单源实测 299 枚，同批订正 298→299（三枚同步）。
 // V349 零 CREATE TABLE、零列定义 ⇒ 对基线列名录零贡献。
-    private static final int SCRIPT_FLOOR = 298;
+    private static final int SCRIPT_FLOOR = 299;
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
     // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。
