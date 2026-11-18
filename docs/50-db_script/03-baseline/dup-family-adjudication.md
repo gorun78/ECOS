@@ -428,13 +428,13 @@ DROP 子表不需要先动父表，也不会触发 CASCADE 删父表数据。
 
 | 残项 | 请求 | 前置 / 实测约束 |
 |---|---|---|
-| **A1-残** | `ecos_data.ecos_dq_score_asset`（0 行）是否 DROP —— 本批**唯一**未被既有裁决封死的候选 | 🔴 **但实测又出两处矛盾**：① `V165.1:9` 明写「如需回滚**禁 DROP**（IR03）」；② 该表是 V165.1 为符合 DR02 前缀规范**刻意命名**的，而 V342（pg_dump 反向导出）建了**裸名** `dq_score_asset` 且生产代码读的正是裸名 ⇒ 两套 DDL 意图互相打架。**建议不删**，改裁「哪一侧是权威命名」 |
+| **A1-残** | ~~`ecos_data.ecos_dq_score_asset`（0 行）是否 DROP~~ **✅ 2026-11-18 已裁**：用户裁定「**裸名 `dq_score_asset` 为权威**」（commit `1fdf61f6`） | 实测支撑：裸名 6 列、生产代码 5 处真 SQL 全读写；`ecos_dq_score_asset` 14 列、0 行、零引用。V165.1 原计划「消费侧 Mapper 切限定名」从未执行 ⇒ 那个表从建出来就是空壳。**处置 = 两张都保留**（`00_init` 与活库一致）+ 加注释标权威/遗留，不 DROP（V165.1:9 禁 DROP，IR03） |
 | **A2** | #13 `kb_extract_candidate` 权威侧裁定（倾向留 `ecos_` 前缀，V179 合规形态） | 两侧皆 0 行 0 引用；**每侧是否也在 R-12 ① 名下须逐张查注释**（本批未查，不作为「可直接删」依据） |
 | **A3** | #29 `ecos_wm_goal_log` 权威 schema 裁定（`ecos_cognitive` vs `ecos_control`）+ 连带 FK 归属 | 见订正②；演示面只认 control 侧 |
 | **A4** | 🔴 **#2 先补 DDL**：新增 V350+ 建 `ecos_ai.ecos_agent_registry`，并裁 13 行是否随迁 | 补建后才可议裸名侧清退；**本项是补建不是 DROP，风险方向相反** |
 | **A5** | R1（`kb_ontology_snapshot` 读腿）三选一：R1-a 补限定 / R1-b 走 kb-api 门面 / R1-c 只登记不修 | 见 §五 R1 附注；任何修法都要重打 gateway fat jar + 重启，会中断当前环境 |
 | **A6** | 门禁红 B-1/B-2/B-3：`OntologyNoFactValueArchTest` 的 V344 误报（§8.7） | B-2「补登换绿」= 固化误报，与「不为换绿扩豁免」纪律冲突 |
-| **A7** | `ecos_dq` schema 空壳（0 对象，ST07 枚举外第 10 个）如何收口（§8.4 路一 / 路二） | 路一 = 扩 `ALLOWED_DUPLICATES` 登记 11 个 `dq_*` 族；路二 = V350+ `DROP SCHEMA ecos_dq CASCADE`（撞 IR03）。**两路都与既有纪律有张力，必须你裁** |
+| **A7** | ~~`ecos_dq` schema 空壳（0 对象，ST07 枚举外第 10 个）如何收口~~ **✅ 2026-11-18 已裁并执行**：用户裁定「**数据质量 dq 属于数据引擎的内容，应该并入 dataengine**」⇒ 选**路二**，V350 已实跑清退（commit `23cbd05e`） | 活库实测 `ecos_dq` schema = 0（`pg_namespace` 无行），`ecos_data.dq_*` 11 张保全、`dq_rule` 37 行完好。DdlCodeSchemaAlignmentGateTest 的 11 个 `dq_*` 重名**由红转绿**（29 tests/0 failures）。lint 豁免改为 `IR03-EXEMPT:` 标记制，FAIL 仍 42（纯存量） |
 
 > 本节方法论补一条（接 §六）：
 > **7. 「零引用」必须声明是哪种口径**——生产 Java SQL 零引用 ≠ DDL 零引用 ≠ 种子零引用。
