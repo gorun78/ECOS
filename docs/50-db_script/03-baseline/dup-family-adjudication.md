@@ -429,11 +429,11 @@ DROP 子表不需要先动父表，也不会触发 CASCADE 删父表数据。
 | 残项 | 请求 | 前置 / 实测约束 |
 |---|---|---|
 | **A1-残** | ~~`ecos_data.ecos_dq_score_asset`（0 行）是否 DROP~~ **✅ 2026-11-18 已裁**：用户裁定「**裸名 `dq_score_asset` 为权威**」（commit `1fdf61f6`） | 实测支撑：裸名 6 列、生产代码 5 处真 SQL 全读写；`ecos_dq_score_asset` 14 列、0 行、零引用。V165.1 原计划「消费侧 Mapper 切限定名」从未执行 ⇒ 那个表从建出来就是空壳。**处置 = 两张都保留**（`00_init` 与活库一致）+ 加注释标权威/遗留，不 DROP（V165.1:9 禁 DROP，IR03） |
-| **A2** | #13 `kb_extract_candidate` 权威侧裁定（倾向留 `ecos_` 前缀，V179 合规形态） | 两侧皆 0 行 0 引用；**每侧是否也在 R-12 ① 名下须逐张查注释**（本批未查，不作为「可直接删」依据） |
-| **A3** | #29 `ecos_wm_goal_log` 权威 schema 裁定（`ecos_cognitive` vs `ecos_control`）+ 连带 FK 归属 | 见订正②；演示面只认 control 侧 |
-| **A4** | 🔴 **#2 先补 DDL**：新增 V350+ 建 `ecos_ai.ecos_agent_registry`，并裁 13 行是否随迁 | 补建后才可议裸名侧清退；**本项是补建不是 DROP，风险方向相反** |
-| **A5** | R1（`kb_ontology_snapshot` 读腿）三选一：R1-a 补限定 / R1-b 走 kb-api 门面 / R1-c 只登记不修 | 见 §五 R1 附注；任何修法都要重打 gateway fat jar + 重启，会中断当前环境 |
-| **A6** | 门禁红 B-1/B-2/B-3：`OntologyNoFactValueArchTest` 的 V344 误报（§8.7） | B-2「补登换绿」= 固化误报，与「不为换绿扩豁免」纪律冲突 |
+| **A2** | ~~#13 `kb_extract_candidate` 权威侧裁定~~ **✅ 2026-11-18 按 DR02 裁决：权威 = `ecos_knowledge.ecos_kb_extract_candidate`** | 依据：V179:105 头部原话「`ecos_kb_extract_candidate` ← `ecos_knowledge.kb_extract_candidate`（V140，BIGSERIAL）」，是**官方改名计划**（同时修 MC01 的 BIGSERIAL 主键）；DR02 强制 `ecos_` 前缀。裸名侧 0 行 0 引用 ⇒ 置留表。`00_init` 两表都保留 + 加注释标权威/遗留（与 A1 同法，不 DROP） |
+| **A3** | ~~#29 `ecos_wm_goal_log` 权威 schema 裁定~~ **✅ 2026-11-18 按 ST07 裁决：权威 = `ecos_cognitive.ecos_wm_goal_log`** | 依据：ST07 八 schema 封闭枚举，目标/心智属认知域（五引擎之一）；`00_init` 只建 cognitive 侧（实测确认），control 侧仅活库历史遗留。连带：`ecos_wm_goal` 主表同为 cognitive 权威，代码 `DiagnosticAgentDao` 用裸名靠 search_path 解析（DR01 待后续批次收口） |
+| **A4** | ~~🔴 #2 先补 DDL 建 `ecos_ai.ecos_agent_registry`~~ **✅ 2026-11-18 按 DR02 裁决：权威 = `ecos_ai.ecos_agent_registry`（V200 已建，非本批补建）** | 事实更正：V200 早已建好该表且**13 行真业务数据在它上面**；代码 6 处真 SQL（`AgentRegistryRepository`）读的正是 `ecos_agent_registry`（search_path 正确解析）。裸名侧 `agent_registry`（V50 漏前缀）仅剩 `demo_seed.sql` 灌的 4 行演示数据，与权威表 ID 无交集 ⇒ 置留表。**无需补建、无需迁数据** |
+| **A5** | ~~R1（`kb_ontology_snapshot` 读腿）三选一~~ **✅ 2026-11-18 选 R1-c「只登记不修」，并顺带订正 2 处误导注释** | 事实更正：`KbOntologySnapshotDao` 已用**动态拼接 schema**读 `ecos_kb_ontology_snapshot`（DR02 权威，1 行），读腿**本来就是通的**；原 R1 判据基于注释中的裸名。已订正 `KgMapperService` / `KnowledgeStatsVO` 两处 Javadoc 指向 `ecos_kb_ontology_snapshot`。`KbOntologySnapshotDao` 的注释本就准确（写明旧名不存在），未动 |
+| **A6** | ~~门禁红 B-1/B-2/B-3：`OntologyNoFactValueArchTest` 的 V344 误报（§8.7）~~ **✅ 2026-11-18 选 B-1 修词法**（commit `ecf464a2`） | B-2「补登换绿」= 固化误报、与不为换绿扩豁免冲突；B-3 让门禁长期红着会钝化敏感度 ⇒ 选 B-1。`stripComments` 增 `stripStringLiterals()` 剥单引号字面量。**变异探针证明没弄瞎门禁**：往 V200 塞真实 `NUMERIC(18,2)` 列 ⇒ 立刻变红。8 门禁 40 tests/0 failures |
 | **A7** | ~~`ecos_dq` schema 空壳（0 对象，ST07 枚举外第 10 个）如何收口~~ **✅ 2026-11-18 已裁并执行**：用户裁定「**数据质量 dq 属于数据引擎的内容，应该并入 dataengine**」⇒ 选**路二**，V350 已实跑清退（commit `23cbd05e`） | 活库实测 `ecos_dq` schema = 0（`pg_namespace` 无行），`ecos_data.dq_*` 11 张保全、`dq_rule` 37 行完好。DdlCodeSchemaAlignmentGateTest 的 11 个 `dq_*` 重名**由红转绿**（29 tests/0 failures）。lint 豁免改为 `IR03-EXEMPT:` 标记制，FAIL 仍 42（纯存量） |
 
 > 本节方法论补一条（接 §六）：

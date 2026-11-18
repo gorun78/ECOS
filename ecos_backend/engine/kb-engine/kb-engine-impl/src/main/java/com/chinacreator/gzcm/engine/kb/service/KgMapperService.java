@@ -21,9 +21,10 @@ import java.util.*;
  * <ol>
  *   <li><b>数据源修正（D1）</b>：原实现读 {@code ontology_objects} / {@code object_relationships}
  *       两张全仓无 DDL 的幻影表，且异常被吞成空集 → 本体发布后图谱实际产出 0 节点 0 边。
- *       现改为读本体快照表 {@code ecos_knowledge.kb_ontology_snapshot}（V116，含
- *       {@code ontology_id} + {@code version} + {@code schema_hash} + entity/relationship codes），
- *       它是本体版本的唯一权威对齐基准。</li>
+ *       现改为读本体快照表 {@code ecos_knowledge.ecos_kb_ontology_snapshot}（V116 建裸名
+ *       {@code kb_ontology_snapshot}，B28 快照写腿切 V179 后统一走 {@code ecos_kb_} 前缀，
+ *       DR02 权威侧；含 {@code ontology_id} + {@code version} + {@code schema_hash}
+ *       + entity/relationship codes），它是本体版本的唯一权威对齐基准。</li>
  *   <li><b>异常不吞</b>：快照读取失败或快照缺失一律 {@code log.error}（含 ontologyId / 异常堆栈）
  *       并抛 {@link DataAccessException} / {@link NotFoundException}（{@code DataBridgeException} 子类），
  *       禁止「catch 后返回空集」的静默降级。</li>

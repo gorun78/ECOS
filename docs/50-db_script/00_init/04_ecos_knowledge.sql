@@ -855,6 +855,11 @@ ALTER SEQUENCE ecos_knowledge.kb_extract_audit_id_seq OWNED BY ecos_knowledge.kb
 --
 
 -- kb_extract_candidate (TABLE)
+-- ⚠ 历史遗留（2026-11-18 按 DR02 裁决：权威 = ecos_kb_extract_candidate）：
+--   V140 建本表（BIGSERIAL PK，违 MC01）；V179 依 DR02 前缀规范重建为
+--   ecos_knowledge.ecos_kb_extract_candidate（见本文件上方），头部原话
+--   「ecos_kb_extract_candidate <- ecos_knowledge.kb_extract_candidate（V140，BIGSERIAL）」。
+--   本表实测 0 行、零代码引用，保留建表只为「从零建库与当前活库一致」，不是权威表。
 CREATE TABLE ecos_knowledge.kb_extract_candidate (
     id bigint NOT NULL,
     doc_id character varying(64),

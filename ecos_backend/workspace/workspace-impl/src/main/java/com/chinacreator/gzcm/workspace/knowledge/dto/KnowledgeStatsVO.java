@@ -38,7 +38,7 @@ public class KnowledgeStatsVO implements Serializable {
     /** 规则版本快照数（ecos_control.sys_rule_version） */
     private Long ruleVersionCount;
 
-    /** 本体快照数（ecos_knowledge.kb_ontology_snapshot, is_deleted = 0） */
+    /** 本体快照数（ecos_knowledge.ecos_kb_ontology_snapshot, is_deleted = 0；V179 起的 DR02 权威名） */
     private Long ontologySnapshotCount;
 
     /** 本体版本数（distinct ontology_id, is_deleted = 0） */

@@ -235,6 +235,12 @@ COMMENT ON TABLE ecos_ai.agent_memory IS 'Agent记忆表';
 --
 
 -- agent_registry (TABLE)
+-- ⚠ 历史遗留（2026-11-18 按 DR02 裁决：权威 = ecos_agent_registry）：
+--   V50 建本表时漏了 ecos_ 前缀（违 DR02）；V200 依规范新建
+--   ecos_ai.ecos_agent_registry（见本文件 :347），13 行真业务数据落后者。
+--   代码 6 处真 SQL 全读写 ecos_agent_registry（AgentRegistryRepository），本表仅剩
+--   demo_seed.sql 灌的 4 行演示数据（ag-coordinator/ag-data/ag-knowledge/ag-compliance），
+--   与权威表 13 行 ID 无交集。保留建表只为「从零建库与当前活库一致」，不是权威表。
 CREATE TABLE ecos_ai.agent_registry (
     id character varying(64) NOT NULL,
     name character varying(255) NOT NULL,
