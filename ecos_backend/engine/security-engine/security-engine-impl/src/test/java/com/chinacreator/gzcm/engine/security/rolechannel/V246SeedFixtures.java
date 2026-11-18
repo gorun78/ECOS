@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  *
  * <p><b>为什么存在</b>：矩阵的四行（财务负责人 / 项目负责人 p1 / 部门用户 d01 / 无权用户）
  * 验收的是「策略集 → 谓词/列投影」的裁决结果，而策略集的唯一真值是
- * {@code docs/50-db_script/02-flyway-migration/gateway/V246__security_policy_seed.sql}
+ * {@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V246__security_policy_seed.sql}
  * （{@code SecuritySeedConsistencyTest} 已把它当单源校验）。本类<b>只解析、不内联</b>策略内容：
  * 任何人改 V246，四个具名用例的输入随之变化，不会出现"测试里另抄一份策略"的第二套真值。</p>
  *
@@ -298,7 +298,7 @@ public final class V246SeedFixtures {
         Path cur = Paths.get("").toAbsolutePath();
         for (int i = 0; i < 8 && cur != null; i++) {
             Path canonical = cur.resolve(
-                    "docs/50-db_script/02-flyway-migration/gateway/V246__security_policy_seed.sql");
+                    "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V246__security_policy_seed.sql");
             if (Files.isRegularFile(canonical)) return canonical;
             cur = cur.getParent();
         }

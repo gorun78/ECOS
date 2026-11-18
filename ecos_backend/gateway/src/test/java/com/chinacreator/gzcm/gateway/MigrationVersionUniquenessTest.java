@@ -72,6 +72,9 @@ import org.junit.jupiter.api.Test;
 class MigrationVersionUniquenessTest {
 
     private static final String MIGRATION_REL = "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 历史脚本已归档（2026-11-18 阶段5）；本门禁扫两目录并集，钉值口径不变。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** Flyway 版本化迁移命名文法（描述段禁空、禁再含连续下划线）。 */
     private static final Pattern LEGAL_NAME =
@@ -177,9 +180,33 @@ class MigrationVersionUniquenessTest {
      * 16 位装不下导致消费者落库报 value too long、拒绝类审计整条丢失；public 与 ecos_control
      * 两处同名表都加宽，to_regclass 守卫；只加宽不删列、幂等）落地
      * ⇒ 按实测订正 337→338 / 下一号 338→339。
+     * 2026-11-17 数据库脚本整理阶段 1（public 硬编码归位）：V345（{@code ecos_scenario_query_history}
+     * public→ecos_control，配合 {@code JdbcQueryHistoryRepository} 改配置注入）+ V346（28 张 public
+     * 独有表按引用方模块归属批量 SET SCHEMA 到 ecos_ai/ecos_control/ecos_data/ecos_knowledge/
+     * ecos_ontology；活体取证证明其中 25 张虽 0 行但有活 SQL 引用且是唯一载体，禁 DROP）落地
+     * ⇒ 按实测订正 344→346 / 下一号 345→347。
+     * 2026-11-17 登录权威归一（用户裁决「迁登录到 td_user，消灭 users」）：V347（td_user 补
+     * failed_attempts/locked_until/is_password_change_required/last_password_change/password_history_json
+     * 五列 + role_super_admin 角色与 u-admin 隶属 + 从 users 单向回填锁态；boot AuthDao/AuthService/
+     * AuthController 全部改读 td_user，镜像层 LoginCredentialService/LoginCredentialDaoImpl 拆除）
+     * + V348（对账发现 admin 的 SECURITY_AUDITOR 在隶属链缺失，补 role_security_auditor 与隶属，
+     * 使新角色集 ROLE_SUPER_ADMIN,ADMIN,SECURITY_AUDITOR 成为旧 users.roles 的等价超集）落地
+     * ⇒ 按实测订正 346→348 / 下一号 347→349。
+     * 2026-11-17 阶段3「无争议面」清理（用户裁决「先做无争议面」）：V349 落地并实跑提交
+     * （23 张被 ecos_control 遮蔽的 0 行 public 死壳 + ecos_control.users + ecos_sysman 8 表
+     * + ecos_security 7 父表含 2 张分区父表，两个 legacy schema 一并消灭；术语关系外键改指
+     * ecos_control.ecos_glossary_term）。全库备份 + 三轮 ROLLBACK 空跑 EXIT=0 后实跑，
+     * 事后复核：public 剩 7 张挂起待裁定独有表、零外键指向 public、td_user 18 行保全、
+     * 重名表族 48→26。引擎侧 0 行副本**刻意不在本批清退**（可能是逐族裁定的迁移目标）。
+     * ⇒ 按实测订正 348→349 / 下一号 349→350。
+     * 2026-11-18 DQ 并入数据引擎（用户裁决「数据质量 dq 属于数据引擎的内容，应该并入 dataengine」）：
+     * V350 落地，清退 ecos_dq schema（V111~V114 建的 11 张 dq_* 早已由 V342 在 ecos_data 重建，
+     * 活库 ecos_dq 实测 0 对象、零 FK、零依赖；规范 §二 一直记着「已消灭」但从未执行）。
+     * 临时库从零建库实测：ecos_dq 表 0 / schema 0，ecos_data.dq_* 11 张保全。
+     * ⇒ 按实测订正 349→350 / 下一号 350→351。
      */
-    private static final int MAX_BASELINE_VERSION = 344;
-    private static final int NEXT_FREE_VERSION = 345;
+    private static final int MAX_BASELINE_VERSION = 350;
+    private static final int NEXT_FREE_VERSION = 351;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
@@ -376,10 +403,14 @@ class MigrationVersionUniquenessTest {
     }
 
     private static List<String> scriptNames() throws IOException {
-        Path dir = repoRoot().resolve(MIGRATION_REL);
-        assertTrue(Files.isDirectory(dir), "缺迁移 DDL 单源目录（铁律 v2.2 §3.1 权威单源）: " + dir);
-        try (Stream<Path> s = Files.list(dir)) {
-            return s.filter(p -> p.getFileName().toString().endsWith(".sql"))
+        Path repo = repoRoot();
+        Path dir = repo.resolve(MIGRATION_REL);
+        assertTrue(Files.isDirectory(dir), "缺迁移 DDL 单源目录（铁律 §3.1 权威单源）: " + dir);
+        Path legacy = repo.resolve(LEGACY_MIGRATION_REL);
+        try (Stream<Path> live = Files.list(dir);
+             Stream<Path> archived = Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty()) {
+            return Stream.concat(live, archived)
+                    .filter(p -> p.getFileName().toString().endsWith(".sql"))
                     .map(p -> p.getFileName().toString())
                     .sorted(Comparator.<String>naturalOrder())
                     .toList();

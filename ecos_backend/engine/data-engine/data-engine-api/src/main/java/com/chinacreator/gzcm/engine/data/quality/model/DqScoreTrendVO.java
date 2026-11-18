@@ -17,7 +17,7 @@ import lombok.Data;
  *          dimension,
  *          AVG(score_value) AS score_value,
  *          COUNT(*) AS hits
- *   FROM ecos_dq.dq_score_snapshot
+ *   FROM ecos_data.dq_score_snapshot
  *   WHERE scope_type = ? AND scope_id = ?
  *     AND evaluated_at &gt;= NOW() - (? || ' days')::interval
  *   GROUP BY 1, 2

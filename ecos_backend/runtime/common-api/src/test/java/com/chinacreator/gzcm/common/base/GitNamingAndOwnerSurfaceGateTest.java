@@ -140,7 +140,7 @@ class GitNamingAndOwnerSurfaceGateTest {
     private static final String REPO_ROOT_RESOLVER =
             "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/service/GitRepoRootResolver.java";
     private static final String V300_DDL =
-            "docs/50-db_script/02-flyway-migration/gateway/V300__ontology_rule_git_cols_and_ecos_git_repo.sql";
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V300__ontology_rule_git_cols_and_ecos_git_repo.sql";
 
     /** 扫描面阈值：main 面实扫 java 文件数下限（路径变更／读不到 ≠ 零违例）。 */
     private static final int MIN_SCANNED_MAIN_FILES = 2000;

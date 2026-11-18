@@ -26,9 +26,9 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 class MetricDefinitionConformTest {
 
-    // V200 治理后 DDL 单源目录（数据库访问规范 v1.4 §八），仓库根相对
+    // V168.1 属 V1~V349 历史批，已随 DDL 归档搬迁（2026-11-18），仓库根相对
     private static final String DDL_FILE =
-            "docs/50-db_script/02-flyway-migration/gateway/V168.1__metric_definition_conform.sql";
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V168.1__metric_definition_conform.sql";
 
     @Test
     void v168_1FileExists() {

@@ -38,6 +38,9 @@ class SchemaDriftLintTest {
 
     private static final String MIGRATION_REL =
             "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 历史脚本已归档（2026-11-18）；扫描面 = 活单源 ∪ 归档，覆盖面不缩减。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** 每张「已声明」表须出现在至少一个 V*.sql 单源脚本里。 */
     private static final List<String> EXPECTED_TABLES = List.of(
@@ -64,9 +67,12 @@ class SchemaDriftLintTest {
         assertTrue(Files.isDirectory(migrationDir), "缺迁移单源目录: " + migrationDir);
 
         List<String> allSql = new ArrayList<>();
-        try (Stream<Path> files = Files.list(migrationDir)) {
-            for (Path f : (List<Path>) files.filter(p -> p.getFileName().toString().startsWith("V")
-                    && p.toString().endsWith(".sql")).toList()) {
+        // 扫描面 = 活单源 ∪ 归档（V1~V349 已归档），文件集合与搬迁前一致
+        try (Stream<Path> live = Files.list(migrationDir);
+             Stream<Path> archived = legacyScripts()) {
+            for (Path f : (List<Path>) Stream.concat(live, archived)
+                    .filter(p -> p.getFileName().toString().startsWith("V")
+                            && p.toString().endsWith(".sql")).toList()) {
                 allSql.add(Files.readString(f, StandardCharsets.UTF_8));
             }
         }
@@ -82,6 +88,12 @@ class SchemaDriftLintTest {
         assertTrue(missing.isEmpty(),
                 "W48/M0：以下已声明的控制面/DQ/业务事实表/新列在迁移单源目录无对应 V*.sql"
                         + "（DDL 声明 ⇔ 单源脚本漂移，W48 反证）：\n" + String.join("\n", missing));
+    }
+
+    /** 归档目录脚本流；目录不存在则空流（与 DdlShapeScanner 同口径）。 */
+    private static Stream<Path> legacyScripts() throws IOException {
+        Path legacy = findRepoRoot().resolve(LEGACY_MIGRATION_REL);
+        return Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
     }
 
     static Path findRepoRoot() {

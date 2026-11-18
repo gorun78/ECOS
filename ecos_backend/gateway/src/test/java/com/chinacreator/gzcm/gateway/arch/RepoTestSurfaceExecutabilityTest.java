@@ -81,7 +81,7 @@ class RepoTestSurfaceExecutabilityTest {
     private static final List<NamedInclude> NAMED_INCLUDE_REGISTRY = List.of(
             new NamedInclude("engine/kb-engine/kb-engine-impl/pom.xml",
                     "**/KbNavMissingTableReturnsServerError.java",
-                    "docs/30-设计/详细设计-04-知识域-dccheng与kb-engine-2026-09-29.md",
+                    "docs/90-归档/30-设计/详细设计-分册/详细设计-04-知识域-dccheng与kb-engine-2026-09-29.md",
                     "mvn -Dtest=KbNavMissingTableReturnsServerError#absentTableYields500Not404"));
 
     /** 具名 include 面基线＝1 枚（F04-03 验收类）；改名或新留具名项都必须先动这条。 */

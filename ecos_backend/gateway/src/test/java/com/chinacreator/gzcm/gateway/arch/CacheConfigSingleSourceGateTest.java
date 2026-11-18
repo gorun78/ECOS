@@ -35,7 +35,8 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <p><b>三条面</b>：A 资源面（{@code src/main/resources/**&#47;*.{yml,yaml,properties}}，不限文件名）；
  * B 源面（{@code src/main/java/**&#47;*.java} 的字符串字面量，剥注释）；
- * C DDL 播种面（{@code docs/50-db_script/02-flyway-migration/gateway/*.sql} 的引号键）。
+ * C DDL 播种面（活单源 {@code docs/50-db_script/02-flyway-migration/gateway/*.sql} ∪ 归档
+ * {@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/*.sql} 的引号键）。
  * 底座属主键（{@code ecos.cache.*}）与归口外键分开钉：前者零容差（A/B 面只许出现在 2 枚属主文件，
  * C 面只许落在 V306 一枚种子脚本的 4 枚 config_key），后者走 {@link #LEGACY_FACES} 白名单棘轮。</p>
  *
@@ -73,8 +74,12 @@ class CacheConfigSingleSourceGateTest {
     private static final int MIN_MAIN_JAVA_FILES = 2000;
     /** 底座属主去重命中数（只减不增）。#147Z-2 HEAD 实测 = 9。 */
     private static final int BASE_OWNER_HITS = 9;
-    /** 底座键在 DDL 单源里的唯一种子脚本。 */
-    private static final String BASE_SEED_SCRIPT = "docs/50-db_script/02-flyway-migration/gateway/V306__cache_config_group_seed.sql";
+    /** 底座键在 DDL 单源里的唯一种子脚本（V306 属历史段，已归档）。 */
+    private static final String BASE_SEED_SCRIPT = "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V306__cache_config_group_seed.sql";
+    /** DDL 播种面扫描根 = 活单源（V350+）∪ 归档（V1~V349，2026-11-18 阶段5）。 */
+    private static final String DDL_SEED_DIR = "docs/50-db_script/02-flyway-migration/gateway";
+    private static final String LEGACY_DDL_SEED_DIR =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** 底座键的 DDL 播种集（sysman 字典里 {@code config_group=cache} 的四枚 config_key）。 */
     private static final Set<String> BASE_SEED_KEYS = Set.of(
@@ -112,16 +117,16 @@ class CacheConfigSingleSourceGateTest {
         //   余下 5 条不是「归口外配置键」：1 条历史迁移里的键字面（V13，不可改写历史）
         //   + 4 条 sys_config 种子行 id（形态撞判据、语义是主键）；当前均零读取方。
         // —— DDL 播种面：历史迁移中的键字面（当前零读取方；迁移不可改写，删行须授权）——
-        m.put("C|docs/50-db_script/02-flyway-migration/gateway/V13__ecos_sys_config.sql|cache_ttl_seconds",
+        m.put("C|docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V13__ecos_sys_config.sql|cache_ttl_seconds",
                 "历史迁移键字面（g1-data-foundation 组，live 1 行；当前零读取方）。迁移不可改写；删行须授权。");
-        m.put("C|docs/50-db_script/02-flyway-migration/gateway/V13__ecos_sys_config.sql|cfg-g1-cache-ttl",
+        m.put("C|docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V13__ecos_sys_config.sql|cfg-g1-cache-ttl",
                 SEED_ID_REASON);
         // —— DDL 播种面：底座键（属主=V306，由 baseCacheKeysOnDdlFaceLiveOnlyInSeedScript 单独钉）——
-        m.put("C|docs/50-db_script/02-flyway-migration/gateway/V306__cache_config_group_seed.sql|cfg-cache-enabled",
+        m.put("C|docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V306__cache_config_group_seed.sql|cfg-cache-enabled",
                 SEED_ID_REASON);
-        m.put("C|docs/50-db_script/02-flyway-migration/gateway/V306__cache_config_group_seed.sql|cfg-cache-default-ttl",
+        m.put("C|docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V306__cache_config_group_seed.sql|cfg-cache-default-ttl",
                 SEED_ID_REASON);
-        m.put("C|docs/50-db_script/02-flyway-migration/gateway/V306__cache_config_group_seed.sql|cfg-cache-redis-enabled",
+        m.put("C|docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V306__cache_config_group_seed.sql|cfg-cache-redis-enabled",
                 SEED_ID_REASON);
         // 注：V306 的第 4 枚行 id 是 cfg-cache-max-stale，形态上缺时效/开关词（stale 不在 VALUE_TOKEN 内）
         // ⇒ 天然不落判据、无需白名单。这是「键形态判据会漏掉语义违例」的自觉样本，别把它当误报清掉。
@@ -362,11 +367,14 @@ class CacheConfigSingleSourceGateTest {
     }
 
     private static void scanSqlSeed(Path root, Faces f) throws IOException {
-        Path base = root.resolve("docs/50-db_script/02-flyway-migration/gateway");
-        if (!Files.isDirectory(base)) {
-            return;
+        List<Path> sqlFiles = new ArrayList<>();
+        for (String rel : new String[]{DDL_SEED_DIR, LEGACY_DDL_SEED_DIR}) {
+            Path base = root.resolve(rel);
+            if (Files.isDirectory(base)) {
+                sqlFiles.addAll(walk(base));
+            }
         }
-        for (Path p : walk(base)) {
+        for (Path p : sqlFiles) {
             String rel = rel(root, p);
             if (!rel.endsWith(".sql")) {
                 continue;

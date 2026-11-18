@@ -88,9 +88,9 @@ class RateLimitDenialTraceTest {
     private static final ToolAdjudicationRequest.Subject SUBJECT =
             new ToolAdjudicationRequest.Subject("u-pj", List.of("project_owner"), "d01", "t-demo");
 
-    /** V204 DDL 单源路径（跨制品核对用；路径不入库到本机绝对路径，按仓根相对解析）。 */
+    /** V204 DDL 路径（已归档；跨制品核对用；路径不入库到本机绝对路径，按仓根相对解析）。 */
     private static final String LEDGER_DDL_PATH =
-            "docs/50-db_script/02-flyway-migration/gateway/V204__ai_guardrail_decision_ledger.sql";
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V204__ai_guardrail_decision_ledger.sql";
 
     private static final Pattern CK_DECISION = Pattern.compile(
             "ck_agdl_decision\\s+CHECK\\s*\\(\\s*decision\\s+IN\\s*\\(([^)]*)\\)\\s*\\)",

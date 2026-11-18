@@ -41,8 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("确定性计算产物落 ecos_dw（REQ-COG-09）")
 class DeterministicForecastArtifactTest {
 
+    // V197 属 V1~V349 历史批，已随 DDL 归档搬迁（2026-11-18）
     private static final Path V197 = CogScope.REPO.resolve(
-            "docs/50-db_script/02-flyway-migration/gateway/V197__ecos_dw_application_forecast_run.sql");
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V197__ecos_dw_application_forecast_run.sql");
 
     /** 引擎 schema 禁建金额结果表（ST08 认知侧禁建表）。 */
     private static final Pattern CREATE_TABLE = Pattern.compile(
@@ -68,11 +69,14 @@ class DeterministicForecastArtifactTest {
         assertEquals(List.of("ecos_dw"), schemas.stream().distinct().toList(),
                 "确定性产物表落点必须且只能是 ecos_dw（规格 2 / R-17 ① / ADR-14）");
 
-        // 全仓单源目录内不得出现"同族表落引擎 schema"的并行形态（禁 ecos_cognitive / ecos_knowledge 金额结果表）
+        // 全仓迁移扫描面（活单源 ∪ 归档）内不得出现"同族表落引擎 schema"的并行形态（禁 ecos_cognitive / ecos_knowledge 金额结果表）
         Path migration = CogScope.REPO.resolve("docs/50-db_script/02-flyway-migration/gateway");
+        // 并集扫描：V1~V349 已归档，只扫一侧会让另一侧的寄生形态脱离门禁
+        Path legacy = CogScope.REPO.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
         List<String> offenders = new ArrayList<>();
-        try (Stream<Path> walk = Files.walk(migration, 1)) {
-            for (Path p : walk.filter(f -> f.toString().endsWith(".sql")).toList()) {
+        try (Stream<Path> live = Files.walk(migration, 1);
+             Stream<Path> archived = Files.isDirectory(legacy) ? Files.walk(legacy, 1) : Stream.<Path>empty()) {
+            for (Path p : Stream.concat(live, archived).filter(f -> f.toString().endsWith(".sql")).toList()) {
                 Matcher m = CREATE_TABLE.matcher(stripSql(readUtf8(p)));
                 while (m.find()) {
                     String schema = m.group(1).toLowerCase(Locale.ROOT);

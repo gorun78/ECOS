@@ -19,7 +19,7 @@ import java.util.List;
  * <p>ST07（v1.4 八 schema 封闭枚举）：workspace 层新表落主控制 schema {@code ecos_control}
  * （原稿 {@code workspace.} schema 不在枚举且实库不存在，2026-10-11 修订，场景层 12 表同在
  * ecos_control；属主仍 workspace 服务唯一写入面，DDL 单源
- * {@code docs/50-db_script/02-flyway-migration/gateway/V271}）；
+ * {@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V271}）；
  * MC01 应用侧 UUID；MC03 索引前置条件并入 WHERE（is_deleted）；DR05 approval_required 列名带 required 语义。</p>
  */
 @Repository

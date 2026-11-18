@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
- * DQ 告警记录 VO — 对应 {@code ecos_dq.dq_alert_record} 字段（驼峰）。
+ * DQ 告警记录 VO — 对应 {@code ecos_data.dq_alert_record} 字段（驼峰）。
  *
  * @author PMO-48-C T12
  */

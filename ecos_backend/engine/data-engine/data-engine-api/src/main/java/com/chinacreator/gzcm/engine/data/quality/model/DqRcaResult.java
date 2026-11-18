@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 /**
  * DQ 根因分析结果 DTO（PMO-48-C T13）— cognitive-engine 返回契约。
  *
- * <p>写入 {@code ecos_dq.dq_work_order.rca_result} JSONB；{@link #confidence}
+ * <p>写入 {@code ecos_data.dq_work_order.rca_result} JSONB；{@link #confidence}
  * 单独落到 {@code rca_confidence} 列。stub 阶段 confidence=0.0。</p>
  *
  * @author PMO-48-C T13

@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -51,6 +52,9 @@ class DdlComplianceLintTest {
 
     private static final String MIGRATION_REL =
             "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 历史脚本已归档（2026-11-18）；扫描面 = 活单源 ∪ 归档，红线覆盖面不缩减。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** 红线语针登记（Javadoc spot-check 用 needle；含基线证据项 NUMERIC(p,s)/TIMESTAMPTZ）。 */
     private static final String[] NEEDLES = {
@@ -89,7 +93,16 @@ class DdlComplianceLintTest {
                 // （592 例里唯一失败项），现按「同一条铁律例外」归位，未扩大豁免面。
                 "V323__drop_ontology_version_history_table.sql",
                 "V324__drop_rule_version_history_table.sql",
-                "V325__drop_object_version_history_table.sql");
+                "V325__drop_object_version_history_table.sql",
+                // 2026-11-18 补齐：V349 = 数据库脚本整理计划阶段3「无争议面」清退（用户两轮裁决，
+                // 第二轮在收到反证后收窄为「引擎侧 0 行副本一律不动」）。三项前置均记于脚本头部：
+                // 逐项授权、备份已落 Temp/pre_phase3_backup.sql（9798 行/120 CREATE TABLE/118 COPY）、
+                // 默认 ROLLBACK 空跑后才 -v ecos_commit=1 实跑。清退面 = 23 张被 ecos_control 遮蔽的
+                // public 死壳 + ecos_control.users（登录权威已由 V347 迁 td_user）+ ecos_sysman/ecos_security
+                // 两个零引用 legacy schema，逐张 count(*) 实测为 0（users 2 行属已迁移的镜像层）。
+                // 与 V315 同口径：一次性裁决登记，不构成新增先例；本名单仍按文件名精确冻结，
+                // 任何**其它**新增 DROP 文件依旧 FAIL（V349 登记前本用例即红，可证判据未失明）。
+                "V349__phase3_retire_superseded_shells.sql");
         List<String> hits = new ArrayList<>();
         for (Path p : listMigrations()) {
             String name = p.getFileName().toString();
@@ -343,14 +356,30 @@ class DdlComplianceLintTest {
     private static List<Path> listMigrations() throws IOException {
         Path dir = findRepoRoot().resolve(MIGRATION_REL);
         List<Path> files = new ArrayList<>();
-        try (Stream<Path> st = Files.list(dir)) {
-            st.filter(p -> p.getFileName().toString().startsWith("V")
+        // 扫描面 = 活单源 ∪ 归档（V1~V349 已归档），按文件名排序保持与搬迁前一致
+        try (Stream<Path> live = Files.list(dir);
+             Stream<Path> archived = legacyScripts()) {
+            Stream.concat(live, archived)
+                    .filter(p -> p.getFileName().toString().startsWith("V")
                             && p.toString().endsWith(".sql"))
-                    .sorted()
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
                     .forEach(files::add);
         }
         assertTrue(!files.isEmpty(), "迁移单源目录为空: " + dir);
         return files;
+    }
+
+    /** 归档目录脚本流；目录不存在则空流（与 DdlShapeScanner 同口径）。 */
+    private static Stream<Path> legacyScripts() throws IOException {
+        Path legacy = findRepoRoot().resolve(LEGACY_MIGRATION_REL);
+        return Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
+    }
+
+    /** 点名脚本活单源优先（V350+ 落活目录，历史落归档）。 */
+    private static Path scriptPath(String fileName) {
+        Path live = findRepoRoot().resolve(MIGRATION_REL).resolve(fileName);
+        return Files.isRegularFile(live) ? live
+                : findRepoRoot().resolve(LEGACY_MIGRATION_REL).resolve(fileName);
     }
 
     private static List<String> readAllMigrations() throws IOException {
@@ -362,7 +391,7 @@ class DdlComplianceLintTest {
     }
 
     private static String readMigration(String fileName) throws IOException {
-        return read(findRepoRoot().resolve(MIGRATION_REL).resolve(fileName));
+        return read(scriptPath(fileName));
     }
 
     private static String read(Path p) throws IOException {

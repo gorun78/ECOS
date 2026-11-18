@@ -88,7 +88,9 @@ jobs:
 # 「从零建库」基线，它在此之前必然红，故移除而非留一个常红 job 污染信号。
 #
 # 为什么建不起来（实测，非推断）：
-#   docs/50-db_script/02-flyway-migration/gateway 的 278 枚迁移是一条**增量补丁链**，假设库里
+#   当时 docs/50-db_script/02-flyway-migration/gateway 的 278 枚迁移是一条**增量补丁链**，假设库里
+#   （2026-11-18 阶段5：V1~V349 共 298 枚已归档至 docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/，
+#    活单源只留 V350+；从零建库改用 docs/50-db_script/00_init/，本段实测数字属当时口径）
 #   已存在一份**仓外**建立的 schema 基线。空库按版本序全量跑（生产同款 search_path）：
 #     · 裸跑链                  → OK=143 / FAIL=136
 #     · 仅先建 10 个 schema     → OK=213 / FAIL=66   （90 个失败纯因 schema 未创建）

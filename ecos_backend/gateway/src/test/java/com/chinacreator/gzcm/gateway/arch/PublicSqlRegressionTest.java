@@ -44,6 +44,9 @@ class PublicSqlRegressionTest {
     /** V200（commit cda0810d）DDL 单源落位：docs/50-db_script/02-flyway-migration/gateway/。 */
     private static final String DDL_SINGLE_SOURCE_DIR =
             "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 已归档（2026-11-18 阶段5）；扫描面 = 活单源 ∪ 归档，否则非空/体量断言空转。 */
+    private static final String LEGACY_DDL_DIR =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** 5KB 安全下限（真实 DDL 是几十 KB）。 */
     private static final long MIN_PUBLIC_SQL_BYTES = 5 * 1024L;
@@ -100,7 +103,10 @@ class PublicSqlRegressionTest {
 
         long[] maxHolder = {0L};
         List<String> pgFiles = new ArrayList<>();
-        try (Stream<Path> stream = Files.list(ddl)) {
+        Path legacy = repoRoot().resolve(LEGACY_DDL_DIR);
+        try (Stream<Path> live = Files.list(ddl);
+             Stream<Path> archived = Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
+             Stream<Path> stream = Stream.concat(live, archived)) {
             stream.filter(Files::isRegularFile)
                   .filter(p -> p.toString().endsWith(".sql"))
                   .forEach(p -> {

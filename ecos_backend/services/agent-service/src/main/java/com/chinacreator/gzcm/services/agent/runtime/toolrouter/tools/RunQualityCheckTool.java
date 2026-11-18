@@ -19,8 +19,9 @@ import java.util.Optional;
  * {@code checkId = UUID.randomUUID(); dao.insertQualityCheck(...); return "status":"triggered"}，
  * DAO 的实现是
  * {@code INSERT INTO ecos_quality_check (id, rule_id, datasource_id, table_name, sample_size, status, created_at) VALUES(...,'RUNNING',NOW())}。
- * ①<b>{@code ecos_quality_check} 是一张幽灵表</b>：DDL 单源目录
- * {@code docs/50-db_script/02-flyway-migration/} 全量 {@code V*.sql} 中 {@code CREATE TABLE ... ecos_quality_check}
+ * ①<b>{@code ecos_quality_check} 是一张幽灵表</b>：DDL 活单源目录
+ * {@code docs/50-db_script/02-flyway-migration/} ∪ 归档目录
+ * {@code docs/90-归档/50-db_script/02-flyway-migration-legacy/} 全量 {@code V*.sql} 中 {@code CREATE TABLE ... ecos_quality_check}
  * 实扫 <b>0 枚</b>，全仓除本 DAO 外也没有任何读写方——即这条腿要么在运行时抛「表不存在」、
  * 要么在某个手工建过表的库里写一张没人读的台账；②<b>它根本没跑评估</b>：插一行 {@code RUNNING}
  * 不产生任何检查结果，却回 {@code "triggered"}，向 LLM 伪造成功；③<b>DQ 的评估台账属主是 data-engine</b>

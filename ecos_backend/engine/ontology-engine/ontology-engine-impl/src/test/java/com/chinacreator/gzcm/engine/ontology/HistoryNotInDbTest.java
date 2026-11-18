@@ -34,25 +34,35 @@ class HistoryNotInDbTest {
     //   V200 之前 DDL 单源在 ecos_backend/gateway/src/main/resources/db/migration/，
     //   V200 起 DDL 单源迁至 docs/50-db_script/02-flyway-migration/gateway/，
     //   本测试指向的新路径与生产单源对齐。
+    // 2026-11-18 归档搬迁：V1~V349 历史脚本移入 LEGACY_MIGRATION_DIR，活单源目录保留（V350+ 落点）；
+    //   本测试判据面 = 活单源 ∪ 归档（V170.* 全在归档侧）。
     private static final String MIGRATION_DIR =
             "docs/50-db_script/02-flyway-migration/gateway";
+    private static final String LEGACY_MIGRATION_DIR =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     @Test
     void noNewHistoryTablesCreatedForOntologyVersion() throws IOException {
-        Path dir = locateMigrationDir();
+        // 并集扫描：V170.* 已归档，只扫活目录会零文件命中 = 假绿
+        List<Path> dirs = new java.util.ArrayList<>();
+        dirs.add(locateMigrationDir());
+        Path legacy = locateLegacyMigrationDir();
+        if (legacy != null) dirs.add(legacy);
         List<String> violations = new java.util.ArrayList<>();
-        try (Stream<Path> s = Files.list(dir)) {
-            s.filter(p -> p.getFileName().toString().startsWith("V170"))
-                .forEach(p -> {
-                    try {
-                        String sql = Files.readString(p, StandardCharsets.UTF_8);
-                        if (containsForbiddenHistoryTable(sql)) {
-                            violations.add(p.getFileName().toString());
+        for (Path dir : dirs) {
+            try (Stream<Path> s = Files.list(dir)) {
+                s.filter(p -> p.getFileName().toString().startsWith("V170"))
+                    .forEach(p -> {
+                        try {
+                            String sql = Files.readString(p, StandardCharsets.UTF_8);
+                            if (containsForbiddenHistoryTable(sql)) {
+                                violations.add(p.getFileName().toString());
+                            }
+                        } catch (IOException e) {
+                            fail("读 V170.* 失败：" + e.getMessage());
                         }
-                    } catch (IOException e) {
-                        fail("读 V170.* 失败：" + e.getMessage());
-                    }
-                });
+                    });
+            }
         }
         assertTrue(violations.isEmpty(),
             "V170.* 迁移批不应新建版本历史表（§十一：历史走 Git，DB 只存在用版本）；命中文件：" + violations);
@@ -60,7 +70,7 @@ class HistoryNotInDbTest {
 
     @Test
     void oldSnapshotColumnCarriesDeprecatedMarker() throws IOException {
-        Path v1701 = locateMigrationDir().resolve("V170.1__ecos_ontology_version_snapshot_text.sql");
+        Path v1701 = migrationScript("V170.1__ecos_ontology_version_snapshot_text.sql");
         assertTrue(Files.exists(v1701), "V170.1 迁移脚本缺失");
         String sql = Files.readString(v1701, StandardCharsets.UTF_8);
         assertTrue(sql.contains("停写"),
@@ -122,5 +132,24 @@ class HistoryNotInDbTest {
         }
         fail("无法定位迁移目录：" + MIGRATION_DIR);
         return null;
+    }
+
+    /** 归档目录定位（不存在返回 null，由调用方按并集/回落口径处理）。 */
+    private static Path locateLegacyMigrationDir() {
+        Path cur = Path.of("").toAbsolutePath().normalize();
+        for (int i = 0; i < 10 && cur != null; i++) {
+            Path cand = cur.resolve(LEGACY_MIGRATION_DIR);
+            if (Files.isDirectory(cand)) return cand;
+            cur = cur.getParent();
+        }
+        return null;
+    }
+
+    /** 同名脚本活单源优先（V350+ 落活目录，历史落归档）。 */
+    private static Path migrationScript(String fileName) {
+        Path live = locateMigrationDir().resolve(fileName);
+        if (Files.exists(live)) return live;
+        Path legacy = locateLegacyMigrationDir();
+        return legacy != null ? legacy.resolve(fileName) : live;
     }
 }

@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
- * DQ 监控调度计划 VO — 对应 {@code ecos_dq.dq_schedule}（PMO-48-C T11）。
+ * DQ 监控调度计划 VO — 对应 {@code ecos_data.dq_schedule}（PMO-48-C T11）。
  *
  * <p>ruleIds 列 JSONB 由 Mapper 层反序列化为 {@code List<String>}。</p>
  *

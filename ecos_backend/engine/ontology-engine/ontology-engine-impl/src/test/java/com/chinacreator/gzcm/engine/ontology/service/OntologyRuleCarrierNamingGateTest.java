@@ -63,8 +63,9 @@ class OntologyRuleCarrierNamingGateTest {
             ONTOLOGY_ENGINE_ROOT + "/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/dao/OntologyRuleDao.java";
     private static final String SAVE_DTO_REL =
             ONTOLOGY_ENGINE_ROOT + "/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/dto/OntologyRuleSaveDTO.java";
+    // V300 属 V1~V349 历史批，已随 DDL 归档搬迁（2026-11-18）
     private static final String V300_DDL_REL =
-            "docs/50-db_script/02-flyway-migration/gateway/V300__ontology_rule_git_cols_and_ecos_git_repo.sql";
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V300__ontology_rule_git_cols_and_ecos_git_repo.sql";
 
     @Test
     @DisplayName("DC-2：本体规则域 main 面裸名 carrier 剥注释后零命中（词边界判据）")

@@ -55,17 +55,14 @@ public class UserController {
 	private final IUserService userService;
 	private final PermissionCacheService permissionCacheService;
 	private final com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService permissionCheckService;
-	private final com.chinacreator.gzcm.sysman.iam.service.impl.LoginCredentialService loginCredentialService;
 
 	public UserController(IUserService userService, UserQueryService userQueryService,
 			PermissionCacheService permissionCacheService,
-			com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService permissionCheckService,
-			com.chinacreator.gzcm.sysman.iam.service.impl.LoginCredentialService loginCredentialService) {
+			com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService permissionCheckService) {
 		this.userService = userService;
 		this.userQueryService = userQueryService;
 		this.permissionCacheService = permissionCacheService;
 		this.permissionCheckService = permissionCheckService;
-		this.loginCredentialService = loginCredentialService;
 	}
 
 	@GetMapping
@@ -310,8 +307,6 @@ public class UserController {
 			for (String roleId : roleIds) {
 				userQueryService.update("INSERT INTO TD_USER_ROLE (user_id, role_id, created_by) VALUES (?, ?, 'admin')", id, roleId);
 			}
-			// 登录表 roles 列会原样进 JWT；不同步则改完角色直到下次改密才生效
-			loginCredentialService.syncRolesIfProvisioned(id);
 			// 授权关系是权限缓存的权威数据源：提交后必须立即失效该用户的全部缓存视图，
 			// 否则撤权要等 TTL 才生效（§2.9.8④「先提交权威数据、再失效缓存」+ ⑥「证明撤权生效」；#147AA）。
 			permissionCacheService.evictUser(id);

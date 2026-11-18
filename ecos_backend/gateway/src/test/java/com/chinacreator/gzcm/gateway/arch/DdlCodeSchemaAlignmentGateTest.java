@@ -55,6 +55,9 @@ import org.junit.jupiter.api.io.TempDir;
 class DdlCodeSchemaAlignmentGateTest {
 
     private static final String DDL_DIR = "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 已归档（2026-11-18 阶段5）；DDL 面 = 活单源 ∪ 归档，否则 MIN_SQL_SCRIPTS 空转。 */
+    private static final String LEGACY_DDL_DIR =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /** DDL 面下限（防扫描根漂移把门变成空转）：实存 260+ 枚脚本。 */
     private static final int MIN_SQL_SCRIPTS = 250;
@@ -81,15 +84,11 @@ class DdlCodeSchemaAlignmentGateTest {
             "ecos_business_scenario",
             "V123 认知域错放镜像（R-13 ① 只停写不迁移）+ V315 补建的 ecos_ai 读端 + 2026-11-15 D108 起的"
                     + " ecos_control 真身（V336 补建，此前只有 search_path 落库、单源无建表脚本）三副本并存，"
-                    + "属登记在案的镜像而非重复缺陷",
-            "ecos_ontology_entity",
-            "2026-11-07 DD-4 延伸：canonical 读端在 ecos_ontology（V322 单源补建），public 侧为 V3/V122 历史建表"
-                    + "（只停写、不 DROP）；public 孤儿清退属授权项，清退后本行同步删除");
+                    + "属登记在案的镜像而非重复缺陷");
 
     private static final Map<String, Integer> EXPECTED_DUPLICATE_WIDTH = Map.of(
             "outbox_event", 11,
-            "ecos_business_scenario", 3,
-            "ecos_ontology_entity", 2);
+            "ecos_business_scenario", 3);
 
     /**
      * 声明式目录（非读端）：{@code legacyWriteSuspended} 里登记的是 IR03「只停写、不 DROP、不改名」的旧形态，
@@ -191,11 +190,14 @@ class DdlCodeSchemaAlignmentGateTest {
 
     private static AnalyzeResult analyzeRepo(Path root) throws IOException {
         Map<String, String> ddl = new LinkedHashMap<>();
-        Path ddlDir = root.resolve(DDL_DIR);
         List<Path> scripts = new ArrayList<>();
-        if (Files.isDirectory(ddlDir)) {
-            try (Stream<Path> s = Files.list(ddlDir)) {
-                scripts = s.filter(p -> p.getFileName().toString().endsWith(".sql")).toList();
+        for (String rel : new String[]{DDL_DIR, LEGACY_DDL_DIR}) {
+            Path dir = root.resolve(rel);
+            if (!Files.isDirectory(dir)) {
+                continue;
+            }
+            try (Stream<Path> s = Files.list(dir)) {
+                scripts.addAll(s.filter(p -> p.getFileName().toString().endsWith(".sql")).toList());
             }
         }
         for (Path p : scripts) {

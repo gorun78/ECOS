@@ -30,7 +30,7 @@ import java.util.Optional;
  * 带 {@code /} 或 {@code ?} 就是让 LLM 决定这条请求打到哪个端点；②基址经
  * {@link AgentToolEndpointResolver#dataBaseUrl()}（属主 {@code datanet}，禁内联 {@code localhost:8080}）；
  * ③端点即 V55 工具种子里为 {@code TriggerPipeline} 登记的那一条
- * {@code POST /api/v1/engine/data/pipeline/tasks/{id}/run}（{@code docs/50-db_script/02-flyway-migration/gateway/V55__ecos_tool_seed.sql}
+ * {@code POST /api/v1/engine/data/pipeline/tasks/{id}/run}（{@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V55__ecos_tool_seed.sql}
  * 第 11 行 {@code tool-007}），收口前的实现反而没有走它，与 #142/B4-3e-16 对 {@code QueryPhysicalTable}
  * 的裁决依据同形；④结论一律按 {@link Outcome} 分态、由 {@link OwnerPostLeg} 归一，
  * <b>属主的受理凭据（runId 等）只透传、不自造</b>。</p>

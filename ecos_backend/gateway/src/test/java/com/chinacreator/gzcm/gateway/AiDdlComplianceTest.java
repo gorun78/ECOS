@@ -43,6 +43,9 @@ class AiDdlComplianceTest {
 
     private static final Path MIGRATION_DIR_REL =
             Paths.get("docs/50-db_script/02-flyway-migration/gateway");
+    /** V1~V349 已归档（2026-11-18 阶段5）；扫描面 = 活单源 ∪ 归档，否则 V350+ 新脚本脱离门禁。 */
+    private static final Path LEGACY_MIGRATION_DIR_REL =
+            Paths.get("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
 
     /** AI 新表脚本（含 CREATE TABLE）—— V202 是既有真身的 ADD COLUMN（ALTER-only），故用负向排除。 */
     private static final Pattern NEW_TABLE_SCRIPT = Pattern.compile("^V20(0|1|3|4)__ai_.*\\.sql$");
@@ -114,10 +117,13 @@ class AiDdlComplianceTest {
     }
 
     static List<Path> listAiScripts(Path dir, Pattern namePattern) throws IOException {
-        try (Stream<Path> s = Files.list(dir)) {
-            return s.filter(Files::isRegularFile)
+        Path legacy = repoRoot().resolve(LEGACY_MIGRATION_DIR_REL);
+        try (Stream<Path> live = Files.list(dir);
+             Stream<Path> archived = Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty()) {
+            return Stream.concat(live, archived)
+                    .filter(Files::isRegularFile)
                     .filter(f -> namePattern.matcher(f.getFileName().toString()).matches())
-                    .sorted()
+                    .sorted((a, b) -> a.getFileName().toString().compareTo(b.getFileName().toString()))
                     .toList();
         }
     }

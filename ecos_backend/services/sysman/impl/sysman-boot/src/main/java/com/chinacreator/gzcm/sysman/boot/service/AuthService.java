@@ -61,6 +61,14 @@ public class AuthService {
         return authDao.findTenantByUsername(username);
     }
 
+    /**
+     * 取用户平台角色码集（单源 = td_user_role → td_role，超管码置首）。
+     * <p>排序语义与授权判据见 {@code AuthDao.findRoleCodes}。
+     */
+    public List<String> findRoleCodes(String userId) {
+        return authDao.findRoleCodes(userId);
+    }
+
     // ── 获取当前用户信息 ──────────────────────────────────
 
     /**

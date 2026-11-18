@@ -11,7 +11,7 @@ import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
 /**
  * DQ 治理服务接口 — 数据质量规则只读治理（PMO-48-A T3）。
  * <p>
- * 读 {@code ecos_dq.dq_rule / dq_rule_version}；响应前强制安全卡：
+ * 读 {@code ecos_data.dq_rule / dq_rule_version}；响应前强制安全卡：
  * 敏感字段 mask 脱敏（铁律 2.4 #3）+ 读操作异步审计（铁律 2.4 #5）。
  * </p>
  *

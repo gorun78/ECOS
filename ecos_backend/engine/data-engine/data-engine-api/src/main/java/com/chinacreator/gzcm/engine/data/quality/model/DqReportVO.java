@@ -10,7 +10,7 @@ import lombok.Data;
 /**
  * DQ 报告 VO（PMO-48-D T15）。
  *
- * <p>对应 {@code ecos_dq.dq_report} 表的驼峰映射：
+ * <p>对应 {@code ecos_data.dq_report} 表的驼峰映射：
  * <ul>
  *   <li>{@code reportType} — DAILY / WEEKLY / MONTHLY</li>
  *   <li>{@code scope} — ALL / NATIVE / OFI / DOMAIN:xxx</li>

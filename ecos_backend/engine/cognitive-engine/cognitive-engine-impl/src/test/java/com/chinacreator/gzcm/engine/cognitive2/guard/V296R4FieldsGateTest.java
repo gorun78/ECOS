@@ -47,9 +47,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class V296R4FieldsGateTest {
 
     private static final Path REPO = CogScope.REPO;
-    private static final Path MIGRATIONS = REPO.resolve("docs/50-db_script/02-flyway-migration/gateway");
-    private static final Path V296 = MIGRATIONS.resolve("V296__cognitive_model_hypo_r4_fields.sql");
-    private static final Path V297 = MIGRATIONS.resolve("V297__cognitive_hypo_scenario_mind_filter_cols.sql");
+    // V296/V297 属 V1~V349 历史批，已随 DDL 归档搬迁（2026-11-18）；本门只按名取单文件，不扫目录
+    private static final Path LEGACY_MIGRATIONS =
+            REPO.resolve("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
+    private static final Path V296 = LEGACY_MIGRATIONS.resolve("V296__cognitive_model_hypo_r4_fields.sql");
+    private static final Path V297 = LEGACY_MIGRATIONS.resolve("V297__cognitive_hypo_scenario_mind_filter_cols.sql");
     private static final Path BACKEND = REPO.resolve("ecos_backend");
 
     private static final String SINGLE_SOURCE_FILE = "CognitiveR4ModelCategory.java";

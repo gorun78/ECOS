@@ -39,6 +39,9 @@ class DdlComplianceLintTest {
 
     private static final String MIGRATION_REL =
             "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 已归档（2026-11-18 阶段5）；本门禁点名的批次脚本全在归档目录。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
 
     /**
      * 数据域 E.2/E.5 与 F02 入驻本批次的单源 DDL 脚本（设计 doc E.5 版本清单 + F02-03/-05/-11）。
@@ -86,6 +89,13 @@ class DdlComplianceLintTest {
     private static final Pattern JSONB = Pattern.compile(
             "\\bjsonb\\b", Pattern.CASE_INSENSITIVE);
 
+    /** 按名取脚本：活单源优先，回落归档（历史脚本已搬走）。 */
+    private static Path scriptPath(Path liveDir, String fileName) throws IOException {
+        Path live = liveDir.resolve(fileName);
+        return Files.isRegularFile(live) ? live
+                : findRepoRoot().resolve(LEGACY_MIGRATION_REL).resolve(fileName);
+    }
+
     @Test
     @DisplayName("数据域 E.2/E.5 新增 DDL 非注释行 0 处 gen_random_uuid/SERIAL（严格）+ 仅白名单脚本容许 JSONB 遗留")
     void dataDomainDdlBatchIsMcCompliant() throws IOException {
@@ -97,7 +107,7 @@ class DdlComplianceLintTest {
         allScripts.addAll(LEGACY_JSONB_TOLERATED_SCRIPTS);
         List<String> missingScripts = new ArrayList<>();
         for (String script : allScripts) {
-            if (!Files.isRegularFile(migrationDir.resolve(script))) {
+            if (!Files.isRegularFile(scriptPath(migrationDir, script))) {
                 missingScripts.add(script);
             }
         }
@@ -109,7 +119,7 @@ class DdlComplianceLintTest {
         List<String> violations = new ArrayList<>();
         for (String script : allScripts) {
             boolean jsonbTolerated = LEGACY_JSONB_TOLERATED_SCRIPTS.contains(script);
-            List<String> lines = Files.readAllLines(migrationDir.resolve(script), StandardCharsets.UTF_8);
+            List<String> lines = Files.readAllLines(scriptPath(migrationDir, script), StandardCharsets.UTF_8);
             int lin = 0;
             for (String raw : lines) {
                 lin++;

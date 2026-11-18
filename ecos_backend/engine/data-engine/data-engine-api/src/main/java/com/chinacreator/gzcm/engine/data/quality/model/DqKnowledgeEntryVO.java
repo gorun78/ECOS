@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
- * DQ 知识条目 VO — 对应 {@code ecos_dq.dq_knowledge_entry}（PMO-48-D T16）。
+ * DQ 知识条目 VO — 对应 {@code ecos_data.dq_knowledge_entry}（PMO-48-D T16）。
  *
  * <p>字段映射 V114 表（驼峰）；{@link #embeddingJson} 对应 {@code embedding} TEXT 列
  * （JSON 数组字符串，DIM=1024，pgvector 未启用降级）。</p>

@@ -4,7 +4,7 @@ package com.chinacreator.gzcm.workspace.backtest;
  * 回测粒度词表单源（#146aa 附录A 第 33 条，契约行 = 详设 line 8267
  * {@code granularity ∈ 项目/部门/环节}；机读取值取 DDL 单源）。
  *
- * <p>取值以 DDL 单源为准（{@code docs/50-db_script/02-flyway-migration/gateway/V217__fc_backtest.sql:15}
+ * <p>取值以 DDL 单源为准（{@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway/V217__fc_backtest.sql:15}
  * 列 {@code granularity VARCHAR(16)} 注释「PROJECT/DEPARTMENT/STAGE（§3.4 粒度三选）」，
  * 与详设 line 8366 列面表 {@code granularity IN('PROJECT','DEPARTMENT','STAGE')} 同值）。
  * 中文合同词「项目/部门/环节」是<b>展示词</b>，不是 API 入参值——薄承流面只认 DDL 枚举，

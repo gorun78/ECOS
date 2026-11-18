@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -82,18 +83,6 @@ class WorkspaceLayeringArchTest {
     @Test
     void noEngineSchemaTablesTouchedDirectly() throws IOException {
         Path srcRoot = mainSourceRoot();
-        Set<String> crossEngineLiterals = Set.of(
-                "ecos_ontology_entity",
-                "ecos_ontology_action",
-                "ecos_ontology_relationship",
-                "ecos_entity_table_mapping",
-                "ecos_knowledge",
-                "ecos_cognitive",
-                "ecos_ai",
-                "ecos_dw",
-                "ecos_data",
-                "ecos_control"
-        );
         /** 冻结基线：文件 → 该文件命中的跨引擎表名集合。只允许减少，不允许新增。 */
         Set<String> baseline = Set.of(
                 "controller/ObjectQLParser.java",
@@ -106,21 +95,10 @@ class WorkspaceLayeringArchTest {
                 "knowledge/dto/KnowledgeStatsVO.java"
         );
 
-        Pattern tablePattern = Pattern.compile("ecos_[a-z0-9_]+");
         Set<String> offenders = new LinkedHashSet<>();
         try (Stream<Path> walk = Files.walk(srcRoot)) {
             for (Path p : (Iterable<Path>) walk.filter(f -> f.toString().endsWith(".java"))::iterator) {
-                // 门禁语义=「代码里的 SQL/表引用」；Javadoc 与行注释里的表名属文档陈述，不计违约。
-                String text = stripComments(new String(Files.readAllBytes(p), StandardCharsets.UTF_8)).toLowerCase();
-                Matcher m = tablePattern.matcher(text);
-                boolean hit = false;
-                while (m.find()) {
-                    if (crossEngineLiterals.contains(m.group())) {
-                        hit = true;
-                        break;
-                    }
-                }
-                if (hit) {
+                if (hitsCrossEngine(new String(Files.readAllBytes(p), StandardCharsets.UTF_8))) {
                     offenders.add(relativize(srcRoot, p));
                 }
             }
@@ -149,6 +127,60 @@ class WorkspaceLayeringArchTest {
             }).toList();
             assertTrue(bad.isEmpty(), "workspace 源码 import 了引擎/业务实现包: " + bad);
         }
+    }
+
+    /**
+     * 检测器精度自证：占位符豁免不得把真硬编码 SQL 一起放过去。
+     *
+     * <p>本用例与 {@link #noEngineSchemaTablesTouchedDirectly()} 共用同一判据函数，
+     * 因此「豁免面扩大导致门禁失明」会在这里先红。</p>
+     */
+    @Test
+    void placeholderExemptionDoesNotBlindHardcodedSql() {
+        assertFalse(hitsCrossEngine(
+                "class A { A(@Value(\"${ecos.db.control-schema:ecos_control}\") String s) {} }"),
+                "MC06 配置注入的占位符默认值被误判为跨引擎直连");
+        assertTrue(hitsCrossEngine(
+                "class A { String q = \"SELECT 1 FROM ecos_control.ecos_decision\"; }"),
+                "硬编码跨引擎 SQL 未被检出 —— 检测器已失明");
+        assertTrue(hitsCrossEngine(
+                "class A { String q = \"SELECT 1 FROM \" + schema + \".ecos_ontology_entity\"; }"),
+                "拼接形态的跨引擎表名未被检出");
+        assertFalse(hitsCrossEngine(
+                "class A { /** 说明：本类不碰 ecos_knowledge。 */ String q = \"SELECT 1 FROM t\"; }"),
+                "注释里的表名属文档陈述，不应计违约");
+    }
+
+    /** 跨引擎 schema/表字面量（铁律 §3.1 封闭枚举中不属于 workspace 的那些）。 */
+    private static final Set<String> CROSS_ENGINE_LITERALS = Set.of(
+            "ecos_ontology_entity",
+            "ecos_ontology_action",
+            "ecos_ontology_relationship",
+            "ecos_entity_table_mapping",
+            "ecos_knowledge",
+            "ecos_cognitive",
+            "ecos_ai",
+            "ecos_dw",
+            "ecos_data",
+            "ecos_control"
+    );
+
+    private static final Pattern TABLE_PATTERN = Pattern.compile("ecos_[a-z0-9_]+");
+
+    /**
+     * Spring 配置占位符 {@code ${key:default}} 是 MC06 要求的 schema 注入形态，
+     * 其默认值是配置声明而非 SQL 字面量，整体剔除后再判表名。
+     */
+    private static final Pattern SPRING_PLACEHOLDER = Pattern.compile("\\$\\{[^}]*}");
+
+    private static boolean hitsCrossEngine(String source) {
+        // 门禁语义=「代码里的 SQL/表引用」；Javadoc 与行注释里的表名属文档陈述，不计违约。
+        String text = SPRING_PLACEHOLDER.matcher(stripComments(source)).replaceAll("").toLowerCase();
+        Matcher m = TABLE_PATTERN.matcher(text);
+        while (m.find()) {
+            if (CROSS_ENGINE_LITERALS.contains(m.group())) return true;
+        }
+        return false;
     }
 
     /** 剥离行注释与块注释，只留代码本体 —— 注释里的表名是文档陈述，不计 SQL 违约。 */

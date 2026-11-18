@@ -9,7 +9,7 @@ import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
  * DQ 知识沉淀服务契约（PMO-48-D T16）。
  *
  * <p>从 {@code dq_rule} / {@code dq_alert_record} / {@code dq_work_order} 沉淀知识条目
- * 至 {@code ecos_dq.dq_knowledge_entry}，供 RCA 真接 cognitive + RAG 相似检索。</p>
+ * 至 {@code ecos_data.dq_knowledge_entry}，供 RCA 真接 cognitive + RAG 相似检索。</p>
  *
  * <p><b>命名说明</b>：本接口为全新接口，<b>不</b> implements 任何已有 Service（铁律 1.3）。
  * T15 只建了 {@code DqReportService}（报告域），无同名 {@code DqKnowledgeSinkService}，

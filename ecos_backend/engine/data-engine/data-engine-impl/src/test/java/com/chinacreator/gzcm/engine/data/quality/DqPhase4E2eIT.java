@@ -140,7 +140,7 @@ class DqPhase4E2eIT {
                 .thenReturn(3);
         when(reportDao.avgScore()).thenReturn(0.87);
         // 六维快照行：dimension + score_value
-        final String scoreSql = "SELECT dimension, score_value FROM ecos_dq.dq_score_snapshot";
+        final String scoreSql = "SELECT dimension, score_value FROM ecos_data.dq_score_snapshot";
         List<Map<String, Object>> dimScores = List.of(
                 Map.of("dimension", "COMPLETENESS", "score_value", "0.92"),
                 Map.of("dimension", "ACCURACY", "score_value", "0.88"),

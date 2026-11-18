@@ -46,6 +46,9 @@ class SchemaInventoryGateTest {
 
     private static final Path MIGRATION_DIR_REL =
             Paths.get("docs/50-db_script/02-flyway-migration/gateway");
+    /** V1~V349 已归档（2026-11-18 阶段5）；扫描面 = 活单源 ∪ 归档，否则 V350+ 新脚本脱离门禁。 */
+    private static final Path LEGACY_MIGRATION_DIR_REL =
+            Paths.get("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
     private static final String CARRIER_TABLE = "td_data_resource";
 
     /**
@@ -79,7 +82,7 @@ class SchemaInventoryGateTest {
         Path migrationDir = repoRoot().resolve(MIGRATION_DIR_REL);
         assertTrue(Files.isDirectory(migrationDir), "迁移目录缺失: " + migrationDir);
 
-        try (Stream<Path> s = Files.list(migrationDir)) {
+        try (Stream<Path> s = migrationScripts(migrationDir)) {
             long carrierScripts = s
                     .filter(f -> Files.isRegularFile(f))
                     .filter(f -> f.getFileName().toString().toLowerCase().contains("td_")
@@ -102,9 +105,17 @@ class SchemaInventoryGateTest {
                 "载体 DDL 必须幂等（IF NOT EXISTS）");
     }
 
+    /** 活单源 ∪ 归档目录的脚本流（两目录并集，调用方负责 close）。 */
+    private static Stream<Path> migrationScripts(Path liveDir) throws IOException {
+        Path legacy = repoRoot().resolve(LEGACY_MIGRATION_DIR_REL);
+        Stream<Path> live = Files.list(liveDir);
+        Stream<Path> archived = Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
+        return Stream.concat(live, archived);
+    }
+
     private static String findScriptContaining(Path migrationDir, String needle) throws IOException {
         String found = "";
-        try (Stream<Path> s = Files.list(migrationDir)) {
+        try (Stream<Path> s = migrationScripts(migrationDir)) {
             for (Path f : (Iterable<Path>) s::iterator) {
                 if (!Files.isRegularFile(f)) continue;
                 String name = f.getFileName().toString();
@@ -208,7 +219,7 @@ class SchemaInventoryGateTest {
         assertTrue(Files.isDirectory(migrationDir), "迁移单源目录缺失: " + migrationDir);
 
         StringBuilder combined = new StringBuilder();
-        try (Stream<Path> s = Files.list(migrationDir)) {
+        try (Stream<Path> s = migrationScripts(migrationDir)) {
             List<Path> files = s
                     .filter(Files::isRegularFile)
                     .filter(f -> f.getFileName().toString().matches("V20[0-4]__ai_.*\\.sql"))

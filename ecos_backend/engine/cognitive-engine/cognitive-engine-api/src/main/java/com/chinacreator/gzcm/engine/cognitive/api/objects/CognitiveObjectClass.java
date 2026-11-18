@@ -63,8 +63,8 @@ public enum CognitiveObjectClass {
             "写入只经 data-engine 唯一写通道，cognitive 禁直连 ecos_dw（ST08）"),
 
     /** 情景/场景：权威载体在场景/世界模型侧，引擎 schema 内的同名镜像属错放（R-13 ① 定性停写）。 */
-    SCENARIO("scenario", Kind.PHYSICAL, "public.ecos_world_scenarios", null,
-            List.of("ecos_cognitive.ecos_wm_scenario", "ecos_cognitive.ecos_world_scenarios"),
+    SCENARIO("scenario", Kind.PHYSICAL, "ecos_cognitive.ecos_world_scenarios", null,
+            List.of("ecos_cognitive.ecos_wm_scenario"),
             "PRD-05 §6.1 / R-13 ①", "双源先定性：ecos_cognitive 内的业务/WM 表只停写不迁移"),
 
     /** 因果结果：无等价载体，禁以 {@code ecos_decision_causal_link} 冒充。 */
@@ -80,7 +80,7 @@ public enum CognitiveObjectClass {
             "PRD-05 §6.1 / R-42", "不新建 cognitive 侧表"),
 
     /** 决策依据：{@code ecos_decision*} 表族定性为 C 层资产（不改表、不改既有 API）。 */
-    DECISION_BASIS("decision_basis", Kind.PHYSICAL, "public.ecos_decision", null,
+    DECISION_BASIS("decision_basis", Kind.PHYSICAL, "ecos_control.ecos_decision", null,
             List.of("ecos_agent.ecos_decision_case", "ecos_ai.ecos_decision_case"),
             "PRD-05 §6.3 REQ-COG-08 / R-42 / V47",
             "对 W Agent 只读（引用 decisionId + version + hash）；case 镜像写权威须实测");

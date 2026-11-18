@@ -39,8 +39,7 @@ class UserControllerPermissionDecisionsTest {
 
     private static UserController controller(IPermissionCheckService checker) {
         return new UserController(mock(IUserService.class), mock(UserQueryService.class),
-                mock(PermissionCacheService.class), checker,
-                mock(com.chinacreator.gzcm.sysman.iam.service.impl.LoginCredentialService.class));
+                mock(PermissionCacheService.class), checker);
     }
 
     @Test

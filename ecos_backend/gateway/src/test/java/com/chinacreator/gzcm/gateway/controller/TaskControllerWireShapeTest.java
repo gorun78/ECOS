@@ -58,6 +58,7 @@ class TaskControllerWireShapeTest {
                 new Class<?>[]{ITaskManagementService.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "queryTasks" -> List.of(task());
+                    case "countTasks" -> 7;
                     case "getTaskDescription" -> task();
                     case "getTaskStatus" -> status();
                     case "submitTask" -> "t9";
@@ -109,6 +110,8 @@ class TaskControllerWireShapeTest {
         assertEquals(TASK_KEYS, keys(data.path("items").get(0)));
         assertEquals("pipeline", data.path("items").get(0).path("category").asText());
         assertEquals(new Date(0).toString(), data.path("items").get(0).path("createTime").asText());
+        // D119：total 取 countTasks（7），不是当页条数（1）—— 桩若漏 countTasks 分支会在此处 NPE
+        assertEquals(7, data.path("total").asInt());
     }
 
     @Test

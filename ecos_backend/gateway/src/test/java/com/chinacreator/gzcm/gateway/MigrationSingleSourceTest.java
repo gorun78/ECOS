@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>断言（源码扫描，无 DB）</b>：AI 域新增 DDL（V200~V204）必须满足单源纪律：
  * <ol>
  *   <li><b>版本唯一</b>：V200~V204 每个版本键在迁移单源目录
- *       {@code docs/50-db_script/02-flyway-migration/gateway} 中恰好出现 1 次
+ *       {@code docs/50-db_script/02-flyway-migration/gateway}（V350+ 新增）与归档目录
+ *       {@code docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway}（V1~V349 历史）
+ *       的<b>并集</b>中恰好出现 1 次
  *       （Flyway 当前禁用，但一旦启用，同版本号多文件即确定性崩溃 —— 本门禁
  *       只管辖 AI 域新增段，存量 V50/V150/V155 重复版本属 R-22 裁决项，不在本域断言面）；</li>
  *   <li><b>无第二 DDL 源</b>：第二 DDL 源
@@ -42,6 +44,9 @@ class MigrationSingleSourceTest {
 
     private static final Path SINGLE_SOURCE_REL =
             Paths.get("docs/50-db_script/02-flyway-migration/gateway");
+    /** 历史脚本已归档（2026-11-18 阶段5）；版本唯一面扫两目录并集，否则 V350+ 新脚本脱离门禁。 */
+    private static final Path LEGACY_SOURCE_REL =
+            Paths.get("docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway");
     private static final Path SECOND_SOURCE_REL =
             Paths.get("docs/50-db_script/01-ddl-多方言/migration/12_to_8_schema.sql");
     private static final int[] AI_VERSIONS = {200, 201, 202, 203, 204};
@@ -75,6 +80,7 @@ class MigrationSingleSourceTest {
 
         // (a) 版本唯一：V200~V204 每个版本键恰好 1 个文件
         Set<String> fileList = listSqlNames(singleSource);
+        fileList.addAll(listSqlNames(repo.resolve(LEGACY_SOURCE_REL)));
         for (int v : AI_VERSIONS) {
             List<String> matches = new ArrayList<>();
             for (String n : fileList) {

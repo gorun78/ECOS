@@ -78,7 +78,7 @@ class OpenApiPathParityTest {
 
     /** 设计权威：详设-07 §D-2 表。 */
     private static final String DESIGN_REL =
-            "docs/30-设计/详细设计-07-场景层-workspace场景工作台-2026-09-29.md";
+            "docs/90-归档/30-设计/详细设计-分册/详细设计-07-场景层-workspace场景工作台-2026-09-29.md";
 
     /** 代码现实：workspace 部署单元源码根（只扫 main，测试 harness 控制器不算对外面）。 */
     private static final Path CONTROLLER_ROOT_REL =

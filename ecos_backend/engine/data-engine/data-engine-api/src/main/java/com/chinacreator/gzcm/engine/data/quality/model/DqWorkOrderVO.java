@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 /**
- * DQ 工单 VO — 对应 {@code ecos_dq.dq_work_order} 字段（驼峰）。
+ * DQ 工单 VO — 对应 {@code ecos_data.dq_work_order} 字段（驼峰）。
  *
  * <p>T12 骨架：基础字段（状态/级别/处理模式/指派/修复/验证/重试/时间）。</p>
  * <p>T13 扩展：RCA 字段（rcaResult / rcaConfidence / rcaAnalyzedAt）+ verifyNote /

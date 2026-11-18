@@ -13,7 +13,7 @@ import com.chinacreator.gzcm.engine.data.quality.model.PageResult;
  * <ol>
  *   <li>{@link #dispatchOnRuleCheckFailed} — 规则检查未通过（passed=false / 评估失败）时分发：
  *       severity 映射 P0-P3 → 判重合并（同 rule 5min 内合并 notify_count++）→
- *       写 {@code ecos_dq.dq_alert_record} → P0/P1/P2 经 runtime IAlertService 推送（P3 仅落库）
+ *       写 {@code ecos_data.dq_alert_record} → P0/P1/P2 经 runtime IAlertService 推送（P3 仅落库）
  *       → P0/P1 自动建工单（DqWorkOrderService）并尝试白名单自动修复（DqAutoRepairService）</li>
  *   <li>告警列表/详情/确认/解决 — REST 端点契约</li>
  * </ol>

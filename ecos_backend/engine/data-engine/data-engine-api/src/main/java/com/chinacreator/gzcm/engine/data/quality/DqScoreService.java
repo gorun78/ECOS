@@ -42,8 +42,8 @@ public interface DqScoreService {
      *       AND status='ACTIVE' AND is_deleted=FALSE}（限最近 1h 避免跨窗口统计）</li>
      *   <li>查配对的 {@code dq_rule_check WHERE rule_id IN (...) AND executed_at >= NOW() - interval '1 hour'}</li>
      *   <li>按 dq_rule.rule_type dispatch 到 6 评估器，调 {@code DqScoreEngine#evaluateAll}</li>
-     *   <li>写 {@code ecos_dq.dq_score_snapshot}（每维度 1 行，scope_type='TABLE'，scope_id=assetId）</li>
-     *   <li>加权汇总 → 写 {@code ecos_dq.dq_score_asset ON CONFLICT DO UPDATE}</li>
+     *   <li>写 {@code ecos_data.dq_score_snapshot}（每维度 1 行，scope_type='TABLE'，scope_id=assetId）</li>
+     *   <li>加权汇总 → 写 {@code ecos_data.dq_score_asset ON CONFLICT DO UPDATE}</li>
      *   <li>异步 audit（DQ_SCORE_RECOMPUTE）</li>
      * </ol>
      *
@@ -67,7 +67,7 @@ public interface DqScoreService {
      * <pre>
      *   SELECT to_date(evaluated_at, 'YYYY-MM-DD') AS day,
      *          dimension, AVG(score_value) AS score, COUNT(*) AS hits
-     *   FROM ecos_dq.dq_score_snapshot
+     *   FROM ecos_data.dq_score_snapshot
      *   WHERE scope_type = ? AND scope_id = ?
      *     AND evaluated_at &gt;= NOW() - (? || ' days')::interval
      *   GROUP BY 1, 2
@@ -95,8 +95,8 @@ public interface DqScoreService {
      *
      * <p>SQL:</p>
      * <pre>
-     *   SELECT AVG(overall_score) FROM ecos_dq.dq_score_asset WHERE is_deleted = FALSE
-     *   SELECT dimension, AVG(score_value) FROM ecos_dq.dq_score_snapshot
+     *   SELECT AVG(overall_score) FROM ecos_data.dq_score_asset WHERE is_deleted = FALSE
+     *   SELECT dimension, AVG(score_value) FROM ecos_data.dq_score_snapshot
      *     WHERE evaluated_at &gt;= NOW() - interval '1 day'
      *     GROUP BY dimension
      * </pre>

@@ -40,6 +40,12 @@ class AuditEventContractShapeGateTest {
     private static final Pattern ADD_COLUMN = Pattern.compile(
             "(?i)ALTER\\s+TABLE\\s+public\\.ecos_audit_log\\s+ADD\\s+COLUMN\\s+IF\\s+NOT\\s+EXISTS\\s+([a-z_]+)");
 
+    /** DDL 活单源目录（V350+ 新脚本落此）。 */
+    private static final String MIGRATION_REL = "docs/50-db_script/02-flyway-migration/gateway";
+    /** V1~V349 历史脚本归档目录（2026-11-18 阶段5）；扫描面 = 活单源 ∪ 归档，覆盖面不缩减。 */
+    private static final String LEGACY_MIGRATION_REL =
+            "docs/90-归档/50-db_script/02-flyway-migration-legacy/gateway";
+
     private static Path repoRoot() {
         Path cur = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize();
         for (Path p = cur; p != null; p = p.getParent()) {
@@ -50,9 +56,10 @@ class AuditEventContractShapeGateTest {
         return fail("无法定位仓库根: user.dir=" + cur);
     }
 
+    /** V303 属历史脚本，已归档；按名取归档目录。 */
     private static Path v303() {
-        return repoRoot().resolve("docs/50-db_script/02-flyway-migration/gateway/"
-                + "V303__audit_event_contract_columns.sql");
+        return repoRoot().resolve(LEGACY_MIGRATION_REL
+                + "/V303__audit_event_contract_columns.sql");
     }
 
     @Test
@@ -183,14 +190,22 @@ class AuditEventContractShapeGateTest {
         }
     }
 
-    /** 防扫描面失明：仓根必须能看到单源目录与 V303。 */
+    /** 防扫描面失明：仓根必须能看到活单源目录，且活单源 ∪ 归档并集含 V303。 */
     @Test
-    @DisplayName("扫描面可信：单源目录存在且含 V303")
+    @DisplayName("扫描面可信：活单源 ∪ 归档目录存在且含 V303")
     void scanSurfaceIsTrustworthy() throws IOException {
-        Path dir = repoRoot().resolve("docs/50-db_script/02-flyway-migration/gateway");
+        Path dir = repoRoot().resolve(MIGRATION_REL);
         assertTrue(Files.isDirectory(dir));
-        try (Stream<Path> walk = Files.list(dir)) {
-            assertTrue(walk.anyMatch(p -> p.getFileName().toString().startsWith("V303__")));
+        try (Stream<Path> live = Files.list(dir);
+             Stream<Path> archived = legacyScripts()) {
+            assertTrue(Stream.concat(live, archived)
+                    .anyMatch(p -> p.getFileName().toString().startsWith("V303__")));
         }
+    }
+
+    /** 归档目录脚本流（目录不存在则空流，与 DdlShapeScanner 同口径）。 */
+    private static Stream<Path> legacyScripts() throws IOException {
+        Path legacy = repoRoot().resolve(LEGACY_MIGRATION_REL);
+        return Files.isDirectory(legacy) ? Files.list(legacy) : Stream.empty();
     }
 }
