@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.cognitive2.service.backtest;
 
 import com.chinacreator.gzcm.engine.cognitive2.service.CognitiveConfigQueryService;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -46,8 +46,8 @@ class BacktestThresholdSingleSourceTest {
 
     private static final Path MAIN_SRC = Path.of("src", "main", "java");
 
-    private static SysConfigService configStore(Map<String, String> values) {
-        SysConfigService svc = mock(SysConfigService.class);
+    private static ISysConfigService configStore(Map<String, String> values) {
+        ISysConfigService svc = mock(ISysConfigService.class);
         when(svc.getString(anyString())).thenAnswer(inv -> values.get(inv.<String>getArgument(0)));
         when(svc.getByKey(anyString())).thenAnswer(inv -> {
             String key = inv.getArgument(0);

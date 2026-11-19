@@ -4,7 +4,7 @@ import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -46,8 +46,8 @@ class SessionTokenQuotaTest {
     private LLMGateway llmGateway;
     private AgentConfigResolver configResolver;
     private GuardrailsService guardrails;
-    private SysConfigService sysConfig;
-    private ObjectProvider<SysConfigService> quotaProviderStub;
+    private ISysConfigService sysConfig;
+    private ObjectProvider<ISysConfigService> quotaProviderStub;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
@@ -63,8 +63,8 @@ class SessionTokenQuotaTest {
         guardrails = mock(GuardrailsService.class);
         when(guardrails.validate(any())).thenReturn(Map.of("passed", true));
 
-        sysConfig = mock(SysConfigService.class);
-        ObjectProvider<SysConfigService> provider = mock(ObjectProvider.class);
+        sysConfig = mock(ISysConfigService.class);
+        ObjectProvider<ISysConfigService> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(sysConfig);
         quotaProviderStub = provider;
     }

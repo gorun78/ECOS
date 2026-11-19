@@ -79,7 +79,7 @@
         <!-- F05-13 跨域读写收口：sys_config 一律经 sysman 配置门面 SysConfigService（与 data-engine 同款声明） -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>sysman-impl</artifactId>
+            <artifactId>sysman-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
         <!-- PMO-59 P2a: SaveDTO 强类型入参与 Service 构造器按后端规范用 Lombok (与 data-engine-impl 同款声明) -->
@@ -92,6 +92,13 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- CD-3 pom 解耦：测试用 SecurityContext/UsernamePasswordAuthenticationToken，
+             原靠 sysman-impl 传递；依赖降到 sysman-api 后显式声明 test 作用域 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

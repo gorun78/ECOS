@@ -9,7 +9,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentRunEventDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentRunStepDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentRunDO;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentRunStepDO;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -39,8 +39,8 @@ import static org.mockito.Mockito.when;
 class RunBudgetTest {
 
     @SuppressWarnings("unchecked")
-    private static ObjectProvider<SysConfigService> provider(SysConfigService svc) {
-        ObjectProvider<SysConfigService> p = mock(ObjectProvider.class);
+    private static ObjectProvider<ISysConfigService> provider(ISysConfigService svc) {
+        ObjectProvider<ISysConfigService> p = mock(ObjectProvider.class);
         when(p.getIfAvailable()).thenReturn(svc);
         return p;
     }

@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 
 /**
  * F02-12 ① 存在性校验守卫 — 验收测试：
@@ -82,8 +82,8 @@ class RepoRootMissingDirectoryTest {
         assertTrue(Files.isDirectory(Path.of(root)), "真实存在目录应放行并返回可用根");
     }
 
-    private static SysConfigService stub(Path root) {
-        SysConfigService cfg = mock(SysConfigService.class);
+    private static ISysConfigService stub(Path root) {
+        ISysConfigService cfg = mock(ISysConfigService.class);
         when(cfg.getString(GitRepoRootResolver.KEY_REPO_ROOT))
                 .thenReturn(root.toString().replace('\\', '/'));
         return cfg;

@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 class GitRepoRootResolverTest {
 
     @Mock
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
 
     @TempDir
     Path tmp;
@@ -144,8 +144,8 @@ class GitRepoRootResolverTest {
                         link.resolve("real-file").toString()));
     }
 
-    private static SysConfigService stub(Path root) {
-        SysConfigService cfg = org.mockito.Mockito.mock(SysConfigService.class);
+    private static ISysConfigService stub(Path root) {
+        ISysConfigService cfg = org.mockito.Mockito.mock(ISysConfigService.class);
         when(cfg.getString(GitRepoRootResolver.KEY_REPO_ROOT))
                 .thenReturn(root.toString().replace('\\', '/'));
         return cfg;

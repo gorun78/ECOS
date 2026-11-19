@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 
 /**
  * F02-12 ② symlink 逃逸（W63 补充）— 验收守卫测试：
@@ -101,9 +101,9 @@ class RepoRootSymlinkEscapeTest {
         assertThrows(BusinessException.class, () -> r.requireInsideRoot("   "), "空白必须拒");
     }
 
-    private static SysConfigService stub(Path root) throws IOException {
+    private static ISysConfigService stub(Path root) throws IOException {
         Files.createDirectories(root);
-        SysConfigService cfg = mock(SysConfigService.class);
+        ISysConfigService cfg = mock(ISysConfigService.class);
         when(cfg.getString(GitRepoRootResolver.KEY_REPO_ROOT))
                 .thenReturn(root.toString().replace('\\', '/'));
         return cfg;

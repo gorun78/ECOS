@@ -70,7 +70,7 @@
         <!-- SysMan (system config) -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>sysman-impl</artifactId>
+            <artifactId>sysman-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 

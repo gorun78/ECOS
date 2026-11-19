@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class GitPathSafetyTest {
 
     @BeforeEach
     void setUp() {
-        SysConfigService cfg = mock(SysConfigService.class);
+        ISysConfigService cfg = mock(ISysConfigService.class);
         when(cfg.getString(GitRepoRootResolver.KEY_REPO_ROOT))
                 .thenReturn(tmp.toString().replace('\\', '/'));
         resolver = new GitRepoRootResolver(cfg);

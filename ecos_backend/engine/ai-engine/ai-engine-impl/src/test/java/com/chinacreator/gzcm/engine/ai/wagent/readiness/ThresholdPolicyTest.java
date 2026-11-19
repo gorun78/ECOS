@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.wagent.readiness;
 
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -40,7 +40,7 @@ class ThresholdPolicyTest {
     @Test
     @DisplayName("profile 专属行优先；未命中回落 default 行并留痕 resolvedFrom")
     void profileRowWinsAndDefaultFallbackIsRecorded() {
-        SysConfigService cfg = mock(SysConfigService.class);
+        ISysConfigService cfg = mock(ISysConfigService.class);
         when(cfg.getString("wagent.readiness.forecast.data.check_coverage")).thenReturn("0.85");
         when(cfg.getString("wagent.readiness.default.data.check_coverage")).thenReturn("0.7");
         ThresholdPolicy policy = policyWith(cfg);
@@ -67,7 +67,7 @@ class ThresholdPolicyTest {
     @Test
     @DisplayName("两档皆无该键 ⇒ 缺席（present=false ⇒ hasAll=false ⇒ 检查项 UNKNOWN），禁代码兜底默认")
     void absentKeysYieldUnsetNotCodeDefault() {
-        SysConfigService cfg = mock(SysConfigService.class);
+        ISysConfigService cfg = mock(ISysConfigService.class);
         when(cfg.getString(anyString())).thenReturn(null);
         ThresholdPolicy policy = policyWith(cfg);
 
@@ -81,7 +81,7 @@ class ThresholdPolicyTest {
     @Test
     @DisplayName("多片段项只命中一半 ⇒ hasAll=false（禁'半截阈值 + 半截猜测'混算）")
     void partialFragmentHitIsNotJudgeable() {
-        SysConfigService cfg = mock(SysConfigService.class);
+        ISysConfigService cfg = mock(ISysConfigService.class);
         when(cfg.getString("wagent.readiness.default.know.sample_size_min")).thenReturn("30");
         when(cfg.getString("wagent.readiness.default.know.sample_size_trend_floor")).thenReturn("  ");
         ThresholdSet result = policyWith(cfg).resolve(null, ReadinessCheckCode.KNOW_SAMPLE_SIZE);
@@ -97,7 +97,7 @@ class ThresholdPolicyTest {
     @DisplayName("sysman 未装配 ⇒ 空集合 + WARN，不抛异常（探测面结论仍可用，档位保守落 UNKNOWN）")
     void missingSysConfigBeanDoesNotBreakEvaluation() {
         @SuppressWarnings("unchecked")
-        ObjectProvider<SysConfigService> absent = mock(ObjectProvider.class);
+        ObjectProvider<ISysConfigService> absent = mock(ObjectProvider.class);
         when(absent.getIfAvailable()).thenReturn(null);
 
         ThresholdSet result = new ThresholdPolicy(absent)
@@ -137,9 +137,9 @@ class ThresholdPolicyTest {
         }
     }
 
-    private static ThresholdPolicy policyWith(SysConfigService cfg) {
+    private static ThresholdPolicy policyWith(ISysConfigService cfg) {
         @SuppressWarnings("unchecked")
-        ObjectProvider<SysConfigService> provider = mock(ObjectProvider.class);
+        ObjectProvider<ISysConfigService> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(cfg);
         return new ThresholdPolicy(provider);
     }

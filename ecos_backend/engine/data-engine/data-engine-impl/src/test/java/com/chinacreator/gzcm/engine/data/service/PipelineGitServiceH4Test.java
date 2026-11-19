@@ -7,7 +7,7 @@ import com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress;
 import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +30,7 @@ class PipelineGitServiceH4Test {
     @Mock
     private PipelineGitDao gitDao;
     @Mock
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
     @Mock
     private GitRepositoryService gitRepositoryService;
     @Mock

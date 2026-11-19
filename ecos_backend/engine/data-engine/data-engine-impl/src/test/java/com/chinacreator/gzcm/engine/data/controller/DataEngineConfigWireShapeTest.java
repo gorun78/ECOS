@@ -9,7 +9,7 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigRefreshVO;
 import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigSegmentsVO;
 import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigUpdateVO;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,19 +33,19 @@ import static org.mockito.Mockito.when;
  *
  * <p>分段视图（{@code segments[].subgroups[].id/configs}）、子组视图短键、更新回执
  * （{@code updated/total}）与刷新回执（{@code refreshed/cache_size}）全部按既有键面与顺序断言；
- * 配置行夹具走属主 {@code SysConfigService#getByGroup} 的 Map 行（契约未改），
+ * 配置行夹具走属主 {@code ISysConfigService#getByGroup} 的 Map 行（契约未改），
  * 转换由 {@code DataEngineConfigRow.fromRows} 承接。</p>
  */
 class DataEngineConfigWireShapeTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
     private DataEngineConfigController controller;
 
     @BeforeEach
     void setUp() throws Exception {
-        sysConfigService = mock(SysConfigService.class);
+        sysConfigService = mock(ISysConfigService.class);
         controller = new DataEngineConfigController();
         Field field = DataEngineConfigController.class.getDeclaredField("sysConfigService");
         field.setAccessible(true);

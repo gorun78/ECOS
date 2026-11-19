@@ -7,7 +7,7 @@ import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSuppor
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,7 +71,7 @@ class SessionCompressionTest {
     @Mock
     private LLMGateway llmGateway;
     @Mock
-    private SysConfigService sysConfig;
+    private ISysConfigService sysConfig;
     @Mock
     private EventBusService eventBus;
 
