@@ -11,7 +11,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController;
 import com.chinacreator.gzcm.engine.ai.controller.CognitiveController;
-import com.chinacreator.gzcm.engine.ai.controller.CognitiveConfigController;
 import com.chinacreator.gzcm.engine.ai.service.CognitiveService;
 import com.chinacreator.gzcm.sysman.config.I18nConfig;
 import com.chinacreator.gzcm.sysman.config.SysManRuntimeConfig;
@@ -86,11 +85,9 @@ import com.chinacreator.gzcm.sysman.controller.SysConfigController;
                 CognitiveService.class,
                 com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineOpenHealthController.class
         }),
-        // R2 (PMO-60 T0b): ai-engine 的 cognitive stub controller 与 cognitive2 真实现同频冲突 —
-        // 同前缀 /api/v1/cognitive/config: GET / 与 PUT / 双向撞车 (cognitive2 CognitiveConfigController 完整实现优先)
-        // 取舍与 gateway 对齐 (GatewayApplication 同条目, PMO-55 E-A)
-        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
-                classes = CognitiveConfigController.class),
+        // R2 (PMO-60 T0b): 2026-11-19 收口 —— ai-engine 侧 cognitive stub controller
+        // **源码已删除**（E-4 死代码清理），同前缀冲突源消失，原 ASSIGNABLE_TYPE 排除项移除。
+        // cognitive2 CognitiveConfigController 为唯一提供者（与 gateway 口径一致）。
         // R3 (PMO-60 T0b): sysman.config 整包扫描引入的 sysman 域 side effect 排除 —
         //  - SysConfigController 路由 /api/v1/system/config 与 sysman service :18081 撞车 (镜像 gateway 同条目)
         //  - I18nConfig @Primary MessageSource + I18nMessageSource bean 会沉淀 I18nUtils 静态态,

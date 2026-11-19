@@ -90,10 +90,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 统一走 gateway 转发（与 CognitiveController 排除模式对齐）。
         com.chinacreator.gzcm.engine.ai.oag.OagController.class,
         // PMO-55 E-A 修复 (2026-09-12)：cognitive2/CognitiveConfigController 是
-        // PMO-51 引入的权威认知配置端点（含 DTO + PUT），engine/ai 侧同名
-        // CognitiveConfigController 只处理 GET，两者都映射 GET /api/v1/cognitive/config
-        // 导致 Ambiguous mapping。排除 ai 侧简化版，保留 cognitive2 完整版。
-        com.chinacreator.gzcm.engine.ai.controller.CognitiveConfigController.class,
+        // PMO-51 引入的权威认知配置端点（含 DTO + PUT）。
+        // 2026-11-19 收口：engine/ai 侧同名简化版**源码已删除**（E-4 死代码清理），
+        // 本排除项随之移除——不再有第二个提供者，无需屏蔽。
         // D73（2026-11-14 验证）：原条目「cognitive2/CognitiveEngineHealthController 与
         // ai-engine/CognitiveController 都映射 /api/v1/cognitive/health，保留 ai 版」的
         // 前提已消失——ai-engine/CognitiveController 现为空桩（类上自述「无任何端点」），

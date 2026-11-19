@@ -1,10 +1,13 @@
 package com.chinacreator.gzcm.runtime.access.document;
 
 import com.chinacreator.gzcm.common.exception.DataAccessException;
+import com.chinacreator.gzcm.runtime.core.storage.StorageSettingsSource;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -50,8 +53,33 @@ public class MinerUHttpParser {
     /** 最大文件大小 50MB */
     private static final long MAX_FILE_SIZE = 50_485_760L;
 
-    /** MinerU 解析为 OCR 重活，请求超时放宽到 5 分钟 */
-    private static final Duration REQUEST_TIMEOUT = Duration.ofMinutes(5);
+    /** MinerU 解析为 OCR 重活，请求超时放宽（缺省 5 分钟 = 接线前的硬编码常量值） */
+    private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofMinutes(5);
+
+    /** G-2 消费端：sys_config storage 组（未装配 ⇒ 纯常量行为，等价改造前）。 */
+    @Autowired(required = false)
+    private ObjectProvider<StorageSettingsSource> storageSettingsProvider;
+
+    /**
+     * 生效请求超时：sys_config {@code storage.mineru.timeout-seconds} 优先，未装配/读不到 ⇒ 5 分钟。
+     *
+     * <p>注意：该方法在<b>每次解析时</b>调用（不做字段快照），改配置 + 刷新缓存即生效。</p>
+     */
+    private Duration requestTimeout() {
+        StorageSettingsSource src = storageSettingsProvider == null
+                ? null : storageSettingsProvider.getIfAvailable();
+        if (src != null) {
+            try {
+                int seconds = src.settings().mineruTimeoutSeconds();
+                if (seconds > 0) {
+                    return Duration.ofSeconds(seconds);
+                }
+            } catch (RuntimeException e) {
+                log.warn("读取 storage.mineru.timeout-seconds 失败，回落 5 分钟: {}", e.getMessage());
+            }
+        }
+        return DEFAULT_REQUEST_TIMEOUT;
+    }
 
     /** OCR + 版面分析请求的最大页数 */
     private static final int MAX_PAGES = 500;
@@ -146,7 +174,7 @@ public class MinerUHttpParser {
             String body = mapper.writeValueAsString(payload);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .timeout(REQUEST_TIMEOUT)
+                    .timeout(requestTimeout())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
