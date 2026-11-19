@@ -9,6 +9,7 @@ import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.chinacreator.gzcm.runtime.llm.config.LLMGatewayProperties;
+import com.chinacreator.gzcm.runtime.llm.config.LlmSettingsSource;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
@@ -63,17 +64,21 @@ public class ModelCapabilityExecutorImpl implements ModelCapabilityExecutor {
     private final CapabilityLedgerDao ledgerDao;
     private final ObjectProvider<LLMGateway> llmGatewayProvider;
     private final ObjectProvider<LLMGatewayProperties> llmPropsProvider;
+    /** G-2 消费端：sys_config llm 组（未装配 ⇒ 纯 yml 行为，等价改造前）。 */
+    private final ObjectProvider<LlmSettingsSource> llmSettingsProvider;
     private final ObjectProvider<ITaskManagementService> taskManagementProvider;
     private final ObjectProvider<EventBusService> eventBusProvider;
 
     public ModelCapabilityExecutorImpl(CapabilityLedgerDao ledgerDao,
                                        ObjectProvider<LLMGateway> llmGatewayProvider,
                                        ObjectProvider<LLMGatewayProperties> llmPropsProvider,
+                                       ObjectProvider<LlmSettingsSource> llmSettingsProvider,
                                        ObjectProvider<ITaskManagementService> taskManagementProvider,
                                        ObjectProvider<EventBusService> eventBusProvider) {
         this.ledgerDao = ledgerDao;
         this.llmGatewayProvider = llmGatewayProvider;
         this.llmPropsProvider = llmPropsProvider;
+        this.llmSettingsProvider = llmSettingsProvider;
         this.taskManagementProvider = taskManagementProvider;
         this.eventBusProvider = eventBusProvider;
     }
@@ -263,7 +268,23 @@ public class ModelCapabilityExecutorImpl implements ModelCapabilityExecutor {
         return (t != null && !t.isBlank()) ? t : AiTraceSupport.currentTraceId();
     }
 
+    /**
+     * 默认模型：sys_config {@code llm.default-model} 优先（G-2 在线可调），
+     * 未装配/读不到/空白 ⇒ 回落 yml {@code engine.default-model}（行为等价改造前）。
+     */
     private String defaultModel() {
+        LlmSettingsSource settings = llmSettingsProvider == null
+                ? null : llmSettingsProvider.getIfAvailable();
+        if (settings != null) {
+            try {
+                String fromDb = settings.settings().defaultModel();
+                if (fromDb != null && !fromDb.isBlank()) {
+                    return fromDb;
+                }
+            } catch (RuntimeException e) {
+                log.warn("读取 llm.default-model 失败，回落 yml 缺省: {}", e.getMessage());
+            }
+        }
         LLMGatewayProperties p = llmPropsProvider.getIfAvailable();
         return p != null ? p.getEngine().getDefaultModel() : null;
     }

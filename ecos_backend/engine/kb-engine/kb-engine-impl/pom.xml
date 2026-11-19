@@ -109,6 +109,11 @@
             <version>2.9.2</version>
         </dependency>
             <!-- 测试 -->
+        <!-- CD-3 pom 解耦：KnowledgeGraphServiceImpl 用 Caffeine，原靠 sysman-impl 传递 -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -117,7 +122,7 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-core</artifactId>
-            <scope>test</scope>
+            
         </dependency>
         <dependency>
             <groupId>com.tngtech.archunit</groupId>

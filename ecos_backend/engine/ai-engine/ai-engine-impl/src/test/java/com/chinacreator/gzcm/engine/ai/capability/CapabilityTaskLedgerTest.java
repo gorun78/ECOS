@@ -57,7 +57,7 @@ class CapabilityTaskLedgerTest {
 
     private ModelCapabilityExecutorImpl newExecutor() {
         return new ModelCapabilityExecutorImpl(ledgerDao, llmGatewayProvider, llmPropsProvider,
-                taskManagementProvider, eventBusProvider);
+                null, taskManagementProvider, eventBusProvider);
     }
 
     private CapabilityRequest syncRequest() {

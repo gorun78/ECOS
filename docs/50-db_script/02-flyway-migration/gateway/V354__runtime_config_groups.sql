@@ -22,10 +22,25 @@
 --   本脚本只收编后者；catalog 清单仍留 yml（部署形态不变）。G-2 整改方向第 1 条
 --   据此成立，V264 头注对「行为参数」不再适用。
 --
--- 消费缝（后续批次接代码）：
---   参照 `SysConfigCacheSettingsSource` 形态，为 llm 组做 `SysConfigLlmSettingsSource`
---   桥接（LLMGatewayProperties 读取面改经 sysman 门面）；event/storage 组桥接随后。
---   本脚本只播种数据面，不改任何读取逻辑——读到即生效与否取决于桥接批次。
+-- 消费缝状态（2026-11-19 第二批实测订正 — 勿把「已播种」当「已生效」）：
+--   | 键 | 消费方 | 改库是否真的影响行为 |
+--   |----|--------|----------------------|
+--   | llm.default-model     | ModelCapabilityExecutorImpl#defaultModel()（缺省模型路径） | ✅ 是 |
+--   | llm.default-temperature | **无**（温度取值来自 AgentProfile/LLMConfig，不读本键） | ❌ 否 |
+--   | llm.agent-timeout-ms    | **无**（LLMGatewayProperties.getDefaultTimeout 定义但无人调用） | ❌ 否 |
+--   | llm.max-context-tokens  | **无**（上下文窗口由 AgentLoopConfig 逐次传入） | ❌ 否 |
+--   | event.* / storage.*     | **无**（桥接未做） | ❌ 否 |
+--
+--   ⇒ 现状诚实口径：**8 枚键中仅 llm.default-model 真正接线**（门禁 LlmDefaultModelSourceGateTest
+--   锁死其 sys_config→yml 取值链）。其余 7 枚属「数据面先行」：已入库、可在配置面看到与编辑，
+--   但改值不影响运行行为。**在桥接补齐前不得对外宣称这些键可在线调整**——
+--   接入方须按 `SysConfigCacheSettingsSource` / `SysConfigLlmSettingsSource` 同款形态，
+--   在各自读取点插入「配置面优先 → yml 回落」判定。
+--
+-- 桥接落地形态（llm.default-model 已按此完成，可作模板）：
+--   runtime 侧 SPI（`LlmSettingsSource`，底座零依赖）→ sysman-impl 适配 Bean
+--   （`SysConfigLlmSettingsSource`，读表）→ 消费点在决策处 ObjectProvider 取用。
+--   未装配 ⇒ 纯 yml 行为（等价改造前），禁 fail-open 改行为。
 --
 -- 值口径（保守基线，与 yml/Properties 现值对齐，不借本脚本改行为）：
 --   * llm.default-model = 'deepseek/deepseek-chat'、default-temperature = '0.7'、

@@ -114,6 +114,12 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- CD-3 pom 解耦：main+test 均用 SecurityContext/UsernamePasswordAuthenticationToken，
+             原靠 sysman-impl 传递；降级到 sysman-api 后须显式声明 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>
