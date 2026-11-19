@@ -1,9 +1,11 @@
 package com.chinacreator.gzcm.runtime.eventbus;
 
+import com.chinacreator.gzcm.runtime.core.event.EventSettingsSource;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -47,7 +49,11 @@ public class KafkaBusConsumerConfig {
     @ConditionalOnMissingBean(name = "runtimeEventConsumerBaseProps")
     public ConsumerBaseProps runtimeEventConsumerBaseProps(
             @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
-            @Value("${ecos.event.kafka.auto-offset-reset:latest}") String autoOffsetReset) {
+            @Value("${ecos.event.kafka.auto-offset-reset:latest}") String ymlAutoOffsetReset,
+            ObjectProvider<EventSettingsSource> settingsSourceProvider) {
+        // G-2：sys_config event 组优先，未装配/读不到 ⇒ 回落 yml @Value（行为等价改造前）
+        EventSettingsSource src = settingsSourceProvider == null ? null : settingsSourceProvider.getIfAvailable();
+        String autoOffsetReset = src == null ? ymlAutoOffsetReset : src.settings().autoOffsetReset();
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);

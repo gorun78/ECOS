@@ -29,13 +29,22 @@
 --   | llm.default-temperature | **无**（温度取值来自 AgentProfile/LLMConfig，不读本键） | ❌ 否 |
 --   | llm.agent-timeout-ms    | **无**（LLMGatewayProperties.getDefaultTimeout 定义但无人调用） | ❌ 否 |
 --   | llm.max-context-tokens  | **无**（上下文窗口由 AgentLoopConfig 逐次传入） | ❌ 否 |
---   | event.* / storage.*     | **无**（桥接未做） | ❌ 否 |
+--   | event.kafka.auto-offset-reset | KafkaBusConsumerConfig#runtimeEventConsumerBaseProps | ✅ 是 |
+--   | event.kafka.group-prefix      | KafkaEventBusServiceImpl 构造器 | ✅ 是 |
+--   | storage.minio.bucket          | MinioStorageService#effectiveBucket | ✅ 是 |
+--   | storage.mineru.timeout-seconds | **无**（MinerUHttpParser 硬编码 Duration.ofMinutes(5)，见下方订正） | ❌ 否 |
 --
---   ⇒ 现状诚实口径：**8 枚键中仅 llm.default-model 真正接线**（门禁 LlmDefaultModelSourceGateTest
---   锁死其 sys_config→yml 取值链）。其余 7 枚属「数据面先行」：已入库、可在配置面看到与编辑，
---   但改值不影响运行行为。**在桥接补齐前不得对外宣称这些键可在线调整**——
---   接入方须按 `SysConfigCacheSettingsSource` / `SysConfigLlmSettingsSource` 同款形态，
---   在各自读取点插入「配置面优先 → yml 回落」判定。
+--   ⇒ 现状诚实口径：**8 枚键中 4 枚已接线**（default-model + event×2 + minio.bucket）。
+--   未接线的 4 枚（temperature / agent-timeout / max-context / mineru.timeout）已入库、
+--   可在配置面看到与编辑，但改值不影响运行行为；**接线前不得对外宣称可在线调整**。
+--   桥接落地形态见下方「模板」段（llm.default-model 与 event/storage 均已按此完成）。
+--
+-- ⚠ 播种值不实订正（2026-11-19 接线时实测）：
+--   `storage.mineru.timeout-seconds = 120` 的原注释称「取 runtime-access 现行缺省」——**不实**。
+--   代码真相 = `MinerUHttpParser.REQUEST_TIMEOUT = Duration.ofMinutes(5)`（**300 秒**，OCR 重活放宽）。
+--   本脚本按既有播种值保留 120（已实跑入库，改值属另外的运维决定），但桥接代码的
+--   `StorageSettings.DEFAULTS` 取 **300** 与代码对齐。⇒ 若将来启用 mineru 超时读取，
+--   库内 120 会**缩短**超时（300 → 120），属行为变更，启用前须显式确认。
 --
 -- 桥接落地形态（llm.default-model 已按此完成，可作模板）：
 --   runtime 侧 SPI（`LlmSettingsSource`，底座零依赖）→ sysman-impl 适配 Bean

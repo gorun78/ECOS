@@ -1,11 +1,14 @@
 package com.chinacreator.gzcm.runtime.access.storage;
 
+import com.chinacreator.gzcm.runtime.core.storage.StorageSettingsSource;
 import io.minio.*;
 import io.minio.errors.*;
 import io.minio.messages.Bucket;
 import io.minio.messages.Item;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -56,6 +59,10 @@ public class MinioStorageService {
     @Value("${minio.bucket:}")
     private String cfgBucket;
 
+    /** G-2 消费端：sys_config storage 组（未装配 ⇒ 纯 yml/环境变量行为，等价改造前）。 */
+    @Autowired(required = false)
+    private ObjectProvider<StorageSettingsSource> storageSettingsProvider;
+
     private volatile MinioClient client;
     private volatile boolean initialized = false;
 
@@ -81,8 +88,20 @@ public class MinioStorageService {
         return isBlank(cfgSecretKey) ? secretKey : cfgSecretKey;
     }
 
-    /** 生效 bucket：yml 配置 > 默认值 */
+    /** 生效 bucket：sys_config storage 组优先，未装配/读不到 ⇒ yml 配置 > 默认值（行为等价改造前） */
     private String effectiveBucket() {
+        StorageSettingsSource src = storageSettingsProvider == null
+                ? null : storageSettingsProvider.getIfAvailable();
+        if (src != null) {
+            try {
+                String fromDb = src.settings().minioBucket();
+                if (!isBlank(fromDb)) {
+                    return fromDb;
+                }
+            } catch (RuntimeException e) {
+                log.warn("读取 storage.minio.bucket 失败，回落 yml/默认值: {}", e.getMessage());
+            }
+        }
         return isBlank(cfgBucket) ? DEFAULT_BUCKET : cfgBucket;
     }
 

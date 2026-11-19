@@ -9,6 +9,8 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.chinacreator.gzcm.runtime.core.event.EventSettingsSource;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -96,11 +98,14 @@ public class KafkaEventBusServiceImpl implements EventBusService {
     public KafkaEventBusServiceImpl(KafkaTemplate<String, String> kafkaTemplate,
                                     ObjectMapper objectMapper,
                                     KafkaBusConsumerConfig.ConsumerBaseProps consumerBaseProps,
-                                    @Value("${ecos.event.kafka.group-prefix:}") String sharedGroupPrefix) {
+                                    @Value("${ecos.event.kafka.group-prefix:}") String ymlSharedGroupPrefix,
+                                    ObjectProvider<EventSettingsSource> settingsSourceProvider) {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.consumerBaseProps = consumerBaseProps;
-        this.sharedGroupPrefix = sharedGroupPrefix;
+        // G-2：sys_config event 组优先，未装配/读不到 ⇒ 回落 yml @Value（行为等价改造前）
+        EventSettingsSource src = settingsSourceProvider == null ? null : settingsSourceProvider.getIfAvailable();
+        this.sharedGroupPrefix = src == null ? ymlSharedGroupPrefix : src.settings().groupPrefix();
         log.info("[EventBus][KAFKA] activated — broker 在/不在都能发, 失败仅记 WARN 不阻塞主流程; groupPrefix={}",
                 sharedGroupPrefix == null || sharedGroupPrefix.isEmpty() ? "<per-subscription fan-out>" : sharedGroupPrefix);
     }

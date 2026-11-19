@@ -51,7 +51,7 @@ class KafkaEventBusServiceImplTest {
         Map<String, Object> props = new HashMap<>();
         props.put("bootstrap.servers", "localhost:1");
         return new KafkaEventBusServiceImpl(template, mapper,
-                new KafkaBusConsumerConfig.ConsumerBaseProps(props), "");
+                new KafkaBusConsumerConfig.ConsumerBaseProps(props), "", null);
     }
 
     @AfterEach

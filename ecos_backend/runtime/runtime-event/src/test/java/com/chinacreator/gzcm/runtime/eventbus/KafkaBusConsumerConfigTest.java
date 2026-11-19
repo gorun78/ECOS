@@ -24,7 +24,7 @@ class KafkaBusConsumerConfigTest {
     @Test
     @DisplayName("基参：bootstrap/反序列化/自动提交按入参装配，且不含 group.id")
     void basePropsCarryBootstrapAndStringDeserializersWithoutGroupId() {
-        Map<String, Object> props = config.runtimeEventConsumerBaseProps("kafka:9092", "earliest").asMap();
+        Map<String, Object> props = config.runtimeEventConsumerBaseProps("kafka:9092", "earliest", null).asMap();
 
         assertEquals("kafka:9092", props.get(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG));
         assertEquals(StringDeserializer.class, props.get(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG));
