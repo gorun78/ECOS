@@ -22,12 +22,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import com.chinacreator.gzcm.engine.ai.dao.LlmModelRegistryDao;
+import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
+import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
@@ -59,7 +62,7 @@ class AiModelCatalogControllerTest {
                 new LLMGateway.ModelLimit("deepseek-reasoner", 64_000, true, true)));
 
         ResponseEntity<ApiResponse<Map<String, Object>>> resp =
-                new AiModelCatalogController(gateway, null).listLlmModels(null, null);
+                new AiModelCatalogController(gateway, null, null, null, null).listLlmModels(null, null);
 
         assertEquals(HttpStatus.OK, resp.getStatusCode());
         Map<String, Object> data = resp.getBody().getData();
@@ -97,7 +100,7 @@ class AiModelCatalogControllerTest {
         when(gateway.modelCatalog()).thenReturn(List.of(
                 new LLMGateway.ModelLimit("unknown-model", 0, true, false)));
 
-        Map<String, Object> data = new AiModelCatalogController(gateway, null)
+        Map<String, Object> data = new AiModelCatalogController(gateway, null, null, null, null)
                 .listLlmModels(null, null).getBody().getData();
 
         @SuppressWarnings("unchecked")
@@ -112,7 +115,7 @@ class AiModelCatalogControllerTest {
     @DisplayName("#17 未装配 / 空目录 → 501 + stub=true（X-22 禁 200 空 items 伪实现）")
     void unreadableCatalogYields501() {
         ResponseEntity<ApiResponse<Map<String, Object>>> unassembled =
-                new AiModelCatalogController(null, null).listLlmModels(null, null);
+                new AiModelCatalogController(null, null, null, null, null).listLlmModels(null, null);
         assertEquals(HttpStatus.NOT_IMPLEMENTED, unassembled.getStatusCode());
         Map<String, Object> unassembledData = unassembled.getBody().getData();
         assertEquals(Boolean.TRUE, unassembledData.get("stub"));
@@ -125,7 +128,7 @@ class AiModelCatalogControllerTest {
         LLMGateway emptyGateway = mock(LLMGateway.class);
         when(emptyGateway.modelCatalog()).thenReturn(List.of());
         ResponseEntity<ApiResponse<Map<String, Object>>> empty =
-                new AiModelCatalogController(emptyGateway, null).listLlmModels(null, null);
+                new AiModelCatalogController(emptyGateway, null, null, null, null).listLlmModels(null, null);
         assertEquals(HttpStatus.NOT_IMPLEMENTED, empty.getStatusCode());
         assertEquals(Boolean.TRUE, empty.getBody().getData().get("stub"));
         assertTrue(String.valueOf(empty.getBody().getMessage())
@@ -136,7 +139,7 @@ class AiModelCatalogControllerTest {
     @DisplayName("#17 capability/dataClassification 过滤无载体 → 显式 400，禁静默忽略后假装已筛选")
     void unsupportedFilterRejectedWith400() throws Exception {
         LLMGateway gateway = mock(LLMGateway.class);
-        MvcResult r = MockMvcBuilders.standaloneSetup(new AiModelCatalogController(gateway, null))
+        MvcResult r = MockMvcBuilders.standaloneSetup(new AiModelCatalogController(gateway, null, null, null, null))
                 .setControllerAdvice(new AiErrorAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build()
@@ -162,7 +165,7 @@ class AiModelCatalogControllerTest {
 
         // DAO 未装配（独立引擎调试态 / V359 未实跑）⇒ 501 承流，禁装作写成功
         ResponseEntity<ApiResponse<Map<String, Object>>> resp =
-                new AiModelCatalogController(gateway, null).registerLlmModel(body);
+                new AiModelCatalogController(gateway, null, null, null, null).registerLlmModel(body);
 
         assertEquals(HttpStatus.NOT_IMPLEMENTED, resp.getStatusCode());
         Map<String, Object> data = resp.getBody().getData();
@@ -174,7 +177,7 @@ class AiModelCatalogControllerTest {
     }
 
     @Test
-    @DisplayName("#18 注册/升版 → 载体可用时真实写入，升版自增且旧行 RETIRED（E-3）")
+    @DisplayName("#18 注册/升版 → 载体可用 + 鉴权通过时真实写入，升版自增（E-3）")
     void registerFaceWritesWhenTableReady() {
         LLMGateway gateway = mock(LLMGateway.class);
         LlmModelRegistryDao dao = mock(LlmModelRegistryDao.class);
@@ -188,13 +191,14 @@ class AiModelCatalogControllerTest {
         body.put("contextLimit", 64000);
 
         ResponseEntity<ApiResponse<Map<String, Object>>> resp =
-                new AiModelCatalogController(gateway, dao).registerLlmModel(body);
+                new AiModelCatalogController(gateway, dao, allowAllSecurityClient(), adminIdentity(), null)
+                        .registerLlmModel(body);
 
         assertEquals(HttpStatus.OK, resp.getStatusCode());
         Map<String, Object> data = resp.getBody().getData();
         assertEquals(Boolean.TRUE, data.get("written"));
         assertEquals("3", data.get("activeVersion"), "版本号 = 历史行数 + 1");
-        assertNull(data.get("gitRef"), "Git 归档链路未接 ⇒ 如实 null，禁编造 ref");
+        assertNull(data.get("gitRef"), "归档器未装配 ⇒ 如实 null，禁编造 ref");
         assertFalse(String.valueOf(jsonSerialize(data)).contains("SECRET-REF-MUST-NOT-ECHO"),
                 "apiKeyRef 值禁外泄（X-49），响应只回 modelId/version");
 
@@ -208,10 +212,80 @@ class AiModelCatalogControllerTest {
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.eq("3"),
-                org.mockito.ArgumentMatchers.eq("api"));
+                org.mockito.ArgumentMatchers.eq("u-admin"));
         verify(dao, org.mockito.Mockito.never())
                 .retireActive(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
         verifyNoInteractions(gateway);
+    }
+
+    @Test
+    @DisplayName("#18 注册/升版 → OPA 裁决拒绝时零写入（fail-closed，E-3 角色级）")
+    void registerFaceRejectsWhenOpaDenies() {
+        LLMGateway gateway = mock(LLMGateway.class);
+        LlmModelRegistryDao dao = mock(LlmModelRegistryDao.class);
+        when(dao.tableReady()).thenReturn(true);
+
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("modelKey", "deepseek-chat");
+        body.put("provider", "deepseek");
+
+        AiSecurityEngineClient denyClient = mock(AiSecurityEngineClient.class);
+        when(denyClient.evaluate(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(false);
+
+        assertThrows(IllegalStateException.class,
+                () -> new AiModelCatalogController(gateway, dao, denyClient, adminIdentity(), null)
+                        .registerLlmModel(body),
+                "角色不足/裁决不可用必须拒绝，不得写入");
+        verify(dao, org.mockito.Mockito.never()).replaceActive(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+        verifyNoInteractions(gateway);
+    }
+
+    @Test
+    @DisplayName("#18 注册/升版 → 裁决链未装配时 fail-closed 拒绝（禁静默放行）")
+    void registerFaceFailsClosedWithoutSecurityClient() {
+        LlmModelRegistryDao dao = mock(LlmModelRegistryDao.class);
+        when(dao.tableReady()).thenReturn(true);
+
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("modelKey", "k");
+        body.put("provider", "p");
+
+        assertThrows(IllegalStateException.class,
+                () -> new AiModelCatalogController(mock(LLMGateway.class), dao, null, null, null)
+                        .registerLlmModel(body));
+        // tableReady() 探活会调到 dao，但必须零写入
+        verify(dao, org.mockito.Mockito.never()).replaceActive(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    /** 恒放行的裁决桩（只用于"鉴权已过"的路径验证；拒绝路径另有专门用例）。 */
+    private static AiSecurityEngineClient allowAllSecurityClient() {
+        AiSecurityEngineClient c = mock(AiSecurityEngineClient.class);
+        when(c.evaluate(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(true);
+        return c;
+    }
+
+    private static WAgentIdentityResolver adminIdentity() {
+        WAgentIdentityResolver r = mock(WAgentIdentityResolver.class);
+        when(r.requireWithRoles()).thenReturn(
+                new WAgentIdentityResolver.IdentityWithRoles("tenant-a", "u-admin", null,
+                        java.util.List.of("ROLE_SUPER_ADMIN")));
+        return r;
     }
 
     @Test
@@ -219,7 +293,7 @@ class AiModelCatalogControllerTest {
     void healthFaceIsExplicit501() {
         LLMGateway gateway = mock(LLMGateway.class);
         ResponseEntity<ApiResponse<Map<String, Object>>> resp =
-                new AiModelCatalogController(gateway, null).checkModelHealth("deepseek-chat");
+                new AiModelCatalogController(gateway, null, null, null, null).checkModelHealth("deepseek-chat");
 
         assertEquals(HttpStatus.NOT_IMPLEMENTED, resp.getStatusCode());
         Map<String, Object> data = resp.getBody().getData();
@@ -243,7 +317,7 @@ class AiModelCatalogControllerTest {
         LLMGateway gateway = mock(LLMGateway.class);
         when(gateway.modelCatalog()).thenReturn(List.of(
                 new LLMGateway.ModelLimit("deepseek-chat", 64_000, true, true)));
-        var mvc = MockMvcBuilders.standaloneSetup(new AiModelCatalogController(gateway, null))
+        var mvc = MockMvcBuilders.standaloneSetup(new AiModelCatalogController(gateway, null, null, null, null))
                 .setControllerAdvice(new AiErrorAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
@@ -262,7 +336,7 @@ class AiModelCatalogControllerTest {
     @DisplayName("禁造契约外别名：本类只挂 /api/v1/ai 基址，/api/v1/agent/models 不得存在")
     void noOutOfContractAliasPrefix() throws Exception {
         LLMGateway gateway = mock(LLMGateway.class);
-        var mvc = MockMvcBuilders.standaloneSetup(new AiModelCatalogController(gateway, null))
+        var mvc = MockMvcBuilders.standaloneSetup(new AiModelCatalogController(gateway, null, null, null, null))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
 
@@ -280,7 +354,7 @@ class AiModelCatalogControllerTest {
         Map<String, Object> providerData =
                 new AgentProviderController(providerGateway).listProviders().getBody().getData();
 
-        Map<String, Object> healthData = new AiModelCatalogController(null, null)
+        Map<String, Object> healthData = new AiModelCatalogController(null, null, null, null, null)
                 .checkModelHealth("m").getBody().getData();
 
         assertEquals(providerData.get("errorCode"), healthData.get("errorCode"));
@@ -303,7 +377,7 @@ class AiModelCatalogControllerTest {
                 new AgentProviderController(providerGateway).listProviders().getBody().getMessage();
 
         ResponseEntity<ApiResponse<Map<String, Object>>> health =
-                new AiModelCatalogController(null, null).checkModelHealth("m");
+                new AiModelCatalogController(null, null, null, null, null).checkModelHealth("m");
 
         assertEquals(501, HttpStatus.valueOf(health.getStatusCode().value()).value());
         String prefix = "该能力尚未上线（";

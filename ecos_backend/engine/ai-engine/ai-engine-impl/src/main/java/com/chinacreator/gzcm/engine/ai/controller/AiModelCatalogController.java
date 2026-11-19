@@ -4,7 +4,10 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.capability.web.AiCapabilityApiPaths;
 import com.chinacreator.gzcm.engine.ai.dao.LlmModelRegistryDao;
+import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
+import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
+import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,13 +101,38 @@ public class AiModelCatalogController {
     /** E-3 模型注册载体（V359）。required=false：未装配时 POST 走 501 承流而非报错。 */
     private final LlmModelRegistryDao modelRegistryDao;
 
+    /** OPA 裁决（ai:model:register，fail-closed：不可用即拒）。required=false 供单测装配。 */
+    private final AiSecurityEngineClient securityClient;
+
+    /** 身份与角色（JWT claims）。 */
+    private final WAgentIdentityResolver identityResolver;
+
+    /** Git 版本归档（表只承载在用版本，历史版本走 Git — 铁律 §2.5 配置/资产二分）。 */
+    private final DesignAssetArchiver designAssetArchiver;
+
+    /**
+     * 模型注册归档的目标仓 —— 取 {@code ecos_control.ecos_git_repo} 已注册的六枚之一。
+     *
+     * <p>映射依据同 {@code WAgentCandidateController#repositoryIdFor} 的资产类型惯例：
+     * {@code COGNITIVE_MODEL_DEF} / {@code MODEL_ROUTING} 等模型定义类资产归
+     * {@code cognitive-model}。LLM 模型注册同属模型定义，故沿用该仓，
+     * <b>不自造仓库 id</b>（自造必定查无此仓 ⇒ 归档恒 notAvailable，等于空接）。</p>
+     */
+    private static final String MODEL_ARCHIVE_REPO_ID = "cognitive-model";
+
     private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
             new com.fasterxml.jackson.databind.ObjectMapper();
 
     public AiModelCatalogController(@Autowired(required = false) LLMGateway llmGateway,
-                                   @Autowired(required = false) LlmModelRegistryDao modelRegistryDao) {
+                                   @Autowired(required = false) LlmModelRegistryDao modelRegistryDao,
+                                   @Autowired(required = false) AiSecurityEngineClient securityClient,
+                                   @Autowired(required = false) WAgentIdentityResolver identityResolver,
+                                   @Autowired(required = false) DesignAssetArchiver designAssetArchiver) {
         this.llmGateway = llmGateway;
         this.modelRegistryDao = modelRegistryDao;
+        this.securityClient = securityClient;
+        this.identityResolver = identityResolver;
+        this.designAssetArchiver = designAssetArchiver;
     }
 
     /**
@@ -198,6 +226,22 @@ public class AiModelCatalogController {
         if (body == null || body.isEmpty()) {
             throw new IllegalArgumentException("请求体不可为空（需 modelKey 与 provider）");
         }
+
+        // ① OPA 裁决（fail-closed）：securityClient 未装配 / security-engine 不可用 / 角色不足
+        //    一律拒绝。契约原文要求 role:AI_ADMIN，但该角色码全仓零命中；按平台既有超管码
+        //    ROLE_SUPER_ADMIN 授权（rbac.rego 的 is_ai_model_admin）。
+        if (securityClient == null || identityResolver == null) {
+            log.warn("[AiModelCatalogController] registerLlmModel 裁决链未装配，fail-closed 拒绝: traceId={}", traceId);
+            throw new IllegalStateException("模型注册的授权链未装配（security-engine 客户端缺失），拒绝写入");
+        }
+        var identity = identityResolver.requireWithRoles();
+        if (!securityClient.evaluate(identity.operator(), identity.tenantId(),
+                identity.roles(), "ai:model:register", Map.of("modelKey", String.valueOf(body.get("modelKey"))))) {
+            log.warn("[AiModelCatalogController] registerLlmModel OPA 拒绝: operator={} roles={} (traceId={})",
+                    identity.operator(), identity.roles(), traceId);
+            throw new IllegalStateException("模型注册需平台管理员角色（ai:model:register 裁决未通过）");
+        }
+
         String modelKey = str(body.get("modelKey"));
         String provider = str(body.get("provider"));
         if (modelKey == null || provider == null) {
@@ -209,10 +253,8 @@ public class AiModelCatalogController {
         int contextLimit = intOrDefault(body.get("contextLimit"), 0);
         String costClass = str(body.get("costClass"));
         String capabilitiesJson = jsonOf(body.get("capabilities"));
-        String actor = str(body.get("operator"));
-        if (actor == null) {
-            actor = "api";
-        }
+        // 操作者取 JWT 身份，不由 body 自报（否则审计可被伪造）
+        String actor = identity.operator();
 
         String id = java.util.UUID.randomUUID().toString();
         int nextVersion = modelRegistryDao.maxVersion(modelKey) + 1;
@@ -225,13 +267,48 @@ public class AiModelCatalogController {
         log.info("[AiModelCatalogController] registerLlmModel 已落库: modelKey={} version={} traceId={}",
                 modelKey, nextVersion, traceId);
 
+        // ② Git 版本归档：表只承载「在用版本」，历史版本按铁律 §2.5 走 Git。
+        //    归档失败**不回滚落库**（数据面已成功），但如实返回 gitRef=null + 原因，
+        //    禁编造 ref 让调用方误以为已归档。
+        String gitRef = null;
+        String archiveNote = null;
+        if (designAssetArchiver != null) {
+            try {
+                Map<String, Object> snapshot = new LinkedHashMap<>();
+                snapshot.put("modelKey", modelKey);
+                snapshot.put("provider", provider);
+                snapshot.put("endpoint", endpoint);
+                // 密钥只存引用名（X-49）；表与 Git 一致口径。
+                snapshot.put("apiKeyRef", apiKeyRef);
+                snapshot.put("contextLimit", contextLimit);
+                snapshot.put("costClass", costClass);
+                snapshot.put("version", String.valueOf(nextVersion));
+                var outcome = designAssetArchiver.archive(MODEL_ARCHIVE_REPO_ID, "models", modelKey,
+                        String.valueOf(nextVersion), MAPPER.writeValueAsString(snapshot),
+                        "chore(models): register " + modelKey + " v" + nextVersion, actor);
+                gitRef = outcome == null ? null : outcome.commitId();
+                if (gitRef == null) {
+                    archiveNote = outcome == null ? "归档器返回空" : String.valueOf(outcome.reason());
+                    log.warn("[AiModelCatalogController] Git 归档未完成（落库已成功）: modelKey={} note={}",
+                            modelKey, archiveNote);
+                }
+            } catch (Exception e) {
+                archiveNote = "Git 归档异常: " + e.getMessage();
+                log.warn("[AiModelCatalogController] Git 归档异常（落库已成功）: modelKey={}", modelKey, e);
+            }
+        } else {
+            archiveNote = "DesignAssetArchiver 未装配";
+        }
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("modelId", id);
         data.put("modelKey", modelKey);
         data.put("activeVersion", String.valueOf(nextVersion));
-        // 版本类资产的 Git 归档面：本表只承载"在用版本"，历史版本走 Git（铁律 §2.5 配置/资产二分）。
-        // 未接 Git 链路 ⇒ 如实 null，禁编造 ref。
-        data.put("gitRef", null);
+        data.put("gitRef", gitRef);
+        data.put("gitRefApplicable", gitRef != null);
+        if (archiveNote != null) {
+            data.put("gitRefUnavailableReason", archiveNote);
+        }
         data.put("written", true);
         return ResponseEntity.ok(ApiResponse.success(data)
                 .withTraceId(traceId));

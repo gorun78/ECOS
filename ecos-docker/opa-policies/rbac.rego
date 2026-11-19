@@ -145,3 +145,37 @@ allow {
     input.action == "llm:chat"
     input.subject.role == "llm-gateway-service"
 }
+
+# ═══ 模型注册写面（2026-11-19 E-3 收口，用户裁决「模型注册数据入表」）═══
+# 裁决链：AiModelCatalogController#registerLlmModel
+# → AiSecurityEngineClient.evaluate(userId, tenantId, roles, "ai:model:register", attrs)
+# → policy-engine/evaluate(policy=rbac) → 本包。
+#
+# 载荷形态：buildEvaluateBody 归一后送 input.role（首角色）+ input.subject.roles（全量），
+# 与 scenario:* / candidate:publish 同形。两套命名都要认（admin 与 ROLE_SUPER_ADMIN 并存）。
+#
+# 为什么不是契约里的 role:AI_ADMIN：该角色码在 td_role 与全仓源码中**零命中**，
+# 只是设计文档的占位命名。平台既有超管码是 ROLE_SUPER_ADMIN（td_role.role_code，
+# 且是 PermissionAspect / rbac.rego 其它规则组的唯一命中形态）。模型注册属平台级
+# 配置写操作，按超管码授权与既有口径一致；**不新造角色**（避免出现无人可授的空角色）。
+#
+# 未挂此规则前：default allow = false ⇒ 注册面恒 EVALUATED_DENY ⇒ 403。
+is_ai_model_admin {
+    input.role == "admin"
+}
+is_ai_model_admin {
+    input.role == "ROLE_SUPER_ADMIN"
+}
+is_ai_model_admin {
+    some r in input.subject.roles
+    r == "admin"
+}
+is_ai_model_admin {
+    some r in input.subject.roles
+    r == "ROLE_SUPER_ADMIN"
+}
+
+allow {
+    input.action == "ai:model:register"
+    is_ai_model_admin
+}
