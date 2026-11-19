@@ -3,9 +3,11 @@ package com.chinacreator.gzcm.engine.security.service;
 import com.chinacreator.gzcm.common.error.SecurityErrorCode;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -64,25 +66,70 @@ public class OpaPolicyService {
      */
     public static final String POLICY_DATA_ACCESS = GuardrailDecisionContract.POLICY_DATA_ACCESS;
 
-    private final String opaUrl;
-    private final Path policyDir;
+    /** yml 基线（部署缺省）；运行时经 {@link #resolveOpaUrl()} 优先取 sys_config 覆盖值。 */
+    private final String opaUrlBaseline;
+    private final Path policyDirBaseline;
+    /** G-1：sys_config 覆盖面（未装配则纯 yml 行为，等价改造前）。 */
+    private final ObjectProvider<ISysConfigService> configProvider;
     // 详细设计-01 W35（P0）：opa.fail-close 配置项移除，fail-close 硬编码为 true 常量。
     // 任何"可配成 fail-open"的路径都违反铁律 §2.4-8 默认 DENY —— OPA 不可用一律拒绝。
     private static final boolean FAIL_CLOSE = true;
 
+    /** sys_config 键（G-1：OPA 运行参数可在线调整；V355 播种，值 = yml 缺省）。 */
+    static final String CFG_KEY_OPA_URL = "security.opa.url";
+    static final String CFG_KEY_OPA_POLICY_DIR = "security.opa.policy-dir";
+
+    @org.springframework.beans.factory.annotation.Autowired
     public OpaPolicyService(
             @Value("${opa.url:http://localhost:8181}") String opaUrl,
-            @Value("${opa.policy-dir:/opt/ecos/opa-policies}") String policyDir) {
-        this.opaUrl = opaUrl;
-        // W36：跨平台策略目录解析（ECOS_OPA_POLICY_DIR > 显式配置 > classpath 解包）
-        this.policyDir = OpaPolicyDirResolver.resolve(policyDir);
+            @Value("${opa.policy-dir:/opt/ecos/opa-policies}") String policyDir,
+            ObjectProvider<ISysConfigService> configProvider) {
+        this.opaUrlBaseline = opaUrl;
+        this.policyDirBaseline = OpaPolicyDirResolver.resolve(policyDir);
+        this.configProvider = configProvider;
+    }
+
+    /** 便捷构造：无配置门面（纯 yml 行为，等价 G-1 改造前；测试与嵌入式装配用）。 */
+    public OpaPolicyService(String opaUrl, String policyDir) {
+        this(opaUrl, policyDir, null);
+    }
+
+    /**
+     * 生效 OPA 地址：sys_config 非空值优先，否则 yml 基线。
+     * 读取失败按 yml 基线处理（配置面故障不得让安全裁决能力整体崩掉；fail-close 语义不变）。
+     */
+    String resolveOpaUrl() {
+        String configured = configValue(CFG_KEY_OPA_URL);
+        return (configured == null || configured.isBlank()) ? opaUrlBaseline : configured.trim();
+    }
+
+    /** 生效策略目录：sys_config 非空值优先（经同一解析链归一），否则 yml 基线。 */
+    Path resolvePolicyDir() {
+        String configured = configValue(CFG_KEY_OPA_POLICY_DIR);
+        if (configured == null || configured.isBlank()) {
+            return policyDirBaseline;
+        }
+        return OpaPolicyDirResolver.resolve(configured.trim());
+    }
+
+    private String configValue(String key) {
+        ISysConfigService svc = configProvider == null ? null : configProvider.getIfAvailable();
+        if (svc == null) {
+            return null;
+        }
+        try {
+            return svc.getString(key);
+        } catch (RuntimeException e) {
+            log.warn("读取 OPA 配置失败，回落 yml 基线: key={} err={}", key, e.getMessage());
+            return null;
+        }
     }
 
     public Map<String, Object> getStatus() {
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("engine", "OPA v0.63.0");
         try {
-            var req = HttpRequest.newBuilder(URI.create(opaUrl + "/v1/data"))
+            var req = HttpRequest.newBuilder(URI.create(resolveOpaUrl() + "/v1/data"))
                     .timeout(Duration.ofSeconds(5))
                     .build();
             var resp = http.send(req, HttpResponse.BodyHandlers.ofString());
@@ -110,7 +157,7 @@ public class OpaPolicyService {
             String opaPath = "/v1/data/ecos/" + policy;
             String payload = "{\"input\":" + MAPPER.writeValueAsString(input) + "}";
 
-            var req = HttpRequest.newBuilder(URI.create(opaUrl + opaPath))
+            var req = HttpRequest.newBuilder(URI.create(resolveOpaUrl() + opaPath))
                     .timeout(Duration.ofSeconds(5))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
@@ -276,7 +323,7 @@ public class OpaPolicyService {
     public void invalidateCache() {
         try {
             // OPA 自动热加载文件变更，此处主动触发一次健康检查确认策略已生效
-            var req = HttpRequest.newBuilder(URI.create(opaUrl + "/v1/data"))
+            var req = HttpRequest.newBuilder(URI.create(resolveOpaUrl() + "/v1/data"))
                     .timeout(Duration.ofSeconds(3))
                     .build();
             http.send(req, HttpResponse.BodyHandlers.ofString());
@@ -321,7 +368,7 @@ public class OpaPolicyService {
 
     private List<String> listPolicyFiles() {
         List<String> names = new ArrayList<>();
-        try (var stream = Files.list(policyDir)) {
+        try (var stream = Files.list(resolvePolicyDir())) {
             stream.filter(p -> p.toString().endsWith(".rego"))
                   .map(p -> p.getFileName().toString().replace(".rego", ""))
                   .forEach(names::add);
@@ -358,6 +405,6 @@ public class OpaPolicyService {
      * {@code policyDir.resolve} 的拼接口径一字未动。</p>
      */
     private Path resolveSafe(String name) {
-        return policyDir.resolve(name + ".rego").normalize();
+        return resolvePolicyDir().resolve(name + ".rego").normalize();
     }
 }

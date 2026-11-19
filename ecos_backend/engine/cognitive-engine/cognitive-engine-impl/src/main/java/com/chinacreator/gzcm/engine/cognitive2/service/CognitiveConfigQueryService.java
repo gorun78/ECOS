@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.springframework.stereotype.Service;
 
 /**
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>F05-13 收口：sys_config 的 SELECT / UPDATE / INSERT 不再自持 DAO（旧
  * {@code ConfigQueryDao} 直写他域表违反跨域边界），统一委托 sysman  sanctioned
- * 配置门面 {@link SysConfigService}（与 data-engine 同款声明，label 推导由门面完成）；
+ * 配置门面 {@link ISysConfigService}（与 data-engine 同款声明，label 推导由门面完成）；
  * 异常语义不变：门面抛出的 {@code DataAccessException} 原样上浮，由调用方 Controller
  * 捕获并降级返回，与既有 HTTP 行为一致。</p>
  */
@@ -39,9 +39,9 @@ public class CognitiveConfigQueryService {
     /** 门面组名（sys_config.config_group）。 */
     public static final String GROUP_COGNITIVE = "cognitive";
 
-    private final SysConfigService sysConfigService;
+    private final ISysConfigService sysConfigService;
 
-    public CognitiveConfigQueryService(SysConfigService sysConfigService) {
+    public CognitiveConfigQueryService(ISysConfigService sysConfigService) {
         this.sysConfigService = sysConfigService;
     }
 

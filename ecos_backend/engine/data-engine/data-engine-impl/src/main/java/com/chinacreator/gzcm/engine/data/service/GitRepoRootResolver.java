@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -31,9 +31,9 @@ public class GitRepoRootResolver {
 
     public static final String KEY_REPO_ROOT = "ecos_git_repo_root";
 
-    private final SysConfigService sysConfigService;
+    private final ISysConfigService sysConfigService;
 
-    public GitRepoRootResolver(SysConfigService sysConfigService) {
+    public GitRepoRootResolver(ISysConfigService sysConfigService) {
         this.sysConfigService = sysConfigService;
     }
 

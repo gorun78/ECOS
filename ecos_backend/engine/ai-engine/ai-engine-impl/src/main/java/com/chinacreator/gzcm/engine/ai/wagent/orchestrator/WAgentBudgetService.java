@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.wagent.orchestrator;
 
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.RunStatus;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -18,7 +18,7 @@ import java.util.Map;
 /**
  * Run 预算门面（详细设计-10 F10-11 / §4.4 / V265 seed {@code config_group='wagent.budget'}）。
  *
- * <p><b>配置单源</b>：取值一律经 sysman {@link SysConfigService} 门面，禁 @Value 散落默认值、
+ * <p><b>配置单源</b>：取值一律经 sysman {@link ISysConfigService} 门面，禁 @Value 散落默认值、
  * 禁私读表。缺省取代码冻结默认（V265 六键），运维可<b>下调不可上调</b> ⇒
  * 生效值 = {@code min(代码冻结默认, 配置值)}（§4.4 口径；上调请求视同无效，仍按冻结默认）。
  * sysman 未装配（单测切片/启动早期）时回退冻结默认并记 WARN。</p>
@@ -46,18 +46,18 @@ public class WAgentBudgetService {
     public static final int FREEZE_MAX_REPLAN_ROUNDS = 3;
     public static final int FREEZE_MAX_REFILL_ROUNDS = 3;
 
-    private final ObjectProvider<SysConfigService> sysConfigProvider;
+    private final ObjectProvider<ISysConfigService> sysConfigProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public WAgentBudgetService(ObjectProvider<SysConfigService> sysConfigProvider) {
+    public WAgentBudgetService(ObjectProvider<ISysConfigService> sysConfigProvider) {
         this.sysConfigProvider = sysConfigProvider;
     }
 
     /** 单键生效值 = min(冻结默认, 配置值)（可下调不可上调）。 */
     public int effective(String key, int frozenDefault) {
-        SysConfigService cfg = sysConfigProvider.getIfAvailable();
+        ISysConfigService cfg = sysConfigProvider.getIfAvailable();
         if (cfg == null) {
-            log.warn("SysConfigService 未装配，预算键 {} 回退代码冻结默认 {}（禁 @Value 散落）", key, frozenDefault);
+            log.warn("ISysConfigService 未装配，预算键 {} 回退代码冻结默认 {}（禁 @Value 散落）", key, frozenDefault);
             return frozenDefault;
         }
         int configured = cfg.getInt(key, frozenDefault);

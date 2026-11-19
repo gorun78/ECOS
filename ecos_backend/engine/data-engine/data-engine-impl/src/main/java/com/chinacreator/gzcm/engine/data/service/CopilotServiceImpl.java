@@ -6,7 +6,7 @@ import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +21,7 @@ import java.util.Map;
  * Copilot 服务实现 — LLM 调用统一收敛 runtime/llm-gateway (铁律 §2.5)。
  *
  * <p>PMO-74.3 T2: 删除自持 HttpClient 与厂商 URL；provider/model 经 sysman
- * SysConfigService 门面读 sys_config 分组 (dw.copilot.* / config_group='data-engine')；
+ * ISysConfigService 门面读 sys_config 分组 (dw.copilot.* / config_group='data-engine')；
  * api-key 不再由引擎携带（F06-05 / 铁律 §2.5-2）：provider 密钥由 llm-gateway 服务端
  * 经 security-engine 密钥服务按引用解析。</p>
  *
@@ -43,7 +43,7 @@ public class CopilotServiceImpl implements CopilotService {
 
     /** sysman 配置门面 (config_group 单表分组)；可选注入，缺 bean 时走代码默认值 */
     @Autowired(required = false)
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
 
     public CopilotServiceImpl(CopilotDao copilotDao) {
         this.copilotDao = copilotDao;

@@ -6,7 +6,7 @@ import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigRefreshVO;
 import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigRow;
 import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigSegmentsVO;
 import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigUpdateVO;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +31,7 @@ public class DataEngineConfigController {
     private static final Logger log = LoggerFactory.getLogger(DataEngineConfigController.class);
 
     @Autowired
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
 
     /** 默认值常量：config_key → default_value */
     private static final Map<String, String> DEFAULTS = new LinkedHashMap<>();
@@ -255,7 +255,7 @@ public class DataEngineConfigController {
         return DataEngineConfigRow.fromRows(sysConfigService.getByGroup("data-engine"));
     }
 
-    /** 插入默认配置行 (SysConfigService.ensureDefaultConfigs 可能在 schema 就绪前执行) */
+    /** 插入默认配置行 (ISysConfigService.ensureDefaultConfigs 可能在 schema 就绪前执行) */
     private void initDefaultRows() {
         try {
             for (Map.Entry<String, String> e : DEFAULTS.entrySet()) {

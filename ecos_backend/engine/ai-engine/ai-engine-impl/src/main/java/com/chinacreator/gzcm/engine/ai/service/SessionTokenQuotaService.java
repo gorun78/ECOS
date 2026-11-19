@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,13 +33,13 @@ public class SessionTokenQuotaService {
     /** 关闭态取值：0 表示不启用会话配额 */
     public static final long LIMIT_DISABLED = 0L;
 
-    private final ObjectProvider<SysConfigService> sysConfigProvider;
+    private final ObjectProvider<ISysConfigService> sysConfigProvider;
     private final LLMGateway llmGateway;
 
     /** 门面缺失只报一次 WARN（每轮都判，避免刷屏；缺失是部署态而非运行态抖动） */
     private final AtomicBoolean facadeMissingWarned = new AtomicBoolean(false);
 
-    public SessionTokenQuotaService(ObjectProvider<SysConfigService> sysConfigProvider,
+    public SessionTokenQuotaService(ObjectProvider<ISysConfigService> sysConfigProvider,
                                     LLMGateway llmGateway) {
         this.sysConfigProvider = sysConfigProvider;
         this.llmGateway = llmGateway;
@@ -73,7 +73,7 @@ public class SessionTokenQuotaService {
 
     /** 生效上限（token 数）；{@code 0} = 未启用。 */
     public long tokenLimit() {
-        SysConfigService cfg = sysConfigProvider.getIfAvailable();
+        ISysConfigService cfg = sysConfigProvider.getIfAvailable();
         if (cfg == null) {
             if (facadeMissingWarned.compareAndSet(false, true)) {
                 log.warn("[F06-07] sysman 配置门面不可用（独立 boot 进程未扫 sysman 包），会话配额不生效");

@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.KnowledgeSettingsService;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,9 +14,9 @@ public class KnowledgeSettingsServiceImpl implements KnowledgeSettingsService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeSettingsServiceImpl.class);
 
-    private final SysConfigService sysConfigService;
+    private final ISysConfigService sysConfigService;
 
-    public KnowledgeSettingsServiceImpl(SysConfigService sysConfigService) {
+    public KnowledgeSettingsServiceImpl(ISysConfigService sysConfigService) {
         this.sysConfigService = sysConfigService;
     }
 

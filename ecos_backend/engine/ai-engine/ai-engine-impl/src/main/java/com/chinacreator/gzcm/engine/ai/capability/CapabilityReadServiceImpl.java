@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.capability;
 
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -15,7 +15,7 @@ import java.util.Map;
  * 能力读服务实现（§13 {@code GET /api/v1/ai/capabilities}）。
  *
  * <p><b>配置单源（§十/E.5）</b>：工具集分组从既有 {@code sys_config} 的
- * {@code wagent.toolset.*} 族 key 读，一律经 sysman {@link SysConfigService} 门面
+ * {@code wagent.toolset.*} 族 key 读，一律经 sysman {@link ISysConfigService} 门面
  * （ObjectProvider 可空装配），<b>禁 @Value 散落</b>。能力目录三要件
  * （contractVersion/evidenceRequired/automationLevel）冻结在 {@link AiCapabilityId} 代码单源，
  * 配置只补充"工具集是否在册且 active"的归属标签，不改动目录词表（禁单侧漂移，同 V265/V266 纪律）。</p>
@@ -44,9 +44,9 @@ public class CapabilityReadServiceImpl implements CapabilityReadService {
         FAMILY_TOOLSET.put("MULTIMODAL&TEXT", "core");
     }
 
-    private final ObjectProvider<SysConfigService> sysConfigProvider;
+    private final ObjectProvider<ISysConfigService> sysConfigProvider;
 
-    public CapabilityReadServiceImpl(ObjectProvider<SysConfigService> sysConfigProvider) {
+    public CapabilityReadServiceImpl(ObjectProvider<ISysConfigService> sysConfigProvider) {
         this.sysConfigProvider = sysConfigProvider;
     }
 
@@ -79,9 +79,9 @@ public class CapabilityReadServiceImpl implements CapabilityReadService {
 
     /** 读 wagent.toolset 族在册且 active 的工具集标签集合（sysman 未装配/读失败 ⇒ 空集回落代码默认）。 */
     private List<String> readToolsetGroup() {
-        SysConfigService cfg = sysConfigProvider.getIfAvailable();
+        ISysConfigService cfg = sysConfigProvider.getIfAvailable();
         if (cfg == null) {
-            log.warn("SysConfigService 未装配，wagent.toolset 回落代码冻结默认（禁 @Value）");
+            log.warn("ISysConfigService 未装配，wagent.toolset 回落代码冻结默认（禁 @Value）");
             return List.of();
         }
         try {

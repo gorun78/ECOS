@@ -10,7 +10,7 @@ import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -105,14 +105,14 @@ public class SessionCompressionService {
     private final AgentSessionDao sessionDao;
     private final CompressionBatchDao batchDao;
     private final LLMGateway llmGateway;
-    private final ObjectProvider<SysConfigService> sysConfigProvider;
+    private final ObjectProvider<ISysConfigService> sysConfigProvider;
     private final ObjectProvider<EventBusService> eventBusProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SessionCompressionService(AgentSessionDao sessionDao,
                                      CompressionBatchDao batchDao,
                                      LLMGateway llmGateway,
-                                     ObjectProvider<SysConfigService> sysConfigProvider,
+                                     ObjectProvider<ISysConfigService> sysConfigProvider,
                                      ObjectProvider<EventBusService> eventBusProvider) {
         this.sessionDao = sessionDao;
         this.batchDao = batchDao;
@@ -224,7 +224,7 @@ public class SessionCompressionService {
 
     /** 配置读数面（P1.3 #12 context 阈值计算共享；口径与 {@link #compress} 同单源字典链）。 */
     public Settings settings() {
-        SysConfigService cfg = sysConfigProvider.getIfAvailable();
+        ISysConfigService cfg = sysConfigProvider.getIfAvailable();
         if (cfg == null) {
             return new Settings(false, false, DEFAULT_THRESHOLD_RATIO, DEFAULT_KEEP_RECENT_ROUNDS);
         }

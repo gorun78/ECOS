@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.wagent.readiness;
 
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.GoalIntent;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -45,9 +45,9 @@ public class ThresholdPolicy {
     /** 键模板：{@code wagent.readiness.<profile>.<fragment>}（fragment 自带 engine 段与点号）。 */
     private static final String KEY_TEMPLATE = "wagent.readiness.%s.%s";
 
-    private final ObjectProvider<SysConfigService> sysConfigProvider;
+    private final ObjectProvider<ISysConfigService> sysConfigProvider;
 
-    public ThresholdPolicy(ObjectProvider<SysConfigService> sysConfigProvider) {
+    public ThresholdPolicy(ObjectProvider<ISysConfigService> sysConfigProvider) {
         this.sysConfigProvider = sysConfigProvider;
     }
 
@@ -60,9 +60,9 @@ public class ThresholdPolicy {
      */
     public ThresholdSet resolve(String profileId, ReadinessCheckCode code) {
         String profile = normalize(profileId);
-        SysConfigService cfg = sysConfigProvider.getIfAvailable();
+        ISysConfigService cfg = sysConfigProvider.getIfAvailable();
         if (cfg == null) {
-            log.warn("[F10-08] SysConfigService 未装配，阈值单源不可读 ⇒ check_code={} 记 UNKNOWN（禁代码兜底默认）",
+            log.warn("[F10-08] ISysConfigService 未装配，阈值单源不可读 ⇒ check_code={} 记 UNKNOWN（禁代码兜底默认）",
                     code.checkCode());
             return ThresholdSet.unset(profile);
         }
