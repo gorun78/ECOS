@@ -44,7 +44,7 @@ class SysConfigWireShapeTest {
 
     private static final List<String> ROW_KEYS = List.of("id", "config_group", "config_key",
             "config_value", "config_type", "config_label", "config_label_en", "description",
-            "sort_order", "config_options", "impact_scope", "edition");
+            "sort_order", "config_options", "impact_scope", "edition", "default_value");
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> asMap(Object value) {
@@ -80,12 +80,12 @@ class SysConfigWireShapeTest {
     }
 
     @Test
-    @DisplayName("根列表 data 元素＝原始列名 12 键（键序）；两个幻影列键保留但为 null")
+    @DisplayName("根列表 data 元素＝原始列名 13 键（键序）；幻影列键保留但为 null，default_value 带真值")
     void listRowsKeepLegacyColumnNames() {
         SysConfigQueryService service = mock(SysConfigQueryService.class);
         when(service.listByGroup(any(), any(), any())).thenReturn(List.of(
                 new SysConfigQueryService.ConfigGroupRow("1", "general", "k", "v", "string",
-                        "标签", "label", "desc", 3, null, null, "all")));
+                        "标签", "label", "desc", 3, null, null, "all", "v")));
         SysConfigController controller = new SysConfigController(provider(service));
 
         ApiResponse<SysConfigController.ConfigListVO> resp = controller.listByGroup("", "");

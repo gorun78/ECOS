@@ -53,7 +53,8 @@ public class SysConfigQueryService {
             @JsonProperty("sort_order") Integer sortOrder,
             @JsonProperty("config_options") List<String> configOptions,
             @JsonProperty("impact_scope") String impactScope,
-            @JsonProperty("edition") String edition) {
+            @JsonProperty("edition") String edition,
+            @JsonProperty("default_value") String defaultValue) {
     }
 
     /** 元数据行（/metadata 的数据源）。 */
@@ -91,7 +92,7 @@ public class SysConfigQueryService {
     public List<ConfigGroupRow> listByGroup(String group, String edition, String currentEdition) {
         StringBuilder sqlBuilder = new StringBuilder(
             "SELECT id, config_group, config_key, config_value, config_type, " +
-            "config_label, config_label_en, description, sort_order, edition " +
+            "config_label, config_label_en, description, sort_order, edition, default_value " +
             "FROM sys_config WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
@@ -127,7 +128,8 @@ public class SysConfigQueryService {
                     asInt(row.get("sort_order")),
                     null,
                     null,
-                    asString(row.get("edition"))));
+                    asString(row.get("edition")),
+                    asString(row.get("default_value"))));
         }
         return result;
     }
