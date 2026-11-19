@@ -20,7 +20,9 @@
 --   与 sys_config/sys_dict/ecos_security_policy 同域（ST07 控制域归口），
 --   显式不带 schema 前缀沿用 V148 形态。
 --
--- 只加不改（IR03 兼容）：CREATE TABLE IF NOT EXISTS + INSERT ON CONFLICT DO NOTHING。
+-- 只加不改（IR03 兼容）：CREATE TABLE IF NOT EXISTS + 逐行 INSERT ... SELECT ... WHERE NOT EXISTS
+-- （刻意不用 ON CONFLICT：Mc03TimeFormTest 的「PG 专有语法待清退名录」逐脚本计数，
+--   用一次就多一枚债；标准 SQL 表达同一幂等语义，同 V306/V354 先例）。
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ecos_mask_strategy (
@@ -36,20 +38,57 @@ CREATE TABLE IF NOT EXISTS ecos_mask_strategy (
     sort_order      INTEGER      NOT NULL DEFAULT 0,
     description     VARCHAR(500),
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
+    updated_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    -- DR06~DR08 七枚基线列（V200+ 建表即须带齐，DrBaselineColumnsTest 锁③）
+    -- is_deleted 取 SMALLINT(0/1) 而非 BOOLEAN：MC02 类型白名单不含 BOOLEAN
+    -- （存量 BOOLEAN 全在待收口名录，新表禁新增违例），SMALLINT 在白名单内且语义等价
+    create_by       VARCHAR(64),
+    create_time     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    update_by       VARCHAR(64),
+    update_time     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    is_deleted      SMALLINT     NOT NULL DEFAULT 0,
+    version_no      VARCHAR(20)  NOT NULL DEFAULT '1',
+    domain          VARCHAR(50)  NOT NULL DEFAULT 'security'
 );
 
 COMMENT ON TABLE ecos_mask_strategy IS '脱敏策略字典（F04-03）：dataType→脱敏策略映射的可维护事实源，替代 DataMaskingService 硬编码 switch';
 
 INSERT INTO ecos_mask_strategy
     (id, strategy_code, strategy_name, strategy_name_en, data_types, rule_key, pattern_anchor, example_masked, status, sort_order, description)
-VALUES
-    ('mask-idcard',   'idCard',   '身份证号脱敏',  'ID Card Mask',   'ID_CARD',            'idCard',   'ID_CARD_15_18', '110***********1234',      'active', 10, '身份证 15/18 位，保留前 3 后 4'),
-    ('mask-phone',    'phone',    '手机号脱敏',    'Phone Mask',     'PHONE',              'phone',    'PHONE_11',      '138****5678',             'active', 20, '手机号 11 位，保留前 3 后 4'),
-    ('mask-email',    'email',    '邮箱脱敏',      'Email Mask',     'EMAIL',              'email',    'EMAIL_LOCAL',   'a***@example.com',        'active', 30, '邮箱保留首字符与域名'),
-    ('mask-bankcard', 'bankCard', '银行卡号脱敏',  'Bank Card Mask', 'BANK_CARD',          'bankCard', 'BANK_16_19',   '**** **** **** 1234',     'active', 40, '银行卡 16-19 位，仅保留后 4'),
-    ('mask-amount',   'amount',   '金额脱敏',      'Amount Mask',    'AMOUNT',             'amount',   'AMOUNT_NUM',    '¥***,***.00',             'active', 50, '金额数值掩码，保留货币符号与小数格式'),
-    ('mask-address',  'address',  '地址脱敏',      'Address Mask',   'ADDRESS',            'address',  'ADDRESS_CN',    '北京市朝阳区***',          'active', 60, '中文地址保留行政区，详细路段掩码'),
-    ('mask-freetext', 'freeText', '自由文本脱敏',  'Free Text Mask', 'FREE_TEXT',          'freeText', NULL,            '***',                     'active', 70, '自由文本全掩码（F04-03 独立项，原硬编码缺）'),
-    ('mask-none',     'none',     '不脱敏',        'No Masking',     'GENERAL',            'none',     NULL,            '(原样)',                  'active', 99, '兜底策略：未匹配类型不脱敏')
-ON CONFLICT (strategy_code) DO NOTHING;
+SELECT 'mask-idcard',   'idCard',   '身份证号脱敏',  'ID Card Mask',   'ID_CARD',            'idCard',   'ID_CARD_15_18', '110***********1234',      'active', 10, '身份证 15/18 位，保留前 3 后 4'
+WHERE NOT EXISTS (SELECT 1 FROM ecos_mask_strategy WHERE strategy_code = 'idCard');
+
+INSERT INTO ecos_mask_strategy
+    (id, strategy_code, strategy_name, strategy_name_en, data_types, rule_key, pattern_anchor, example_masked, status, sort_order, description)
+SELECT 'mask-phone',    'phone',    '手机号脱敏',    'Phone Mask',     'PHONE',              'phone',    'PHONE_11',      '138****5678',             'active', 20, '手机号 11 位，保留前 3 后 4'
+WHERE NOT EXISTS (SELECT 1 FROM ecos_mask_strategy WHERE strategy_code = 'phone');
+
+INSERT INTO ecos_mask_strategy
+    (id, strategy_code, strategy_name, strategy_name_en, data_types, rule_key, pattern_anchor, example_masked, status, sort_order, description)
+SELECT 'mask-email',    'email',    '邮箱脱敏',      'Email Mask',     'EMAIL',              'email',    'EMAIL_LOCAL',   'a***@example.com',        'active', 30, '邮箱保留首字符与域名'
+WHERE NOT EXISTS (SELECT 1 FROM ecos_mask_strategy WHERE strategy_code = 'email');
+
+INSERT INTO ecos_mask_strategy
+    (id, strategy_code, strategy_name, strategy_name_en, data_types, rule_key, pattern_anchor, example_masked, status, sort_order, description)
+SELECT 'mask-bankcard', 'bankCard', '银行卡号脱敏',  'Bank Card Mask', 'BANK_CARD',          'bankCard', 'BANK_16_19',   '**** **** **** 1234',     'active', 40, '银行卡 16-19 位，仅保留后 4'
+WHERE NOT EXISTS (SELECT 1 FROM ecos_mask_strategy WHERE strategy_code = 'bankCard');
+
+INSERT INTO ecos_mask_strategy
+    (id, strategy_code, strategy_name, strategy_name_en, data_types, rule_key, pattern_anchor, example_masked, status, sort_order, description)
+SELECT 'mask-amount',   'amount',   '金额脱敏',      'Amount Mask',    'AMOUNT',             'amount',   'AMOUNT_NUM',    '¥***,***.00',             'active', 50, '金额数值掩码，保留货币符号与小数格式'
+WHERE NOT EXISTS (SELECT 1 FROM ecos_mask_strategy WHERE strategy_code = 'amount');
+
+INSERT INTO ecos_mask_strategy
+    (id, strategy_code, strategy_name, strategy_name_en, data_types, rule_key, pattern_anchor, example_masked, status, sort_order, description)
+SELECT 'mask-address',  'address',  '地址脱敏',      'Address Mask',   'ADDRESS',            'address',  'ADDRESS_CN',    '北京市朝阳区***',          'active', 60, '中文地址保留行政区，详细路段掩码'
+WHERE NOT EXISTS (SELECT 1 FROM ecos_mask_strategy WHERE strategy_code = 'address');
+
+INSERT INTO ecos_mask_strategy
+    (id, strategy_code, strategy_name, strategy_name_en, data_types, rule_key, pattern_anchor, example_masked, status, sort_order, description)
+SELECT 'mask-freetext', 'freeText', '自由文本脱敏',  'Free Text Mask', 'FREE_TEXT',          'freeText', NULL,            '***',                     'active', 70, '自由文本全掩码（F04-03 独立项，原硬编码缺）'
+WHERE NOT EXISTS (SELECT 1 FROM ecos_mask_strategy WHERE strategy_code = 'freeText');
+
+INSERT INTO ecos_mask_strategy
+    (id, strategy_code, strategy_name, strategy_name_en, data_types, rule_key, pattern_anchor, example_masked, status, sort_order, description)
+SELECT 'mask-none',     'none',     '不脱敏',        'No Masking',     'GENERAL',            'none',     NULL,            '(原样)',                  'active', 99, '兜底策略：未匹配类型不脱敏'
+WHERE NOT EXISTS (SELECT 1 FROM ecos_mask_strategy WHERE strategy_code = 'none');

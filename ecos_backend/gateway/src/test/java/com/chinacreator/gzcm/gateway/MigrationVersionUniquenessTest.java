@@ -204,9 +204,12 @@ class MigrationVersionUniquenessTest {
      * 活库 ecos_dq 实测 0 对象、零 FK、零依赖；规范 §二 一直记着「已消灭」但从未执行）。
      * 临时库从零建库实测：ecos_dq 表 0 / schema 0，ecos_data.dq_* 11 张保全。
      * ⇒ 按实测订正 349→350 / 下一号 350→351。
+     * 2026-11-19 系统配置差距整改批：V351 default_value 列 + V352 ecos_mask_strategy 表 +
+     * V353 引擎 DEFAULTS 回填 + V354 runtime 三组建组 + V355 OPA 配置化（只加不改，均 IF NOT EXISTS/NOT EXISTS 幂等）。
+     * ⇒ 按实测订正 350→355 / 下一号 355→356。
      */
-    private static final int MAX_BASELINE_VERSION = 350;
-    private static final int NEXT_FREE_VERSION = 351;
+    private static final int MAX_BASELINE_VERSION = 355;
+    private static final int NEXT_FREE_VERSION = 356;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
