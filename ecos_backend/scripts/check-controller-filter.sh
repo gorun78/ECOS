@@ -23,8 +23,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 FILTER_FILE="${ROOT_DIR}/ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/VersionPrefixRewriteFilter.java"
-SECURITY_FILE="${ROOT_DIR}/ecos_backend/sysman/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/security/SecurityConfig.java"
-INTERCEPTOR_FILE="${ROOT_DIR}/ecos_backend/sysman/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/security/ClearanceInterceptor.java"
+SECURITY_FILE="${ROOT_DIR}/ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/security/SecurityConfig.java"
+INTERCEPTOR_FILE="${ROOT_DIR}/ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/security/ClearanceInterceptor.java"
 
 if [ "$#" -lt 1 ]; then
   echo "用法: bash $(basename "$0") \"/api/v1/<prefix>\" [\"/<prefix>\" ...]" >&2
