@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.ai.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.capability.web.AiCapabilityApiPaths;
+import com.chinacreator.gzcm.engine.ai.dao.LlmModelRegistryDao;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import org.slf4j.Logger;
@@ -30,8 +31,8 @@ import java.util.TreeMap;
  * <ul>
  *   <li>{@code GET  /api/v1/ai/models} → {@code listLlmModels}（#17，<b>本批实装真值腿</b>：
  *       modelKey/contextWindow 取 {@link LLMGateway#modelCatalog()} 的登记序读数）；</li>
- *   <li>{@code POST /api/v1/ai/models} → {@code registerLlmModel}（#18，<b>显式 501</b>：
- *       版本类资产的运行期写通道缺位，见 {@link #REGISTER_MISSING}）；</li>
+ *   <li>{@code POST /api/v1/ai/models} → {@code registerLlmModel}（#18，<b>已上线</b>：
+ *       E-3 模型注册入表，载体 {@code ecos_ai.ecos_llm_model}（V359）；表不可用时 501 承流）；</li>
  *   <li>{@code GET  /api/v1/ai/models/{modelKey}/health} → {@code checkModelHealth}（#19，
  *       <b>显式 501</b>：模型维度熔断/探测读数无载体，见 {@link #HEALTH_MISSING}）。</li>
  * </ul>
@@ -83,13 +84,6 @@ public class AiModelCatalogController {
     static final String FILTERS_UNAVAILABLE =
             "capability/dataClassification 过滤无载体：目录面不存在该二列，按其筛选只能产出假筛选结果";
 
-    /** #18 未上线的欠账清单（取证单源，响应自证；逐条均可复验）。 */
-    static final List<String> REGISTER_MISSING = List.of(
-            "运行期写通道：llm.models.catalog 属 Spring yml 部署期形态（gateway application.yml 的「运维覆盖面：llm.models.catalog.&lt;model-name&gt;.context-limit」口径，与 V264 头注的部署期/业务期边界同源），注册即升版无处可写",
-            "AI_ADMIN 角色：ecos_backend/ecos_frontend/ecos-tests/tools 源码零命中，仅设计文档记载 ⇒ 角色谓词无载体可判",
-            "OPA 策略：rbac.rego 为 default allow=false + 4 条 allow（pipeline.execute/read/list/get），无 ai:model:* ⇒ 现挂必 fail-closed",
-            VERSION_UNAVAILABLE);
-
     /** #19 未上线的欠账清单（取证单源，响应自证；逐条均可复验）。 */
     static final List<String> HEALTH_MISSING = List.of(
             "模型维度熔断态载体：唯一熔断器 AgentCircuitBreaker 以 agentId 为键，且是 AgentLoopController 的字段级 new 实例（非 Spring 单例），改按 modelKey 取用属推断式关联（禁）",
@@ -101,8 +95,16 @@ public class AiModelCatalogController {
 
     private final LLMGateway llmGateway;
 
-    public AiModelCatalogController(@Autowired(required = false) LLMGateway llmGateway) {
+    /** E-3 模型注册载体（V359）。required=false：未装配时 POST 走 501 承流而非报错。 */
+    private final LlmModelRegistryDao modelRegistryDao;
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    public AiModelCatalogController(@Autowired(required = false) LLMGateway llmGateway,
+                                   @Autowired(required = false) LlmModelRegistryDao modelRegistryDao) {
         this.llmGateway = llmGateway;
+        this.modelRegistryDao = modelRegistryDao;
     }
 
     /**
@@ -168,28 +170,104 @@ public class AiModelCatalogController {
     }
 
     /**
-     * #18 {@code registerLlmModel}：注册/升版模型 —— <b>显式 501 承流，零写入</b>。
+     * #18 {@code registerLlmModel}：注册/升版模型 —— <b>真实写入</b>
+     * （E-3，2026-11-19 用户裁决「模型注册数据入表」，载体 {@code ecos_ai.ecos_llm_model} / V359）。
      *
-     * <p>本面只回显收到的<b>字段名</b>（值一律不回显：{@code apiKeyRef} 与 {@code endpoint} 属敏感
-     * 载体，禁外泄，X-49），并按 {@link #REGISTER_MISSING} 逐条自证为何未上线。禁把"参数收下但
-     * 什么都没写"伪装成 200 成功，也禁就地写 yml 或内存表造出注册成功的假象。</p>
+     * <p><b>升版语义</b>：同 {@code modelKey} 再注册 ⇒ 旧 ACTIVE 行置 {@code RETIRED}、
+     * 新行 {@code version_no + 1}。不物理删（IR03）。</p>
+     *
+     * <p><b>密钥纪律</b>：{@code apiKeyRef} 只收引用名，落库列 {@code api_key_ref}；
+     * 响应与日志<b>一律不回显</b>其值（X-49）。{@code endpoint} 同理不入日志。</p>
+     *
+     * <p><b>表不在</b>：{@code tableReady()} 为 false ⇒ 501 承流（契约级"载体不可用"），
+     * 禁静默写失败伪装成功。</p>
      */
     @PostMapping(AiCapabilityApiPaths.MODELS_REL)
     public ResponseEntity<ApiResponse<Map<String, Object>>> registerLlmModel(
             @RequestBody(required = false) Map<String, Object> body) {
         String traceId = AiTraceSupport.currentTraceId();
-        log.warn("[AiModelCatalogController] registerLlmModel 未上线，显式 501（零写入）: {} 字段 (traceId={})",
-                body == null ? 0 : body.size(), traceId);
-        Map<String, Object> extra = new LinkedHashMap<>();
-        extra.put("written", false);
-        extra.put("modelId", null);
-        extra.put("activeVersion", null);
-        extra.put("gitRef", null);
-        extra.put("received_field_names", body == null ? List.of() : new ArrayList<>(
-                new TreeMap<>(body).keySet()));
-        extra.put("value_echo", "字段值不回显（apiKeyRef/endpoint 属敏感载体，X-49）");
-        extra.put("missing", REGISTER_MISSING);
-        return stub(traceId, "模型注册/升版的运行期写通道与授权载体均缺位", extra);
+
+        if (modelRegistryDao == null || !modelRegistryDao.tableReady()) {
+            log.warn("[AiModelCatalogController] registerLlmModel 载体不可用（V359 未实跑或 DAO 未装配），501: traceId={}", traceId);
+            Map<String, Object> extra = new LinkedHashMap<>();
+            extra.put("written", false);
+            extra.put("missing", List.of("存储载体：ecos_ai.ecos_llm_model（V359）未就位"));
+            return stub(traceId, "模型注册存储载体不可用", extra);
+        }
+
+        if (body == null || body.isEmpty()) {
+            throw new IllegalArgumentException("请求体不可为空（需 modelKey 与 provider）");
+        }
+        String modelKey = str(body.get("modelKey"));
+        String provider = str(body.get("provider"));
+        if (modelKey == null || provider == null) {
+            throw new IllegalArgumentException("modelKey 与 provider 均为必填");
+        }
+
+        String endpoint = str(body.get("endpoint"));
+        String apiKeyRef = str(body.get("apiKeyRef"));
+        int contextLimit = intOrDefault(body.get("contextLimit"), 0);
+        String costClass = str(body.get("costClass"));
+        String capabilitiesJson = jsonOf(body.get("capabilities"));
+        String actor = str(body.get("operator"));
+        if (actor == null) {
+            actor = "api";
+        }
+
+        String id = java.util.UUID.randomUUID().toString();
+        int nextVersion = modelRegistryDao.maxVersion(modelKey) + 1;
+
+        // 升版必须原子：先 retire 旧 ACTIVE 行、再插新行，两步任一步失败都不得留下
+        // "只有 RETIRED、没有 ACTIVE"的空窗（V360 活体实测暴露过该副作用）。
+        modelRegistryDao.replaceActive(id, modelKey, provider, endpoint, apiKeyRef,
+                contextLimit, capabilitiesJson, costClass, String.valueOf(nextVersion), actor);
+
+        log.info("[AiModelCatalogController] registerLlmModel 已落库: modelKey={} version={} traceId={}",
+                modelKey, nextVersion, traceId);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("modelId", id);
+        data.put("modelKey", modelKey);
+        data.put("activeVersion", String.valueOf(nextVersion));
+        // 版本类资产的 Git 归档面：本表只承载"在用版本"，历史版本走 Git（铁律 §2.5 配置/资产二分）。
+        // 未接 Git 链路 ⇒ 如实 null，禁编造 ref。
+        data.put("gitRef", null);
+        data.put("written", true);
+        return ResponseEntity.ok(ApiResponse.success(data)
+                .withTraceId(traceId));
+    }
+
+    private static String str(Object v) {
+        if (v == null) {
+            return null;
+        }
+        String s = String.valueOf(v).trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private static int intOrDefault(Object v, int fallback) {
+        if (v instanceof Number n) {
+            return n.intValue();
+        }
+        if (v instanceof String s && !s.isBlank()) {
+            try {
+                return Integer.parseInt(s.trim());
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private static String jsonOf(Object v) {
+        if (v == null) {
+            return null;
+        }
+        try {
+            return MAPPER.writeValueAsString(v);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
