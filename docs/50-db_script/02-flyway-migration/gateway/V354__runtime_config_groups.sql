@@ -25,26 +25,27 @@
 -- 消费缝状态（2026-11-19 第二批实测订正 — 勿把「已播种」当「已生效」）：
 --   | 键 | 消费方 | 改库是否真的影响行为 |
 --   |----|--------|----------------------|
---   | llm.default-model     | ModelCapabilityExecutorImpl#defaultModel()（缺省模型路径） | ✅ 是 |
---   | llm.default-temperature | **无**（温度取值来自 AgentProfile/LLMConfig，不读本键） | ❌ 否 |
---   | llm.agent-timeout-ms    | **无**（LLMGatewayProperties.getDefaultTimeout 定义但无人调用） | ❌ 否 |
---   | llm.max-context-tokens  | **无**（上下文窗口由 AgentLoopConfig 逐次传入） | ❌ 否 |
+--   | llm.default-model       | ModelCapabilityExecutorImpl#defaultModel / AgentConfigResolver L1 | ✅ 是 |
+--   | llm.default-temperature | AgentConfigResolver L1（@Value 缺省 0.3） | ✅ 是 |
+--   | llm.agent-timeout-ms    | AgentConfigResolver L1（@Value 缺省 300000） | ✅ 是 |
+--   | llm.max-context-tokens  | AgentConfigResolver L1（@Value 缺省 8000） | ✅ 是 |
 --   | event.kafka.auto-offset-reset | KafkaBusConsumerConfig#runtimeEventConsumerBaseProps | ✅ 是 |
 --   | event.kafka.group-prefix      | KafkaEventBusServiceImpl 构造器 | ✅ 是 |
 --   | storage.minio.bucket          | MinioStorageService#effectiveBucket | ✅ 是 |
---   | storage.mineru.timeout-seconds | **无**（MinerUHttpParser 硬编码 Duration.ofMinutes(5)，见下方订正） | ❌ 否 |
+--   | storage.mineru.timeout-seconds | MineruHttpParser（**未接**：该类超时是硬编码常量，见下方订正） | ❌ 否 |
 --
---   ⇒ 现状诚实口径：**8 枚键中 4 枚已接线**（default-model + event×2 + minio.bucket）。
---   未接线的 4 枚（temperature / agent-timeout / max-context / mineru.timeout）已入库、
---   可在配置面看到与编辑，但改值不影响运行行为；**接线前不得对外宣称可在线调整**。
---   桥接落地形态见下方「模板」段（llm.default-model 与 event/storage 均已按此完成）。
+--   ⇒ 现状诚实口径：**8 枚键中 7 枚已接线**。唯一未接的是
+--   `storage.mineru.timeout-seconds`——`MinerUHttpParser.REQUEST_TIMEOUT` 是
+--   `static final Duration.ofMinutes(5)` 常量，改成可配需重构该类（另立项）。
+--   接入方模板见下段（llm / event / storage 均已按此完成）。
 --
--- ⚠ 播种值不实订正（2026-11-19 接线时实测）：
---   `storage.mineru.timeout-seconds = 120` 的原注释称「取 runtime-access 现行缺省」——**不实**。
---   代码真相 = `MinerUHttpParser.REQUEST_TIMEOUT = Duration.ofMinutes(5)`（**300 秒**，OCR 重活放宽）。
---   本脚本按既有播种值保留 120（已实跑入库，改值属另外的运维决定），但桥接代码的
---   `StorageSettings.DEFAULTS` 取 **300** 与代码对齐。⇒ 若将来启用 mineru 超时读取，
---   库内 120 会**缩短**超时（300 → 120），属行为变更，启用前须显式确认。
+-- ⚠ 播种值不实订正（2026-11-19 接线时实测，两处）：
+--   1. `llm.default-temperature` / `llm.max-context-tokens` 初版按 0.7 / 8192 播种
+--      （抄自 `LLMGatewayProperties`），与**真实消费方** `AgentConfigResolver` 的
+--      `@Value` 缺省 0.3 / 8000 不符 ⇒ 本文件已订正，另出 V356 修已跑环境。
+--   2. `storage.mineru.timeout-seconds = 120` 原注释称「取 runtime-access 现行缺省」——**不实**，
+--      代码真相 = 硬编码 300 秒（OCR 重活放宽）。本脚本保留 120（已实跑，改值属运维决定），
+--      但 `StorageSettings.DEFAULTS` 取 300 与代码对齐；该键未接线，暂不影响行为。
 --
 -- 桥接落地形态（llm.default-model 已按此完成，可作模板）：
 --   runtime 侧 SPI（`LlmSettingsSource`，底座零依赖）→ sysman-impl 适配 Bean
