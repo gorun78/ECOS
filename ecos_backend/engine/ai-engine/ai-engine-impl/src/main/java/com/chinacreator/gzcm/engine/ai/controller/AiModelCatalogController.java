@@ -230,16 +230,18 @@ public class AiModelCatalogController {
         // ① OPA 裁决（fail-closed）：securityClient 未装配 / security-engine 不可用 / 角色不足
         //    一律拒绝。契约原文要求 role:AI_ADMIN，但该角色码全仓零命中；按平台既有超管码
         //    ROLE_SUPER_ADMIN 授权（rbac.rego 的 is_ai_model_admin）。
+        //    拒绝面必须是 403 ECOS-AI-403（契约口径），不能抛 IllegalStateException 让兜底
+        //    渲染成 502——"你没有权限"不是"服务端坏了"，客户端按状态行分派时会误判成可重试。
         if (securityClient == null || identityResolver == null) {
             log.warn("[AiModelCatalogController] registerLlmModel 裁决链未装配，fail-closed 拒绝: traceId={}", traceId);
-            throw new IllegalStateException("模型注册的授权链未装配（security-engine 客户端缺失），拒绝写入");
+            return denied(traceId, "模型注册的授权链未装配（security-engine 客户端缺失）");
         }
         var identity = identityResolver.requireWithRoles();
         if (!securityClient.evaluate(identity.operator(), identity.tenantId(),
                 identity.roles(), "ai:model:register", Map.of("modelKey", String.valueOf(body.get("modelKey"))))) {
             log.warn("[AiModelCatalogController] registerLlmModel OPA 拒绝: operator={} roles={} (traceId={})",
                     identity.operator(), identity.roles(), traceId);
-            throw new IllegalStateException("模型注册需平台管理员角色（ai:model:register 裁决未通过）");
+            return denied(traceId, "模型注册需平台管理员角色（ai:model:register 裁决未通过）");
         }
 
         String modelKey = str(body.get("modelKey"));
@@ -387,5 +389,26 @@ public class AiModelCatalogController {
     private static ResponseEntity<ApiResponse<Map<String, Object>>> stub(
             String traceId, String reason, Map<String, Object> extra) {
         return AiResponseSupport.stubCapability(traceId, reason, extra);
+    }
+
+    /**
+     * 403 拒绝信封（契约 {@code ECOS-AI-403}）。
+     *
+     * <p>不抛异常的原因：{@link AiErrorAdvice} 的兜底把未预期异常渲染成 502，
+     * 而「角色不足」是<b>客户端的权限问题</b>，不是服务端故障——按 502 返回会让调用方
+     * 误判为可重试。故在此直接构造 403，与 {@code AiErrorClass.GUARDRAIL_DENIED} 同码。</p>
+     */
+    private static ResponseEntity<ApiResponse<Map<String, Object>>> denied(String traceId, String reason) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("errorCode", AiErrorClass.GUARDRAIL_DENIED.errorCode());
+        data.put("errorClass", AiErrorClass.GUARDRAIL_DENIED.name());
+        data.put("traceId", traceId == null ? "-" : traceId);
+        data.put("retryable", false);
+        data.put("written", false);
+        data.put("reason", reason);
+        ApiResponse<Map<String, Object>> body = ApiResponse.error(403,
+                AiErrorClass.GUARDRAIL_DENIED.errorCode(), reason);
+        body.setData(data);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(body);
     }
 }

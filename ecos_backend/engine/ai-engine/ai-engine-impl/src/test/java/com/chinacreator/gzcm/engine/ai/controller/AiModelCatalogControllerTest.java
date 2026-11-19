@@ -235,10 +235,9 @@ class AiModelCatalogControllerTest {
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(false);
 
-        assertThrows(IllegalStateException.class,
-                () -> new AiModelCatalogController(gateway, dao, denyClient, adminIdentity(), null)
-                        .registerLlmModel(body),
-                "角色不足/裁决不可用必须拒绝，不得写入");
+        ResponseEntity<ApiResponse<Map<String, Object>>> denied = new AiModelCatalogController(gateway, dao, denyClient, adminIdentity(), null).registerLlmModel(body);
+        assertEquals(HttpStatus.FORBIDDEN, denied.getStatusCode(), "角色不足必须 403，禁落 502");
+        assertEquals("ECOS-AI-403", denied.getBody().getData().get("errorCode"));
         verify(dao, org.mockito.Mockito.never()).replaceActive(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
@@ -258,9 +257,8 @@ class AiModelCatalogControllerTest {
         body.put("modelKey", "k");
         body.put("provider", "p");
 
-        assertThrows(IllegalStateException.class,
-                () -> new AiModelCatalogController(mock(LLMGateway.class), dao, null, null, null)
-                        .registerLlmModel(body));
+        ResponseEntity<ApiResponse<Map<String, Object>>> nc = new AiModelCatalogController(mock(LLMGateway.class), dao, null, null, null).registerLlmModel(body);
+        assertEquals(HttpStatus.FORBIDDEN, nc.getStatusCode(), "裁决链缺失也必须 403 fail-closed");
         // tableReady() 探活会调到 dao，但必须零写入
         verify(dao, org.mockito.Mockito.never()).replaceActive(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
