@@ -16,7 +16,22 @@ public record LlmSettings(
         long agentTimeoutMs,
         int maxContextTokens) {
 
-    /** 未桥接/读取失败时的兜底（= LLMGatewayProperties 现行缺省，禁 fail-open 改行为）。 */
+    /**
+     * 未桥接/读取失败时的兜底。
+     *
+     * <p>取值以<b>代码真相</b>为准（2026-11-19 接线时实测定）：</p>
+     * <ul>
+     *   <li>{@code defaultModel = "deepseek/deepseek-chat"} —
+     *       {@code ModelCapabilityExecutorImpl} 缺省路径 / LLMGatewayProperties 缺省；</li>
+     *   <li>{@code defaultTemperature = 0.3} — {@code AgentConfigResolver}
+     *       {@code @Value("${llm.default-temperature:0.3}")}；</li>
+     *   <li>{@code agentTimeoutMs = 300000} — 同上 {@code ${llm.agent-timeout-ms:300000}}；</li>
+     *   <li>{@code maxContextTokens = 8000} — 同上 {@code ${llm.max-context-tokens:8000}}。</li>
+     * </ul>
+     * <p>注意 V354 曾按 0.7 / 8192 播种（模仿 LLMGatewayProperties 而非 AgentConfigResolver），
+     * 与真实 L1 缺省不符；桥接生效后若读数仍是 0.7/8192，会**改变**现有 agent 行为，
+     * 故本批同时把 V354 播种值订正为 0.3/8000。</p>
+     */
     public static final LlmSettings DEFAULTS = new LlmSettings(
-            "deepseek/deepseek-chat", 0.7d, 300_000L, 8192);
+            "deepseek/deepseek-chat", 0.3d, 300_000L, 8000);
 }

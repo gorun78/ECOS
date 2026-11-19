@@ -52,11 +52,13 @@
 --   未装配 ⇒ 纯 yml 行为（等价改造前），禁 fail-open 改行为。
 --
 -- 值口径（保守基线，与 yml/Properties 现值对齐，不借本脚本改行为）：
---   * llm.default-model = 'deepseek/deepseek-chat'、default-temperature = '0.7'、
---     agent-timeout-ms = '300000'、max-context-tokens = '8192'：
---     取 `LLMGatewayProperties` 现行缺省（defaultModel='deepseek/deepseek-chat'，
---     provider/model 组合键；agent-timeout 取 gateway application.yml 的 300s 口径），
---     播种后语义不变。temperature/max-context 为运行期可调代表键。
+--   * llm.default-model = 'deepseek/deepseek-chat'、default-temperature = '0.3'、
+--     agent-timeout-ms = '300000'、max-context-tokens = '8000'：
+--     **以代码真相为准**（2026-11-19 接线实测订正）——这四键的真实 L1 缺省在
+--     `AgentConfigResolver` 的 `@Value` 声明，分别是 0.3 / 300000 / 8000；
+--     `llm.default-model` 另在 `LLMGatewayProperties` 有同名缺省（二者一致）。
+--     本脚本初版误按 LLMGatewayProperties 的 0.7 / 8192 播种，与运行时真实缺省不符，
+--     已在本文件内订正（未跑环境直接得正确值），并另出 V356 修正已跑环境。
 --   * event.kafka.auto-offset-reset = 'earliest'、group-prefix = 'ecos'：
 --     取 runtime-event KafkaBusConsumerConfig 现行缺省。
 --   * storage.minio.bucket = 'ecos-data'、storage.mineru.timeout-seconds = '120'：
@@ -76,9 +78,9 @@ SELECT 'cfg-llm-default-model', 'llm', 'llm.default-model', 'deepseek/deepseek-c
 WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'llm.default-model');
 
 INSERT INTO sys_config (id, config_group, config_key, config_value, config_type, config_label, config_label_en, description, sort_order, status, default_value)
-SELECT 'cfg-llm-default-temperature', 'llm', 'llm.default-temperature', '0.7', 'float',
+SELECT 'cfg-llm-default-temperature', 'llm', 'llm.default-temperature', '0.3', 'float',
        'LLM·默认温度', 'LLM Default Temperature',
-       '采样温度缺省值（0.0~2.0）。运行期可调，影响后续请求的创作/确定性倾向', 2, 'active', '0.7'
+       '采样温度缺省值（0.0~2.0）。运行期可调，影响后续请求的创作/确定性倾向（对齐 AgentConfigResolver @Value 缺省 0.3）', 2, 'active', '0.3'
 WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'llm.default-temperature');
 
 INSERT INTO sys_config (id, config_group, config_key, config_value, config_type, config_label, config_label_en, description, sort_order, status, default_value)
@@ -88,9 +90,9 @@ SELECT 'cfg-llm-agent-timeout', 'llm', 'llm.agent-timeout-ms', '300000', 'int',
 WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'llm.agent-timeout-ms');
 
 INSERT INTO sys_config (id, config_group, config_key, config_value, config_type, config_label, config_label_en, description, sort_order, status, default_value)
-SELECT 'cfg-llm-max-context', 'llm', 'llm.max-context-tokens', '8192', 'int',
+SELECT 'cfg-llm-max-context', 'llm', 'llm.max-context-tokens', '8000', 'int',
        'LLM·最大上下文（tokens）', 'LLM Max Context Tokens',
-       '单次请求上下文 tokens 上限（超过截断）。运行期可调；受模型实际上限钳制', 4, 'active', '8192'
+       '单次请求上下文 tokens 上限（超过截断）。运行期可调；受模型实际上限钳制（对齐 AgentConfigResolver @Value 缺省 8000）', 4, 'active', '8000'
 WHERE NOT EXISTS (SELECT 1 FROM sys_config WHERE config_key = 'llm.max-context-tokens');
 
 -- ── event 组（2 键，Kafka 消费行为） ──

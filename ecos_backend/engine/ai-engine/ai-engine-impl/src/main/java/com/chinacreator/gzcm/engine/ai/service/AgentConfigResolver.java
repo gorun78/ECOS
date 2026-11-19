@@ -2,9 +2,12 @@ package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
+import com.chinacreator.gzcm.runtime.llm.config.LlmSettings;
+import com.chinacreator.gzcm.runtime.llm.config.LlmSettingsSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -64,7 +67,31 @@ public class AgentConfigResolver {
     @Autowired(required = false)
     private AgentRegistryRepository agentRepo;
 
+    /** G-2 消费端：sys_config llm 组（未装配 ⇒ 纯 @Value 行为，等价改造前）。 */
+    @Autowired(required = false)
+    private ObjectProvider<LlmSettingsSource> llmSettingsProvider;
+
     // ─── 公开 API ──────────────────────────────────────────────────────
+
+    /**
+     * L1 生效值：sys_config {@code config_group=llm} 优先，未装配/读不到 ⇒ {@code @Value} 缺省。
+     * 只覆盖四个已播种的键；{@code default-provider} / {@code max-iterations} /
+     * {@code system-prompt} 不在 llm 组内，仍走 {@code @Value}。
+     */
+    private LlmSettings l1Settings() {
+        LlmSettingsSource src = llmSettingsProvider == null ? null : llmSettingsProvider.getIfAvailable();
+        if (src == null) {
+            return new LlmSettings(l1DefaultModel, l1DefaultTemperature,
+                    l1AgentTimeoutMs, l1MaxContextTokens);
+        }
+        try {
+            return src.settings();
+        } catch (RuntimeException e) {
+            log.warn("[AgentConfigResolver] 读取 sys_config llm 组失败，回落 @Value: {}", e.getMessage());
+            return new LlmSettings(l1DefaultModel, l1DefaultTemperature,
+                    l1AgentTimeoutMs, l1MaxContextTokens);
+        }
+    }
 
     /**
      * 执行三层解析，返回最终合并后的配置。
@@ -74,19 +101,20 @@ public class AgentConfigResolver {
      * @return 三层合并后的 AgentLoopConfig
      */
     public AgentLoopConfig resolve(String agentId, Map<String, Object> requestOverrides) {
-        // L1: 全局默认值
+        // L1: 全局默认值（sys_config llm 组优先 → @Value 回落）
+        LlmSettings l1 = l1Settings();
         AgentLoopConfig config = new AgentLoopConfig(
-                l1DefaultProvider, l1DefaultModel, l1DefaultTemperature,
+                l1DefaultProvider, l1.defaultModel(), l1.defaultTemperature(),
                 null,           // maxTokens — L1 不设默认，由 L2/L3/请求决定
-                l1MaxContextTokens,
+                l1.maxContextTokens(),
                 l1MaxIterations,
-                l1AgentTimeoutMs,
+                l1.agentTimeoutMs(),
                 l1DefaultSystemPrompt
         );
 
         log.debug("[AgentConfigResolver] L1 defaults: provider={}, model={}, temp={}, maxCtx={}, maxIter={}, timeout={}ms",
-                l1DefaultProvider, l1DefaultModel, l1DefaultTemperature,
-                l1MaxContextTokens, l1MaxIterations, l1AgentTimeoutMs);
+                l1DefaultProvider, l1.defaultModel(), l1.defaultTemperature(),
+                l1.maxContextTokens(), l1MaxIterations, l1.agentTimeoutMs());
 
         // "default" 或空 → 跳过 L2/L3，仅用 L1 + 请求覆盖
         if (agentId == null || agentId.isBlank() || "default".equals(agentId)) {
