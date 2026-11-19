@@ -16,7 +16,6 @@ interface GanttTimelineProps {
 
 export default function GanttTimeline({ tasks, mode }: GanttTimelineProps) {
   const { styles } = useTheme();
-  if (tasks.length === 0) return null;
 
   const sorted = [...tasks].sort((a, b) => a.seq - b.seq);
   const maxDuration = Math.max(...sorted.map(t => t.durationMs || 0), 1);
@@ -37,6 +36,8 @@ export default function GanttTimeline({ tasks, mode }: GanttTimelineProps) {
     }
     return result;
   }, [sorted, mode]);
+
+  if (tasks.length === 0) return null;
 
   return (
     <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
