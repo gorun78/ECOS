@@ -57,28 +57,41 @@ public class SysConfigController {
      * PUT /api/v1/sysconfig/{key}/reset
      *
      * <p>D23（2026-11-13 验证）：原实现 {@code SELECT config_value, default_value FROM sys_config}
-     * 引用了库中不存在的列 —— {@code sys_config} 在 {@code ecos_control} / {@code ecos_sysman}
-     * 两个 schema 均无 {@code default_value}（实测 information_schema，V13 建表 + V162 补列清单里都没有），
-     * 且 {@code public.sys_config} 根本不存在 ⇒ 每次调用必然抛 {@code BadSqlGrammarException}，
-     * 接口恒返 -1 并把 JDBC 异常原文塞进 message 给前端（系统配置页「重置」按钮 100% 失败）。
+     * 引用了库中不存在的列，接口恒返 -1 并把 JDBC 异常原文塞进 message 给前端。
      *
-     * <p>现在改为：只查真实存在的列；库内无默认值基线 ⇒ 如实返回 404 + 明确原因，
-     * 不再把 SQL 异常当业务错误外泄。默认值基线一旦落到 sys_config（新增列走迁移单源）即可恢复重置能力。
+     * <p><b>V351（2026-11-19）起列已补</b>：{@code V351__sys_config_default_value.sql}
+     * 新增 {@code default_value} 列并按 seed 原值回填安全/全局 11 键默认基线
+     * （差距分析 G-3「reset 恒 404」根因修复）。本方法据此恢复真实重置能力：
+     * 有默认基线 ⇒ 回退到基线 + 发审计；键存在但无基线（引擎配置未回填）⇒ 如实 404 不伪造。
      */
     @RequirePermission(permission = "system:config:manage")
     @PutMapping("/{key}/reset")
     public ApiResponse<ResetResultVO> reset(@PathVariable String key) {
         try {
             List<Map<String, Object>> rows = gatewaySysConfigService.queryForList(
-                    "SELECT config_value FROM sys_config WHERE config_key=?", (Object[]) new Object[]{key});
+                    "SELECT config_value, default_value FROM sys_config WHERE config_key=?", (Object[]) new Object[]{key});
             if (rows.isEmpty()) {
                 return ApiResponse.notFound("配置项不存在: " + key);
             }
 
-            Object currentVal = rows.get(0).get("config_value");
-            // sys_config 无 default_value 列（见方法注释）⇒ 无可回退基线，如实拒绝而非伪造成功
-            return ApiResponse.notFound(
-                    "配置项 " + key + " 未定义默认值基线，无法重置（当前值: " + currentVal + "）");
+            Object previousVal = rows.get(0).get("config_value");
+            Object defaultVal = rows.get(0).get("default_value");
+            if (defaultVal == null) {
+                // 键存在但未回填默认基线（引擎配置等尚未迁移默认值的组）⇒ 如实 404，不伪造重置
+                return ApiResponse.notFound(
+                        "配置项 " + key + " 未定义默认值基线，无法重置（当前值: " + previousVal + "）");
+            }
+
+            String resetValue = String.valueOf(defaultVal);
+            gatewaySysConfigService.update(
+                    "UPDATE sys_config SET config_value=?, updated_at=NOW() WHERE config_key=?",
+                    resetValue, key);
+
+            String operator = resolveOperator();
+            publishAuditEvent(buildAuditPayload(operator, key, previousVal, resetValue));
+
+            return ApiResponse.success(new ResetResultVO(
+                    key, resetValue, previousVal == null ? null : String.valueOf(previousVal), true));
 
         } catch (Exception e) {
             log.error("配置重置失败: key={}", key, e);

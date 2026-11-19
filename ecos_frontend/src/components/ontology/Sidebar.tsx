@@ -9,7 +9,7 @@
  */
 
 import React, { useState } from 'react';
-import { Scale, ScrollText, BookOpen, ChevronDown, LayoutDashboard, Plus } from 'lucide-react';
+import { Scale, ScrollText, BookOpen, ChevronDown, LayoutDashboard, Plus, Settings } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain } from '../../types/ontology';
@@ -22,7 +22,7 @@ import SidebarElementSections from './sidebar/SidebarElementSections';
 import CreateElementMenu from './sidebar/CreateElementMenu';
 import ConfirmDialog from '../common/ConfirmDialog';
 
-type SidebarCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary' | 'caliber' | 'function_audit';
+type SidebarCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary' | 'caliber' | 'function_audit' | 'engine_config';
 
 interface SidebarProps {
   objectTypes: ObjectType[];
@@ -262,6 +262,17 @@ export default function Sidebar({
         >
           <ScrollText size={14} />
           <span>{t('ow.sidebar.functionAudit')}</span>
+        </button>
+        <button type="button"
+          onClick={() => onSelectCategory('engine_config', null)}
+          className={`w-full flex items-center gap-2 py-2 px-3 rounded-lg font-semibold text-xs transition-colors ${
+            selectedCategory === 'engine_config'
+              ? 'bg-sky-50 text-sky-700 border-l-2 border-sky-600'
+              : `${styles.sidebarText} ${styles.sidebarHoverBg}`
+          }`}
+        >
+          <Settings size={14} />
+          <span>{t('ow.sidebar.engineConfig')}</span>
         </button>
       </div>
 

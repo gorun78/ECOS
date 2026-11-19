@@ -9,7 +9,7 @@ import ErrorBoundary from '../components/common/ErrorBoundary';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import ErrorPanel from '../components/common/status/ErrorPanel';
 
-// ── Security config keys — displayed under the security section ──
+// ── Security config keys — 仅保留作「保存前确认门」判定（原还承担分区归类，已改按 config_group 驱动） ──
 const SECURITY_KEYS = new Set([
   'password_min_length',
   'password_require_upper',
@@ -20,12 +20,6 @@ const SECURITY_KEYS = new Set([
   'max_login_attempts',
   'lockout_duration_minutes',
   'max_concurrent_sessions',
-]);
-
-// ── Global config keys — displayed under global section ──
-const GLOBAL_KEYS = new Set([
-  'session_timeout_minutes',
-  'audit_retention_days',
 ]);
 
 // ── i18n key map for known config keys ──
@@ -162,11 +156,17 @@ export default function SystemConfigManager() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // Categorize configs — 白名单之外的键不再静默隐藏（报告 §4.3 行160），
-  // 全量归入「其它配置」区渲染。
-  const globalConfigs = allConfigs.filter(c => GLOBAL_KEYS.has(c.key));
-  const securityConfigs = allConfigs.filter(c => SECURITY_KEYS.has(c.key));
-  const otherConfigs = allConfigs.filter(c => !GLOBAL_KEYS.has(c.key) && !SECURITY_KEYS.has(c.key));
+  // Categorize configs — 按 config_group 驱动分区（差距分析 G-3：白名单驱动改为组驱动，
+  // 新增安全/runtime 键入库后自动可见，无需再改前端白名单）。后端 V40 已带 config_options 时
+  // 在输入侧渲染枚举下拉（差距分析 D-2）。GLOBAL_KEYS/SECURITY_KEYS 白名单废弃。
+  const GLOBAL_GROUPS = new Set(['global', 'general']);
+  const SECURITY_GROUPS = new Set(['security']);
+  const RUNTIME_GROUPS = new Set(['cache', 'llm', 'event', 'storage', 'runtime']);
+  const globalConfigs = allConfigs.filter(c => GLOBAL_GROUPS.has(c.group));
+  const securityConfigs = allConfigs.filter(c => SECURITY_GROUPS.has(c.group));
+  const runtimeConfigs = allConfigs.filter(c => RUNTIME_GROUPS.has(c.group));
+  const otherConfigs = allConfigs.filter(c =>
+    !GLOBAL_GROUPS.has(c.group) && !SECURITY_GROUPS.has(c.group) && !RUNTIME_GROUPS.has(c.group));
 
   // ── Determine type for input rendering ──
   function resolveInputType(cfg: SysConfigItem): 'INTEGER' | 'BOOLEAN' | 'STRING' {
@@ -316,6 +316,22 @@ export default function SystemConfigManager() {
                 <option value="true">true</option>
                 <option value="false">false</option>
               </select>
+            ) : Array.isArray(cfg.options) && cfg.options.length > 0 ? (
+              /* 枚举下拉：事实源 = 后端 config_options（V40），差距分析 D-2 */
+              <select
+                aria-label={label}
+                value={curVal}
+                onChange={e => setEditing(prev => ({ ...prev, [cfg.key]: e.target.value }))}
+                className={`px-2 py-1.5 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
+              >
+                {cfg.options.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+                {/* 现值不在枚举内（历史遗留值）时如实列出，避免静默吞值 */}
+                {!cfg.options.includes(curVal) && curVal !== '' && (
+                  <option value={curVal}>{curVal}</option>
+                )}
+              </select>
             ) : (
               <input
                 aria-label={label}
@@ -463,7 +479,17 @@ export default function SystemConfigManager() {
 
               <div className={`h-2 ${styles.cardBorder}`} />
 
-              {/* Section 3: 其余全部配置（白名单外不再静默隐藏，报告 §4.3 行160） */}
+              {/* Section 3: Runtime 底座配置（cache/llm/event/storage 等组，差距分析 G-3） */}
+              {renderSection(
+                t('systemConfig.section.runtime'),
+                <Settings size={15} className={styles.accentText} />,
+                runtimeConfigs,
+                ''
+              )}
+
+              <div className={`h-2 ${styles.cardBorder}`} />
+
+              {/* Section 4: 其余全部配置（白名单外不再静默隐藏，报告 §4.3 行160） */}
               {renderSection(
                 t('systemConfig.section.other'),
                 <Settings size={15} className={styles.muted} />,

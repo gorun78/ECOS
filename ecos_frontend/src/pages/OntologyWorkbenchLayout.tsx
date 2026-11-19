@@ -41,6 +41,7 @@ import ObjectExplorerView from './ObjectExplorerView';
 import ProposalPanel from './ontology/ProposalPanel';
 import CaliberPage from './ontology/caliber';
 import FunctionAuditPage from './ontology/function-audit';
+import EngineConfigView from './ontology/EngineConfigView';
 
 import {
   createEntity,
@@ -66,7 +67,7 @@ import {
 import { useOntologyData } from '../hooks/useOntologyData';
 import type { Entity } from '../types/workbench';
 
-type ViewCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary' | 'caliber' | 'function_audit';
+type ViewCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary' | 'caliber' | 'function_audit' | 'engine_config';
 type CreatableType = 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function';
 
 /**
@@ -411,7 +412,8 @@ export default function OntologyWorkbenchLayout() {
              selectedCategory === 'dataset' ? t('ow.nav.dataset') :
              selectedCategory === 'glossary' ? t('ow.nav.glossary') :
              selectedCategory === 'caliber' ? t('ow.nav.caliber') :
-             selectedCategory === 'function_audit' ? t('ow.nav.functionAudit') : ''}
+             selectedCategory === 'function_audit' ? t('ow.nav.functionAudit') :
+             selectedCategory === 'engine_config' ? t('ow.nav.engineConfig') : ''}
             </span>
             {DEMO_SOURCE_CATEGORIES.includes(selectedCategory) && (
               <Badge variant="warning">{t('ontology.demo_data_badge')}</Badge>
@@ -672,6 +674,11 @@ export default function OntologyWorkbenchLayout() {
           <div className="h-full min-h-0">
             <FunctionAuditPage onToast={showToast} />
           </div>
+        )}
+
+        {/* 引擎配置（E-2：OntologyConfigController 后端就绪，补前端消费） */}
+        {selectedCategory === 'engine_config' && (
+          <EngineConfigView showToast={showToast} />
         )}
         </div>
 

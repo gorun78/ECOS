@@ -514,6 +514,7 @@
   "systemConfig.audit": "参数审计",
   "systemConfig.section.global": "全局通用配置",
   "systemConfig.section.security": "安全配置",
+  "systemConfig.section.runtime": "Runtime 底座配置",
   "systemConfig.noConfigs": "暂无配置项",
   "systemConfig.col.key": "配置键",
   "systemConfig.col.desc": "描述",

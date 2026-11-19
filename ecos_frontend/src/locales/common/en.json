@@ -514,6 +514,7 @@
   "systemConfig.audit": "Audit",
   "systemConfig.section.global": "Global Configuration",
   "systemConfig.section.security": "Security Configuration",
+  "systemConfig.section.runtime": "Runtime Base Configuration",
   "systemConfig.noConfigs": "No configs available",
   "systemConfig.col.key": "Key",
   "systemConfig.col.desc": "Description",
