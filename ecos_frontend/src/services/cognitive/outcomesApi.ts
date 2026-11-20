@@ -31,6 +31,19 @@ import {
 /** 评估根路径（由 COGNITIVE_BASE 派生，禁第二处字面量；对齐 cognitivePaths 单源守卫口径）。 */
 export const OUTCOMES_BASE_PATH = `${COGNITIVE_BASE}/outcomes`;
 
+/**
+ * workspace 预测 run 编排面基址（对齐 `ForecastRunController` `/api/v1/workspace/forecast-runs`）。
+ * 2026-11-20 决策工作空间：`compare` 双 run 数值对比是后端唯一真实对比端点，
+ * 常量落本文件（与 `workspace/scenarios/{id}/runs` 同族），避免各处自拼。
+ */
+export const WORKSPACE_FORECAST_RUNS_BASE = `${API_BASE}/v1/workspace/forecast-runs`;
+
+/** 双 run 对比路径（`baselineRunId`/`candidateRunId` 均必填，后端缺失 400）。 */
+export function forecastRunsComparePath(baselineRunId: string, candidateRunId: string): string {
+  const q = new URLSearchParams({ baselineRunId, candidateRunId });
+  return `${WORKSPACE_FORECAST_RUNS_BASE}/compare?${q.toString()}`;
+}
+
 /** 按预测运行读回评估列表（runId 必 URL 编码，防路径注入）。 */
 export function outcomesByRunPath(runId: string): string {
   return `${OUTCOMES_BASE_PATH}/by-run/${encodeURIComponent(runId)}`;

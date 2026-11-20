@@ -78,7 +78,8 @@ const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx
 const GatewayDiagnosticsPage = lazy(() => import('./pages/platform/GatewayDiagnosticsPage.tsx'));
 const AlertsPage = lazy(() => import('./pages/platform/AlertsPage.tsx'));
 // 2026-10-14 菜单重构（用户裁决）：总览/资源概览/控制面板 三页对
-const DecisionBoard = lazy(() => import('./pages/DecisionBoard.tsx'));
+// 2026-11-20：首页改为原型 v2 形态的经营决策工作空间（任务优先），原 DecisionBoard 拆分迁入
+const DecisionWorkspace = lazy(() => import('./pages/decision/DecisionWorkspace.tsx'));
 const DecisionMindList = lazy(() => import('./pages/decision/DecisionMindList.tsx'));
 const DecisionMindDetail = lazy(() => import('./pages/decision/DecisionMindDetail.tsx'));
 const ResourceCenter = lazy(() => import('./pages/ResourceCenter.tsx'));
@@ -150,7 +151,7 @@ createRoot(document.getElementById('root')!).render(
                     认知蓝图（CognitiveOperatingSystem）保留在 /mission_control 可达，
                     不在首页渲染。index 根仍为 Navigate 重定向（红线：路由根只增不删）。 */}
                 <Route index element={<Navigate to="/decision" replace />} />
-                <Route path="decision" element={<DecisionBoard />} />
+                <Route path="decision" element={<DecisionWorkspace />} />
                 <Route path="decision/cognition" element={<CognitiveWorkbench />} />
                 {/* R4 Mind 治理（差距分析 P0-6 / B3-c）：列表 + 详情（三轴 + 候选闸门） */}
                 <Route path="decision/mind" element={<DecisionMindList />} />
