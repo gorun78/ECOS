@@ -59,6 +59,13 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired(required = false)
     private AgentRegistryRepository agentRepo;
 
+    /**
+     * 生效的 LLM 默认配置（sys_config llm 组优先，落 @Value 缺省）。
+     * required=false 只服务无 llm-gateway 的装配面；缺失时种子用目录兜底模型。
+     */
+    @Autowired(required = false)
+    private com.chinacreator.gzcm.runtime.llm.config.LlmSettingsSource llmSettingsSource;
+
     public DataInitializer(CronJobDao cronJobRepository,
                            CronJobExecutionDao executionRepository,
                            SkillDao skillRepository,
@@ -275,16 +282,20 @@ public class DataInitializer implements CommandLineRunner {
             return;
         }
 
+        // 内置智能体是 L2 模板，其 model 会覆盖 L1 默认；必须跟随生效配置，
+        // 否则换模型（尤其私有化内网端点）后 Copilot 仍打旧供应商模型名。
+        String seedModel = effectiveDefaultModel();
+
         // 1) 六个 Copilot 内置智能体：合并 upsert（缺键补齐；seedVersion 只升不覆盖用户改值）
         for (CopilotSeedCatalog.Seed seed : CopilotSeedCatalog.all()) {
             try {
                 AgentRegistryEntity existing = agentRepo.findById(seed.id());
                 if (existing == null) {
-                    agentRepo.insert(toEntity(seed));
-                    log.info("Copilot 内置智能体创建: id={} tools={}", seed.id(),
-                            CopilotToolCatalog.namesForAgent(seed.id()).size());
+                    agentRepo.insert(toEntity(seed, seedModel));
+                    log.info("Copilot 内置智能体创建: id={} tools={} model={}", seed.id(),
+                            CopilotToolCatalog.namesForAgent(seed.id()).size(), seedModel);
                 } else {
-                    agentRepo.update(mergeSeed(existing, seed));
+                    agentRepo.update(mergeSeed(existing, seed, seedModel));
                 }
             } catch (Exception e) {
                 log.warn("Copilot 内置智能体种子失败（不中断其余种子）: id={} reason={}",
@@ -309,7 +320,7 @@ public class DataInitializer implements CommandLineRunner {
         log.info("Copilot 内置智能体种子完成: {} 个", CopilotSeedCatalog.all().size());
     }
 
-    private static AgentRegistryEntity toEntity(CopilotSeedCatalog.Seed seed) {
+    private static AgentRegistryEntity toEntity(CopilotSeedCatalog.Seed seed, String model) {
         AgentRegistryEntity entity = new AgentRegistryEntity();
         entity.setId(seed.id());
         entity.setName(seed.name());
@@ -317,7 +328,8 @@ public class DataInitializer implements CommandLineRunner {
         entity.setStatus("ACTIVE");
         entity.setEndpoint("");
         try {
-            entity.setMetadata(mapper.writeValueAsString(CopilotSeedCatalog.seedMetadata(seed)));
+            entity.setMetadata(mapper.writeValueAsString(
+                    CopilotSeedCatalog.seedMetadata(seed, model, null)));
             entity.setCapability(mapper.writeValueAsString(java.util.Map.of(
                     "tools", CopilotToolCatalog.namesForAgent(seed.id()))));
         } catch (Exception e) {
@@ -330,16 +342,35 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     /**
+     * 生效的默认模型：{@code sys_config llm.default-model} → 目录缺省。
+     * 读取失败不得让种子写下空模型名（那会让 L2 覆盖出空值），一律回落兜底。
+     */
+    private String effectiveDefaultModel() {
+        if (llmSettingsSource != null) {
+            try {
+                String fromDb = llmSettingsSource.settings().defaultModel();
+                if (fromDb != null && !fromDb.isBlank()) {
+                    return fromDb.trim();
+                }
+            } catch (RuntimeException e) {
+                log.warn("读取 llm.default-model 失败，内置智能体种子回落目录兜底模型: {}", e.getMessage());
+            }
+        }
+        return com.chinacreator.gzcm.runtime.llm.config.LlmSettings.DEFAULTS.defaultModel();
+    }
+
+    /**
      * 种子合并：只补缺失键 / 升级 seedVersion 相关字段，不覆盖用户在工作台改过的值
      * （systemPrompt/toolWhitelist/guardrails/rag/publish 等用户键存在即保留）。
      */
-    private AgentRegistryEntity mergeSeed(AgentRegistryEntity existing, CopilotSeedCatalog.Seed seed) {
+    private AgentRegistryEntity mergeSeed(AgentRegistryEntity existing, CopilotSeedCatalog.Seed seed,
+                                        String model) {
         try {
             Map<String, Object> meta = mapper.readValue(
                     existing.getMetadata() == null || existing.getMetadata().isBlank()
                             ? "{}" : existing.getMetadata(),
                     new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-            Map<String, Object> seedMeta = CopilotSeedCatalog.seedMetadata(seed);
+            Map<String, Object> seedMeta = CopilotSeedCatalog.seedMetadata(seed, model, null);
             for (Map.Entry<String, Object> entry : seedMeta.entrySet()) {
                 // routes/quickQuestions/name/engine 描述随种子演进可刷新；用户键（提示词/白名单/绑定）存在即保留
                 boolean refreshKey = "kind".equals(entry.getKey()) || "engine".equals(entry.getKey())

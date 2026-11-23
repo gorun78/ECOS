@@ -87,11 +87,19 @@ public class LLMGatewayImpl implements LLMGateway {
 
     /**
      * 获取指定 provider 的 base URL
-     * 优先使用 LLMConfig 中显式设置的 baseUrl，否则使用默认映射
+     *
+     * <p>解析序：请求级显式 {@code LLMConfig.baseUrl} → 部署期覆写
+     * {@code llm.gateway.base-url}（私有化内网 OpenAI 兼容网关）→ 内置公网映射。
+     * 覆写位只改地址不改协议面：仍按 OpenAI 兼容 {@code {baseUrl}/chat/completions} 调用。</p>
      */
     private String resolveBaseUrl(LLMConfig config) {
         if (config.getBaseUrl() != null && !config.getBaseUrl().isEmpty()) {
             return config.getBaseUrl();
+        }
+        String override = llmGatewayProperties == null
+                ? null : llmGatewayProperties.getGateway().getBaseUrl();
+        if (override != null && !override.isBlank()) {
+            return override.trim();
         }
         String provider = config.getProvider() != null ? config.getProvider().toLowerCase() : "";
         return DEFAULT_BASE_URLS.getOrDefault(provider,

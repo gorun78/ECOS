@@ -86,6 +86,13 @@ public class LLMGatewayProperties {
          */
         private String defaultApiKeyRef;
         /**
+         * 部署期 provider 端点<b>覆写</b>（私有化 / 内网 OpenAI 兼容网关）：
+         * 非空时所有 provider 的 baseUrl 一律指向该地址，覆盖 {@code LLMGatewayImpl} 的内置
+         * 公网映射；空 = 保持内置映射（行为不变）。这是部署形态而非业务配置，故留 yml 面。
+         * 环境注入：{@code LLM_GATEWAY_BASE_URL}。
+         */
+        private String baseUrl;
+        /**
          * 限流降级备用 provider 的目标模型（F06-14 要点 2，仅 {@code LLM_RATE_LIMITED} 用尽退避后使用，
          * 且只在网关内部路由 —— 引擎侧不得感知或绕行，X-22）。
          * 默认空 = <b>不降级</b>；代码内禁兜底任何备用模型常量。
@@ -98,6 +105,8 @@ public class LLMGatewayProperties {
         public void setRequestTimeout(Duration requestTimeout) { this.requestTimeout = requestTimeout; }
         public String getDefaultApiKeyRef() { return defaultApiKeyRef; }
         public void setDefaultApiKeyRef(String defaultApiKeyRef) { this.defaultApiKeyRef = defaultApiKeyRef; }
+        public String getBaseUrl() { return baseUrl; }
+        public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
         public String getFallbackModel() { return fallbackModel; }
         public void setFallbackModel(String fallbackModel) { this.fallbackModel = fallbackModel; }
     }

@@ -27,6 +27,10 @@ public final class CopilotSeedCatalog {
     /** 种子版本（升级时只补缺键，不覆盖用户改值）。 */
     public static final int SEED_VERSION = 2;
 
+    /** 未注入生效配置时的兜底模型/提供商（与 yml {@code llm.default-*} 缺省一致）。 */
+    private static final String DEFAULT_MODEL = "deepseek-chat";
+    private static final String DEFAULT_PROVIDER = "deepseek";
+
     public record Seed(String id, String name, String engine, String description,
                        List<String> routes, List<String> quickQuestions, String systemPrompt) {
     }
@@ -110,6 +114,19 @@ public final class CopilotSeedCatalog {
 
     /** 种子 metadata（完整初始配置：SOUL/白名单/绑定/RAG/护栏/发布）。 */
     public static Map<String, Object> seedMetadata(Seed seed) {
+        return seedMetadata(seed, DEFAULT_MODEL, DEFAULT_PROVIDER);
+    }
+
+    /**
+     * 种子 metadata（模型/提供商由调用方注入）。
+     *
+     * <p>模型名<b>不在本类硬编码</b>：内置智能体是 L2 模板，其 {@code model} 会在
+     * {@code AgentConfigResolver} 里覆盖 L1 默认值；写死供应商模型名会让
+     * {@code llm.default-model}（sys_config llm 组）对 Copilot 完全失效——
+     * 私有化部署换成内网模型后，请求仍打到不存在的 {@code deepseek-chat}
+     * （实测 {@code model_not_found}）。调用方应传入生效的默认模型。</p>
+     */
+    public static Map<String, Object> seedMetadata(Seed seed, String model, String provider) {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("kind", "copilot");
         meta.put("engine", seed.engine());
@@ -118,9 +135,9 @@ public final class CopilotSeedCatalog {
         meta.put("routes", seed.routes());
         meta.put("quickQuestions", seed.quickQuestions());
         meta.put("toolWhitelist", CopilotToolCatalog.namesForAgent(seed.id()));
-        meta.put("model", "deepseek-chat");
-        meta.put("modelProvider", "deepseek");
-        meta.put("modelName", "deepseek-chat");
+        meta.put("model", model);
+        meta.put("modelProvider", provider);
+        meta.put("modelName", model);
         meta.put("maxIterations", 5);
         meta.put("temperature", 0.3);
 
