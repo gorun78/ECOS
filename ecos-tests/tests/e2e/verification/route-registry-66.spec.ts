@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { injectAuth, loginAsAdmin } from '../../helpers/ecos';
 
 /**
- * 66 条前端路由全登记判定（产品级逐功能验证 B2 交付物）。
+ * 69 条前端路由全登记判定（产品级逐功能验证 B2 交付物 + 2026-11-22 场景工作台简化 3 条）。
  *
  * 判定口径（每条路由必须有明确结论，禁「未判定」）：
  *   - render  ：进入后必须真正渲染出页面（main 区有可见文案）、不落 ErrorBoundary
@@ -61,7 +61,10 @@ const CASES: RouteCase[] = [
   { key: 'project_workbench', hash: '#/project_workbench', kind: 'render' },
   { key: 'cognitive-workbench', hash: '#/cognitive-workbench', kind: 'render' },
   { key: 'workbench', hash: '#/workbench', kind: 'render' },
+  { key: 'workbench/config', hash: '#/workbench/config', kind: 'render', expectAnyText: ['场景配置', 'Templates', 'Algorithm Library'] },
   { key: 'workbench/:scenarioId', hash: '#/workbench/sc001', kind: 'param' },
+  { key: 'workbench/:scenarioId/definition', hash: '#/workbench/sc001/definition', kind: 'render', expectAnyText: ['场景定义', 'Definition'] },
+  { key: 'workbench/:scenarioId/run', hash: '#/workbench/sc001/run', kind: 'render', expectAnyText: ['场景运行', 'Run History'] },
   { key: 'workbench/:scenarioId/forecast', hash: '#/workbench/sc001/forecast', kind: 'render' },
   { key: 'workbench/:scenarioId/decisions', hash: '#/workbench/sc001/decisions', kind: 'render' },
   { key: 'scenario-sandbox/:scenarioId', hash: '#/scenario-sandbox/sc001', kind: 'render' },
@@ -141,7 +144,7 @@ const KNOWN_BACKEND_GAPS: { pattern: RegExp; id: string; why: string }[] = [
 
 test.setTimeout(900_000);
 
-test('66 条路由全登记判定：无未判定项、无整页崩', async ({ page, request, context }) => {
+test('69 条路由全登记判定：无未判定项、无整页崩', async ({ page, request, context }) => {
   const token = await loginAsAdmin(request);
   await injectAuth(context, token);
 
@@ -256,7 +259,7 @@ test('66 条路由全登记判定：无未判定项、无整页崩', async ({ pa
   }
 
     const failed = verdicts.filter((v) => !v.ok);
-    expect(verdicts, '必须逐条判定，不得缺项').toHaveLength(66);
+    expect(verdicts, '必须逐条判定，不得缺项').toHaveLength(69);
 
     // 二次探针：对首屏报出的 4xx/5xx 逐条重放（带同一 token），把「瞬时抖动」与「真缺陷」分开。
     // 纪律：重放用**同一路径与方法**，只判状态码是否仍 ≥400；仍失败才算真缺陷。

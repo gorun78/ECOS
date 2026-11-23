@@ -62,6 +62,8 @@ test.describe('六态行为面 — 权限/未找到/引擎降级/离线', () => 
       r.fulfill(json500(403, { code: 403, message: 'blueprint access denied', success: false })),
     );
     await page.goto(`/#/workbench/${SCENARIO}`);
+    // 高级区展开后可见蓝图面板
+    await page.getByRole('button', { name: /高级|Advanced/ }).click();
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('无权访问该场景蓝图').first()).toBeVisible();
     // 拒绝态下不得出现版本切换按钮/状态轨（无合成数据）
@@ -85,6 +87,8 @@ test.describe('六态行为面 — 权限/未找到/引擎降级/离线', () => 
       ),
     );
     await page.goto(`/#/workbench/${SCENARIO}`);
+    // 高级区展开后可见蓝图面板
+    await page.getByRole('button', { name: /高级|Advanced/ }).click();
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     // workspace.bp.engine_unavailable = 「蓝图服务暂不可用（{code}），traceId={traceId}」
     await expect(

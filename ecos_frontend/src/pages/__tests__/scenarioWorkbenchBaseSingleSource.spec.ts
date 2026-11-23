@@ -79,7 +79,7 @@ const SITES_PER_FILE: Readonly<Record<string, number>> = {
 /** 本批闭合的两个目录根与其生产文件数（实跑读出，扫描根漂移成空集即红）。 */
 const DOMAIN_ROOTS: ReadonlyArray<{ dir: string; files: number }> = [
   { dir: 'scenario', files: 15 },
-  { dir: 'workbench', files: 23 }, // 2026-11-07：蓝图/工作台新增 3 枚生产文件，按实跑重设（原 20）
+  { dir: 'workbench', files: 26 }, // 2026-11-22：场景工作台简化（definition/run/config 3 枚生产文件，按实跑重设）原 23
 ];
 
 /** 私设基址判据：引号/反引号后紧跟 `/api`（与 `api-base-single-source` 同口径）。 */

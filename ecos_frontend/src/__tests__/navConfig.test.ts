@@ -175,7 +175,7 @@ describe('W209/C191 — 本册实现轮未新增内容路由根（§2.1 落地�
     'ops_apps', 'ops_dashboard', 'platform-governance', 'project_tracker',
     'project_workbench', 'resource-center', 'scenario-sandbox', 'security-center',
     'system-config', 'telemetry', 'tenants', 'tokens', 'workbench',
-    'workflow_designer', 'workshop', 'world_model',
+    'workflow_designer', 'workshop', 'world_model', 'cognitive-workbench',
   ];
 
   it('content route roots in main.tsx equal the frozen baseline (no new roots)', () => {
@@ -200,7 +200,7 @@ describe('W209/C191 — 本册实现轮未新增内容路由根（§2.1 落地�
       removed,
       `路由根消失须先经 W191/R-52 定档并同步本基线清单：${removed.join(', ')}`,
     ).toEqual([]);
-    expect(CONTENT_ROUTE_ROOT_BASELINE.length).toBe(56); // 53（2026-09-29 基线+他册 +4）+3（2026-10-14 菜单重构：decision/resource-center/platform-governance，见上注释）
+    expect(CONTENT_ROUTE_ROOT_BASELINE.length).toBe(57); // 53（2026-09-29 基线+他册 +4）+3（2026-10-14 菜单重构：decision/resource-center/platform-governance）+1（2026-11-21 场景工作台简化：cognitive-workbench 重定向根，保留旧 URL）
   });
 });
 

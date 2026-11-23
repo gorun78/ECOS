@@ -83,14 +83,18 @@ test.describe('议题3 — 场景工作台 Blueprint 中心面', () => {
     await injectAuth(context, token);
     watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED, expectConsoleErrors: RECENT_ACTIONS_DEGRADED });
     await page.goto(`/#/workbench/${SCENARIO_WITH_BP}`);
+    // 高级区展开后可见蓝图面板（用户面术语 = 定义版本；工程面仍保留 blueprint）
+    await page.getByRole('button', { name: /高级|Advanced/ }).click();
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     // 权威副题（workspace.bp.subtitle）
     await expect(page.getByText(/Blueprint 为权威对象/).first()).toBeVisible();
     // curl 核验同口径：列表来自 GET blueprints（200 真数据），非本地拼装
     await expect(page.getByText(/v1|尚无蓝图版本/).first()).toBeVisible();
-    // 运行面（认知四端点）如实态：引擎不承流 ⇒ 503 横幅；有 mind  ⇒ 真数据。二者必居其一，禁静默
+    // 运行面（认知四端点）如实态三选一：引擎不承流 ⇒ 503 横幅；有 mind ⇒ 真数据；
+    // 无 mind ⇒「该场景未绑定 Mind」（scenario.cognition.scenarioNoBind，详设-05 F05-01 起既有文案）。
+    // 三者必居其一，禁静默——2026-11-23 补第三种：原断言漏了「未绑定 Mind」这条合法空态。
     await expect(
-      page.getByText(/认知引擎暂不可用|该场景暂未绑定任何数据或认知|Pending|待处理/).first(),
+      page.getByText(/认知引擎暂不可用|该场景暂未绑定任何数据或认知|该场景未绑定 Mind|Pending|待处理/).first(),
     ).toBeVisible({ timeout: 30_000 });
     await expectNoErrorBoundary(page);
     expectHealthyPage(page);
@@ -101,6 +105,8 @@ test.describe('议题3 — 场景工作台 Blueprint 中心面', () => {
     await injectAuth(context, token);
     watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED, expectConsoleErrors: RECENT_ACTIONS_DEGRADED });
     await page.goto(`/#/workbench/${SCENARIO_WITH_BP}`);
+    // 高级区展开后可见蓝图面板（用户面术语 = 定义版本；工程面仍保留 blueprint）
+    await page.getByRole('button', { name: /高级|Advanced/ }).click();
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     const createBtn = page.getByRole('button', { name: /新建蓝图草稿/ });
     await expect(createBtn).toBeVisible();
@@ -120,6 +126,8 @@ test.describe('议题3 — 场景工作台 Blueprint 中心面', () => {
     await injectAuth(context, token);
     watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED, expectConsoleErrors: RECENT_ACTIONS_DEGRADED });
     await page.goto(`/#/workbench/${SCENARIO_WITH_BP}`);
+    // 高级区展开后可见蓝图面板（用户面术语 = 定义版本；工程面仍保留 blueprint）
+    await page.getByRole('button', { name: /高级|Advanced/ }).click();
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     // 能力目录区（workspace.cap.title）——只读快照 + ★ 声明标记
     const capSection = page.getByText('能力目录');
@@ -136,8 +144,12 @@ test.describe('议题3 — 场景工作台 Blueprint 中心面', () => {
     await injectAuth(context, token);
     watchPageHealth(page, { expectDegraded: COGNITION_DEGRADED, expectConsoleErrors: RECENT_ACTIONS_DEGRADED });
     await page.goto(`/#/workbench/${process.env.ECOS_E2E_EMPTY_SCENARIO_ID ?? 'sc002'}`);
-    // 运行面降级的如实呈现：cognition 503 → L2 认知卡片显示 unavailable 横幅，禁占位假数据
-    await expect(page.getByText(/认知引擎暂不可用|该场景暂未绑定任何数据或认知/).first()).toBeVisible({ timeout: 30_000 });
+    // 运行面降级的如实呈现（四选一，与 T3 同口径 + 空评估态）：cognition 503 → unavailable 横幅；
+    // 无 mind →「该场景未绑定 Mind」；无评估数据 →「该场景暂无经营评估记录」（workspace.l2.empty）。
+    // 禁占位假数据。
+    await expect(page.getByText(/认知引擎暂不可用|该场景暂未绑定任何数据或认知|该场景未绑定 Mind|该场景暂无经营评估记录/).first()).toBeVisible({ timeout: 30_000 });
+    // 高级区展开后可见蓝图面板
+    await page.getByRole('button', { name: /高级|Advanced/ }).click();
     await expect(page.getByText('场景蓝图').first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('尚无蓝图版本').first()).toBeVisible();
     await expect(page.getByText(/创建首版蓝图/).first()).toBeVisible();
