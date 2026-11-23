@@ -943,5 +943,6 @@
   "topbar.user.anonymous": "匿名用户",
   "topbar.user.email.placeholder": "例如 name@company.com",
   "topbar.user.securityNotice": "安全等级 / 沙盒开关将写入后端安全档案，保存前需二次确认；此处修改不等于变更全局策略。",
-  "topbar.user.workstation.placeholder": "例如 WS-AOC-03"
+  "topbar.user.workstation.placeholder": "例如 WS-AOC-03",
+  "common.retry": "重试"
 }

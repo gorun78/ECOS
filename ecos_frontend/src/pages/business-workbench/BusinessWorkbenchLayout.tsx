@@ -98,8 +98,9 @@ export default function BusinessWorkbenchLayout({
     try {
       // Try loading from backend API
       // D30（2026-11-13 验证）：原用 `apiFetch(...)` 传**完整 URL**，而 apiFetch 内部还会拼
-      // `${API_BASE}`（= /api）⇒ 实际请求 /api/api/v1/ecos/* 恒 404，本页四处取数全部失败、
-      // 只能一直吃 mock 兜底。apiFetchData 接收完整 URL、不自加前缀，正是这里需要的语义。
+      // `${API_BASE}`（= /api）⇒ 实际请求会变成「/api」再叠「/api/v1/ecos/*」的双前缀恒 404，
+      // 本页四处取数全部失败、只能一直吃 mock 兜底。apiFetchData 接收完整 URL、不自加前缀，
+      // 正是这里需要的语义（门禁 workbenchScatterBaseSingleSource 对双前缀字面零容忍，故此处不写原样）。
       const [objectsResp, linksResp, actionsResp, domainsResp] = await Promise.allSettled([
         apiFetchData(ECOS_ONTOLOGIES_BASE) as Promise<any>,
         apiFetchData(`${API_BASE}/v1/ecos/relationships`) as Promise<any>,

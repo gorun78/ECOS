@@ -33,11 +33,12 @@
  */
 
 import { API_BASE, rawAuthedJsonUrlFetch } from './httpClient';
+import { WORKSPACE_ANALYSES_BASE } from './scenarioAnalysisBase';
 
 // ── 路径单源（唯一出口）───────────────────────────────
 
-/** workspace 域基址（派生自 API_BASE，不重复定义前缀）。 */
-const WORKSPACE_BASE = `${API_BASE}/v1/workspace`;
+/** workspace 域基址（由 scenarioAnalysisBase 单源持有；本文件只消费不重声明）。 */
+const WORKSPACE_BASE = WORKSPACE_ANALYSES_BASE;
 
 /**
  * 场景集合基址单源：`/api/v1/workspace/scenarios`（#145/B6-2）。

@@ -943,5 +943,6 @@
   "topbar.user.anonymous": "Anonymous",
   "topbar.user.email.placeholder": "e.g. name@company.com",
   "topbar.user.securityNotice": "Access clearance / sandbox toggle are written to the backend security profile and require a second confirmation before saving; changing them here does not alter global policy.",
-  "topbar.user.workstation.placeholder": "e.g. WS-AOC-03"
+  "topbar.user.workstation.placeholder": "e.g. WS-AOC-03",
+  "common.retry": "Retry"
 }
