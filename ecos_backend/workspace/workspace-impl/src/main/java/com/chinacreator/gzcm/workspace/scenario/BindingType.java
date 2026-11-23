@@ -14,6 +14,7 @@ public enum BindingType {
     DATASET(ScenarioTier.SUBGRAPH),
     OBJECT_TYPE(ScenarioTier.SUBGRAPH),
     KNOWLEDGE_BASE(ScenarioTier.SUBGRAPH),
+    RULE_SET(ScenarioTier.SUBGRAPH),
     AI_AGENT(ScenarioTier.CROSSCUT),
     SECURITY_POLICY(ScenarioTier.EXIT),
     INTERFACE(ScenarioTier.EXIT);

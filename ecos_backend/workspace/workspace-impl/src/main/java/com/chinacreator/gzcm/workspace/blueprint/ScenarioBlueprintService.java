@@ -161,6 +161,62 @@ public class ScenarioBlueprintService {
         return toVO(bp, BlueprintStatus.DRAFT);
     }
 
+    /**
+     * 更新 DRAFT 草稿内容（2026-11-21 场景工作台简化）。
+     * <p>只允许 DRAFT；RELEASED 起冻结（{@link ScenarioBlueprintStateMachine#immutableAfterRelease}）。
+     * 由 {@code ScenarioDefinitionController} 调用，既有 12 端点契约不变。</p>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ScenarioBlueprintVO updateDraft(String blueprintId, BlueprintSaveDTO dto, String actor) {
+        ScenarioBlueprint bp = requireById(blueprintId);
+        BlueprintStatus from = parseStatus(bp);
+        if (stateMachine.immutableAfterRelease(from)) {
+            throw new BlueprintConflictException(bp.getId(), from.name(), BlueprintStatus.DRAFT.name());
+        }
+        if (from != BlueprintStatus.DRAFT) {
+            throw new BlueprintContentInvalidException("status", "仅 DRAFT 可更新，当前 " + from);
+        }
+        if (dto == null) {
+            throw new BlueprintContentInvalidException("body", "更新体不可为空");
+        }
+        if (dto.getGoalStatement() != null && dto.getGoalStatement().isBlank()) {
+            throw new BlueprintContentInvalidException("goalStatement", "不可为空白");
+        }
+        if (dto.getGoalStatement() != null) {
+            bp.setGoalStatement(dto.getGoalStatement());
+        }
+        if (dto.getSuccessCriteria() != null) {
+            bp.setGoalSuccessText(jsonOrNull(dto.getSuccessCriteria()));
+        }
+        if (dto.getScope() != null) {
+            bp.setScopeJsonText(jsonOrNull(dto.getScope()));
+        }
+        if (dto.getDependencies() != null) {
+            bp.setDependenciesText(jsonOrNull(dto.getDependencies(), "[]"));
+        }
+        if (dto.getCapabilities() != null) {
+            bp.setCapabilitiesText(jsonOrNull(dto.getCapabilities(), "[]"));
+        }
+        if (dto.getRisks() != null) {
+            bp.setRisksText(jsonOrNull(dto.getRisks(), "[]"));
+        }
+        if (dto.getTests() != null) {
+            bp.setTestsText(jsonOrNull(dto.getTests(), "[]"));
+        }
+        bp.setApprovalRequired(dto.isApprovalRequired() ? 1 : 0);
+        if (dto.getContextDigest() != null) {
+            bp.setContextDigest(dto.getContextDigest());
+        }
+        bp.setUpdateBy(actor);
+        bp.setContentJson(buildContentSnapshot(bp, dto));
+        int rows = dao.updateDraftContent(bp);
+        if (rows == 0) {
+            throw new BlueprintConflictException(bp.getId(), from.name(), BlueprintStatus.DRAFT.name());
+        }
+        log.info("蓝图草稿更新 bp={} v={} actor={}", bp.getId(), bp.getVersion(), actor);
+        return get(bp.getId());
+    }
+
     // ═══════════════ 读 ═══════════════
 
     public List<ScenarioBlueprintVO> listVersions(String scenarioId) {

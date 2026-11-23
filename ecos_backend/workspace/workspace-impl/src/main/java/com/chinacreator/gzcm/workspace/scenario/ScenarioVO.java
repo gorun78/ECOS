@@ -96,6 +96,7 @@ public class ScenarioVO {
         m.put("datasets", new ArrayList<>());
         m.put("objectTypes", new ArrayList<>());
         m.put("knowledgeBases", new ArrayList<>());
+        m.put("ruleSets", new ArrayList<>());
         m.put("aiAgents", new ArrayList<>());
         m.put("securityPolicies", new ArrayList<>());
         m.put("interfaces", new ArrayList<>());

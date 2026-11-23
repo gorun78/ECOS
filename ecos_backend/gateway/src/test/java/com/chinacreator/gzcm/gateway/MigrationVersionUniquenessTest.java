@@ -208,8 +208,8 @@ class MigrationVersionUniquenessTest {
      * V353 引擎 DEFAULTS 回填 + V354 runtime 三组建组 + V355 OPA 配置化（只加不改，均 IF NOT EXISTS/NOT EXISTS 幂等）。
      * ⇒ 按实测订正 350→355 / 下一号 355→356。
      */
-    private static final int MAX_BASELINE_VERSION = 360;
-    private static final int NEXT_FREE_VERSION = 361;
+    private static final int MAX_BASELINE_VERSION = 362;
+    private static final int NEXT_FREE_VERSION = 363;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

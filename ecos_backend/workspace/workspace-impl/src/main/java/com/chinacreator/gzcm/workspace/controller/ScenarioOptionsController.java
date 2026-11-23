@@ -75,6 +75,15 @@ public class ScenarioOptionsController {
         return callRemoteObjects(domain);
     }
 
+    /**
+     * 规则库（2026-11-21 场景工作台简化）：规则中心属主 buszhi
+     * {@code GET /api/v1/ecos/rules}；本面只投影 id/name 与白名单字段，不复制规则体。
+     */
+    @GetMapping("/available/rules")
+    public ApiResponse<?> availableRules() {
+        return callRemote(buszhiRest, "/ecos/rules", "buszhi", "id", "name");
+    }
+
     /** 可用知识资产（dccheng knowledge assets）。 */
     @GetMapping("/available/knowledge")
     public ApiResponse<?> availableKnowledge(@RequestParam(required = false) String domain) {

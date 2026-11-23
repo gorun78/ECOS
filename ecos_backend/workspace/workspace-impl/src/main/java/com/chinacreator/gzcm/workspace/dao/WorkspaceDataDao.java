@@ -341,6 +341,133 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             actual, metricsJson, operator, id);
     }
 
+    /**
+     * 回写场景当前已发布定义版本/摘要（V361 列；只存当前版本，历史走 Git）。
+     */
+    public int updateScenarioDefinitionPointer(String definitionVersion, String definitionDigest,
+                                               String operator, String id) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_business_scenario SET definition_version = ?, definition_digest = ?, " +
+            "update_time = NOW(), update_by = ? WHERE id = ? AND is_deleted = 0",
+            definitionVersion, definitionDigest, operator, id);
+    }
+
+    /** 运行锚点行插入（V361：定义版本/摘要/分析类型/来源）。 */
+    public int insertAnalysisAnchor(String runId, String scenarioId, String analysisType, String status,
+                                    String metric, Object deviation, boolean degraded, String operator,
+                                    String runMode, String sourceRunId, String definitionVersion,
+                                    String definitionDigest, String sourceType, String sourceId) {
+        return jdbcTemplate.update(
+            "INSERT INTO ecos_scenario_run " +
+            "(id, scenario_id, run_type, status, metric, deviation, degraded, " +
+            " run_mode, source_run_id, sandbox_lineage, create_by, update_by, " +
+            " definition_version, definition_digest, analysis_type, source_type, source_id) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NONE', ?, ?, ?, ?, ?, ?, ?)",
+            runId, scenarioId, analysisType, status, metric, deviation, degraded,
+            runMode, sourceRunId, operator, operator,
+            definitionVersion, definitionDigest, analysisType, sourceType, sourceId);
+    }
+
+    /** 锚点状态回写（预测远端结果回来后）。 */
+    public int updateAnalysisAnchorStatus(String runId, String status, String updateBy) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_scenario_run SET status = ?, update_time = NOW(), update_by = ? " +
+            "WHERE id = ? AND is_deleted = 0",
+            status, updateBy, runId);
+    }
+
+    /**
+     * 既有运行行补锚点列（因果/仿真由 ScenarioRunService 先写行，本方法只补元数据，
+     * 不新增行、不改结果列）。
+     */
+    public int updateAnalysisAnchorMeta(String runId, String analysisType, String sourceType,
+                                        String sourceId, String definitionVersion, String definitionDigest) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_scenario_run SET analysis_type = ?, source_type = ?, source_id = ?, " +
+            "definition_version = ?, definition_digest = ?, update_time = NOW() " +
+            "WHERE id = ? AND is_deleted = 0",
+            analysisType, sourceType, sourceId, definitionVersion, definitionDigest, runId);
+    }
+
+    /** 定义摘要读取（运行引用；无当前版本返回 null，禁伪造）。 */
+    public List<Map<String, Object>> findDefinitionPointer(String scenarioId) {
+        return jdbcTemplate.queryForList(
+            "SELECT definition_version, definition_digest FROM ecos_business_scenario " +
+            "WHERE id = ? AND is_deleted = 0",
+            scenarioId);
+    }
+
+    /** 按锚点 id 读运行（含来源）。 */
+    public List<Map<String, Object>> findAnalysisById(String runId) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, scenario_id, run_type, analysis_type, status, metric, deviation, degraded, " +
+            "       run_mode, source_run_id, source_type, source_id, definition_version, definition_digest, " +
+            "       diagnosis_result, forecast_result, simulation_result, strategy_result, create_time " +
+            "FROM ecos_scenario_run WHERE id = ? AND is_deleted = 0",
+            runId);
+    }
+
+    /** 场景分析列表（锚点表统一读，倒序）。 */
+    public List<Map<String, Object>> listAnalyses(String scenarioId, int limit) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, scenario_id, run_type, analysis_type, status, metric, deviation, degraded, " +
+            "       run_mode, source_run_id, source_type, source_id, definition_version, definition_digest, " +
+            "       diagnosis_result, forecast_result, simulation_result, strategy_result, create_time " +
+            "FROM ecos_scenario_run WHERE scenario_id = ? AND is_deleted = 0 " +
+            "ORDER BY create_time DESC LIMIT ?",
+            scenarioId, limit);
+    }
+
+    // ═══════════════ 场景配置（V361：模板/算法库，供 ScenarioConfigService） ═══════════════
+
+    public int insertScenarioTemplate(String id, String name, String category, String description,
+                                      String defaults, String analyses, String status, String operator) {
+        return jdbcTemplate.update(
+            "INSERT INTO ecos_scenario_template (id, name, category, description, definition_defaults, default_analysis, status, create_by, update_by) " +
+            "VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?)",
+            id, name, category, description, defaults, analyses, status, operator, operator);
+    }
+
+    public int updateScenarioTemplate(String id, String name, String category, String description,
+                                      String defaults, String analyses, String status, String operator) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_scenario_template SET name = ?, category = ?, description = ?, " +
+            "definition_defaults = ?::jsonb, default_analysis = ?::jsonb, status = ?, update_by = ?, update_time = NOW() " +
+            "WHERE id = ? AND is_deleted = 0",
+            name, category, description, defaults, analyses, status, operator, id);
+    }
+
+    public int deleteScenarioTemplate(String id, String operator) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_scenario_template SET is_deleted = 1, update_by = ?, update_time = NOW() WHERE id = ? AND is_deleted = 0",
+            operator, id);
+    }
+
+    public int insertScenarioAlgorithm(String id, String name, String analysisType, String version,
+                                       String providerType, String implRef, String params, String output,
+                                       String status, String operator) {
+        return jdbcTemplate.update(
+            "INSERT INTO ecos_algorithm_registry (id, name, analysis_type, version, provider_type, implementation_ref, params_schema, output_schema, status, create_by, update_by) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?)",
+            id, name, analysisType, version, providerType, implRef, params, output, status, operator, operator);
+    }
+
+    public int updateScenarioAlgorithm(String id, String name, String analysisType, String version,
+                                       String providerType, String implRef, String params, String output,
+                                       String status, String operator) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_algorithm_registry SET name = ?, analysis_type = ?, version = ?, provider_type = ?, " +
+            "implementation_ref = ?, params_schema = ?::jsonb, output_schema = ?::jsonb, status = ?, update_by = ?, update_time = NOW() " +
+            "WHERE id = ? AND is_deleted = 0",
+            name, analysisType, version, providerType, implRef, params, output, status, operator, id);
+    }
+
+    public int deleteScenarioAlgorithm(String id, String operator) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_algorithm_registry SET is_deleted = 1, update_by = ?, update_time = NOW() WHERE id = ? AND is_deleted = 0",
+            operator, id);
+    }
+
     /** 新建一条场景绑定。 */
     public int insertBinding(String bid, String scenarioId, String bindingType, String targetRef,
                              String targetId, String targetType, String remark, String createBy, String updateBy) {

@@ -43,18 +43,27 @@ class BindingCatalogContractTest {
     }
 
     @Test
-    @DisplayName("三层归属：SUBGRAPH×3 / CROSSCUT×1 / EXIT×2（铁律 §0.6.1）")
+    @DisplayName("三层归属：SUBGRAPH×4 / CROSSCUT×1 / EXIT×2（铁律 §0.6.1）")
     void tierSplitMatchesIronLaw() {
         Map<ScenarioTier, Integer> count = new LinkedHashMap<>();
         for (BindingType t : BindingType.values()) {
             count.merge(t.tier(), 1, Integer::sum);
         }
-        assertEquals(Integer.valueOf(3), count.get(ScenarioTier.SUBGRAPH),
-                "子图层 = DATASET/OBJECT_TYPE/KNOWLEDGE_BASE");
+        assertEquals(Integer.valueOf(4), count.get(ScenarioTier.SUBGRAPH),
+                "子图层 = DATASET/OBJECT_TYPE/KNOWLEDGE_BASE/RULE_SET");
         assertEquals(Integer.valueOf(1), count.get(ScenarioTier.CROSSCUT),
                 "横切层 = AI_AGENT");
         assertEquals(Integer.valueOf(2), count.get(ScenarioTier.EXIT),
                 "出口层 = SECURITY_POLICY/INTERFACE");
+    }
+
+    @Test
+    @DisplayName("RULE_SET 入目录且不参与必需边（2026-11-21 简化收口）")
+    void ruleSetIsInCatalogAndNotRequired() {
+        assertTrue(BindingType.byName().containsKey("RULE_SET"));
+        assertEquals(BindingType.RULE_SET, BindingType.fromNullable("rule_set"));
+        var adj = new FixedDenominatorEdgePolicy().adjacency();
+        assertTrue(adj.get(BindingType.RULE_SET).isEmpty(), "RULE_SET 不参与必需边邻接");
     }
 
     @Test

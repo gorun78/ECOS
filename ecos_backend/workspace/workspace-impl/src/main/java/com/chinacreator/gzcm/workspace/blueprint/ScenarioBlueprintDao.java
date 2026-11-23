@@ -146,6 +146,25 @@ public class ScenarioBlueprintDao extends JdbcTemplateDaoSupport {
                 toStatus, actor, reason, traceId, actor, id, fromStatus);
     }
 
+    /**
+     * 草稿内容更新（仅 DRAFT；CAS status 守卫，发布后不可改）。
+     * <p>2026-11-21 场景工作台简化：原 12 端点无“更新草稿”，每次保存都会新增版本；
+     * 本方法由 {@code ScenarioDefinitionService} 经新 Controller 调用，不改变既有 API。</p>
+     */
+    public int updateDraftContent(ScenarioBlueprint b) {
+        return jdbcTemplate.update(
+                "UPDATE " + TABLE + " SET goal_statement = ?, goal_success_text = ?, scope_json_text = ?, " +
+                "dependencies_text = ?, capabilities_text = ?, gaps_text = ?, risks_text = ?, tests_text = ?, " +
+                "content_json = ?, approval_required = ?, approval_ref = ?, context_digest = ?, " +
+                "update_time = NOW(), update_by = ? " +
+                "WHERE id = ? AND status = 'DRAFT' AND is_deleted = 0",
+                b.getGoalStatement(), b.getGoalSuccessText(), b.getScopeJsonText(),
+                b.getDependenciesText(), b.getCapabilitiesText(), b.getGapsText(),
+                b.getRisksText(), b.getTestsText(), b.getContentJson(),
+                b.getApprovalRequired(), b.getApprovalRef(), b.getContextDigest(),
+                b.getUpdateBy(), b.getId());
+    }
+
     /** 审批引用回填（approval 端点）。 */
     public int updateApprovalRef(String id, String approvalRef, String actor) {
         return jdbcTemplate.update(

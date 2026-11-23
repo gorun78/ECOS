@@ -41,6 +41,7 @@ public class ScenarioService {
         BINDING_ENDPOINTS.put("DATASET", "datasets");
         BINDING_ENDPOINTS.put("OBJECT_TYPE", "objectTypes");
         BINDING_ENDPOINTS.put("KNOWLEDGE_BASE", "knowledgeBases");
+        BINDING_ENDPOINTS.put("RULE_SET", "ruleSets");
         BINDING_ENDPOINTS.put("AI_AGENT", "aiAgents");
         BINDING_ENDPOINTS.put("SECURITY_POLICY", "securityPolicies");
         BINDING_ENDPOINTS.put("INTERFACE", "interfaces");
@@ -260,6 +261,22 @@ public class ScenarioService {
         merged.putAll(mergeMetrics);
         int n = dao.updateScenarioSafetyIndexAndMetrics(actual, toJson(merged), operator, id);
         return n > 0;
+    }
+
+    /**
+     * 回写场景当前已发布定义版本/摘要（场景工作台简化 v0.3，V361 列）。
+     * <p>只存当前版本，历史版本走 Git；发布门面在 RELEASED 后调用。</p>
+     */
+    @Transactional
+    public void updateDefinitionPointer(String id, String definitionVersion, String definitionDigest, String operator) {
+        if (!exists(id)) {
+            throw new NotFoundException("SCEN-404: 场景不存在: " + id);
+        }
+        int n = dao.updateScenarioDefinitionPointer(definitionVersion, definitionDigest,
+                operator == null ? currentOperator() : operator, id);
+        if (n == 0) {
+            throw new NotFoundException("SCEN-404: 场景不存在或已删除: " + id);
+        }
     }
 
     // ═══════════════ 私有辅助 ═══════════════
