@@ -147,10 +147,14 @@ public class ScenarioQuestionRunService {
         Map<String, Object> intent = detectIntent(question);
         trace.add(step("intent", "success", "意图=" + intent.get("intent"), t0));
 
-        // 装配心智模型输入：问题 + 已确认假设（这是「获取心智模型需要的输入」的落地形态）
+        // 装配心智模型输入：问题 + 已确认假设 + 场景绑定的知识与数据资产
+        // （需求「装配获取心智模型需要的数据和知识资产」落在这三项上：模型拿到的不只是问题本身）
+        KnowledgeContext modelCtx = loadKnowledgeContext(scenarioId, question);
         Map<String, Object> inputs = new LinkedHashMap<>();
-        inputs.put("prompt", buildModelPrompt(question, hypotheses));
+        inputs.put("prompt", buildModelPrompt(question, hypotheses, modelCtx));
         inputs.put("scenarioId", scenarioId);
+        inputs.put("confirmedHypotheses", hypotheses == null ? List.of() : hypotheses);
+        inputs.put("knowledgeBindings", modelCtx.bindings());
 
         long t1 = System.currentTimeMillis();
         String execStatus;
@@ -296,16 +300,18 @@ public class ScenarioQuestionRunService {
     /**
      * 候选假设/信念。
      *
-     * <p>需求要求「通过知识库 tools 获取」，这里用知识库文章作为检索语料 + LLM 提炼；
-     * 知识库不可用时如实返回空列表并标注，不编造假设。</p>
+     * <p>需求要求「通过知识库 tools 获取」。知识检索端点
+     * （{@code POST /api/v1/knowledge/retrieval/search}）在本部署被 OPA
+     * {@code kb.retrieval.search} 默认 DENY（rbac 包无该动作规则，fail-closed 基线，
+     * 不擅自改安全策略），故改走<b>同源知识资产</b>：场景绑定的 KNOWLEDGE_BASE/DATASET
+     * + 知识文档库按问题关键词的正文片段。取到什么用什么，取不到如实标注无依据。</p>
      */
     private List<Map<String, Object>> proposeHypotheses(String scenarioId, String question, String intent) {
-        String context = safeKnowledgeSnippet();
+        KnowledgeContext ctx = loadKnowledgeContext(scenarioId, question);
         String sys = "你是场景请求智能体。基于给定资料，列出该问题涉及的关键假设与信念，供用户确认。"
                 + "只回 JSON 数组，每项 {\"text\":\"假设内容\",\"kind\":\"ASSUMPTION|BELIEF\",\"source\":\"依据\"}，最多 5 项。"
-                + "资料不足就少列，不要编造数据。";
-        String user = "问题：" + question + "\n意图：" + intent
-                + (context.isBlank() ? "\n（无可用知识库资料）" : "\n参考资料：\n" + context);
+                + "source 必须指向给定资料里的具体条目；资料里没有的就写「无知识库依据」，不要编造。";
+        String user = "问题：" + question + "\n意图：" + intent + "\n" + ctx.render();
         String raw = callLlm(sys, user, 900);
         List<Map<String, Object>> out = new ArrayList<>();
         try {
@@ -328,21 +334,79 @@ public class ScenarioQuestionRunService {
         return out;
     }
 
-    /** 知识库语料：取已登记知识库的文档标题做轻量语料；不可用即返回空串（不阻塞主链路）。 */
-    private String safeKnowledgeSnippet() {
-        try {
-            List<Map<String, Object>> rows = dao.listKnowledgeBaseDocTitles(8);
-            if (rows.isEmpty()) return "";
-            StringBuilder sb = new StringBuilder();
-            for (Map<String, Object> r : rows) {
-                Object title = r.get("title");
-                if (title != null) sb.append("- ").append(title).append('\n');
+    /** 一次运行可用的知识上下文（绑定资产 + 文档片段），渲染成给 LLM/心智模型的资料段。 */
+    private record KnowledgeContext(List<Map<String, Object>> bindings,
+                                    List<Map<String, Object>> docs) {
+
+        boolean isEmpty() {
+            return bindings.isEmpty() && docs.isEmpty();
+        }
+
+        /** 给 LLM 的「参考资料」段；空时显式说明，避免模型误以为有资料。 */
+        String render() {
+            if (isEmpty()) {
+                return "参考资料：（本场景未绑定知识资产，且知识文档库无相关条目）";
+            }
+            StringBuilder sb = new StringBuilder("参考资料：\n");
+            if (!bindings.isEmpty()) {
+                sb.append("[已绑定知识资产]\n");
+                for (Map<String, Object> b : bindings) {
+                    sb.append("- ").append(b.get("binding_type")).append(": ")
+                      .append(b.get("target_id")).append('\n');
+                }
+            }
+            if (!docs.isEmpty()) {
+                sb.append("[知识文档片段]\n");
+                for (Map<String, Object> d : docs) {
+                    sb.append("- 《").append(d.get("title")).append("》 ");
+                    Object snippet = d.get("snippet");
+                    sb.append(snippet == null ? "（无正文）" : String.valueOf(snippet)).append('\n');
+                }
             }
             return sb.toString();
-        } catch (RuntimeException e) {
-            log.debug("场景问题运行：知识库语料不可用（不阻塞主链路）: {}", e.getMessage());
-            return "";
         }
+    }
+
+    /**
+     * 装载知识上下文：场景绑定的资产 + 按问题关键词命中的知识文档片段。
+     *
+     * <p>任何一步失败都不阻塞主链路（降级为空并记日志），但**绝不**在失败时假装有资料。</p>
+     */
+    private KnowledgeContext loadKnowledgeContext(String scenarioId, String question) {
+        List<Map<String, Object>> bindings = List.of();
+        try {
+            bindings = dao.listScenarioKnowledgeBindings(scenarioId);
+        } catch (RuntimeException e) {
+            log.warn("场景问题运行：场景知识绑定读取失败（降级为空）: {}", e.getMessage());
+        }
+        List<Map<String, Object>> docs = List.of();
+        try {
+            docs = dao.searchKnowledgeDocs(extractKeywords(question), 5);
+        } catch (RuntimeException e) {
+            log.warn("场景问题运行：知识文档检索失败（降级为空）: {}", e.getMessage());
+        }
+        return new KnowledgeContext(bindings, docs);
+    }
+
+    /**
+     * 从问题里抽关键词（去停用词/标点，取长度≥2 的词元，最多 6 个）。
+     *
+     * <p>轻量启发式而非分词器：只为 ILIKE 定位候选文档，精度不足由 LLM 在假设阶段择优。</p>
+     */
+    static List<String> extractKeywords(String question) {
+        if (question == null || question.isBlank()) return List.of();
+        String cleaned = question.replaceAll("[\\p{Punct}，。？！、；：“”‘’（）《》【】…—]", " ");
+        java.util.Set<String> stop = java.util.Set.of(
+                "如何", "怎么", "什么", "为什么", "应该", "我们", "可以", "这个", "那个",
+                "以及", "但是", "如果", "因为", "所以", "进行", "需要", "问题", "情况");
+        List<String> out = new ArrayList<>();
+        for (String w : cleaned.split("\\s+")) {
+            String t = w.trim();
+            if (t.length() < 2 || stop.contains(t)) continue;
+            if (!out.contains(t)) out.add(t);
+            if (out.size() >= 6) break;
+        }
+        return out;
     }
 
     private List<Map<String, Object>> recommendAlgorithms(String intent) {
@@ -423,7 +487,8 @@ public class ScenarioQuestionRunService {
         return s;
     }
 
-    private static String buildModelPrompt(String question, List<Map<String, Object>> hypotheses) {
+    private static String buildModelPrompt(String question, List<Map<String, Object>> hypotheses,
+                                           KnowledgeContext ctx) {
         StringBuilder sb = new StringBuilder();
         sb.append("问题：").append(question).append('\n');
         if (hypotheses != null && !hypotheses.isEmpty()) {
@@ -435,6 +500,10 @@ public class ScenarioQuestionRunService {
                     sb.append("- ").append(text).append('\n');
                 }
             }
+        }
+        // 知识资产同样进模型输入：心智模型不该在「不知道本场景有哪些资料」的情况下推理
+        if (ctx != null && !ctx.isEmpty()) {
+            sb.append('\n').append(ctx.render());
         }
         return sb.toString();
     }

@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -450,12 +451,52 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             "WHERE status = 'ACTIVE' AND is_deleted = 0 ORDER BY sort_order");
     }
 
-    /** 知识库文档标题（假设检索的轻量语料；表不可用由调用方兜住）。 */
-    public List<Map<String, Object>> listKnowledgeBaseDocTitles(int limit) {
+    /**
+     * 场景绑定的知识类资产（KNOWLEDGE_BASE / DATASET 的 target_id）。
+     *
+     * <p>「心智模型需要的数据和知识资产」的取数入口：只有场景<b>显式绑定</b>的资产才参与装配，
+     * 不做全库捞取（越权且噪声大）。空列表 = 场景未绑定知识资产，调用方须如实标注而非编造。</p>
+     */
+    public List<Map<String, Object>> listScenarioKnowledgeBindings(String scenarioId) {
         return jdbcTemplate.queryForList(
-            "SELECT title FROM ecos_knowledge.kb_doc " +
-            "WHERE is_deleted = 0 AND title IS NOT NULL ORDER BY update_time DESC NULLS LAST LIMIT ?",
-            limit);
+            "SELECT binding_type, COALESCE(target_id, target_ref) AS target_id, target_ref " +
+            "FROM ecos_control.ecos_scenario_binding " +
+            "WHERE scenario_id = ? AND is_deleted = 0 " +
+            "  AND binding_type IN ('KNOWLEDGE_BASE', 'DATASET') " +
+            "ORDER BY binding_type, target_id",
+            scenarioId);
+    }
+
+    /**
+     * 按问题关键词在知识文档里取真实片段（标题/正文/标签任一命中）。
+     *
+     * <p>表为 {@code ecos_knowledge.ecos_kb_document}（有 title/content/tags_json）；
+     * <b>不是</b> {@code kb_doc}——后者只有文件元数据、无 title 列、且多为 queued 未解析，
+     * 早先误用导致查询抛错被吞成「无知识」（2026-11-24 实测订正）。</p>
+     *
+     * @param keywords 关键词（已拆分，空则退化为最近更新）
+     */
+    public List<Map<String, Object>> searchKnowledgeDocs(List<String> keywords, int limit) {
+        StringBuilder where = new StringBuilder(" WHERE is_deleted = 0 AND status <> 'ARCHIVED' ");
+        List<Object> args = new ArrayList<>();
+        if (keywords != null && !keywords.isEmpty()) {
+            where.append(" AND (");
+            for (int i = 0; i < keywords.size(); i++) {
+                if (i > 0) where.append(" OR ");
+                where.append("(title ILIKE ? OR COALESCE(content,'') ILIKE ? OR tags_json ILIKE ?)");
+                String like = "%" + keywords.get(i) + "%";
+                args.add(like);
+                args.add(like);
+                args.add(like);
+            }
+            where.append(") ");
+        }
+        args.add(limit);
+        return jdbcTemplate.queryForList(
+            "SELECT id, doc_code, title, LEFT(COALESCE(content,''), 400) AS snippet, doc_type " +
+            "FROM ecos_knowledge.ecos_kb_document" + where +
+            " ORDER BY update_time DESC LIMIT ?",
+            args.toArray());
     }
 
     /** 定义摘要读取（运行引用；无当前版本返回 null，禁伪造）。 */
