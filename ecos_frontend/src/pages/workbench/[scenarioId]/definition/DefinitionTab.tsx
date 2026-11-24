@@ -6,8 +6,8 @@
  * 页头右侧是「场景上下文构建」——把当前定义的真实绑定作为权威源清单构建运行上下文包。
  * 发布按钮先落盘再发布，避免「改完直接发布」丢改动。</p>
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, GitBranch, Plus, Save, Send, Workflow, X } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, GitBranch, Plus, RefreshCw, Save, Send, Workflow, X } from 'lucide-react';
 import { useLanguage } from '../../../../components/LanguageContext';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useMediaQuery } from '../../../../hooks/useMediaQuery';
@@ -15,6 +15,7 @@ import type { DefinitionVO, DefinitionVersionVO } from '../../../../services/sce
 import { saveScenarioDefinition, publishScenarioDefinition } from '../../../../services/scenarioDefinitionClient';
 import { showToastGlobal } from '../../../../components/common/Toast';
 import ScenarioContextBuilder from './ScenarioContextBuilder';
+import { loadBindingOptions, type BindingGroupKey, type BindingOptionsState } from './bindingOptions';
 
 interface Props {
   scenarioId: string;
@@ -23,17 +24,19 @@ interface Props {
   onPublished: (d: DefinitionVO) => void;
 }
 
-type BindingGroupKey = 'datasets' | 'objectTypes' | 'knowledgeBases' | 'ruleSets' | 'pipelines' | 'aiAgents' | 'securityPolicies' | 'interfaces';
-
+/**
+ * 场景定义页的绑定分组（2026-11-24 用户裁决：只保留数据侧四类）。
+ *
+ * <p>移除 aiAgents / securityPolicies / interfaces 三组：场景运行统一由 AI 工作台提供的
+ * 「场景智能逻辑」（pipelines）驱动，不再在场景侧重复绑定 Agent / 安全策略 / 接口。
+ * 后端 BINDING_ENDPOINTS 八值保留（历史数据可读、API 不改签名），仅前端不再提供入口。</p>
+ */
 const GROUPS: Array<{ key: BindingGroupKey; labelKey: string; hintKey: string }> = [
   { key: 'datasets', labelKey: 'workspace.def.data.datasets', hintKey: 'workspace.def.data.datasetsHint' },
   { key: 'objectTypes', labelKey: 'workspace.def.data.objects', hintKey: 'workspace.def.data.objectsHint' },
   { key: 'knowledgeBases', labelKey: 'workspace.def.knowledge.bases', hintKey: 'workspace.def.knowledge.basesHint' },
   { key: 'ruleSets', labelKey: 'workspace.def.knowledge.rules', hintKey: 'workspace.def.knowledge.rulesHint' },
   { key: 'pipelines', labelKey: 'workspace.def.capability.pipelines', hintKey: 'workspace.def.capability.pipelinesHint' },
-  { key: 'aiAgents', labelKey: 'workspace.def.capability.agents', hintKey: 'workspace.def.capability.agentsHint' },
-  { key: 'securityPolicies', labelKey: 'workspace.def.security.policies', hintKey: 'workspace.def.security.policiesHint' },
-  { key: 'interfaces', labelKey: 'workspace.def.security.interfaces', hintKey: 'workspace.def.security.interfacesHint' },
 ];
 
 function safeMap(def: DefinitionVO | null): Record<string, string[]> {
@@ -51,6 +54,15 @@ const BINDING_TYPE_BY_GROUP: Record<BindingGroupKey, string> = {
   securityPolicies: 'SECURITY_POLICY',
   interfaces: 'INTERFACE',
 };
+
+/**
+ * 后端承认的全部八类绑定（= BINDING_TYPE_BY_GROUP 的键集）。用于保存时全量回传，
+ * 保证「UI 不提供入口」不等于「把已存数据清空」。
+ */
+const ALL_GROUP_KEYS: BindingGroupKey[] = [
+  'datasets', 'objectTypes', 'knowledgeBases', 'ruleSets',
+  'pipelines', 'aiAgents', 'securityPolicies', 'interfaces',
+];
 
 function emptyBindingState(): Record<BindingGroupKey, string[]> {
   return {
@@ -94,6 +106,24 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
     GROUPS.forEach((g) => { init[g.key] = ''; });
     return init;
   });
+
+  /**
+   * 八类绑定候选清单（方案 A：下拉选择取代「凭记忆手输 ID」）。
+   * 全部取真实端点；某类无数据/无端点时如实给 emptyReason，不造演示项。
+   */
+  const [options, setOptions] = useState<Record<BindingGroupKey, BindingOptionsState> | null>(null);
+  const [optionsLoading, setOptionsLoading] = useState(false);
+
+  const reloadOptions = useCallback(() => {
+    let cancelled = false;
+    setOptionsLoading(true);
+    loadBindingOptions(true)
+      .then((next) => { if (!cancelled) setOptions(next); })
+      .finally(() => { if (!cancelled) setOptionsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => reloadOptions(), [reloadOptions]);
 
   useEffect(() => {
     setName(scenarioField(definition, 'name'));
@@ -141,7 +171,14 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
     setBindingState((prev) => ({ ...prev, [key]: prev[key].filter((x) => x !== target) }));
   };
 
-  /** 定义保存体（Publish 前也复用：避免「改完绑定直接发布」丢失改动）。 */
+  /**
+   * 定义保存体（Publish 前也复用：避免「改完绑定直接发布」丢失改动）。
+   *
+   * <p><b>必须提交全部八类绑定</b>（不只是可编辑的五类）：后端 `bindings` 是全量替换语义，
+   * 只提交 GROUPS 会把 aiAgents/securityPolicies/interfaces 三类历史绑定静默清空——
+   * 那是数据丢失而非「移除入口」。UI 不再提供这三类的编辑入口，但它们已存的值
+   * 原样带回，保证「移除入口」不等于「删数据」。</p>
+   */
   const buildPayload = () => ({
     name: name.trim(),
     description: description.trim() || undefined,
@@ -150,10 +187,9 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
     priority,
     budget: budget.trim() || undefined,
     successCriteria: criteriaText.split('\n').map((s) => s.trim()).filter(Boolean),
-    // 绑定全量替换（后端语义：null=不改动，[]=清空）——这里始终提交，保证删掉也能落库
-    bindings: GROUPS.flatMap((g) =>
-      bindingState[g.key].map((target) => ({
-        bindingType: BINDING_TYPE_BY_GROUP[g.key],
+    bindings: ALL_GROUP_KEYS.flatMap((key) =>
+      (bindingState[key] ?? []).map((target) => ({
+        bindingType: BINDING_TYPE_BY_GROUP[key],
         targetRef: target,
         targetId: target,
       })),
@@ -242,6 +278,10 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
         <div className="space-y-4">
           {GROUPS.map((g) => {
             const items = bindingState[g.key] ?? [];
+            const opt = options?.[g.key];
+            const loading = optionsLoading || (opt?.loading ?? false);
+            const candidates = (opt?.items ?? []).filter((o) => !items.includes(o.value));
+            const selectable = candidates.length > 0;
             return (
               <div key={g.key}>
                 <div className="flex items-center justify-between mb-1">
@@ -250,18 +290,44 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
                 </div>
                 <p className={`text-[11px] ${styles.cardTextMuted} mb-2`}>{t(g.hintKey)}</p>
                 <div className="flex items-center gap-1.5 mb-2">
-                  <input
-                    value={bindingDraft[g.key] ?? ''}
-                    onChange={(e) => setBindingDraft((prev) => ({ ...prev, [g.key]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addBinding(g.key);
-                      }
-                    }}
-                    placeholder={t('workspace.def.binding_ph')}
-                    className={`flex-1 min-w-0 text-xs rounded border px-2.5 py-1.5 font-mono ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
-                  />
+                  {selectable ? (
+                    <select
+                      value={bindingDraft[g.key] ?? ''}
+                      onChange={(e) => setBindingDraft((prev) => ({ ...prev, [g.key]: e.target.value }))}
+                      disabled={loading}
+                      aria-label={t(g.labelKey)}
+                      className={`flex-1 min-w-0 text-xs rounded border px-2.5 py-1.5 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+                    >
+                      <option value="">{t('workspace.def.binding_select_ph')}</option>
+                      {candidates.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.hint ? `${o.label} · ${o.hint}` : o.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div
+                      className={`flex-1 min-w-0 text-[11px] rounded border px-2.5 py-1.5 ${styles.inputBg} ${styles.inputBorder} ${styles.cardTextMuted}`}
+                      role="status"
+                    >
+                      {loading
+                        ? t('workspace.def.binding_loading')
+                        : opt?.error
+                          ? t('workspace.def.binding_load_failed', { msg: opt.error })
+                          : (opt?.emptyReason ?? t('workspace.def.binding_none'))}
+                    </div>
+                  )}
+                  {/* 候选为空/出错时给重试（不把失败伪装成「没有数据」） */}
+                  {!loading && !selectable && (
+                    <button
+                      type="button"
+                      onClick={() => reloadOptions()}
+                      aria-label={t('workspace.def.binding_reload')}
+                      className={`shrink-0 p-1.5 rounded border cursor-pointer ${styles.cardBg} ${styles.accentText} ${styles.accentBorder}`}
+                    >
+                      <RefreshCw size={11} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => addBinding(g.key)}

@@ -81,4 +81,34 @@ public interface KbDocMapper {
             + "</where>"
             + "</script>")
     long countByStatus(@Param("status") String status);
+
+    /**
+     * 按知识库（{@code domain} 列）聚合的真实统计行（Context Builder KNOWLEDGE_BASE reader 用）。
+     *
+     * <p>只读在册列，不合成字段：{@code base_id}=domain；{@code doc_count} 文档数；
+     * {@code chunk_total} 已产出的分块总数；{@code last_updated} 该库内最新一次更新时间
+     * （作用域版本口径，与其它 reader 的 updatedAt 语义一致）。</p>
+     *
+     * <p>返回 {@code domain} 为空串/空值的历史行归入 {@code default} 库，与库列表端点口径一致。</p>
+     */
+    @Select("SELECT COALESCE(NULLIF(TRIM(domain), ''), 'default') AS base_id, "
+            + " COUNT(*) AS doc_count, "
+            + " COALESCE(SUM(chunk_count), 0) AS chunk_total, "
+            + " MAX(updated_at) AS last_updated "
+            + "FROM ecos_knowledge.kb_doc "
+            + "GROUP BY COALESCE(NULLIF(TRIM(domain), ''), 'default') "
+            + "ORDER BY base_id")
+    List<java.util.Map<String, Object>> groupByBase();
+
+    /**
+     * 单个知识库（{@code domain} 列）的真实统计；库内无文档时返回 {@code null}（调用方据 404 语义处理）。
+     */
+    @Select("SELECT COALESCE(NULLIF(TRIM(domain), ''), 'default') AS base_id, "
+            + " COUNT(*) AS doc_count, "
+            + " COALESCE(SUM(chunk_count), 0) AS chunk_total, "
+            + " MAX(updated_at) AS last_updated "
+            + "FROM ecos_knowledge.kb_doc "
+            + "WHERE COALESCE(NULLIF(TRIM(domain), ''), 'default') = #{baseId} "
+            + "GROUP BY COALESCE(NULLIF(TRIM(domain), ''), 'default')")
+    java.util.Map<String, Object> statByBase(@Param("baseId") String baseId);
 }

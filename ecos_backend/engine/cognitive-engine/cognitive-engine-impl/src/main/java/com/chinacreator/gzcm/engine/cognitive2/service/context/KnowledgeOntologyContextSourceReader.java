@@ -36,11 +36,21 @@ public class KnowledgeOntologyContextSourceReader implements ContextSourceReader
     private static final Logger log = LoggerFactory.getLogger(KnowledgeOntologyContextSourceReader.class);
 
     static final String SOURCE_TYPE_KNOWLEDGE = "KNOWLEDGE";
+    /**
+     * 知识库（整个库作为来源，2026-11-24 新增）。
+     *
+     * <p>与 {@code KNOWLEDGE}（单篇文章）的区别：场景定义侧绑定的是**知识库**，
+     * 后端按库聚合（{@code ecos_knowledge.kb_doc.domain}）读版本/时点与文档规模，
+     * 而不是要求用户再指定某篇文章。端点为 kb-engine 的
+     * {@code GET /api/v1/knowledge-bases/{baseId}}（本批新增）。</p>
+     */
+    static final String SOURCE_TYPE_KNOWLEDGE_BASE = "KNOWLEDGE_BASE";
     static final String SOURCE_TYPE_ONTOLOGY = "ONTOLOGY";
 
     static final String KNOWLEDGE_SERVICE = "dccheng";
     static final String ONTOLOGY_SERVICE = "buszhi";
     static final String KNOWLEDGE_PATH = "/api/v1/knowledge/articles/%s";
+    static final String KNOWLEDGE_BASE_PATH = "/api/v1/knowledge-bases/%s";
     static final String ONTOLOGY_PATH = "/api/v1/ecos/ontologies/entities/%s";
     private static final int CODE_SUCCESS = 0;
 
@@ -55,7 +65,9 @@ public class KnowledgeOntologyContextSourceReader implements ContextSourceReader
 
     @Override
     public boolean supports(String sourceType) {
-        return SOURCE_TYPE_KNOWLEDGE.equals(sourceType) || SOURCE_TYPE_ONTOLOGY.equals(sourceType);
+        return SOURCE_TYPE_KNOWLEDGE.equals(sourceType)
+                || SOURCE_TYPE_KNOWLEDGE_BASE.equals(sourceType)
+                || SOURCE_TYPE_ONTOLOGY.equals(sourceType);
     }
 
     @Override
@@ -63,6 +75,9 @@ public class KnowledgeOntologyContextSourceReader implements ContextSourceReader
         if (ref == null || isBlank(ref.getSourceId())) {
             throw new ContextReadException(ref == null ? "UNKNOWN" : ref.getSourceType(), null,
                     "sourceId required (no full-catalog scan, §5.4-2)");
+        }
+        if (SOURCE_TYPE_KNOWLEDGE_BASE.equals(ref.getSourceType())) {
+            return readKnowledgeBase(ref);
         }
         boolean knowledge = SOURCE_TYPE_KNOWLEDGE.equals(ref.getSourceType());
         String service = knowledge ? KNOWLEDGE_SERVICE : ONTOLOGY_SERVICE;
@@ -81,6 +96,41 @@ public class KnowledgeOntologyContextSourceReader implements ContextSourceReader
         result.setVersion(version);
         result.setAsOfTime(asOfTime);
         result.setAssetRefs(assetRefs(ref, data, version, status, asOfTime));
+        // 源侧未声明权威等级/新鲜度 ⇒ 不替源侧声明
+        result.setAuthoritative(false);
+        result.setDenied(false);
+        return result;
+    }
+
+    /**
+     * 读一个知识库（整个库作为权威源）。
+     *
+     * <p>版本口径与其它 reader 一致：取源侧 {@code updatedAt}（库内最新文档更新时间），
+     * 不回填请求声明值。库内无文档 ⇒ 源侧 404/无版本 ⇒ 抛 {@link ContextReadException}，
+     * 由 Builder 按 required/可选语义处置（必需源 503、可选源 warnings），
+     * <b>不返回空集合伪装成「库是空的」</b>。</p>
+     */
+    private SourceReadResult readKnowledgeBase(ContextSourceRef ref) {
+        JsonNode data = fetch(KNOWLEDGE_SERVICE,
+                String.format(KNOWLEDGE_BASE_PATH, enc(ref.getSourceId())),
+                SOURCE_TYPE_KNOWLEDGE_BASE, ref.getSourceId());
+
+        String version = firstText(data, "updatedAt", "updated_at", "version");
+        if (version == null) {
+            throw new ContextReadException(SOURCE_TYPE_KNOWLEDGE_BASE, ref.getSourceId(),
+                    "知识库未透出 updatedAt/version（SUP-CTX-01；禁以请求声明版本回填）");
+        }
+        String asOfTime = firstText(data, "updatedAt", "updated_at");
+
+        SourceReadResult result = new SourceReadResult();
+        result.setVersion(version);
+        result.setAsOfTime(asOfTime);
+        List<AssetProjection> refs = new ArrayList<>();
+        // 库本体作为一个引用（refId = 库标识），库内文档规模作为状态辅助信息
+        String docCount = firstText(data, "documentCount", "docCount", "document_count");
+        String status = docCount == null ? null : "DOCS=" + docCount;
+        refs.add(new AssetProjection(ref.getSourceId(), version, status, asOfTime));
+        result.setAssetRefs(refs);
         // 源侧未声明权威等级/新鲜度 ⇒ 不替源侧声明
         result.setAuthoritative(false);
         result.setDenied(false);

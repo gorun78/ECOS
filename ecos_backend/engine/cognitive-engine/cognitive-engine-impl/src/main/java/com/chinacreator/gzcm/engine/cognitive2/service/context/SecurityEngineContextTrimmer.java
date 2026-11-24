@@ -59,6 +59,9 @@ public class SecurityEngineContextTrimmer implements ContextSecurityTrimmer {
     private static final Map<String, String> SOURCE_TABLES = Map.of(
             "DATA_ASSET", "ecos_data.ecos_data_asset",
             "KNOWLEDGE", "ecos_knowledge.knowledge_article",
+            // 知识库（整库来源，2026-11-24）：按库聚合的载体是文档表，其 domain 列即库标识
+            // （见 KbDocMapper.groupByBase）。未登记会导致 KNOWLEDGE_BASE 恒 DENY（fail-closed）。
+            "KNOWLEDGE_BASE", "ecos_knowledge.kb_doc",
             "ONTOLOGY", "ecos_ontology.ecos_ontology_entity",
             "COGNITIVE", "ecos_cognitive.ecos_cognitive_belief");
 

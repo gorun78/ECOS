@@ -561,8 +561,14 @@ export async function transitionCognitiveAsset(
 /** context/build 唯一路径（对齐 CognitiveApiPaths.CONTEXT_BUILD；纳入单源守卫）。 */
 export const CONTEXT_BUILD_PATH = `${COGNITIVE_BASE}/context/build`;
 
-/** 权威源类型（后端 ContextSourceRef.sourceType 词表；来自 §5.2 请求示例单源）。 */
-export const CONTEXT_SOURCE_TYPES = ["DATA_ASSET", "ONTOLOGY", "KNOWLEDGE", "COGNITIVE", "CAPABILITY"] as const;
+/**
+ * 权威源类型（后端 ContextSourceRef.sourceType 词表；来自 §5.2 请求示例单源）。
+ *
+ * <p>{@code KNOWLEDGE_BASE}（2026-11-24 新增）表示「整个知识库」作为来源，
+ * 与 {@code KNOWLEDGE}（单篇文章）区分：场景定义侧绑定的是知识库，
+ * 由 kb-engine 的 {@code GET /api/v1/knowledge-bases/{id}} 按库聚合读版本/时点。</p>
+ */
+export const CONTEXT_SOURCE_TYPES = ["DATA_ASSET", "ONTOLOGY", "KNOWLEDGE", "KNOWLEDGE_BASE", "COGNITIVE", "CAPABILITY"] as const;
 export type ContextSourceType = (typeof CONTEXT_SOURCE_TYPES)[number];
 
 /** 必需资产条目输入（SUP-CTX-01：缺 id/版本/时点三要素后端 400，前端只做提示不代行校验）。 */

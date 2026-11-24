@@ -13,7 +13,7 @@
  *
  * <p>六态：表单(idle)/提交中/结果/错误族/引擎 503 横幅(含 traceId)/未选蓝图。</p>
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertOctagon,
   CircleCheck,
@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
+import { getAuthToken } from '../../../../services/auth';
 import {
   buildScenarioContext,
   packList,
@@ -70,12 +71,34 @@ const ctxErrKey = (status: number): string => {
   }
 };
 
+/**
+ * 从当前登录 token 解析租户 ID（`tenant_id` claim）。
+ *
+ * <p>为什么这么做：后端 `validateRequest` 要求 `scope.tenantId` 非空，缺则 400。
+ * 租户是登录会话的固有属性，让用户手填既多余又易错（填错会被 OPA 拒或读到别人租户）。
+ * 只读 payload 的 `tenant_id`，不做任何推断；解不出就返回空串，由用户手填兜底。</p>
+ */
+function tenantIdFromToken(): string {
+  try {
+    const token = getAuthToken();
+    if (!token || token.split('.').length < 2) return '';
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const t = payload?.tenant_id ?? payload?.tenantId;
+    return typeof t === 'string' ? t : '';
+  } catch {
+    return '';
+  }
+}
+
 export default function ContextBuildPanel({ scenarioId, blueprint, initialAssets }: Props) {
   const { styles } = useTheme();
   const { t } = useLanguage();
 
   const scopeTenant = (blueprint?.scope as Record<string, unknown> | undefined)?.tenantId;
-  const [tenantId, setTenantId] = useState(typeof scopeTenant === 'string' ? scopeTenant : '');
+  // 优先级：蓝图 scope 声明的租户 > 登录 token 的 tenant_id > 空（由用户手填）
+  const [tenantId, setTenantId] = useState(
+    typeof scopeTenant === 'string' && scopeTenant !== '' ? scopeTenant : tenantIdFromToken(),
+  );
   const [rows, setRows] = useState<AssetRow[]>(() => (initialAssets ?? []).map((a) => ({
     key: `r${++rowSeq}`,
     sourceType: a.sourceType,
@@ -88,6 +111,27 @@ export default function ContextBuildPanel({ scenarioId, blueprint, initialAssets
   const [asOfTime, setAsOfTime] = useState('');
   const [ttl, setTtl] = useState('');
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+
+  /**
+   * 同步外部预填（含异步解析出的 version）。
+   *
+   * <p>调用方 ScenarioContextBuilder 打开面板后才去读各来源真实版本，解析完成时
+   * 本组件早已挂载——只靠 `useState` 初值会让版本永远为空，提交按钮恒灰。
+   * 这里监听 initialAssets 变化后重建行（用户已手工改过的行会被覆盖，
+   * 取舍：预填是权威源清单的权威快照，重新解析即应刷新）。</p>
+   */
+  useEffect(() => {
+    if (!initialAssets || initialAssets.length === 0) return;
+    setRows(initialAssets.map((a) => ({
+      key: `r${++rowSeq}`,
+      sourceType: a.sourceType,
+      sourceId: a.sourceId,
+      version: a.version,
+      required: a.required !== false,
+      successCritical: a.successCritical === true,
+      evidenceRefs: a.evidenceRefs,
+    })));
+  }, [initialAssets]);
 
   // 三要素与后端 400 校验同形（sourceType + sourceId + version 均非空，SUP-CTX-01）：
   // 仅作禁用态提示，不替代服务端裁决。
