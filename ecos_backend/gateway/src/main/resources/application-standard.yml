@@ -25,4 +25,6 @@ ecos:
     portal: false
   oag:
     # OAG 推理节点 LLM 模型 fallback 链（按优先级排列，第一项最先尝试）
-    model-fallback: deepseek-chat,qwen-turbo
+    # 2026-11-24：改 env 占位（同 llm.* 对齐口径，详见 application.yml LLM 段注释）。
+    # 内网网关无 deepseek-chat/qwen-turbo，部署时用 ECOS_OAG_MODEL_FALLBACK 盖成本网实际模型链。
+    model-fallback: ${ECOS_OAG_MODEL_FALLBACK:deepseek-chat,qwen-turbo}

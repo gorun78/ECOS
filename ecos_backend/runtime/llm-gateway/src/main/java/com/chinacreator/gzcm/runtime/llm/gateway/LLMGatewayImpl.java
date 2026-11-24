@@ -723,7 +723,7 @@ public class LLMGatewayImpl implements LLMGateway {
                 String errorBody = response.body() != null ? response.body().string() : "";
                 log.error("LLM API error: HTTP {} {} | Body: {} | Duration: {}ms",
                         response.code(), response.message(), errorBody, duration);
-                return ChatResponse.fail(classifyHttpStatus(response.code()),
+                return ChatResponse.fail(classifyHttpStatus(response.code(), errorBody),
                         String.format("HTTP %d: %s", response.code(),
                                 errorBody.isEmpty() ? response.message() : errorBody));
             }
@@ -748,19 +748,53 @@ public class LLMGatewayImpl implements LLMGateway {
      * 归入不可重试的 {@code INVALID_ARGUMENT}，文案由调用方按类渲染。</p>
      */
     static AiErrorClass classifyHttpStatus(int status) {
+        return classifyHttpStatus(status, null);
+    }
+
+    /**
+     * 带响应体的分类（2026-11-24 修正「模型不存在被误判成超时」）。
+     *
+     * <p><b>缺陷原形</b>：OpenAI 兼容网关对「模型名不存在」普遍回 {@code 503 model_not_found}
+     * （实测内网 new-api 网关：{@code {"error":{"code":"model_not_found","message":"No available
+     * channel for model deepseek-chat ..."}}}）。原实现 {@code status >= 500 → LLM_TIMEOUT}
+     * 把这种<b>不可重试的配置错误</b>归成可重试超时族（maxRetries=3 + 指数退避），
+     * 结果：白重试 3 次、耗时数秒，最终把「模型名配错」报成 504 超时 —— 真因被彻底掩盖。</p>
+     *
+     * <p><b>判据</b>：5xx 且响应体明确指示「模型/通道不存在」⇒ {@code INVALID_ARGUMENT}
+     * （maxRetries=0，文案原样透出 provider 报错）；其余 5xx 维持 {@code LLM_TIMEOUT}。
+     * 只按响应体的<b>结构化错误码/关键字</b>识别，不做模糊猜测。</p>
+     */
+    static AiErrorClass classifyHttpStatus(int status, String responseBody) {
         if (status == 429) {
             return AiErrorClass.LLM_RATE_LIMITED;
         }
         if (status == 413) {
             return AiErrorClass.CONTEXT_OVERFLOW;
         }
-        if (status >= 500) {
-            return AiErrorClass.LLM_TIMEOUT;
-        }
-        if (status == 408) {
-            return AiErrorClass.LLM_TIMEOUT;
+        if (status >= 500 || status == 408) {
+            return isModelNotConfigured(responseBody)
+                    ? AiErrorClass.INVALID_ARGUMENT
+                    : AiErrorClass.LLM_TIMEOUT;
         }
         return AiErrorClass.INVALID_ARGUMENT;
+    }
+
+    /**
+     * 响应体是否指示「模型/通道不存在」（配置类错误，不可重试）。
+     *
+     * <p>覆盖两类常见 OpenAI 兼容网关形态：结构化 {@code "code":"model_not_found"}
+     * 与文案 {@code No available channel for model X} / {@code model ... does not exist}。</p>
+     */
+    static boolean isModelNotConfigured(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return false;
+        }
+        String lower = responseBody.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("model_not_found")
+                || lower.contains("model not found")
+                || lower.contains("no available channel for model")
+                || lower.contains("does not exist")
+                || lower.contains("unknown model");
     }
 
     /**

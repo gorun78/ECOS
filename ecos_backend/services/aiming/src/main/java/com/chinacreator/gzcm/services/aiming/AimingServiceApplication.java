@@ -63,7 +63,13 @@ import com.chinacreator.gzcm.sysman.controller.SysConfigController;
         // 具体实现; 只扫 config.service 子包，不带入 sysman 安全管理 controller
         "com.chinacreator.gzcm.sysman.config.service",
         // sysman 域 mapper/dao (SysConfigService 依赖 SysConfig DAO)
-        "com.chinacreator.gzcm.sysman.config"
+        "com.chinacreator.gzcm.sysman.config",
+        // 2026-11-24 修复「Copilot 用错模型」：sys_config 组消费适配 Bean
+        // （SysConfigLlmSettingsSource 等 @Component）落在 sysman.cache，原扫描面只到
+        // sysman.config ⇒ LlmSettingsSource 从未装配 ⇒ AgentConfigResolver 静默回落 yml
+        // 的 llm.default-model（deepseek-chat），与 sys_config 里已播种的正确模型名脱钩。
+        // 只补 cache 子包（配置读取适配器）；sysman 安全 controller 仍不入本服务。
+        "com.chinacreator.gzcm.sysman.cache"
 }, excludeFilters = {
         // agent-service 独立启动器 (自身 @ComponentScan, 双启动冲突)
         @ComponentScan.Filter(type = FilterType.REGEX,

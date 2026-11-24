@@ -270,4 +270,31 @@ class AiFaultInjectionIT {
         assertEquals(AiErrorClass.INVALID_ARGUMENT, LLMGatewayImpl.classifyHttpStatus(401));
         assertNotNull(LLMGatewayImpl.classifyHttpStatus(418), "任何状态码都必须落到某一类，禁 null");
     }
+
+    /**
+     * 2026-11-24 回归钉：OpenAI 兼容网关对「模型名不存在」普遍回 5xx，
+     * 这类**不可重试的配置错误**不得被折进可重试的 {@code LLM_TIMEOUT}
+     * （否则白重试 3 次 + 指数退避，最后把「模型配错」报成 504 超时，真因被掩盖）。
+     */
+    @Test
+    @DisplayName("5xx + 模型不存在 ⇒ INVALID_ARGUMENT（不可重试）；纯 5xx 仍为 LLM_TIMEOUT")
+    void modelNotFoundIsNotRetryable() {
+        // 实测报文形态（内网 new-api 网关）
+        String newApi = "{\"error\":{\"code\":\"model_not_found\",\"message\":\"No available channel "
+                + "for model deepseek-chat under group default (distributor)\",\"type\":\"new_api_error\"}}";
+        assertEquals(AiErrorClass.INVALID_ARGUMENT, LLMGatewayImpl.classifyHttpStatus(503, newApi),
+                "model_not_found 归参数面（不重试），否则真因被 504 掩盖");
+        assertEquals(AiErrorClass.INVALID_ARGUMENT, LLMGatewayImpl.classifyHttpStatus(500,
+                "{\"error\":{\"message\":\"The model `gpt-x` does not exist\"}}"));
+        assertEquals(AiErrorClass.INVALID_ARGUMENT, LLMGatewayImpl.classifyHttpStatus(404,
+                "{\"error\":{\"code\":\"model_not_found\"}}"));
+
+        // 反向：真正的 5xx/超时族不受影响（防判据过宽把可重试错误也打死）
+        assertEquals(AiErrorClass.LLM_TIMEOUT, LLMGatewayImpl.classifyHttpStatus(503,
+                "{\"error\":{\"message\":\"upstream connect error\"}}"));
+        assertEquals(AiErrorClass.LLM_TIMEOUT, LLMGatewayImpl.classifyHttpStatus(502, ""));
+        assertEquals(AiErrorClass.LLM_TIMEOUT, LLMGatewayImpl.classifyHttpStatus(502, null));
+        assertEquals(3, AiErrorClass.LLM_TIMEOUT.maxRetries(), "超时族仍可重试");
+        assertEquals(0, AiErrorClass.INVALID_ARGUMENT.maxRetries(), "参数面不重试");
+    }
 }

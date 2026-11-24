@@ -33,6 +33,7 @@ import CopilotInputBar from './CopilotInputBar';
 import { useAipAutomation } from './useAipAutomation';
 import { AgentScenarioType, scenarioPrompt } from './AgentScenarioData';
 import { fetchCopilotAgents, copilotAgentChat, type CopilotAgentInfo } from '../../services/copilotApi';
+import { readApiError } from '../../services/httpClient';
 
 interface AIPCopilotDrawerProps {
   isOpen: boolean;
@@ -212,11 +213,23 @@ export default function AIPCopilotDrawer({
         text,
         timestamp: now(),
       }]);
-    } catch {
+    } catch (e) {
+      // 2026-11-24 修复「AIP 网关离线」误报：原实现把**任何**异常都渲染成「网关离线」，
+      // 而实际上后端返回的是 503 GUARDRAIL_FAIL_CLOSED / 500 PARSE_FAILURE 等有明确分类的
+      // 业务错误（真因被掩盖，用户按「网关离线」去查网络方向必然查不到）。
+      // 现按 readApiError 单源口径分态：① 无 status ⇒ 真·传输失败（网络/网关不可达）；
+      // ② 有 status ⇒ 后端已应答，如实报 HTTP 状态 + 后端 message，并带 traceId 供追溯。
+      const err = readApiError(e);
+      const offline = err.status === undefined;
+      const detail = offline
+        ? `${t('copilot.chat.gatewayOffline')}\n\n> ${err.message}`
+        : `${t('copilot.chat.backendRejected')} (HTTP ${err.status})\n\n> ${err.message}${
+            err.traceId ? `\n\n\`traceId: ${err.traceId}\`` : ''
+          }`;
       setMessages((prev) => [...prev, {
         id: `agent-err-${Date.now()}`,
         sender: 'agent',
-        text: t('copilot.chat.gatewayOffline'),
+        text: detail,
         timestamp: now(),
       }]);
     } finally {

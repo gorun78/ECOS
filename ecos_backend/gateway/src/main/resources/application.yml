@@ -118,9 +118,17 @@ neo4j:
   database: neo4j
 
 # LLM Configuration
+# 2026-11-24 模型名对齐：本仓部署形态可为「内网 OpenAI 兼容网关」（llm.gateway.base-url），
+# 其模型名与公网 DeepSeek 不同（实测内网仅提供 DeepSeek-V4.1-Flash-1017 / GLM-5.3 /
+# Qwen3.8-27B 等，不含任何 deepseek-chat 变体）。模型名属**部署事实**，写死在仓库 yml 会把
+# 三种发布档一起绑死，故改 env 占位，缺省仍为公网 DeepSeek 名（行为不变）：
+#   LLM_DEFAULT_MODEL                 → 顶层 llm.default-model（引擎侧 L1 / TokenMeter 消费）
+#   LLM_ENGINE_DEFAULT_MODEL          → llm.engine.default-model（llm-gateway 内置映射）
+#   LLM_DEEPSEEK_MODEL                → llm.deepseek.model（provider 短名）
+# 内网部署在 ~/.config/ecos/.env 里盖这三个变量即可，无需改仓库。
 llm:
   default-provider: deepseek
-  default-model: deepseek-chat
+  default-model: ${LLM_DEFAULT_MODEL:deepseek-chat}
   default-temperature: 0.3
   max-context-tokens: 8000
   # 详细设计-06 F06-21-2 / X-80：AI/Agent 前缀（/api/v1/agent*、/api/v1/agent-loop、
@@ -129,12 +137,12 @@ llm:
   # 默认 60s 覆盖非 AI 前缀（gateway.request-timeout），AI/Agent 前缀独立 300s。
   agent-timeout-ms: 300000
   deepseek:
-    base-url: https://api.deepseek.com
-    model: deepseek-chat
+    base-url: ${LLM_DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    model: ${LLM_DEEPSEEK_MODEL:deepseek-chat}
   engine:
     running: false
     default-provider: openrouter
-    default-model: deepseek/deepseek-chat
+    default-model: ${LLM_ENGINE_DEFAULT_MODEL:deepseek/deepseek-chat}
     max-concurrency: 5
     default-timeout: 600
   gateway:

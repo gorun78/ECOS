@@ -46,7 +46,17 @@ public class AgentConfigResolver {
     @Value("${llm.default-provider:deepseek}")
     private String l1DefaultProvider;
 
-    @Value("${llm.default-model:deepseek-chat}")
+    /**
+     * L1 模型缺省。
+     *
+     * <p><b>2026-11-24 修正</b>：缺省值原为 {@code deepseek-chat}，而本仓部署对接的是内网
+     * OpenAI 兼容网关（{@code llm.gateway.base-url}），该网关并不提供此模型名 —— 一旦
+     * {@code LlmSettingsSource} 未装配（如宿主 @ComponentScan 未覆盖 sysman.cache），
+     * 就会静默拿这个不存在的模型名去请求，被上游回 {@code 503 model_not_found}。
+     * 缺省改为空串：<b>宁可让下游明确报「未配置模型」，也不静默外发一个可能不存在的名字</b>
+     * （与 {@link LlmSettings#DEFAULTS} 的「不猜」口径一致）。</p>
+     */
+    @Value("${llm.default-model:}")
     private String l1DefaultModel;
 
     @Value("${llm.default-temperature:0.3}")
