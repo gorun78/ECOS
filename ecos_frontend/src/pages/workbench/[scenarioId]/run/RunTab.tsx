@@ -18,9 +18,13 @@ import PipelineTracePanel from './PipelineTracePanel';
 
 interface Props {
   scenarioId: string;
+  /** 场景定义（第四批起用于：心智模型取场景上下文/算法推荐；本批先接住不影响渲染） */
+  definition?: unknown;
   analyses: AnalysisRunVO[];
   onRun: (payload: Record<string, unknown>) => Promise<AnalysisRunVO>;
   onRefresh: () => Promise<AnalysisRunVO[]>;
+  /** 切到「编辑场景定义」次级入口（顶部 Tab 栏摘除后的可达路径） */
+  onEditDefinition?: () => void;
 }
 
 type AnalysisType = 'CAUSAL' | 'FORECAST' | 'SIMULATION' | 'PIPELINE';
@@ -32,7 +36,7 @@ const TYPES: Array<{ key: AnalysisType; icon: React.ReactNode; labelKey: string;
   { key: 'PIPELINE', icon: <Workflow size={16} />, labelKey: 'workspace.run.type.pipeline', hintKey: 'workspace.run.type.pipelineHint' },
 ];
 
-export default function RunTab({ scenarioId, analyses, onRun, onRefresh }: Props) {
+export default function RunTab({ scenarioId, analyses, onRun, onRefresh, onEditDefinition }: Props) {
   const { styles } = useTheme();
   const { t } = useLanguage();
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -112,6 +116,18 @@ export default function RunTab({ scenarioId, analyses, onRun, onRefresh }: Props
 
   return (
     <div className="p-4 space-y-4">
+      {/* 次级入口：顶部 Tab 栏摘除后，定义编辑从这里进（摘按钮 ≠ 摘能力） */}
+      {onEditDefinition && (
+        <div className="flex justify-end -mb-2">
+          <button
+            type="button"
+            onClick={onEditDefinition}
+            className={`text-[11px] font-bold px-2 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
+          >
+            {t('workspace.run.edit_definition')}
+          </button>
+        </div>
+      )}
       {/* 发起器 */}
       <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
         <h3 className={`text-sm font-bold ${styles.cardText} mb-3`}>{t('workspace.run.launcher.title')}</h3>

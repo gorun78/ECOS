@@ -359,7 +359,24 @@ public class AgentStudioService {
         }
         List<PipelineNodeDef> orderedDefs = defs;
 
+        /*
+         * 上下文传播（2026-11-24 修）：节点在 pipeline-executor 自有线程池异步执行，
+         * 而 SecurityContext / CallerCredentialSource 都是 ThreadLocal —— 不显式带过去，
+         * 节点内的 llm-gateway 护栏裁决（→ /api/v1/security/policy-engine/evaluate）
+         * 与属主端点调用会因「无凭据」被 ClearanceInterceptor 挡成 403，
+         * 表现为 ECOS-AI-503 GUARDRAIL_FAIL_CLOSED（实测既有编排同样 100% 失败）。
+         *
+         * 载体必须在**请求线程**取一次（CallerCredentialSource 文档明示：工作线程自己取只得 EMPTY），
+         * 再用 runWith 绑进异步作用域。
+         */
+        final org.springframework.security.core.context.SecurityContext securityContext =
+                org.springframework.security.core.context.SecurityContextHolder.getContext();
+        final com.chinacreator.gzcm.common.security.caller.CallerCredentialSource.Carrier callerCarrier =
+                com.chinacreator.gzcm.common.security.caller.CallerCredentialSource.current();
+
         CompletableFuture.runAsync(() -> {
+            com.chinacreator.gzcm.common.security.caller.CallerCredentialSource.runWith(callerCarrier, () -> {
+            org.springframework.security.core.context.SecurityContextHolder.setContext(securityContext);
             try {
                 boolean hasFailure = false;
                 String previousOutput = null;
@@ -431,11 +448,16 @@ public class AgentStudioService {
                 result.put("message", "Pipeline execution error: " + e.getMessage());
                 exec.setResult(result);
                 log.error("[AgentStudio] Pipeline execution failed: {}", executionId, e);
+            } finally {
+                // 线程池复用：不清上下文会把上一个调用者的身份带给下一个编排（越权风险）
+                org.springframework.security.core.context.SecurityContextHolder.clearContext();
             }
+            });
         }, PIPELINE_EXECUTOR);
 
         return exec;
     }
+
 
     // ═══════════════ Pipeline 节点执行（P0-3） ═══════════════
 

@@ -63,8 +63,9 @@ export default function WorkbenchScenarioDetail() {
   const [error, setError] = useState<string | null>(null);
 
   const tab = useMemo<TabKey>(() => {
-    const q = searchParams.get('tab');
-    return q === 'run' ? 'run' : 'definition';
+    // 2026-11-24：Tab 栏摘除，默认落运行面；定义编辑保留为次级入口（?tab=definition 深链可达，
+    // 运行页内「编辑场景定义」链接切换）。摘按钮 ≠ 摘能力：绑定/成功标准仍需可维护。
+    return searchParams.get('tab') === 'definition' ? 'definition' : 'run';
   }, [searchParams]);
 
   useEffect(() => {
@@ -142,13 +143,27 @@ export default function WorkbenchScenarioDetail() {
           <ArrowLeft size={12} />
           {t('workspace.l2.back')}
         </Link>
-        <button
-          type="button"
-          onClick={() => navigate('/workbench/config')}
-          className={`ml-auto inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
-        >
-          {t('workspace.l2.config')}
-        </button>
+        {/*
+          2026-11-24 裁决：顶部只留「场景运行」+「场景配置」两枚并排按钮。
+          「场景定义」Tab 摘除——定义编辑改由「场景配置」页承接（config 页已含模板/算法库，
+          定义编辑能力随本批迁入）。运行按钮直接进运行页，不做 Tab 切换。
+        */}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => switchTab('run')}
+            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded border cursor-pointer ${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`}
+          >
+            {t('workspace.l2.tab.run')}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/workbench/config')}
+            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
+          >
+            {t('workspace.l2.config')}
+          </button>
+        </div>
       </div>
 
       {loading && (
@@ -199,33 +214,34 @@ export default function WorkbenchScenarioDetail() {
             </div>
           </div>
 
-          <div className={`px-4 py-2 border-b ${styles.cardBorder} flex items-center gap-2`}>
-            {(['definition', 'run'] as TabKey[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => switchTab(k)}
-                className={`px-3 py-1.5 rounded border text-xs font-bold cursor-pointer transition ${
-                  tab === k ? `${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardText} ${styles.cardBorder}`
-                }`}
-              >
-                {t(k === 'definition' ? 'workspace.l2.tab.definition' : 'workspace.l2.tab.run')}
-              </button>
-            ))}
-          </div>
-
-          {tab === 'definition' && (
-            <DefinitionTab
-              scenarioId={scenario.id}
-              definition={definition}
-              onSaved={(d) => setDefinition(d)}
-              onPublished={(d) => setDefinition(d)}
-            />
-          )}
-          {tab === 'run' && (
+          {/*
+            2026-11-24：Tab 栏摘除，运行面直出。「编辑场景定义」为运行面上的次级文字入口
+            （?tab=definition），保证绑定/成功标准仍可维护——摘按钮不等于摘能力。
+          */}
+          {tab === 'definition' ? (
+            <>
+              <div className="px-4 pt-3">
+                <button
+                  type="button"
+                  onClick={() => switchTab('run')}
+                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
+                >
+                  <ArrowLeft size={11} />
+                  {t('workspace.l2.tab.run')}
+                </button>
+              </div>
+              <DefinitionTab
+                scenarioId={scenario.id}
+                definition={definition}
+                onSaved={(d) => setDefinition(d)}
+                onPublished={(d) => setDefinition(d)}
+              />
+            </>
+          ) : (
             <>
               <RunTab
                 scenarioId={scenario.id}
+                definition={definition}
                 analyses={analyses}
                 onRun={runAnalysis}
                 onRefresh={async () => {
@@ -233,9 +249,10 @@ export default function WorkbenchScenarioDetail() {
                   setAnalyses(next);
                   return next;
                 }}
+                onEditDefinition={() => switchTab('definition')}
               />
               {/*
-                认知运行面（原「高级」折叠区，2026-11-23 并入本 Tab 常驻）：
+                认知运行面（原「高级」折叠区，2026-11-23 并入常驻）：
                 运行编排 CognitionPanel + 认知四卡 CognitiveRightPanel（E1~E4 全应用唯一挂载点，
                 E2E COG-IA 单实例断言依赖此唯一性）。
               */}

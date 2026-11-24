@@ -106,7 +106,7 @@ class MigrationVersionUniquenessTest {
      * 2026-11-11 CLI 生产化批 C：V328（{@code ecos_audit_log} 补 {@code changes}/{@code category}
      * 两列——V295 锚表遗漏，致 AuditAspect/AuthDao/ToolDao 三条写入路径在从零建库上恒失败，
      * 审计恒 0 行）落地 ⇒ 单源实测 278。 */
-    private static final int SCRIPT_COUNT_FLOOR = 278;
+    private static final int SCRIPT_COUNT_FLOOR = 280;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -208,8 +208,8 @@ class MigrationVersionUniquenessTest {
      * V353 引擎 DEFAULTS 回填 + V354 runtime 三组建组 + V355 OPA 配置化（只加不改，均 IF NOT EXISTS/NOT EXISTS 幂等）。
      * ⇒ 按实测订正 350→355 / 下一号 355→356。
      */
-    private static final int MAX_BASELINE_VERSION = 362;
-    private static final int NEXT_FREE_VERSION = 363;
+    private static final int MAX_BASELINE_VERSION = 364;
+    private static final int NEXT_FREE_VERSION = 365;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

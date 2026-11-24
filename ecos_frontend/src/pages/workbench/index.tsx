@@ -21,6 +21,7 @@ import {
   Building,
   Inbox,
   LayoutDashboard,
+  LayoutGrid,
   Plus,
   WifiOff
 } from 'lucide-react';
@@ -53,6 +54,8 @@ export default function WorkbenchHome() {
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  /** 新建模态的打开方式：blank=直接新建；template=先展示模板清单（首页「场景模板」按钮） */
+  const [createMode, setCreateMode] = useState<'blank' | 'template'>('blank');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -139,18 +142,31 @@ export default function WorkbenchHome() {
         </div>
       )}
 
-      {/* 快捷入口：首格固定「新建场景」（直接弹模态，勿做成跳转占位） */}
+      {/*
+        快捷入口（2026-11-24 裁决）：首两格为「新建场景」+「场景模板」，同排对齐。
+        「场景模板」原在场景配置页内，挪到首页后与新建场景同等可达；
+        点击即打开新建模态并滚动到模板 chips（模板本身来自真实 /scenario-templates 端点）。
+      */}
       <section className="p-4">
         <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} mb-2`}>{t('workspace.l1.quick_entries')}</h2>
         <div className={`grid gap-2 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => { setCreateMode('blank'); setCreateOpen(true); }}
             className={`${styles.accentBg} ${styles.accentSolidText} rounded-lg p-3 flex items-center gap-2 transition-all hover:opacity-90 cursor-pointer`}
             aria-label={t('workspace.l1.entry.new_scenario')}
           >
             <Plus size={16} />
             <span className="text-xs font-bold">{t('workspace.l1.entry.new_scenario')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCreateMode('template'); setCreateOpen(true); }}
+            className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 flex items-center gap-2 transition-all hover:opacity-90 cursor-pointer`}
+            aria-label={t('workspace.l1.entry.templates')}
+          >
+            <LayoutGrid size={16} className={styles.accentText} />
+            <span className={`text-xs font-bold ${styles.cardText}`}>{t('workspace.l1.entry.templates')}</span>
           </button>
           {navEntries.map((e) => (
             <Link
@@ -250,7 +266,7 @@ export default function WorkbenchHome() {
       </section>
 
       {/* 新建场景模态（L1 直接创建，真实 POST，创建即 DRAFT，成功后跳 L2 并刷新列表） */}
-      <NewScenarioModal isOpen={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => void load()} />
+      <NewScenarioModal isOpen={createOpen} mode={createMode} onClose={() => setCreateOpen(false)} onCreated={() => void load()} />
     </div>
   );
 }
