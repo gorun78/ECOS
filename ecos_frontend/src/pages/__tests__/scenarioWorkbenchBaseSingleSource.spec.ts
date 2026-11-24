@@ -79,7 +79,7 @@ const SITES_PER_FILE: Readonly<Record<string, number>> = {
 /** 本批闭合的两个目录根与其生产文件数（实跑读出，扫描根漂移成空集即红）。 */
 const DOMAIN_ROOTS: ReadonlyArray<{ dir: string; files: number }> = [
   { dir: 'scenario', files: 15 },
-  { dir: 'workbench', files: 26 }, // 2026-11-22：场景工作台简化（definition/run/config 3 枚生产文件，按实跑重设）原 23
+  { dir: 'workbench', files: 28 }, // 2026-11-23：定义页上下文构建 + 运行页智能逻辑轨迹面板各 1 枚，26→28 实跑重设
 ];
 
 /** 私设基址判据：引号/反引号后紧跟 `/api`（与 `api-base-single-source` 同口径）。 */
@@ -207,7 +207,7 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
     expect(API_BASE).toBe('/api');
   });
 
-  it('两个目录根 35 个生产文件 + 根侧场景管理页代码行零私设基址，注释里的端点说明不计', () => {
+  it('两个目录根 36 个生产文件 + 根侧场景管理页代码行零私设基址，注释里的端点说明不计', () => {
     for (const { dir, files } of DOMAIN_ROOTS) {
       const rels = walk(join(PAGES_ROOT, dir), []);
       expect(rels.length, `${dir}/ 生产文件数应实跑等于 ${files}（扫描根漂移即红）`).toBe(files);

@@ -231,10 +231,10 @@ describe("SSE 承流通道单源（D-B5-11）", () => {
     const faces = candidates()
       .filter((f) => STREAM_FACE_PATTERNS.some((re) => re.test(codeOnly(f.src))))
       .map((f) => f.path);
-    expect(faces.length).toBeGreaterThanOrEqual(4);
+    // 2026-11-23 去 wagent 化：W 通道 run 流（services/wagentRunStream.ts）随 wagent 控制面下线，
+    // 承流面 4→3。新增通道仍须显式在册（下方逐条 contains），不许只做「数量够」的弱断言。
+    expect(faces.length).toBeGreaterThanOrEqual(3);
     expect(faces).toContain("services/agentLoopStream.ts");
-    // W 通道 run 流是第四个承流面（#143/B5-5b-2）：新增通道必须显式在册，不许只做「数量够」的弱断言
-    expect(faces).toContain("services/wagentRunStream.ts");
     expect(faces).toContain("pages/aiworkbench/api.ts");
     expect(faces).toContain("pages/knowledge/services/govern.ts");
   });

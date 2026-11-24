@@ -4,8 +4,7 @@
  * 契约：
  * - 顶部说明条 + 明细入口（onOpenDetails 由调用方挂明细抽屉/页签）；
  * - 轮询兜底（progressChannel="poll"）时必须显示「降级：非实时（轮询 N 秒）」注记
- *   （与 RunProgress 共用 common.status.poll_fallback 单源文案，§2.2/W192 C174：
- *   未拿到 P-4 结论前不得声称流式）；
+ *   （与 common.status.poll_fallback 同源文案，§2.2/W192 C174：未拿到 P-4 结论前不得声称流式）；
  * - W run 流 degrade 帧的 `requiresAck` 走本条的只读标注腿：W run 域没有任何确认端点
  *   （全仓 `/ack`、`/acknowledge` 只属于 runtime 告警、DQ 告警与 schema 变更三域，
  *   无一对 Run 降级生效），因此这里**不**渲染确认按钮——
@@ -18,7 +17,7 @@ import React from "react";
 import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
-import type { ProgressChannel } from "../structured/RunProgress";
+import type { ProgressChannel } from "../../../services/sseFrames";
 
 export interface DegradationBannerProps {
   /** 是否处于降级态（由调用方按引擎结果判定并传入） */

@@ -45,10 +45,14 @@ public class AiSecurityEngineAuditInterceptor implements HandlerInterceptor, Web
 
     private static final Logger log = LoggerFactory.getLogger(AiSecurityEngineAuditInterceptor.class);
 
-    /** 审计锚点覆盖的 controller 包前缀（wagent 为其子包但非 `controller` 子路径，故并列登记）。 */
+    /**
+     * 审计锚点覆盖的 controller 包前缀。
+     * <p>2026-11-23 去 wagent 化：原 {@code engine.ai.wagent.controller} 面已删除，L3 审批凭证
+     * 签发移到 {@code engine.ai.approval}（仍在审计锚点内）。</p>
+     */
     private static final List<String> SCOPE_PACKAGES = List.of(
             "com.chinacreator.gzcm.engine.ai.controller",
-            "com.chinacreator.gzcm.engine.ai.wagent.controller");
+            "com.chinacreator.gzcm.engine.ai.approval");
 
     private static final String EVENTBUS_IMPL_FQN = "com.chinacreator.gzcm.runtime.eventbus.EventBusService";
 

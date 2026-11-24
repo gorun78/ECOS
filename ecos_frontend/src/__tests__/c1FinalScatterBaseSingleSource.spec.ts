@@ -102,7 +102,8 @@ const CANONICAL = 'services/httpClient.ts';
  * 全量 run 实走面值 686→**691**，只增；五枚均经 `KNOWLEDGE_BASE`/服务层取址，
  * 代码面零 `/api` 字面量与零 `${API_BASE}` 派生。
  */
-const PROD_FILES = 690; // 2026-11-22 场景工作台简化：definition/run/config 三新客户端经属主常量消费，实跑 698→690（含 base 属主与派生面重排）
+const PROD_FILES = 682; // 2026-11-23 去 wagent 化：删 wagentClient/wagentRunStream/wagentSseFrames 等 8 枚 + 本轮删
+// structured/RunProgress/EvidenceDrawer 2 枚，692→684→682 实跑重设
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [
@@ -486,7 +487,7 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // 属主声明位 `` `${API_BASE}/v1/datanet/datasource` `` 只是「私有改名 + 加 export」，形态与位都没动 ⇒ 净增 0，
     // 全账净 −1 是幻影面退出的直接后果（幻影 URL 只有这一行在生产面上，prod 面 `ecos/data/datasource` 现零枚）。
     // 判据活性由本批两向实跑证得：改前 HEAD 实跑读 297 且旧锚通过，改后首跑即在 296 变红 ⇒ 不是把数字改成当前值。
-    expect(derTotal, '行内派生态面须随批累积，低于 296 即扫描根或判据漂移').toBeGreaterThanOrEqual(296);
+    expect(derTotal, '行内派生态面须随批累积，低于 295 即扫描根或判据漂移').toBeGreaterThanOrEqual(295); // 2026-11-23 去 wagent 化删 wagentClient（1 枚），296→295 实跑重设
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

@@ -16,15 +16,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 详细设计-07 F07-05/W169/C150 词表单源验收：
  * <ol>
- *   <li>{@code BindingType} 六值与 {@code ScenarioService.BINDING_ENDPOINTS} 常量**反射比对**（禁两处各写）；</li>
- *   <li>三层归属 3 子图 + 1 横切 + 2 出口（铁律 §0.6.1）；</li>
+ *   <li>{@code BindingType} 八值与 {@code ScenarioService.BINDING_ENDPOINTS} 常量**反射比对**（禁两处各写）；</li>
+ *   <li>三层归属 5 子图 + 1 横切 + 2 出口（铁律 §0.6.1；PIPELINE 2026-11-23 入子图）；</li>
  *   <li>{@code linkableTo} 由 {@link RequiredEdgePolicy#adjacency()} 导出（禁前端另写邻接表）。</li>
  * </ol>
  */
 class BindingCatalogContractTest {
 
     @Test
-    @DisplayName("BindingType 六值 ≡ ScenarioService.BINDING_ENDPOINTS 键集（反射比对）")
+    @DisplayName("BindingType 八值 ≡ ScenarioService.BINDING_ENDPOINTS 键集（反射比对）")
     void catalogTypesEqualBindingEndpointsConstant() throws Exception {
         Field f = ScenarioService.class.getDeclaredField("BINDING_ENDPOINTS");
         f.setAccessible(true);
@@ -43,14 +43,14 @@ class BindingCatalogContractTest {
     }
 
     @Test
-    @DisplayName("三层归属：SUBGRAPH×4 / CROSSCUT×1 / EXIT×2（铁律 §0.6.1）")
+    @DisplayName("三层归属：SUBGRAPH×5 / CROSSCUT×1 / EXIT×2（铁律 §0.6.1；PIPELINE 2026-11-23 归子图）")
     void tierSplitMatchesIronLaw() {
         Map<ScenarioTier, Integer> count = new LinkedHashMap<>();
         for (BindingType t : BindingType.values()) {
             count.merge(t.tier(), 1, Integer::sum);
         }
-        assertEquals(Integer.valueOf(4), count.get(ScenarioTier.SUBGRAPH),
-                "子图层 = DATASET/OBJECT_TYPE/KNOWLEDGE_BASE/RULE_SET");
+        assertEquals(Integer.valueOf(5), count.get(ScenarioTier.SUBGRAPH),
+                "子图层 = DATASET/OBJECT_TYPE/KNOWLEDGE_BASE/RULE_SET/PIPELINE");
         assertEquals(Integer.valueOf(1), count.get(ScenarioTier.CROSSCUT),
                 "横切层 = AI_AGENT");
         assertEquals(Integer.valueOf(2), count.get(ScenarioTier.EXIT),

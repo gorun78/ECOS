@@ -14,7 +14,6 @@ import {
   SSE_KEYS,
   TEXT_ABSENT,
   TOKEN_UNKNOWN,
-  citationToEvidence,
   frameIndex,
   isCitationUsable,
   isDenialDecision,
@@ -185,7 +184,7 @@ describe("frame payload readers never fabricate values", () => {
   });
 });
 
-describe("citation usability & evidence triple", () => {
+describe("citation usability", () => {
   const full = {
     [SSE_KEYS.forecastRunId]: "run-1",
     [SSE_KEYS.caliberId]: "cal-1",
@@ -198,16 +197,5 @@ describe("citation usability & evidence triple", () => {
     expect(CITATION_REQUIRED_KEYS).toHaveLength(4);
     expect(isCitationUsable(readCitationFrame(full))).toBe(true);
     expect(isCitationUsable(readCitationFrame({ ...full, [SSE_KEYS.version]: "" }))).toBe(false);
-  });
-
-  it("builds source/version/snapshot without padding missing parts", () => {
-    const evidence = citationToEvidence(readCitationFrame(full));
-    expect(evidence.source).toBe("forecastRunId=run-1 | caliberId=cal-1");
-    expect(evidence.version).toBe("v3");
-    expect(evidence.snapshot).toBe("asOfTime=2026-09-30 | minio://a");
-
-    const partial = citationToEvidence(readCitationFrame({ [SSE_KEYS.caliberId]: "cal-9" }));
-    expect(partial.source).toBe("forecastRunId=- | caliberId=cal-9");
-    expect(partial.version).toBe(TEXT_ABSENT);
   });
 });

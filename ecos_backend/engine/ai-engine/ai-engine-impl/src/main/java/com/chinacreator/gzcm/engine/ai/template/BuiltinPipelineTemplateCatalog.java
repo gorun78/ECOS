@@ -6,10 +6,10 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
-import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.GoalIntent;
-import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.StepType;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.ExplorationPlanner;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlanEnums.GoalIntent;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlanEnums.StepType;
+import com.chinacreator.gzcm.engine.ai.plan.ExplorationPlanner;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan;
 
 /**
  * 内置典型模板目录（AI 工作台逻辑编排「从 Wagent 模板新建」的第三来源）。
@@ -27,7 +27,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan;
  *
  * <p><b>不是 Playbook 的替身</b>：ref 前缀 {@link #REF_PREFIX} 与 Playbook git 引用空间
  * 隔离，目录项 source 标 {@code BUILTIN}；实例化不读 Git 内容源，也不伪造
- * {@code plan_source=PLAYBOOK}（返回步骤集，不经 {@link WAgentPlan.Plan} 包装）。</p>
+ * {@code plan_source=PLAYBOOK}（返回步骤集，不经 {@link AiPlan.Plan} 包装）。</p>
  */
 @Component
 public class BuiltinPipelineTemplateCatalog {
@@ -85,23 +85,23 @@ public class BuiltinPipelineTemplateCatalog {
      * {@code s{n}_{tool}} / {@code s9_aggregate}）。tool 版本取工具契约在用版本 {@code 1.0.0}
      * （V236 登记口径），非 {@code ExplorationPlanner} 的探索态缺省值。
      */
-    public List<WAgentPlan.Step> stepsOf(GoalIntent intent) {
+    public List<AiPlan.Step> stepsOf(GoalIntent intent) {
         List<String> tools = ExplorationPlanner.toolSequenceFor(intent.value());
-        List<WAgentPlan.Step> steps = new ArrayList<>();
-        steps.add(new WAgentPlan.Step(ExplorationPlanner.HUMAN_GATE_STEP_KEY,
+        List<AiPlan.Step> steps = new ArrayList<>();
+        steps.add(new AiPlan.Step(ExplorationPlanner.HUMAN_GATE_STEP_KEY,
                 StepType.HUMAN_GATE.value(), null, null, 0, List.of(), Map.of(), false, false, null));
         String previous = ExplorationPlanner.HUMAN_GATE_STEP_KEY;
         List<String> toolKeys = new ArrayList<>();
         int idx = 2;
         for (String tool : tools) {
             String key = "s" + idx + "_" + tool;
-            steps.add(new WAgentPlan.Step(key, StepType.TOOL.value(), tool, "1.0.0",
+            steps.add(new AiPlan.Step(key, StepType.TOOL.value(), tool, "1.0.0",
                     0, List.of(previous), Map.of(), false, false, null));
             toolKeys.add(key);
             previous = key;
             idx++;
         }
-        steps.add(new WAgentPlan.Step(ExplorationPlanner.AGGREGATE_STEP_KEY,
+        steps.add(new AiPlan.Step(ExplorationPlanner.AGGREGATE_STEP_KEY,
                 StepType.AGGREGATE.value(), null, null, 0, List.copyOf(toolKeys), Map.of(), false, false, null));
         return steps;
     }

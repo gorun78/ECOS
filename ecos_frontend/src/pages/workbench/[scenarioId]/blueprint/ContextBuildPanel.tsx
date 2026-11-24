@@ -41,6 +41,8 @@ import type { ScenarioBlueprintVO } from '../../../../services/scenarioBlueprint
 interface Props {
   scenarioId: string;
   blueprint: ScenarioBlueprintVO | null;
+  /** 预填来源（场景定义页把真实绑定带进来；只追加初始行，来源类型仍需后端 reader 承接）。 */
+  initialAssets?: ContextSourceRefInput[];
 }
 
 type Phase =
@@ -68,23 +70,33 @@ const ctxErrKey = (status: number): string => {
   }
 };
 
-export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
+export default function ContextBuildPanel({ scenarioId, blueprint, initialAssets }: Props) {
   const { styles } = useTheme();
   const { t } = useLanguage();
 
   const scopeTenant = (blueprint?.scope as Record<string, unknown> | undefined)?.tenantId;
   const [tenantId, setTenantId] = useState(typeof scopeTenant === 'string' ? scopeTenant : '');
-  const [rows, setRows] = useState<AssetRow[]>([]);
+  const [rows, setRows] = useState<AssetRow[]>(() => (initialAssets ?? []).map((a) => ({
+    key: `r${++rowSeq}`,
+    sourceType: a.sourceType,
+    sourceId: a.sourceId,
+    version: a.version,
+    required: a.required !== false,
+    successCritical: a.successCritical === true,
+    evidenceRefs: a.evidenceRefs,
+  })));
   const [asOfTime, setAsOfTime] = useState('');
   const [ttl, setTtl] = useState('');
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
 
+  // 三要素与后端 400 校验同形（sourceType + sourceId + version 均非空，SUP-CTX-01）：
+  // 仅作禁用态提示，不替代服务端裁决。
   const canSubmit = useMemo(
     () =>
       scenarioId.trim() !== ''
       && tenantId.trim() !== ''
       && rows.length > 0
-      && rows.every((r) => r.sourceId.trim() !== ''),
+      && rows.every((r) => r.sourceId.trim() !== '' && (r.version ?? '').trim() !== ''),
     [scenarioId, tenantId, rows],
   );
 

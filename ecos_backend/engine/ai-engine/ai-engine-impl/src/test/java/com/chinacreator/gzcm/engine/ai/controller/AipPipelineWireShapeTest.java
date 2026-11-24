@@ -12,6 +12,8 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.dao.AipPipelineDao;
 import com.chinacreator.gzcm.engine.ai.dataobject.AipPipelineDO;
 import com.chinacreator.gzcm.engine.ai.dto.AipPipelineUpsertRequest;
+import com.chinacreator.gzcm.engine.ai.pipeline.AipPipelineExecutionService;
+import com.chinacreator.gzcm.engine.ai.service.AgentStudioService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -43,8 +45,13 @@ class AipPipelineWireShapeTest {
 
     @BeforeEach
     void setUp() {
+        InMemoryAipPipelineDao dao = new InMemoryAipPipelineDao();
+        // 2026-11-23 语义修正后控制器多了执行器依赖：用真实执行器（同一内存 DAO）驱动，
+        // 让「按 definition_json 取图 + 六类节点真跑」这条腿在本测试面也可断。
+        AipPipelineExecutionService executor =
+                new AipPipelineExecutionService(dao, new AgentStudioService());
         controller = new AIPPipelineController(
-                providerOf(new InMemoryAipPipelineDao()), providerOf(null), providerOf(null));
+                providerOf(dao), providerOf(null), providerOf(null), providerOf(executor));
     }
 
     /** 内存 DAO 替身：语义与 V329 SQL 一致（is_deleted 软删、按 update_time 倒序、last_executed_at 回写）。 */
@@ -151,15 +158,38 @@ class AipPipelineWireShapeTest {
     }
 
     @Test
-    @DisplayName("执行：回执 4 键；执行后行补 lastExecutedAt 尾键且状态 completed")
-    void executeKeepsReceiptAndTailKey() throws Exception {
+    @DisplayName("执行（2026-11-23 语义修正）：有节点图 → 真跑节点并回执含执行 id；空画布 → 400 拒绝空跑")
+    void executeRunsNodesAndRejectsEmptyGraph() throws Exception {
+        // ① 空画布：拒绝空跑成功（IllegalArgument → AiErrorAdvice 归 400；原实现只刷状态属缺陷）
+        JsonNode emptyCreated = dataOf(controller.createPipeline(
+                new AipPipelineUpsertRequest("空管道", null, null, null, null, null, null)));
+        IllegalArgumentException emptyErr = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> controller.executePipeline(emptyCreated.get("id").asText(), null),
+                "空画布必须拒绝（禁伪成功）");
+        assertTrue(emptyErr.getMessage().contains("AIP-EXEC-01"), "错误码须可定位: " + emptyErr.getMessage());
+
+        // ② 有节点图：trigger + condition 真执行，回执携带执行 id 与节点轨迹
+        Object steps = Map.of("blocks", List.of(), "graph", Map.of(
+                "nodes", List.of(
+                        Map.of("id", "t1", "type", "trigger",
+                                "data", Map.of("type", "trigger", "label", "触发",
+                                        "config", Map.of("cronExpr", "0 0 * * *"))),
+                        Map.of("id", "c1", "type", "condition",
+                                "data", Map.of("type", "condition", "label", "判断",
+                                        "config", Map.of("conditionExpr", "status == \"ok\"")))),
+                "edges", List.of(Map.of("id", "e1", "source", "t1", "target", "c1"))));
         JsonNode created = dataOf(controller.createPipeline(
-                new AipPipelineUpsertRequest("管道", null, null, null, null, null, null)));
+                new AipPipelineUpsertRequest("管道", null, null, steps, null, null, null)));
         String id = created.get("id").asText();
 
-        JsonNode result = dataOf(controller.executePipeline(id));
-        assertEquals(List.of("pipelineId", "status", "message", "executedAt"), fieldNames(result));
+        JsonNode result = dataOf(controller.executePipeline(id, Map.of("status", "ok")));
         assertEquals("executed", result.get("status").asText());
+        assertEquals("t1", result.get("nodeOrder").get(0).asText(), "拓扑序应把 trigger 排在前面");
+        assertTrue(result.get("nodeTraces").has("c1"), "condition 节点轨迹必须真实返回");
+        assertEquals("success", result.get("nodeTraces").get("c1").get("status").asText());
+        assertTrue(result.get("nodeTraces").get("c1").get("output").asText().contains("\"result\""),
+                "condition 输出必须带真实求值结果");
 
         JsonNode after = dataOf(controller.getPipeline(id));
         assertEquals(PIPELINE_KEYS.size() + 1, fieldNames(after).size());

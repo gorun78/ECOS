@@ -38,7 +38,7 @@ class WriteCommandIdempotencyTest {
     @BeforeEach
     void setUp() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/api/v1/wagent/candidates", exchange -> {
+        server.createContext("/api/v1/cognitive/models/", exchange -> {
             hits.incrementAndGet();
             seenTrace.set(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
             seenIdem.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
@@ -62,14 +62,13 @@ class WriteCommandIdempotencyTest {
     @DisplayName("写命令 --dry-run：只回显 plannedCall，桩服务零请求")
     void dryRunSendsNoRequest() {
         CliOptions options = CliOptions.parse(new String[] {
-                "knowledge", "extract",
-                "--candidate-type", "KNOWLEDGE_ITEM",
-                "--payload-json", "{}",
+                "cognition", "model", "validate",
+                "--model-id", "m-1",
                 "--base-url", baseUrl,
                 "--token", "test-token",
-                "--dry-run", "--no-retry"}, 2);
+                "--dry-run", "--no-retry"}, 3);
         CliCommand command = CliCommands.ALL.stream()
-                .filter(c -> CliCommands.KNOWLEDGE_EXTRACT.equals(c.name()))
+                .filter(c -> CliCommands.COGNITION_MODEL_VALIDATE.equals(c.name()))
                 .findFirst()
                 .orElseThrow();
         HttpTransport transport = new HttpTransport(options.baseUrl(), options.traceId(),
@@ -84,21 +83,20 @@ class WriteCommandIdempotencyTest {
         assertTrue(data instanceof Map<?, ?>, "dry-run 应回显 data.plannedCall");
         String planned = String.valueOf(((Map<?, ?>) data).get("plannedCall"));
         assertTrue(planned.startsWith("POST "), "计划应为 POST：实得 " + planned);
-        assertTrue(planned.contains("/candidates"), "计划路径应来自契约：实得 " + planned);
+        assertTrue(planned.contains("/cognitive/models/"), "计划路径应来自契约：实得 " + planned);
     }
 
     @Test
-    @DisplayName("knowledge extract：Idempotency-Key 与回显同值，X-Trace-Id 与 trace_id 同值")
+    @DisplayName("cognition model validate：Idempotency-Key 与回显同值，X-Trace-Id 与 trace_id 同值")
     void idempotencyAndTraceMatchWhatIsSent() {
         CliOptions options = CliOptions.parse(new String[] {
-                "knowledge", "extract",
-                "--candidate-type", "KNOWLEDGE_ITEM",
-                "--payload-json", "{}",
+                "cognition", "model", "validate",
+                "--model-id", "m-1",
                 "--base-url", baseUrl,
                 "--token", "test-token",
-                "--no-retry"}, 2);
+                "--no-retry"}, 3);
         CliCommand command = CliCommands.ALL.stream()
-                .filter(c -> CliCommands.KNOWLEDGE_EXTRACT.equals(c.name()))
+                .filter(c -> CliCommands.COGNITION_MODEL_VALIDATE.equals(c.name()))
                 .findFirst()
                 .orElseThrow();
         HttpTransport transport = new HttpTransport(options.baseUrl(), options.traceId(),

@@ -3,7 +3,6 @@
  *
  * <p>**本域缺陷本体**（改前）：三条流式腿各留一份私设传输 + 域内身份拼接——
  * `services/agentLoopStream.ts`(POST `/api/v1/agent-loop/chat`)、
- * `services/wagentRunStream.ts`(GET `/api/v1/wagent/runs/{id}/events`)、
  * `pages/aiworkbench/api.ts#oagPlaygroundStream`(POST `/api/v1/oag/chat/stream`)
  * 都是 `authHeaders()` 自拼 Bearer + 裸 `await fetch(`。前两条走的是 SSE 承流面，
  * 必须拿到未被消费的 `Response.body` ⇒ 不能折进 `apiFetchData`/`apiFetchEnvelope`。</p>
@@ -36,7 +35,6 @@ import { fileURLToPath } from 'node:url';
 import { authHeaders } from '../auth';
 import { rawAuthedUrlFetch, rawStreamUrlFetch } from '../httpClient';
 import { AGENT_LOOP_CHAT_REL_PATH, streamAgentLoopChat } from '../agentLoopStream';
-import { streamWagentRunEvents, wagentRunEventsStreamPath } from '../wagentRunStream';
 import { oagPlaygroundStream } from '../../pages/aiworkbench/api';
 
 const SRC_ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -44,10 +42,6 @@ const SRC_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const LEGS = {
   'services/agentLoopStream.ts': readFileSync(
     fileURLToPath(new URL('../agentLoopStream.ts', import.meta.url)),
-    'utf8',
-  ),
-  'services/wagentRunStream.ts': readFileSync(
-    fileURLToPath(new URL('../wagentRunStream.ts', import.meta.url)),
     'utf8',
   ),
   'pages/aiworkbench/api.ts': readFileSync(
@@ -216,21 +210,6 @@ describe('SSE 流式三腿传输合流（#143/B5-13）', () => {
     expect(call.headers).toEqual({ ...authHeaders(), Accept: SSE_ACCEPT, 'Last-Event-ID': '7' });
   });
 
-  it('wagent run 腿：GET 路径仍出自单源 path 助手，头集合与改前逐键相等（不新增、不删除键）', async () => {
-    stubSession('tok-run');
-    const ctrl = new AbortController();
-    const spy = stubFetch(makeRes({ status: 200, headers: { 'content-type': SSE_ACCEPT } }));
-
-    await streamWagentRunEvents({ runId: 'run-9', abortSignal: ctrl.signal });
-
-    const call = lastCall(spy);
-    expect(call.url).toBe(`/api${wagentRunEventsStreamPath('run-9')}`);
-    expect(call.init.method).toBe('GET');
-    expect(call.init.signal).toBe(ctrl.signal);
-    expect(call.headers).toEqual({ ...authHeaders(), Accept: SSE_ACCEPT });
-    expect(call.headers['Last-Event-ID']).toBeUndefined();
-  });
-
   it('OAG 腿：头集合恰等于改前 authHeaders()（本腿历史上就没有 Accept，传输合流不许顺手加）', async () => {
     stubSession('tok-oag');
     const ctrl = new AbortController();
@@ -281,8 +260,6 @@ describe('SSE 流式三腿传输合流（#143/B5-13）', () => {
     const loop = await streamAgentLoopChat({ agentId: 'a-3', message: 'y' });
     expect(loop.failure?.kind).toBe('aborted');
 
-    const run = await streamWagentRunEvents({ runId: 'run-3' });
-    expect(run.failure?.kind).toBe('aborted');
 
     // OAG 腿无四分类容器，异常直传给调用方：抛出的必须还是那颗 AbortError，而非 NetworkError。
     await expect(
@@ -325,9 +302,6 @@ describe('SSE 流式三腿传输合流（#143/B5-13）', () => {
       traceId: 'T-503',
     });
 
-    const run = await streamWagentRunEvents({ runId: 'run-4' });
-    // 判别式取窄面而非逐键读：`WagentStreamFailure` 是四态 union，contract 态没有 status/traceId 键
-    expect(run.failure).toMatchObject({ kind: 'transport', status: 503, traceId: 'T-503' });
     // 5xx 是服务端答案而非「网络不可达」⇒ 不该有掉线广播（合流前后同口径）
     expect(dispatched.filter((e) => e.type === 'ecos-network-down')).toEqual([]);
   });
@@ -398,7 +372,7 @@ describe('SSE 流式三腿传输合流（#143/B5-13）', () => {
     };
     walk(SRC_ROOT);
     expect([...files].sort()).toEqual(
-      ['pages/aiworkbench/api.ts', 'services/agentLoopStream.ts', 'services/httpClient.ts', 'services/wagentRunStream.ts'],
+      ['pages/aiworkbench/api.ts', 'services/agentLoopStream.ts', 'services/httpClient.ts'],
     );
   });
 

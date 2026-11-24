@@ -257,53 +257,13 @@ class WAgentEvidenceChainComplianceTest {
     }
 
     // ────────────────────────────────────────────────────────────
-    // ⑤ DDL ↔ DO ↔ 响应 三层同形
-    // ────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("三层同形：DO 字段（camel→snake）与 DDL 列集等值，DO 侧同样零正文字段（claim_text 为反向对照）")
-    void dataObjectsMirrorTheDdlExactly() throws Exception {
-        Map<String, String> bodies = chainTableBodies();
-        assertMirror(EVIDENCE_DO_FQN, EVIDENCE_TABLE, bodies.get(EVIDENCE_TABLE), "evidence");
-        assertMirror(CLAIM_DO_FQN, CLAIM_TABLE, bodies.get(CLAIM_TABLE), "claim");
-        assertMirror(JUNCTION_DO_FQN, JUNCTION_TABLE, bodies.get(JUNCTION_TABLE), "claim_evidence");
-
-        // 锁④：字段扫描必须真的看到 claim 侧正文列（否则上面"等值"可能建立在空集上）
-        Set<String> claimFields = doColumns(CLAIM_DO_FQN);
-        assertTrue(claimFields.contains("claim_text"),
-                "WAgentClaimDO 未声明 claimText（正文承载位丢失或字段扫描退化）: " + claimFields);
-        assertFalse(doColumns(EVIDENCE_DO_FQN).contains("claim_text"),
-                "evidence DO 出现 claimText（正文副本进引用型证据面 = §6.3 违例）");
-    }
-
-    @Test
-    @DisplayName("响应面同形：trace 端点 evidence/claim 视图键集等值钉死，证据视图零正文键")
-    void traceResponsesExposeOnlyReferenceKeys() throws Exception {
-        Class<?> controller = Class.forName(CONTROLLER_FQN);
-        Map<String, Object> evidenceView = invokeView(controller, "evidenceView", EVIDENCE_DO_FQN);
-        Map<String, Object> claimView = invokeView(controller, "claimView", CLAIM_DO_FQN);
-
-        assertEquals(new TreeSet<>(PINNED_EVIDENCE_VIEW_KEYS), new TreeSet<>(evidenceView.keySet()),
-                "evidence 响应键集与钉死名录不一致（加键=先裁正文承载面，禁把明细正文塞进追溯响应）");
-        assertEquals(new TreeSet<>(PINNED_CLAIM_VIEW_KEYS), new TreeSet<>(claimView.keySet()),
-                "claim 响应键集与钉死名录不一致");
-
-        List<String> offenders = new ArrayList<>();
-        for (String key : evidenceView.keySet()) {
-            if (isContentBearing(key) && !REFERENCE_ONLY_EXEMPTIONS.contains(key)) {
-                offenders.add("evidenceView." + key);
-            }
-        }
-        assertTrue(offenders.isEmpty(), "证据追溯响应出现内容键：\n" + String.join("\n", offenders));
-
-        // 反向对照：同一扫描必须看到 claim 侧的合法正文键
-        assertTrue(claimView.containsKey("claim_text"),
-                "claimView 未见 claim_text（键扫描退化 ⇒ 上面'零内容键'不可信）");
-    }
-
-    // ────────────────────────────────────────────────────────────
     // 判定与工具
     // ────────────────────────────────────────────────────────────
+
+    // 2026-11-23 去 wagent 化：原「三层同形 / 响应面同形」两条用例以反射加载 wagent 的
+    // WAgentEvidenceDO/WAgentClaimDO/WAgentClaimEvidenceDO 与 WAgentEvidenceTraceController，
+    // 这些类随 wagent 包删除 ⇒ 用例前提消失，按"功能下线"一并移除。
+    // 保留 DDL 四条（名录/谓词/引用型列/链闭合+数值承载）：V240 建表仍在库，引用型纪律仍须守。
 
     /** 内容承载判定 = 词根命中 且 不在钉死的引用形态豁免内。 */
     private static boolean isContentBearing(String column) {

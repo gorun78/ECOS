@@ -18,16 +18,20 @@ import LogicView from './LogicView';
 import ModelCatalogView from './ModelCatalogView';
 import AgentPlayground from './AgentPlayground';
 import EvalsView from './EvalsView';
-import WagentStudioView from './WagentStudioView';
 import {
   LayoutDashboard, FlaskConical, Cpu, BarChart3, Layers,
-  CloudOff, RefreshCw, MessageSquare, Bot,
+  CloudOff, RefreshCw, MessageSquare,
 } from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
-type TabId = 'overview' | 'playground' | 'orchestration' | 'wagentStudio' | 'evals' | 'models';
+type TabId = 'overview' | 'playground' | 'orchestration' | 'evals' | 'models';
 
+/**
+ * 左侧/移动端菜单项（2026-11-23 用户裁决：去掉「智能体编排」菜单，保留「逻辑编排」）。
+ * 原 wagentStudio Tab 的深链别名 `?tab=wagent_studio` 同批摘除（否则菜单删了、URL 还能进，
+ * 等于留后门）；WagentStudioView 组件文件与 wagentClient 服务保留（能力面未裁决删除）。
+ */
 const NAV_TABS: Array<{
   id: TabId | 'chatbotStudio';
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
@@ -39,7 +43,6 @@ const NAV_TABS: Array<{
   { id: 'overview', icon: LayoutDashboard, labelKey: 'aiworkbench.tab.overview', descKey: 'aiworkbench.tabdesc.overview' },
   { id: 'chatbotStudio', icon: MessageSquare, labelKey: 'aiworkbench.tab.chatbotStudio', descKey: 'aiworkbench.tabdesc.chatbotStudio', route: '/chatbot_studio' },
   { id: 'orchestration', icon: Cpu, labelKey: 'aiworkbench.tab.orchestration', descKey: 'aiworkbench.tabdesc.orchestration' },
-  { id: 'wagentStudio', icon: Bot, labelKey: 'aiworkbench.tab.wagentStudio', descKey: 'aiworkbench.tabdesc.wagentStudio' },
   { id: 'playground', icon: FlaskConical, labelKey: 'aiworkbench.tab.playground', descKey: 'aiworkbench.tabdesc.playground' },
   { id: 'evals', icon: BarChart3, labelKey: 'aiworkbench.tab.evals', descKey: 'aiworkbench.tabdesc.evals' },
   { id: 'models', icon: Layers, labelKey: 'aiworkbench.tab.models', descKey: 'aiworkbench.tabdesc.models' },
@@ -49,7 +52,6 @@ const VIEW_TITLES: Record<TabId, string> = {
   overview: 'aiworkbench.viewTitle.overview',
   playground: 'aiworkbench.viewTitle.playground',
   orchestration: 'aiworkbench.viewTitle.orchestration',
-  wagentStudio: 'aiworkbench.viewTitle.wagentStudio',
   evals: 'aiworkbench.viewTitle.evals',
   models: 'aiworkbench.viewTitle.models',
 };
@@ -63,11 +65,10 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  // 深链：#/ai-workbench?tab=wagent_studio（密钥面复用既有路由，不新增路由根）
+  // 页内 Tab 深链：#/ai-workbench?tab=<TabId>（2026-11-23 起不再接受 wagent_studio 别名）
   const [currentTab, setCurrentTab] = useState<TabId>(() => {
     const raw = searchParams.get('tab');
-    const ids: TabId[] = ['overview', 'playground', 'orchestration', 'wagentStudio', 'evals', 'models'];
-    if (raw === 'wagent_studio') return 'wagentStudio';
+    const ids: TabId[] = ['overview', 'playground', 'orchestration', 'evals', 'models'];
     return raw && (ids as string[]).includes(raw) ? (raw as TabId) : 'overview';
   });
 
@@ -159,9 +160,6 @@ export default function AIPWorkbench({ showToast }: AIPWorkbenchProps) {
             onUpdatePipelines={setPipelines}
             showToast={showToast}
           />
-      )}
-      {currentTab === 'wagentStudio' && (
-        <WagentStudioView />
       )}
       {currentTab === 'evals' && (
         <EvalsView agents={agents} models={models} />

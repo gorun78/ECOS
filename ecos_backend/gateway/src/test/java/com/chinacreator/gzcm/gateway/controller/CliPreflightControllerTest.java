@@ -20,7 +20,7 @@ import org.springframework.web.client.RestTemplate;
  *
  * <p>钉住三条不可退让的语义：</p>
  * <ol>
- *   <li><b>只报告，不建 Run</b>：{@code createsRun=false}，且 11 步齐备；</li>
+ *   <li><b>只报告，不建 Run</b>：{@code createsRun=false}，且 9 步齐备；</li>
  *   <li><b>禁把未知写 PASS</b>：空体/非 JSON/无可判定载荷 ⇒ {@code NOT_VERIFIED}；
  *       业务码非零 / 4xx ⇒ {@code FAIL}；502|503|504 ⇒ {@code BLOCKED}（依赖不可用 ≠ 业务失败）；</li>
  *   <li><b>审批存储探活是四值</b>：可查 ⇒ PASS；{@code ping()} 抛异常 ⇒ BLOCKED；返回假值 ⇒ NOT_VERIFIED
@@ -54,8 +54,8 @@ class CliPreflightControllerTest {
     }
 
     @Test
-    @DisplayName("依赖全不可达 ⇒ 503 BLOCKED，11 步齐备，createsRun=false（只报告不建 Run）")
-    void blockedReportKeepsElevenStepsAndCreatesNoRun() {
+    @DisplayName("依赖全不可达 ⇒ 503 BLOCKED，9 步齐备，createsRun=false（只报告不建 Run）")
+    void blockedReportKeepsAllStepsAndCreatesNoRun() {
         ResponseEntity<ApiResponse<CliPreflightController.PreflightReport>> resp =
                 controller(true, false).run(request());
 
@@ -65,10 +65,10 @@ class CliPreflightControllerTest {
 
         CliPreflightController.PreflightReport report = resp.getBody().getData();
         assertNotNull(report, "报告必须挂在 data 上（CLI 侧按 data.counts 定级）");
-        assertEquals(11, report.stepCount());
-        assertEquals(11, report.steps().size());
+        assertEquals(9, report.stepCount()); // 2026-11-23 去 wagent 化：11→9
+        assertEquals(9, report.steps().size());
         assertFalse(report.createsRun(), "preflight 不得创建 Run");
-        assertEquals(10, report.blocked(), "10 条 HTTP 探测对关闭端口必须落 BLOCKED");
+        assertEquals(8, report.blocked(), "8 条 HTTP 探测对关闭端口必须落 BLOCKED（2026-11-23 去 wagent 化 11→9 步、10→8 条 HTTP）");
         assertEquals(0, report.fail());
         assertEquals(0, report.notVerified());
         assertEquals(1, report.pass(), "审批存储可查 ⇒ 唯一 PASS");
@@ -88,7 +88,7 @@ class CliPreflightControllerTest {
         CliPreflightController.StepReport blockedStep = stepOf(thrown, "approval.store");
         assertEquals("BLOCKED", blockedStep.status());
         assertTrue(blockedStep.reason().contains("不可达"), "原因须指明不可达: " + blockedStep.reason());
-        assertEquals(11, thrown.blocked());
+        assertEquals(9, thrown.blocked());
 
         CliPreflightController.PreflightReport falsy =
                 controller(false, false).run(request()).getBody().getData();
@@ -154,7 +154,7 @@ class CliPreflightControllerTest {
     @Test
     @DisplayName("汇总计数与终态：FAIL 压过 BLOCKED，仅 NOT_VERIFIED ⇒ 200 但如实计数")
     void failDominatesBlockedInHttpStatus() {
-        // 全 BLOCKED 场景已在 blockedReportKeepsElevenStepsAndCreatesNoRun 钉住；此处只验 200 分支
+        // 全 BLOCKED 场景已在 blockedReportKeepsAllStepsAndCreatesNoRun 钉住；此处只验 200 分支
         ResponseEntity<ApiResponse<CliPreflightController.PreflightReport>> resp =
                 controller(true, false).run(request());
         assertTrue(resp.getBody().getData().blocked() > 0, "前置：本场景必有 BLOCKED");

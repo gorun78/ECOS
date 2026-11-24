@@ -215,15 +215,6 @@ test.describe('CLI 控制面（14 条命令 / L0~L3）', () => {
     expect(checks.every((c: any) => c.status === 'UNKNOWN')).toBeTruthy();
   });
 
-  test('agent inspect --dry-run：调用计划取自契约路径模板，零请求', async ({ request }) => {
-    const token = await loginAsAdmin(request);
-    const run = runCli(['agent', 'inspect', '--run-id', 'R-DRYRUN', '--dry-run'], token);
-    expect(run.json?.status).toBe('SUCCESS');
-    expect(run.json.source_refs?.[0]?.operationId).toBe('getRun');
-    expect(run.json.data?.plannedCall).toContain('/api/v1/wagent/runs/R-DRYRUN');
-    expect(run.status).toBe(0);
-  });
-
   test('未接入命令：UNAVAILABLE + 非零退出码（禁空集合伪成功）', async ({ request }) => {
     const token = await loginAsAdmin(request);
     const run = runCli(['model', 'route', '--token', token], token);
@@ -235,30 +226,27 @@ test.describe('CLI 控制面（14 条命令 / L0~L3）', () => {
     expect(run.status).toBe(3);
   });
 
-  test('L3 命令：无 --approval-token ⇒ BLOCKED(2)，服务端未就绪 ⇒ 不发起写请求', async ({ request }) => {
+  test('L1 写命令：缺必填参数 ⇒ 明确拒绝（不发起写请求）', async ({ request }) => {
+    // 2026-11-23 去 wagent 化：原 L3 `ontology publish` 已删，本仓现存写命令均为 L1。
+    // 「无 approval-token ⇒ BLOCKED(2)」的 L3 形态当前无承载命令，故改为断言
+    // L1 写命令缺参的通用拒绝形态（非 0 且 ok=false），仍不开写请求。
     const token = await loginAsAdmin(request);
-    const run = runCli(['ontology', 'publish', '--candidate-id', 'C-DRYRUN', '--token', token], token);
-    expect(['BLOCKED', 'UNAVAILABLE']).toContain(run.json?.status);
+    const run = runCli(['cognition', 'model', 'validate', '--token', token], token);
     expect(run.json?.ok).toBe(false);
     expect(run.status).not.toBe(0);
   });
 });
 
 /**
- * 批 D/E/F 活体面（2026-11-10）：preflight 11 步、候选落库、审批凭证四眼与作用域绑定。
+ * 批 D/E/F 活体面（2026-11-10，2026-11-23 去 wagent 化后收缩）：preflight 9 步、审批凭证四眼与作用域绑定。
  * 断言只认「服务端真实返回」，不接受脚本层自证。
  */
-test.describe('CLI 生产化：preflight / candidate / approval-token', () => {
-  const createdCandidateIds: string[] = [];
+test.describe('CLI 生产化：preflight / approval-token', () => {
   const issuedApprovalIds: string[] = [];
 
   test.afterAll(() => {
-    // 防污染收口：只按本次运行前缀软删，禁物理 DELETE、禁越界清理
-    const res = sql(
-      `UPDATE ecos_ai.ecos_wagent_candidate SET is_deleted = 1, update_time = CURRENT_TIMESTAMP ` +
-      `WHERE batch_id LIKE '${FIXTURE_PREFIX}%' AND is_deleted = 0;`
-    );
-    expect(res.ok, `夹具软删未能执行（psql/docker 均不可用）：${res.out.slice(0, 200)}`).toBeTruthy();
+    // 2026-11-23 去 wagent 化：候选读写面已随 wagent 下线，本节不再建候选夹具
+    // （ecos_wagent_candidate 表仍在库，但已无写入方），故只收口本轮签发的凭证。
     // 凭证表无 is_deleted 列（V50 定版，本批不动 DDL）⇒ 以「作废 + 立即过期」等效收口，
     // 仍不物理 DELETE；按 id 精确作废本轮签发的凭证，不按 scope LIKE 以免误伤同前缀他人行。
     if (issuedApprovalIds.length > 0) {
@@ -269,16 +257,9 @@ test.describe('CLI 生产化：preflight / candidate / approval-token', () => {
       );
       expect(revoke.ok, `夹具凭证作废未执行：${revoke.out.slice(0, 200)}`).toBeTruthy();
     }
-    const remaining = sql(
-      `SELECT count(*) FROM ecos_ai.ecos_wagent_candidate ` +
-      `WHERE batch_id LIKE '${FIXTURE_PREFIX}%' AND is_deleted = 0;`
-    );
-    expect(remaining.ok, `软删后复核未执行：${remaining.out.slice(0, 200)}`).toBeTruthy();
-    expect(Number(remaining.out.trim()), '前缀内仍有未软删夹具').toBe(0);
-    expect(createdCandidateIds.length, '本轮夹具应至少建过 2 个候选').toBeGreaterThanOrEqual(2);
   });
 
-  test('preflight：11 步齐全、四值状态、createsRun=false（只报告不建 Run）', async ({ request }) => {
+  test('preflight：9 步齐全、四值状态、createsRun=false（只报告不建 Run）', async ({ request }) => {
     const token = await loginAsAdmin(request);
     const res = await request.post('/api/v1/cli/preflight', {
       headers: { Authorization: `Bearer ${token}` },
@@ -286,10 +267,10 @@ test.describe('CLI 生产化：preflight / candidate / approval-token', () => {
     expect([200, 500, 503], `preflight 只允许这三档，实得 ${res.status()}`).toContain(res.status());
     const json = await res.json();
     const data = json?.data ?? {};
-    expect(data.stepCount, '必须是 11 步').toBe(11);
+    expect(data.stepCount, '必须是 9 步（2026-11-23 去 wagent 化 11→9）').toBe(9);
     expect(data.createsRun, '预检不得创建 Run').toBe(false);
     const steps = data.steps ?? [];
-    expect(steps.length).toBe(11);
+    expect(steps.length).toBe(9);
     const allowed = ['PASS', 'FAIL', 'BLOCKED', 'NOT_VERIFIED'];
     for (const s of steps) {
       expect(allowed, `步骤 ${s.step} 状态越界: ${s.status}`).toContain(s.status);
@@ -301,65 +282,6 @@ test.describe('CLI 生产化：preflight / candidate / approval-token', () => {
         expect(String(s.reason ?? '').length, `NOT_VERIFIED 必须给理由（${s.step}）`).toBeGreaterThan(0);
       }
     }
-  });
-
-  test('写命令 --dry-run：只打印计划，库面零新增（断言真实不落库）', async ({ request }) => {
-    const token = await loginAsAdmin(request);
-    const batchId = `${FIXTURE_PREFIX}dryrun`;
-    const before = sql(
-      `SELECT count(*) FROM ecos_ai.ecos_wagent_candidate WHERE batch_id = '${batchId}';`
-    );
-    expect(before.ok, `dry-run 前置计数未执行：${before.out.slice(0, 200)}`).toBeTruthy();
-
-    const run = runCli(['knowledge', 'extract', '--dry-run', '--candidate-type', 'KNOWLEDGE_ITEM',
-      '--payload-json', '{"probe":"dryrun"}', '--body-json', `{"batchId":"${batchId}"}`,
-      '--output', 'json', '--token', token], token);
-    expect(run.json?.status).toBe('SUCCESS');
-    expect(run.status).toBe(0);
-    expect(String(run.json?.data?.plannedCall ?? ''), 'dry-run 未回显调用计划')
-      .toContain('/api/v1/wagent/candidates');
-    expect(run.json?.source_refs?.[0]?.operationId).toBe('createWagentCandidate');
-
-    const after = sql(
-      `SELECT count(*) FROM ecos_ai.ecos_wagent_candidate WHERE batch_id = '${batchId}';`
-    );
-    expect(after.ok, `dry-run 后置计数未执行：${after.out.slice(0, 200)}`).toBeTruthy();
-    expect(Number(after.out.trim()), '--dry-run 竟然真落了库').toBe(Number(before.out.trim()));
-  });
-
-
-  test('建候选：201 + status=generated，payload 哈希由服务端计算', async ({ request }) => {
-    const token = await loginAsAdmin(request);
-    const payload = JSON.stringify({ probe: 'cli-l3-e2e', at: Date.now() });
-    const res = await request.post('/api/v1/wagent/candidates', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        candidateType: 'KNOWLEDGE_ITEM',
-        payloadJson: payload,
-        targetEngine: 'kb',
-        batchId: `${FIXTURE_PREFIX}candidate`,
-      },
-    });
-    expect(res.status(), `建候选期望 201，实得 ${res.status()}`).toBe(201);
-    const json = await res.json();
-    const c = json?.data ?? {};
-    const id = c.candidate_id ?? c.candidateId ?? c.id;
-    expect(id, '响应缺候选 id').toBeTruthy();
-    createdCandidateIds.push(String(id));
-    const status = c.status ?? c.candidate_status;
-    expect(String(status), '初始状态必须是 generated').toBe('generated');
-    const hash = c.payload_hash ?? c.payloadHash;
-    expect(String(hash ?? '').length, 'payload_hash 必须由服务端给出（64 hex）').toBe(64);
-    expect(c.batch_id ?? c.batchId, '夹具批次号未按前缀落库').toBe(`${FIXTURE_PREFIX}candidate`);
-  });
-
-  test('建候选：类型越界 ⇒ 400（禁静默默认）', async ({ request }) => {
-    const token = await loginAsAdmin(request);
-    const res = await request.post('/api/v1/wagent/candidates', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: { candidateType: 'NOT_A_TYPE', payloadJson: '{}' },
-    });
-    expect(res.status()).toBe(400);
   });
 
   test('审批凭证：admin 签发成功；自审批（requester=approver）⇒ 403', async ({ request }) => {
@@ -388,53 +310,6 @@ test.describe('CLI 生产化：preflight / candidate / approval-token', () => {
       },
     });
     expect(self.status(), '自审批必须 403').toBe(403);
-  });
-
-  test('凭证闸生效：无效 token ⇒ 403；有效 token 越过凭证闸（批 A 后真链路）', async ({ request }) => {
-    const token = await loginAsAdmin(request);
-    // 造一个候选，专供发布闸验证（同批次前缀，afterAll 统一软删）
-    const created = await request.post('/api/v1/wagent/candidates', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        candidateType: 'KNOWLEDGE_ITEM',
-        payloadJson: JSON.stringify({ probe: 'publish-gate' }),
-        batchId: `${FIXTURE_PREFIX}publish`,
-      },
-    });
-    expect(created.status()).toBe(201);
-    const createdJson = await created.json();
-    const candidateId = createdJson?.data?.candidate_id ?? createdJson?.data?.id;
-    createdCandidateIds.push(String(candidateId));
-
-    // 无效凭证：凭证闸拒绝（403），不是 501
-    const bad = await request.post(`/api/v1/wagent/candidates/${candidateId}/publish`, {
-      headers: { Authorization: `Bearer ${token}` },
-      data: { approvalToken: 'ecos-apv-not-issued' },
-    });
-    expect(bad.status(), '无效凭证必须 403').toBe(403);
-
-    // 有效凭证：越过凭证闸。批 A（rbac.rego admin 规则 + 角色真传）后发布腿为真闭环：
-    // GENERATED 候选命中状态闸 409（状态闸先于裁决）；策略拒绝为 403——三态均证明不再是 501。
-    const issued = await request.post('/api/v1/wagent/approval-tokens', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: { scopeType: 'CANDIDATE_PUBLISH', scopeId: candidateId, requestedBy: 'generator-x' },
-    });
-    expect(issued.status()).toBe(200);
-    const issuedJson = await issued.json();
-    issuedApprovalIds.push(String(issuedJson?.data?.approvalId ?? ''));
-    const good = await request.post(`/api/v1/wagent/candidates/${candidateId}/publish`, {
-      headers: { Authorization: `Bearer ${token}` },
-      data: { approvalToken: issuedJson?.data?.token },
-    });
-    expect([200, 403, 409], `有效凭证下发布腿必须是真裁决（200 发布/403 策略/409 状态闸），禁 501（实得 ${good.status()}）`)
-      .toContain(good.status());
-
-    // 作用域绑定：同凭证换对象 ⇒ 403
-    const mismatch = await request.post('/api/v1/wagent/candidates/c-other-object/publish', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: { approvalToken: issuedJson?.data?.token },
-    });
-    expect([403, 404], `跨对象复用凭证必须被拒（实得 ${mismatch.status()}）`).toContain(mismatch.status());
   });
 
   test('批 A 授权墙双修：admin 角色 candidate:publish 经 OPA rbac 放行（策略可及）', async ({ request }) => {

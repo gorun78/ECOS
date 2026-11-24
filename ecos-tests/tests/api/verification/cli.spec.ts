@@ -142,21 +142,18 @@ test.describe('CLI 未实装能力必须如实 UNAVAILABLE（核心反假绿）'
     expect(String(json?.error?.message ?? ''), '应说明缺失的端点').toMatch(/端点|endpoint/i);
   });
 
-  test('V-CLI-021 L3 命令无审批凭证必须 BLOCKED（不得假执行）', async () => {
-    const { json } = await runCli([
-      'ontology', 'publish',
-      '--body-json', JSON.stringify({ candidateId: 'probe-candidate' }),
-    ]);
-    expect(json?.ok, 'L3 无凭证不得成功').toBe(false);
-    expect(['BLOCKED', 'UNAVAILABLE', 'FAILED'], `L3 无凭证状态应为拒绝类，实得 ${json?.status}`)
-      .toContain(String(json?.status));
+  test('V-CLI-021 L1 写命令缺必填参数必须被拒（不得假执行）', async () => {
+    // 2026-11-23 去 wagent 化：原 L3 `ontology publish` 命令已删（W 面端点下线），
+    // 现存写命令均为 L1。该用例语义退化为「写命令缺参不得成功」。
+    const { json } = await runCli(['cognition', 'model', 'validate']);
+    expect(json?.ok, 'L1 缺参不得成功').toBe(false);
     expect(String(json?.error?.code ?? json?.error?.message ?? ''), '必须给出拒绝原因').not.toBe('');
   });
 
   test('V-CLI-022 缺必填参数必须报错退出（禁默认值兜底）', async () => {
-    const { code, json } = await runCli(['agent', 'readiness']);
+    const { code, json } = await runCli(['cognition', 'model', 'validate']);
     const rejected = code !== 0 || json?.ok === false;
-    expect(rejected, `缺 --question-id 必须失败，实得 code=${code} ok=${json?.ok}`).toBe(true);
+    expect(rejected, `缺必填参数必须失败，实得 code=${code} ok=${json?.ok}`).toBe(true);
     const msg = String(json?.error?.message ?? json?.error ?? '');
     expect(msg || code !== 0, '应说明缺失的参数').toBeTruthy();
   });

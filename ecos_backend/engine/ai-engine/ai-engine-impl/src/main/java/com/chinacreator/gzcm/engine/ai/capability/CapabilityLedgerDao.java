@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.capability;
 
-import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentBaseDO;
+import com.chinacreator.gzcm.engine.ai.toolcontract.AiBaseDO;
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 import org.springframework.stereotype.Repository;
 
@@ -25,7 +25,7 @@ public class CapabilityLedgerDao extends JdbcTemplateDaoSupport {
 
     private static final String TABLE = "ecos_ai.ecos_ai_capability_task";
 
-    /** 显式列名（禁 SELECT *；domain/version_no 等基线列由 {@link WAgentBaseDO} 承载名）。 */
+    /** 显式列名（禁 SELECT *；domain/version_no 等基线列由 {@link AiBaseDO} 承载名）。 */
     private static final String COLUMNS = "id, task_kind, capability_id, tool_contract_ref, input_ref, "
             + "model_ref, model_version, output_ref, status, quality_score, quality_kind, calibrated, "
             + "cost_unit, latency_ms, degraded, warnings_text, selected_model_reason, trace_id, run_id, "

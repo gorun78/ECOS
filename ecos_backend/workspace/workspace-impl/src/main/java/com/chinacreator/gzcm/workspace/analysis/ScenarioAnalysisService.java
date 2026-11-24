@@ -5,7 +5,9 @@ import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunCommand;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunOrchestrationService;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunView;
+import com.chinacreator.gzcm.workspace.scenario.AipPipelineRunClient;
 import com.chinacreator.gzcm.workspace.scenario.RunMode;
+import com.chinacreator.gzcm.workspace.scenario.SandboxWriteGuard;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioRunRequestValidator;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioRunService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioService;
@@ -41,17 +43,34 @@ public class ScenarioAnalysisService {
     private final ScenarioRunService runService;
     private final ScenarioRunRequestValidator runValidator;
     private final ForecastRunOrchestrationService forecastService;
+    private final AipPipelineRunClient pipelineRunClient;
+    private final SandboxWriteGuard sandboxWriteGuard;
 
     public ScenarioAnalysisService(WorkspaceDataDao dao,
                                    ScenarioService scenarioService,
                                    ScenarioRunService runService,
                                    ScenarioRunRequestValidator runValidator,
-                                   ForecastRunOrchestrationService forecastService) {
+                                   ForecastRunOrchestrationService forecastService,
+                                   AipPipelineRunClient pipelineRunClient) {
+        this(dao, scenarioService, runService, runValidator, forecastService, pipelineRunClient,
+                new SandboxWriteGuard());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ScenarioAnalysisService(WorkspaceDataDao dao,
+                                   ScenarioService scenarioService,
+                                   ScenarioRunService runService,
+                                   ScenarioRunRequestValidator runValidator,
+                                   ForecastRunOrchestrationService forecastService,
+                                   AipPipelineRunClient pipelineRunClient,
+                                   SandboxWriteGuard sandboxWriteGuard) {
         this.dao = dao;
         this.scenarioService = scenarioService;
         this.runService = runService;
         this.runValidator = runValidator;
         this.forecastService = forecastService;
+        this.pipelineRunClient = pipelineRunClient;
+        this.sandboxWriteGuard = sandboxWriteGuard;
     }
 
     /** 场景分析列表（锚点表统一读）。 */
@@ -91,9 +110,82 @@ public class ScenarioAnalysisService {
             case "FORECAST" -> runForecast(scenarioId, p, mode, pointer);
             case "CAUSAL" -> runScenarioRun(scenarioId, p, mode, pointer, "DIAGNOSE", "CAUSAL");
             case "SIMULATION" -> runScenarioRun(scenarioId, p, mode, pointer, "SIMULATE", "SIMULATION");
+            case "PIPELINE" -> runPipeline(scenarioId, p, mode, pointer);
             default -> throw new BusinessException(400,
-                    "ANALYSIS-400: 非法 analysisType: " + analysisType + "（允许 CAUSAL|FORECAST|SIMULATION）");
+                    "ANALYSIS-400: 非法 analysisType: " + analysisType
+                            + "（允许 CAUSAL|FORECAST|SIMULATION|PIPELINE）");
         };
+    }
+
+    /**
+     * 场景智能逻辑（2026-11-23 承接批）：按场景绑定的逻辑编排 id 调属主 ai-engine 执行。
+     *
+     * <p><b>取值口径</b>：绑定组 {@code pipelines}（binding_type=PIPELINE）。请求体可显式传
+     * {@code pipelineId} 覆盖（多绑定场景选其一）；都没给则 400 —— <b>不猜默认编排</b>。
+     * 绑定存在但属主不可达 ⇒ 503（{@link AipPipelineUnavailableException}，fail-closed）。</p>
+     *
+     * <p><b>落库口径</b>：结果落 {@code ecos_scenario_run} 锚点（analysis_type=PIPELINE，
+     * source_type=AIP_PIPELINE，source_id=编排 id），节点轨迹写入 simulation_result 槽位
+     * （与 SIMULATE/SAFEGUARD 同槽位语义：非诊断/非预测的结构化执行结果）；
+     * 沙箱模式沿用 {@link SandboxWriteGuard} 的写入限制。</p>
+     */
+    private Map<String, Object> runPipeline(String scenarioId, Map<String, Object> p, RunMode mode,
+                                            String[] pointer) {
+        String pipelineId = text(p.get("pipelineId"));
+        if (pipelineId == null) {
+            List<String> bound = scenarioService.bindings(scenarioId).get("pipelines");
+            if (bound == null || bound.isEmpty()) {
+                throw new BusinessException(400,
+                        "ANALYSIS-400: 场景未绑定逻辑编排（binding_type=PIPELINE），请先在场景定义中绑定");
+            }
+            if (bound.size() > 1) {
+                throw new BusinessException(400,
+                        "ANALYSIS-400: 场景绑定了 " + bound.size()
+                                + " 条编排，请在请求体显式指定 pipelineId");
+            }
+            pipelineId = bound.get(0);
+        }
+
+        Map<String, Object> inputs = new LinkedHashMap<>();
+        Object rawInputs = p.get("inputs");
+        if (rawInputs instanceof Map<?, ?> m) {
+            m.forEach((k, v) -> inputs.put(String.valueOf(k), v));
+        }
+        Map<String, Object> result = pipelineRunClient.execute(pipelineId, inputs);
+
+        String status = result.get("status") == null ? "UNKNOWN" : String.valueOf(result.get("status"));
+        boolean degraded = Boolean.TRUE.equals(result.get("degraded"));
+        String anchorId = "run_" + UUID.randomUUID().toString().substring(0, 12);
+        sandboxWriteGuard.assertAllowed(mode, "ecos_scenario_run");
+        dao.insertRun(anchorId, scenarioId, "PIPELINE",
+                degraded ? "SUCCEEDED_DEGRADED" : "SUCCEEDED",
+                text(p.get("metric")), p.get("deviation"),
+                null, null, toJson(result), null,
+                degraded, currentOperator(), mode.name(),
+                text(p.get("baselineRunId")),
+                mode == RunMode.SANDBOX ? "SANDBOX" : "NONE");
+        dao.updateAnalysisAnchorMeta(anchorId, "PIPELINE", "AIP_PIPELINE", pipelineId,
+                pointer[0], pointer[1]);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("analysisId", anchorId);
+        out.put("scenarioId", scenarioId);
+        out.put("analysisType", "PIPELINE");
+        out.put("runMode", mode.name());
+        out.put("sourceType", "AIP_PIPELINE");
+        out.put("sourceId", pipelineId);
+        out.put("status", status);
+        out.put("degraded", degraded);
+        out.put("executionId", result.get("executionId"));
+        out.put("executedNodes", result.get("executedNodes"));
+        out.put("nodeTraces", result.get("nodeTraces"));
+        out.put("outputs", result.get("outputs"));
+        out.put("message", result.get("message"));
+        out.put("definitionVersion", pointer[0]);
+        out.put("definitionDigest", pointer[1]);
+        log.info("编排分析已执行 analysis={} pipeline={} scenario={} status={} degraded={}",
+                anchorId, pipelineId, scenarioId, status, degraded);
+        return out;
     }
 
     private Map<String, Object> runForecast(String scenarioId, Map<String, Object> p, RunMode mode, String[] pointer) {
@@ -210,6 +302,19 @@ public class ScenarioAnalysisService {
 
     private static boolean eq(Object a, Object b) {
         return a == null ? b == null : a.equals(b);
+    }
+
+    /** 结构化结果 → JSON 文本（落 simulation_result 槽位；失败返 null，不伪造 "{}"）。 */
+    private static String toJson(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(value);
+        } catch (Exception e) {
+            log.warn("分析结果序列化失败，落 null: {}", e.getMessage());
+            return null;
+        }
     }
 
     private static String sha256(String v) {

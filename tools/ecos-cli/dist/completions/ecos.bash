@@ -6,17 +6,14 @@ _ecos_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "doctor cognition capabilities agent ontology knowledge action model runtime help version --output --base-url --token --token-file --profile --trace-id --timeout --dry-run --no-retry --all --page-size --max-pages --idempotency-key --approval-token --body-json --follow --last-event-id --show-config --preflight --help --version --completion" -- "${cur}") )
+        COMPREPLY=( $(compgen -W "doctor cognition capabilities ontology model runtime help version --output --base-url --token --token-file --profile --trace-id --timeout --dry-run --no-retry --all --page-size --max-pages --idempotency-key --approval-token --body-json --follow --last-event-id --show-config --preflight --help --version --completion" -- "${cur}") )
         return 0
     fi
 
     case "${COMP_WORDS[1]}" in
         cognition) COMPREPLY=( $(compgen -W "models list model validate run" -- "${cur}") ); return 0 ;;
         capabilities) COMPREPLY=( $(compgen -W "list" -- "${cur}") ); return 0 ;;
-        agent) COMPREPLY=( $(compgen -W "run inspect stop readiness" -- "${cur}") ); return 0 ;;
-        ontology) COMPREPLY=( $(compgen -W "validate publish" -- "${cur}") ); return 0 ;;
-        knowledge) COMPREPLY=( $(compgen -W "extract validate publish" -- "${cur}") ); return 0 ;;
-        action) COMPREPLY=( $(compgen -W "commit" -- "${cur}") ); return 0 ;;
+        ontology) COMPREPLY=( $(compgen -W "validate" -- "${cur}") ); return 0 ;;
         model) COMPREPLY=( $(compgen -W "list route" -- "${cur}") ); return 0 ;;
         runtime) COMPREPLY=( $(compgen -W "doctor" -- "${cur}") ); return 0 ;;
     esac

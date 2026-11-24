@@ -1,10 +1,8 @@
 /**
- * SSE 帧契约跨语言单源钉桩 — 前端 `services/sseFrames.ts` + `services/wagentSseFrames.ts` ⇄ 后端登记处。
+ * SSE 帧契约跨语言单源钉桩 — 前端 `services/sseFrames.ts` ⇄ 后端登记处。
  *
  * 钉三处源（缺一即漏）：
- * - `runtime/common-api .../common/stream/SseFrameContract.java`：七帧名、`AGENT_LOOP_FRAME_ORDER`、
- *   `KEY_*` 键面、`CITATION_REQUIRED_KEYS`；**以及 W 通道分表**（`WAGENT_FRAME_ORDER` 八帧序、
- *   `wagentFrameKeys()` 逐帧键面、`WAGENT_CHANNEL_EXTRA_KEYS`、`MILESTONE_FRAME_KEYS`）；
+ * - `runtime/common-api .../common/stream/SseFrameContract.java`：七帧名、`AGENT_LOOP_FRAME_ORDER`、`KEY_*` 键面、`CITATION_REQUIRED_KEYS`；
  * - `runtime/common-api .../common/trace/AgentLoopTrace.java`：`Op` 的 wire 词表、`Decision` 词表、
  *   缺失标记 `UNKNOWN`/`ABSENT`；
  * - `engine/ai-engine/ai-engine-impl .../controller/AgentLoopController.java`：done 帧的**内联字面量**
@@ -28,17 +26,6 @@ import {
   TEXT_ABSENT,
   TOKEN_UNKNOWN,
 } from "../sseFrames";
-import {
-  WAGENT_CHANNEL_EXTRA_KEYS,
-  WAGENT_FRAME_KEYS,
-  WAGENT_FRAME_ORDER,
-  WAGENT_MILESTONE_FRAME,
-  WAGENT_MILESTONE_FRAME_KEYS,
-  WAGENT_SSE_KEYS,
-  isKnownWagentFrame,
-  wagentFrameIndex,
-  wagentVocabulary,
-} from "../wagentSseFrames";
 
 const BACKEND = new URL("../../../../ecos_backend/", import.meta.url);
 const CONTRACT_SRC = readFileSync(
@@ -242,84 +229,3 @@ describe("SSE 帧契约跨语言单源", () => {
     expect(mutatedOrder).not.toEqual([...AGENT_LOOP_FRAME_ORDER]);
   });
 });
-
-/**
- * WAgent run 流八帧面（§10.3.6）— 与上面七帧面同文件、不同词表。
- *
- * 分成两个 describe 而不是混进同一批断言：这两套契约的失败原因是两类事，
- * 七帧面分叉＝agent-loop 承流读错，八帧面分叉＝W run 流读错，
- * 一条红消息必须能直接指出是哪条通道。
- */
-describe("WAgent run 流八帧跨语言单源", () => {
-  it("八帧名与序逐字相等（六词与七帧面同形、第 6 帧 degrade 为唯一词面差异）", () => {
-    expect(backendWagentOrder).toHaveLength(8);
-    expect([...WAGENT_FRAME_ORDER]).toEqual(backendWagentOrder);
-    expect(backendWagentOrder).toContain("degrade");
-    // 跨通道互斥：degrade 只在 W 词表里，七帧面出现它即违例
-    expect([...AGENT_LOOP_FRAME_ORDER]).not.toContain("degrade");
-  });
-
-  it("逐帧键面八个帧逐个相等（同名帧不同键形，禁借用另一通道的载荷形状）", () => {
-    expect([...backendWagentFrameKeys.keys()].sort()).toEqual([...WAGENT_FRAME_ORDER].sort());
-    for (const frame of WAGENT_FRAME_ORDER) {
-      expect(
-        WAGENT_FRAME_KEYS[frame],
-        `帧 ${frame} 键面分叉`,
-      ).toEqual(backendWagentFrameKeys.get(frame));
-    }
-    // step 是「同名不同键」的代表，这里把分叉钉成显式断言而不是靠上面循环顺带覆盖
-    expect(WAGENT_FRAME_KEYS.step).toContain("stepKey");
-    expect(WAGENT_FRAME_KEYS.step).toContain("policyEffect");
-    expect(WAGENT_FRAME_KEYS.step).not.toContain("op");
-    expect(WAGENT_FRAME_KEYS.step).not.toContain("decision");
-    expect(backendWagentFrameKeys.get("step")).not.toContain("op");
-    expect(backendWagentFrameKeys.get("step")).not.toContain("decision");
-  });
-
-  it("milestone 是补充帧：可识别但不进八帧序，序位恒取缺失标记", () => {
-    expect(backendWagentOrder).not.toContain(WAGENT_MILESTONE_FRAME);
-    expect(isKnownWagentFrame(WAGENT_MILESTONE_FRAME)).toBe(true);
-    expect(wagentFrameIndex(WAGENT_MILESTONE_FRAME)).toBe(TOKEN_UNKNOWN);
-    expect([...WAGENT_MILESTONE_FRAME_KEYS]).toEqual(backendMilestoneKeys);
-    expect([...wagentVocabulary()]).toEqual([...backendWagentOrder, "milestone"]);
-  });
-
-  it("通道自加键白名单两侧一致（只许 eventId/streamMode/payloadKind）", () => {
-    expect([...WAGENT_CHANNEL_EXTRA_KEYS]).toEqual(backendWagentExtraKeys);
-    // 自加键不得混进八帧键面，否则「设计原文有什么就是什么」的登记表被写成实现自证清单
-    for (const key of backendWagentExtraKeys) {
-      expect([...backendWagentFrameKeys.values()].flat()).not.toContain(key);
-    }
-  });
-
-  it("W 键面集合两侧同集：前端不得自创键，也不得漏登记后端在册键", () => {
-    const frontValues = Object.values(WAGENT_SSE_KEYS);
-    expect(new Set(frontValues).size).toBe(frontValues.length); // 值重复＝一个键面两种写法
-    expect([...new Set(frontValues)].sort()).toEqual([...backendWagentKeyUniverse].sort());
-    // 后端 W 段声明的 KEY_* 必须逐枚进表（八帧键面/自加键/milestone 之一），禁声明一枚没人发的键再让前端去读
-    const unregistered = backendWagentDeclaredKeyValues.filter(
-      (value) => !backendWagentKeyUniverse.includes(value),
-    );
-    expect(unregistered).toEqual([]);
-  });
-
-  it("W 面钉桩自身能变红：后端给 step 帧加一枚键时提取器必须报出 8 键", () => {
-    const mutated = CONTRACT_SRC.replace(
-      "m.put(FRAME_STEP, List.of(KEY_TRACE_ID, KEY_STEP_KEY, KEY_STEP_TYPE, KEY_TOOL,",
-      'm.put(FRAME_STEP, List.of(KEY_TRACE_ID, KEY_STEP_KEY, KEY_STEP_TYPE, KEY_TOOL, KEY_BUDGET,',
-    );
-    const mutatedKeys = wagentFrameKeysMap(mutated, stringConstants(mutated));
-    expect(mutatedKeys.get("step")).toHaveLength(8);
-    expect(mutatedKeys.get("step")).not.toEqual([...WAGENT_FRAME_KEYS.step]);
-  });
-
-  it("后端源码读不到就失败：禁把缺源当合规", () => {
-    expect(() => listOfMembers(TRACE_SRC, "AGENT_LOOP_FRAME_ORDER", new Map())).toThrow(/找不到 List\.of 声明/);
-    expect(() => enumWires(CONTRACT_SRC, "Op")).toThrow(/找不到 enum Op/);
-    expect(() => wagentFrameKeysMap(TRACE_SRC, contractConstants)).toThrow(/一条 m\.put/);
-    expect(() => splitKeySections(TRACE_SRC)).toThrow(/找不到 W 键面分段标记/);
-    expect(backendKeyValues.length).toBeGreaterThan(20);
-    expect(backendWagentKeyUniverse.length).toBeGreaterThan(30);
-  });
-});
-

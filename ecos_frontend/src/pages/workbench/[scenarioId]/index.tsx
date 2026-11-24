@@ -1,8 +1,13 @@
 /**
  * 工作台 L2 — 单场景工作区（场景定义 / 场景运行双 Tab，场景工作台简化 v0.3）。
  *
- * <p>默认落在「场景定义」；保留旧详情路由的加载/404/403/错误/离线六态。
- * 认知/蓝图/能力等工程面收进「高级」折叠区，由既有 AdvancedDebugPanel/BlueprintPanel 承载。</p>
+ * <p>默认落在「场景定义」；保留旧详情路由的加载/404/403/错误/离线六态。</p>
+ *
+ * <p>2026-11-23 界面精简（用户裁决）：去掉「高级」折叠按钮。认知运行面
+ * （{@link AdvancedDebugPanel}：运行编排 + 认知四卡 E1~E4 唯一挂载点）并入
+ * 「场景运行」Tab 下方常驻，不再躲在按钮后面；蓝图工程面 BlueprintPanel 自 L2 摘除
+ * （定义/版本/发布由「场景定义」页承接，融合/决策/Git 经「高级视图」链接可达）。
+ * 场景上下文构建入口见「场景定义」页右上的按钮（见 definition/ScenarioContextBuilder）。</p>
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -10,10 +15,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   BrainCircuit,
-  ChevronDown,
-  ChevronUp,
   FileQuestion,
-  FlaskConical,
   ShieldAlert,
 } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
@@ -26,7 +28,6 @@ import { fetchScenarioDefinition } from '../../../services/scenarioDefinitionCli
 import { fetchScenarioAnalyses, runScenarioAnalysis } from '../../../services/scenarioAnalysisClient';
 import logger from '../../../services/logger';
 import AdvancedDebugPanel from './advanced/AdvancedDebugPanel';
-import BlueprintPanel from './blueprint/BlueprintPanel';
 import DefinitionTab from './definition/DefinitionTab';
 import RunTab from './run/RunTab';
 
@@ -60,7 +61,6 @@ export default function WorkbenchScenarioDetail() {
   const [notFound, setNotFound] = useState(false);
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const tab = useMemo<TabKey>(() => {
     const q = searchParams.get('tab');
@@ -212,15 +212,6 @@ export default function WorkbenchScenarioDetail() {
                 {t(k === 'definition' ? 'workspace.l2.tab.definition' : 'workspace.l2.tab.run')}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((v) => !v)}
-              className={`ml-auto inline-flex items-center gap-1 px-2 py-1 rounded border text-[11px] font-bold cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
-            >
-              <FlaskConical size={12} />
-              {t('workspace.l2.advanced')}
-              {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
           </div>
 
           {tab === 'definition' && (
@@ -232,16 +223,26 @@ export default function WorkbenchScenarioDetail() {
             />
           )}
           {tab === 'run' && (
-            <RunTab
-              scenarioId={scenario.id}
-              analyses={analyses}
-              onRun={runAnalysis}
-              onRefresh={async () => {
-                const next = await fetchScenarioAnalyses(scenarioId);
-                setAnalyses(next);
-                return next;
-              }}
-            />
+            <>
+              <RunTab
+                scenarioId={scenario.id}
+                analyses={analyses}
+                onRun={runAnalysis}
+                onRefresh={async () => {
+                  const next = await fetchScenarioAnalyses(scenarioId);
+                  setAnalyses(next);
+                  return next;
+                }}
+              />
+              {/*
+                认知运行面（原「高级」折叠区，2026-11-23 并入本 Tab 常驻）：
+                运行编排 CognitionPanel + 认知四卡 CognitiveRightPanel（E1~E4 全应用唯一挂载点，
+                E2E COG-IA 单实例断言依赖此唯一性）。
+              */}
+              <div className="px-4 pb-4">
+                <AdvancedDebugPanel scenarioId={scenario.id} />
+              </div>
+            </>
           )}
 
           {/*
@@ -279,13 +280,6 @@ export default function WorkbenchScenarioDetail() {
               {!operationEval.loading && operationEval.data && <OperationEvalView data={operationEval.data} />}
             </div>
           </section>
-
-          {showAdvanced && (
-            <div className="px-4 pb-4 space-y-4">
-              <AdvancedDebugPanel scenarioId={scenario.id} />
-              <BlueprintPanel scenarioId={scenario.id} />
-            </div>
-          )}
         </>
       )}
     </div>

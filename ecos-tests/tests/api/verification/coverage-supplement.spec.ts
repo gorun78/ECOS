@@ -90,27 +90,9 @@ test.describe('AI 域补充面（域03 未覆盖部分）', () => {
   });
 });
 
-test.describe('WAgent 面（写语义面，只验方法契约）', () => {
-  const collections = ['/api/v1/wagent/goals', '/api/v1/wagent/questions', '/api/v1/wagent/runs'];
-
-  for (const p of collections) {
-    test(`V-AI-110 ${p} 只接受 POST（GET 必须 405）`, async ({ request }) => {
-      const { status } = await call(request, 'GET', p, { token });
-      expect(status, `GET ${p} 应 405（写语义面），实得 ${status}`).toBe(405);
-    });
-  }
-
-  test('V-AI-111 WAgent goals 空提交必须被拒', async ({ request }) => {
-    const { status, json } = await call(request, 'POST', '/api/v1/wagent/goals', { token, data: {} });
-    const rejected = status >= 400 || json?.code !== 0;
-    expect(rejected, `WAgent 空 goal 必须被拒，实得 HTTP=${status} code=${json?.code}`).toBe(true);
-  });
-
-  test('V-AI-112 WAgent 不存在 goal 必须 404/400', async ({ request }) => {
-    const { status } = await call(request, 'GET', '/api/v1/wagent/goals/__NOT_EXIST__', { token });
-    expect([400, 404, 405], `不存在 goal 应被拒，实得 ${status}`).toContain(status);
-  });
-});
+// 2026-11-23 去 wagent 化：原「WAgent 面（写语义面，只验方法契约）」整节（V-AI-110~112）
+// 随 goals/questions/runs 端点删除一并移除。存活的 /api/v1/wagent/approval-tokens 由
+// ai-engine-remainder.spec.ts 的 V-AI-055 覆盖（签发腿 + 四眼 + scopeType 闸）。
 
 test.describe('认知域补充面', () => {
   test('V-AI-120 认知引擎健康含组件明细', async ({ request }) => {

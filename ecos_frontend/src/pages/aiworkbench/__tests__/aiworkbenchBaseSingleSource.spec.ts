@@ -75,7 +75,7 @@ const SRC_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 /** 本域生产文件数（实跑读出，防扫描根漂移成零命中）。 */
 const DOMAIN_DIR = 'pages/aiworkbench';
-const DOMAIN_PROD_FILES = 23; // 2026-11-17 死代码清理：旧 Agent Studio 簇 8 文件删除（零生产引用），实跑 31→23
+const DOMAIN_PROD_FILES = 22; // 2026-11-23 去 wagent 化：删除 WagentStudioView.tsx 1 枚（菜单入口早已摘除，成为孤儿），23→22 实跑重设
 
 const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
   { rel: 'pages/aiworkbench/api.ts', importPath: '../../services/httpClient' },

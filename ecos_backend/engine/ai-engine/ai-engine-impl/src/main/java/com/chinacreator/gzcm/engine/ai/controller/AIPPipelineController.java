@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.ai.controller;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,11 +25,11 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.dao.AipPipelineDao;
 import com.chinacreator.gzcm.engine.ai.dataobject.AipPipelineDO;
 import com.chinacreator.gzcm.engine.ai.dto.AipDeleteResultVO;
-import com.chinacreator.gzcm.engine.ai.dto.AipPipelineExecResultVO;
 import com.chinacreator.gzcm.engine.ai.dto.AipPipelineSummaryVO;
 import com.chinacreator.gzcm.engine.ai.dto.AipPipelineUpsertRequest;
 import com.chinacreator.gzcm.engine.ai.dto.AipPipelineVO;
 import com.chinacreator.gzcm.engine.ai.dto.AipTemplateInstantiateRequest;
+import com.chinacreator.gzcm.engine.ai.pipeline.AipPipelineExecutionService;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.template.AipPipelineTemplateService;
 import com.chinacreator.gzcm.engine.ai.template.DefinitionJsonCodec;
@@ -65,13 +66,16 @@ public class AIPPipelineController {
     private final AipPipelineDao pipelineDao;
     private final ToolSubjectResolver subjectResolver;
     private final AipPipelineTemplateService templateService;
+    private final AipPipelineExecutionService executionService;
 
     public AIPPipelineController(ObjectProvider<AipPipelineDao> pipelineDaoProvider,
                                  ObjectProvider<ToolSubjectResolver> subjectResolverProvider,
-                                 ObjectProvider<AipPipelineTemplateService> templateServiceProvider) {
+                                 ObjectProvider<AipPipelineTemplateService> templateServiceProvider,
+                                 ObjectProvider<AipPipelineExecutionService> executionServiceProvider) {
         this.pipelineDao = pipelineDaoProvider.getIfAvailable();
         this.subjectResolver = subjectResolverProvider.getIfAvailable();
         this.templateService = templateServiceProvider.getIfAvailable();
+        this.executionService = executionServiceProvider.getIfAvailable();
     }
 
     // ═══════════════ 列表 ═══════════════
@@ -157,15 +161,40 @@ public class AIPPipelineController {
 
     // ═══════════════ 执行 ═══════════════
 
+    /**
+     * 执行编排（2026-11-23 语义修正）。
+     *
+     * <p><b>原实现缺陷</b>：只把行刷成 {@code completed} + {@code last_executed_at}，一个节点都不跑。
+     * 现改为：从 {@code definition_json.steps.graph} 取图 → 拓扑排序 → 复用 AgentStudioService
+     * 六类节点真实执行 → 同步等终态；失败/超时如实上报（禁伪成功）。
+     * 回执 4 键（pipelineId/status/message/executedAt）保持不变，另追加节点轨迹与执行 id。</p>
+     */
     @PostMapping("/{id}/execute")
-    public ApiResponse<AipPipelineExecResultVO> executePipeline(@PathVariable String id) {
+    public ApiResponse<Map<String, Object>> executePipeline(@PathVariable String id,
+                                                            @RequestBody(required = false) Map<String, Object> inputs) {
         AipPipelineDO existing = pipelineDao.findById(currentTenant(), id).orElse(null);
         if (existing == null) return ApiResponse.notFound("Pipeline " + id + " 不存在");
-        String executedAt = Instant.now().toString();
-        pipelineDao.markExecuted(currentTenant(), id, "completed", currentOperator());
-        log.info("AIP Pipeline executed: {}", id);
-        return ApiResponse.success(new AipPipelineExecResultVO(
-                id, "executed", "Pipeline executed successfully", executedAt));
+        if (executionService == null) {
+            return ApiResponse.error(503, "AIP-EXEC-503: 编排执行器未装配");
+        }
+        AipPipelineExecutionService.Result result =
+                executionService.execute(currentTenant(), id, inputs, AipPipelineExecutionService.DEFAULT_TIMEOUT_MS);
+        String rowStatus = result.degraded() ? "failed" : "completed";
+        pipelineDao.markExecuted(currentTenant(), id, rowStatus, currentOperator());
+        log.info("AIP Pipeline executed: {} status={} degraded={}", id, result.status(), result.degraded());
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("pipelineId", id);
+        data.put("status", "completed".equals(result.status()) ? "executed" : "failed");
+        data.put("message", result.message());
+        data.put("executedAt", Instant.now().toString());
+        data.put("executionId", result.executionId());
+        data.put("degraded", result.degraded());
+        data.put("executedNodes", result.executedNodes());
+        data.put("nodeOrder", result.nodeOrder());
+        data.put("nodeTraces", result.nodeTraces());
+        data.put("outputs", result.outputs());
+        return ApiResponse.success(data);
     }
 
     // ═══════════════ 模板（Wagent Playbook → 逻辑流骨架，批 2） ═══════════════

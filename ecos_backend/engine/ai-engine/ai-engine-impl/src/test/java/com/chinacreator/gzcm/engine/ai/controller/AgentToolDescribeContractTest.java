@@ -4,8 +4,8 @@ import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
 import com.chinacreator.gzcm.engine.ai.service.ToolSchema;
-import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentToolContractDao;
-import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentToolContractDO;
+import com.chinacreator.gzcm.engine.ai.toolcontract.ToolContractDao;
+import com.chinacreator.gzcm.engine.ai.toolcontract.ToolContractDO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,14 +43,14 @@ class AgentToolDescribeContractTest {
     private static final String DESCRIBE_PATH = "/api/v1/agent/tools/{name}";
 
     private ToolRegistry toolRegistry;
-    private WAgentToolContractDao toolContractDao;
+    private ToolContractDao toolContractDao;
     private MockMvc mockMvc;
     private final ObjectMapper mapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
         toolRegistry = mock(ToolRegistry.class);
-        toolContractDao = mock(WAgentToolContractDao.class);
+        toolContractDao = mock(ToolContractDao.class);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AgentToolController(toolRegistry, mock(AgentToolPolicyGate.class),
                         mock(ToolSubjectResolver.class), toolContractDao, new MockEnvironment()))
@@ -58,8 +58,8 @@ class AgentToolDescribeContractTest {
                 .build();
     }
 
-    private static WAgentToolContractDO contract(String version) {
-        WAgentToolContractDO c = new WAgentToolContractDO();
+    private static ToolContractDO contract(String version) {
+        ToolContractDO c = new ToolContractDO();
         c.setId("tc-1");
         c.setName("query_data");
         c.setVersion(version);

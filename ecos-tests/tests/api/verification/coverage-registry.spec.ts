@@ -47,8 +47,6 @@ const TARGETS: Array<{ path: string; label: string; kind: 'array' | 'object' | '
   // 2026-11-15 追加：登记册把这 2 个 wAgent 面判「未覆盖（前缀是常量/无 path）」，
   // 但正文自述「已实测 GET → 200」。既已确认可达就必须有用例，否则「未覆盖」清单
   // 会长期藏真实面。
-  { path: '/api/v1/wagent/tools', label: 'wAgent 工具契约面', kind: 'any' },
-  { path: '/api/v1/wagent/candidates', label: 'wAgent 候选面', kind: 'any' },
 ];
 
 test.describe('未覆盖但真实可达的面（登记判定闭环）', () => {

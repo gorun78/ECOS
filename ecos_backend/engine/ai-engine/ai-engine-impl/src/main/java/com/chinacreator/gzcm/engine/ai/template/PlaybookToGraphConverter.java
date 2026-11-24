@@ -9,9 +9,9 @@ import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan.Plan;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan.Step;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan.Plan;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan.Step;
 
 /**
  * Wagent Playbook 计划 → 逻辑编排画布骨架的确定性转换器（AI 工作台模板融合，模板型）。
@@ -31,7 +31,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan.Step;
  * </ul>
  * 未知值同样记入 {@code unmapped}，<b>禁静默丢弃</b>。</p>
  *
- * <p><b>确定性</b>：节点顺序 = {@link WAgentPlan#topoOrder}（Kahn，声明序稳定）；
+ * <p><b>确定性</b>：节点顺序 = {@link AiPlan#topoOrder}（Kahn，声明序稳定）；
  * 坐标 = 层号 × 220 / 层内序号 × 120（固定步长，无随机、无时钟）；
  * 边 = {@code depends_on} 前驱列表原序。同输入两次调用必得逐字符相同的 JSON。</p>
  */
@@ -59,7 +59,7 @@ public class PlaybookToGraphConverter {
 
     /** Plan → 画布快照。结构非法（环/悬空依赖）时 topoOrder 返回空 ⇒ fail-loud。 */
     public ConvertedGraph convert(Plan plan) {
-        List<Step> ordered = WAgentPlan.topoOrder(plan);
+        List<Step> ordered = AiPlan.topoOrder(plan);
         if (ordered.isEmpty() && !plan.steps().isEmpty()) {
             throw new IllegalArgumentException(
                     "Playbook 计划结构非法（存在环或依赖悬空），拒绝转换为画布");

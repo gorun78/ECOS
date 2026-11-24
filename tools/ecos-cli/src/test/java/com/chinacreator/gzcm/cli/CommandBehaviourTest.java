@@ -53,7 +53,7 @@ class CommandBehaviourTest {
     }
 
     @Test
-    @DisplayName("capabilities list：14 条命令全登记，operationId 均可解析，L3 必带审批")
+    @DisplayName("capabilities list：8 条命令全登记，operationId 均可解析，需审批者必为 L3 写命令")
     void capabilitiesIsReadOnlyAndResolvable() {
         OperationRegistry registry = OperationRegistry.load();
         CliOptions options = CliOptions.parse(new String[] {"capabilities", "list"}, 2);
@@ -62,17 +62,19 @@ class CommandBehaviourTest {
 
         assertEquals("SUCCESS", out.get("status"));
         List<?> commands = (List<?>) ((Map<?, ?>) out.get("data")).get("commands");
-        assertEquals(17, commands.size(), "14 条设计命令 + doctor/capabilities list 两条 MVP 命令 + knowledge validate（D-WC-1）");
+        // 2026-11-23 去 wagent 化：设计册 §10.3.5 的 14 条中 9 条（agent run/inspect/stop/readiness、
+        // ontology publish、knowledge extract/validate/publish、action commit）随 wagent 控制面下线，
+        // 实存 8 条。数量与名录双向钉死（数量相等挡不住「删一条加一条」）。
+        assertEquals(8, commands.size(), "wagent 面下线后实存 8 条命令（见下方名录）");
         // 计划 §一 完成判定：设计册 §10.3.5 的 14 条必须逐条在列（数量相等挡不住「删一条加一条」）
-        List<String> design14 = List.of(
-                "agent run", "agent inspect", "agent stop", "agent readiness",
-                "ontology validate", "ontology publish", "knowledge extract", "knowledge publish",
-                "cognition model validate", "cognition model run", "action commit",
-                "model list", "model route", "doctor");
+        List<String> expected8 = List.of(
+                "doctor", "cognition models list", "capabilities list",
+                "ontology validate", "cognition model validate", "cognition model run",
+                "model list", "model route");
         List<String> actual = commands.stream()
                 .map(c -> String.valueOf(((Map<?, ?>) c).get("name"))).toList();
-        for (String name : design14) {
-            assertTrue(actual.contains(name), "设计册 14 条命令缺失: " + name);
+        for (String name : expected8) {
+            assertTrue(actual.contains(name), "命令名录缺失: " + name);
         }
         for (Object c : commands) {
             Map<?, ?> row = (Map<?, ?>) c;
@@ -145,15 +147,16 @@ class CommandBehaviourTest {
     @DisplayName("L3 已接入但缺 --approval-token ⇒ BLOCKED（本地不放行、不发请求）")
     void l3WithoutApprovalTokenIsBlocked() {
         OperationRegistry registry = OperationRegistry.load();
-        // 用一份「已接入」的 L3 命令夹具：真命令在批 D 前 wired=false，走不到审批闸
-        CliCommand syntheticL3 = new CliCommand("ontology publish", "fixture", CliCommands.ACCESS_WRITE,
-                "L3", List.of("publishCandidate"), List.of(),
-                List.of(new CliCommand.PathParam("--candidate-id", "publishCandidate", "candidateId", "id")),
-                List.of(new CliCommand.BodyParam("--approval-token", "publishCandidate", "approval_token",
+        // 2026-11-23 去 wagent 化：原夹具借 publishCandidate（已随 wagent 下线）作 L3 载体，
+        // 改挂仍存在的 validateOntologyCandidate，判据（L3 缺凭证 ⇒ BLOCKED）不变。
+        CliCommand syntheticL3 = new CliCommand("ontology validate", "fixture", CliCommands.ACCESS_WRITE,
+                "L3", List.of("validateOntologyCandidate"), List.of(),
+                List.of(new CliCommand.PathParam("--candidate-id", "validateOntologyCandidate", "candidateId", "id")),
+                List.of(new CliCommand.BodyParam("--approval-token", "validateOntologyCandidate", "approval_token",
                         "token")),
                 true, true);
         CliOptions options = CliOptions.parse(
-                new String[] {"ontology", "publish", "--candidate-id", "c1", "--token", "t"}, 2);
+                new String[] {"ontology", "validate", "--candidate-id", "c1", "--token", "t"}, 2);
         Map<String, Object> out = com.chinacreator.gzcm.cli.commands.GenericCommandRunner.run(
                 registry, options, new HttpTransport("http://127.0.0.1:1", "t", 500), syntheticL3);
         assertEquals("BLOCKED", out.get("status"));
@@ -163,13 +166,14 @@ class CommandBehaviourTest {
     @DisplayName("dry-run 打印调用计划且不构造真实请求（路径来自契约清单）")
     void dryRunShowsPlannedCallFromContract() {
         OperationRegistry registry = OperationRegistry.load();
-        CliCommand inspect = CliCommands.find(CliCommands.AGENT_INSPECT);
+        CliCommand inspect = CliCommands.find(CliCommands.ONTOLOGY_VALIDATE);
         CliOptions options = CliOptions.parse(
-                new String[] {"agent", "inspect", "--run-id", "R-1", "--dry-run"}, 2);
+                new String[] {"ontology", "validate", "--candidate-id", "C-1", "--dry-run"}, 2);
         Map<String, Object> out = com.chinacreator.gzcm.cli.commands.GenericCommandRunner.run(
                 registry, options, new HttpTransport("http://127.0.0.1:1", "t", 500), inspect);
         assertEquals("SUCCESS", out.get("status"));
         String planned = String.valueOf(((Map<?, ?>) out.get("data")).get("plannedCall"));
-        assertEquals("GET http://127.0.0.1:1" + registry.pathOf("getRun").replace("{runId}", "R-1"), planned);
+        assertEquals("POST http://127.0.0.1:1" + registry.pathOf("validateOntologyCandidate")
+                .replace("{candidateId}", "C-1"), planned);
     }
 }

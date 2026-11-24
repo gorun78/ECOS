@@ -1,17 +1,20 @@
 /**
- * 场景定义页（场景工作台简化 v0.3）。
+ * 场景定义页（场景工作台简化 v0.3，2026-11-23 补全为「单页定义全部要素」）。
  *
- * <p>业务语义四段：基本信息 → 数据 → 知识 → 版本与发布。蓝图明细收进高级区；
- * 用户只面对「定义版本」与「待补齐项」，不出现 Mind/Goal Tree/Causal 等词。</p>
+ * <p>业务语义四段：基本信息（含成功标准） → 数据/知识/能力/安全绑定 → 版本与发布。
+ * 绑定在此直接增删、随保存一并落库（PUT 全量替换语义），不再需要去别处补齐。
+ * 页头右侧是「场景上下文构建」——把当前定义的真实绑定作为权威源清单构建运行上下文包。
+ * 发布按钮先落盘再发布，避免「改完直接发布」丢改动。</p>
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, GitBranch, Save, Send, Workflow } from 'lucide-react';
+import { ChevronDown, ChevronUp, GitBranch, Plus, Save, Send, Workflow, X } from 'lucide-react';
 import { useLanguage } from '../../../../components/LanguageContext';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useMediaQuery } from '../../../../hooks/useMediaQuery';
 import type { DefinitionVO, DefinitionVersionVO } from '../../../../services/scenarioDefinitionClient';
 import { saveScenarioDefinition, publishScenarioDefinition } from '../../../../services/scenarioDefinitionClient';
 import { showToastGlobal } from '../../../../components/common/Toast';
+import ScenarioContextBuilder from './ScenarioContextBuilder';
 
 interface Props {
   scenarioId: string;
@@ -20,13 +23,14 @@ interface Props {
   onPublished: (d: DefinitionVO) => void;
 }
 
-type BindingGroupKey = 'datasets' | 'objectTypes' | 'knowledgeBases' | 'ruleSets' | 'aiAgents' | 'securityPolicies' | 'interfaces';
+type BindingGroupKey = 'datasets' | 'objectTypes' | 'knowledgeBases' | 'ruleSets' | 'pipelines' | 'aiAgents' | 'securityPolicies' | 'interfaces';
 
 const GROUPS: Array<{ key: BindingGroupKey; labelKey: string; hintKey: string }> = [
   { key: 'datasets', labelKey: 'workspace.def.data.datasets', hintKey: 'workspace.def.data.datasetsHint' },
   { key: 'objectTypes', labelKey: 'workspace.def.data.objects', hintKey: 'workspace.def.data.objectsHint' },
   { key: 'knowledgeBases', labelKey: 'workspace.def.knowledge.bases', hintKey: 'workspace.def.knowledge.basesHint' },
   { key: 'ruleSets', labelKey: 'workspace.def.knowledge.rules', hintKey: 'workspace.def.knowledge.rulesHint' },
+  { key: 'pipelines', labelKey: 'workspace.def.capability.pipelines', hintKey: 'workspace.def.capability.pipelinesHint' },
   { key: 'aiAgents', labelKey: 'workspace.def.capability.agents', hintKey: 'workspace.def.capability.agentsHint' },
   { key: 'securityPolicies', labelKey: 'workspace.def.security.policies', hintKey: 'workspace.def.security.policiesHint' },
   { key: 'interfaces', labelKey: 'workspace.def.security.interfaces', hintKey: 'workspace.def.security.interfacesHint' },
@@ -34,6 +38,31 @@ const GROUPS: Array<{ key: BindingGroupKey; labelKey: string; hintKey: string }>
 
 function safeMap(def: DefinitionVO | null): Record<string, string[]> {
   return (def?.bindings ?? {}) as Record<string, string[]>;
+}
+
+/** 分组 key → 后端 BindingType 八值（与 ScenarioService.BINDING_ENDPOINTS 逐字对齐）。 */
+const BINDING_TYPE_BY_GROUP: Record<BindingGroupKey, string> = {
+  datasets: 'DATASET',
+  objectTypes: 'OBJECT_TYPE',
+  knowledgeBases: 'KNOWLEDGE_BASE',
+  ruleSets: 'RULE_SET',
+  pipelines: 'PIPELINE',
+  aiAgents: 'AI_AGENT',
+  securityPolicies: 'SECURITY_POLICY',
+  interfaces: 'INTERFACE',
+};
+
+function emptyBindingState(): Record<BindingGroupKey, string[]> {
+  return {
+    datasets: [],
+    objectTypes: [],
+    knowledgeBases: [],
+    ruleSets: [],
+    pipelines: [],
+    aiAgents: [],
+    securityPolicies: [],
+    interfaces: [],
+  };
 }
 
 function scenarioField(def: DefinitionVO | null, key: string): string {
@@ -52,9 +81,19 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
   const [department, setDepartment] = useState('');
   const [priority, setPriority] = useState('MEDIUM');
   const [budget, setBudget] = useState('');
+  /** 成功标准（一行一条）：发布校验与上下文 gap 生成的输入。 */
+  const [criteriaText, setCriteriaText] = useState('');
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
+  /** 绑定编辑态：与 definition 同步，保存时随定义一并提交（PUT 全量替换语义）。 */
+  const [bindingState, setBindingState] = useState<Record<BindingGroupKey, string[]>>(emptyBindingState);
+  /** 每个分组的新增输入框草稿（受控，回车/按钮提交到 bindingState）。 */
+  const [bindingDraft, setBindingDraft] = useState<Record<BindingGroupKey, string>>(() => {
+    const init = {} as Record<BindingGroupKey, string>;
+    GROUPS.forEach((g) => { init[g.key] = ''; });
+    return init;
+  });
 
   useEffect(() => {
     setName(scenarioField(definition, 'name'));
@@ -63,6 +102,24 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
     setDepartment(scenarioField(definition, 'department'));
     setPriority(scenarioField(definition, 'priority') || 'MEDIUM');
     setBudget(scenarioField(definition, 'budget'));
+    // 成功标准来自当前定义版本（无版本时为空）
+    const versions = definition?.versions ?? [];
+    const draft = versions.filter((v) => String(v.status).toUpperCase() === 'DRAFT');
+    const pool = draft.length > 0 ? draft : versions;
+    const latest = pool.length > 0 ? pool.reduce((a, b) => (b.version > a.version ? b : a)) : null;
+    const crit = latest?.successCriteria;
+    setCriteriaText(Array.isArray(crit) ? crit.join('\n') : '');
+  }, [definition]);
+
+  // 绑定回填：definition 变化（首次加载 / 保存回读 / 发布回读）时重置编辑态。
+  // 保存回读是服务端真实结果，重置不会丢失用户输入（保存时已提交）。
+  useEffect(() => {
+    const map = safeMap(definition);
+    const next = emptyBindingState();
+    GROUPS.forEach((g) => {
+      next[g.key] = Array.isArray(map[g.key]) ? [...map[g.key]] : [];
+    });
+    setBindingState(next);
   }, [definition]);
 
   const versions = useMemo(() => definition?.versions ?? [], [definition]);
@@ -70,18 +127,43 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
   const upstream = definition?.upstream;
   const missing = upstream?.missingEdges ?? [];
 
+  const addBinding = (key: BindingGroupKey) => {
+    const raw = (bindingDraft[key] ?? '').trim();
+    if (!raw) return;
+    setBindingState((prev) => {
+      if (prev[key].includes(raw)) return prev;
+      return { ...prev, [key]: [...prev[key], raw] };
+    });
+    setBindingDraft((prev) => ({ ...prev, [key]: '' }));
+  };
+
+  const removeBinding = (key: BindingGroupKey, target: string) => {
+    setBindingState((prev) => ({ ...prev, [key]: prev[key].filter((x) => x !== target) }));
+  };
+
+  /** 定义保存体（Publish 前也复用：避免「改完绑定直接发布」丢失改动）。 */
+  const buildPayload = () => ({
+    name: name.trim(),
+    description: description.trim() || undefined,
+    businessGoal: businessGoal.trim() || undefined,
+    department: department.trim() || undefined,
+    priority,
+    budget: budget.trim() || undefined,
+    successCriteria: criteriaText.split('\n').map((s) => s.trim()).filter(Boolean),
+    // 绑定全量替换（后端语义：null=不改动，[]=清空）——这里始终提交，保证删掉也能落库
+    bindings: GROUPS.flatMap((g) =>
+      bindingState[g.key].map((target) => ({
+        bindingType: BINDING_TYPE_BY_GROUP[g.key],
+        targetRef: target,
+        targetId: target,
+      })),
+    ),
+  });
+
   const save = async () => {
     setSaving(true);
     try {
-      const payload = {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        businessGoal: businessGoal.trim() || undefined,
-        department: department.trim() || undefined,
-        priority,
-        budget: budget.trim() || undefined,
-      };
-      const result = await saveScenarioDefinition(scenarioId, payload);
+      const result = await saveScenarioDefinition(scenarioId, buildPayload());
       onSaved(result);
       showToastGlobal('success', t('workspace.def.save_ok'));
     } catch (e) {
@@ -94,6 +176,9 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
   const publish = async () => {
     setPublishing(true);
     try {
+      // 先落盘再发布：发布端点只推进蓝图状态机，不写场景字段与绑定
+      const saved = await saveScenarioDefinition(scenarioId, buildPayload());
+      onSaved(saved);
       const result = await publishScenarioDefinition(scenarioId, { approvalRequired: false });
       onPublished(result);
       showToastGlobal('success', t('workspace.def.publish_ok', { version: result.releasedVersion ?? '' }));
@@ -106,6 +191,12 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
 
   return (
     <div className="p-4 space-y-4">
+      {/* 页头：左侧标题，右侧「场景上下文构建」（构建场景运行所需上下文包） */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h2 className={`text-sm font-extrabold ${styles.cardText}`}>{t('workspace.def.title')}</h2>
+        <ScenarioContextBuilder scenarioId={scenarioId} definition={definition} />
+      </div>
+
       {/* 基本信息 */}
       <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
         <h3 className={`text-sm font-bold ${styles.cardText} mb-3`}>{t('workspace.def.basic.title')}</h3>
@@ -132,15 +223,25 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
             <span className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.def.basic.description')}</span>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={`w-full text-xs rounded border px-2.5 py-1.5 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`} />
           </label>
+          <label className="space-y-1 col-span-full">
+            <span className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.def.basic.criteria')}</span>
+            <textarea
+              value={criteriaText}
+              onChange={(e) => setCriteriaText(e.target.value)}
+              rows={3}
+              placeholder={t('workspace.def.basic.criteria_ph')}
+              className={`w-full text-xs rounded border px-2.5 py-1.5 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+            />
+          </label>
         </div>
       </section>
 
-      {/* 数据 / 知识 / 能力 / 安全 */}
+      {/* 数据 / 知识 / 能力 / 安全 —— 绑定在此直接增删，保存即落库 */}
       <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
         <h3 className={`text-sm font-bold ${styles.cardText} mb-3`}>{t('workspace.def.data.title')}</h3>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {GROUPS.map((g) => {
-            const items = safeMap(definition)[g.key] ?? [];
+            const items = bindingState[g.key] ?? [];
             return (
               <div key={g.key}>
                 <div className="flex items-center justify-between mb-1">
@@ -148,6 +249,29 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
                   <span className={`text-[10px] ${styles.cardTextMuted}`}>{items.length}</span>
                 </div>
                 <p className={`text-[11px] ${styles.cardTextMuted} mb-2`}>{t(g.hintKey)}</p>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <input
+                    value={bindingDraft[g.key] ?? ''}
+                    onChange={(e) => setBindingDraft((prev) => ({ ...prev, [g.key]: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addBinding(g.key);
+                      }
+                    }}
+                    placeholder={t('workspace.def.binding_ph')}
+                    className={`flex-1 min-w-0 text-xs rounded border px-2.5 py-1.5 font-mono ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => addBinding(g.key)}
+                    disabled={!(bindingDraft[g.key] ?? '').trim()}
+                    className={`shrink-0 inline-flex items-center gap-1 px-2 py-1.5 rounded border text-[11px] font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles.cardBg} ${styles.accentText} ${styles.accentBorder}`}
+                  >
+                    <Plus size={11} />
+                    {t('workspace.def.binding_add')}
+                  </button>
+                </div>
                 {items.length === 0 ? (
                   <div className={`text-xs ${styles.cardTextMuted} border border-dashed ${styles.cardBorder} rounded p-3`}>
                     {t('workspace.def.empty')}
@@ -155,7 +279,17 @@ export default function DefinitionTab({ scenarioId, definition, onSaved, onPubli
                 ) : (
                   <ul className="space-y-1">
                     {items.map((id) => (
-                      <li key={id} className={`text-xs ${styles.cardText} font-mono`}>{id}</li>
+                      <li key={id} className={`flex items-center justify-between gap-2 text-xs ${styles.cardText} font-mono border ${styles.cardBorder} rounded px-2 py-1`}>
+                        <span className="break-all">{id}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeBinding(g.key, id)}
+                          aria-label={t('workspace.def.binding_remove')}
+                          className={`shrink-0 p-0.5 rounded cursor-pointer ${styles.cardTextMuted} hover:opacity-70`}
+                        >
+                          <X size={12} />
+                        </button>
+                      </li>
                     ))}
                   </ul>
                 )}

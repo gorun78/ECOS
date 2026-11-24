@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  *
  * <p>判据只看代码行：注释里的 {@code @RestControllerAdvice} 提及（如 {@code KbErrorCodes} 类注释）
  * 不计入 —— 注解在源码里恒置于行首，注释行以 {@code *} 或 {@code /} 起始。跨行书写的注解
- * （如 {@code CognitiveErrorAdvice}／{@code WAgentOrchestrationAdvice}）按括号配对续行读取，
+ * （如 {@code CognitiveErrorAdvice}／{@code L3ApprovalExceptionAdvice}）按括号配对续行读取，
  * 避免把已限定域的类误判成违例。{@code @Order} 不参与 advice 识别，只对 KbErrorAdvice 专项断言。</p>
  */
 class RestControllerAdviceScopeRatchetTest {
@@ -48,7 +48,10 @@ class RestControllerAdviceScopeRatchetTest {
     /** 限定域 advice 的基线清单（防"文件被删/改名 ⇒ 扫描集变小 ⇒ 假绿"）。 */
     private static final Set<String> SCOPED_ADVICE_BASELINE = Set.of(
             "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/controller/AiErrorAdvice.java",
-            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/wagent/web/WAgentOrchestrationAdvice.java",
+            // 2026-11-23 去 wagent 化：原 wagent/web/WAgentOrchestrationAdvice.java 已删，
+            // L3 审批面异常出口迁到 ai/controller/L3ApprovalExceptionAdvice.java
+            // （assignableTypes = L3ApprovalController，作用域仍显式限定，故登记在限定域基线）。
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/controller/L3ApprovalExceptionAdvice.java",
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/controller/ContextBuildErrorAdvice.java",
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/controller/scenario/CognitiveErrorAdvice.java",
             "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/support/KbErrorAdvice.java",

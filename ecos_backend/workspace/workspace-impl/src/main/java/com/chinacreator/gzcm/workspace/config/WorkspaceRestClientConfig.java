@@ -173,6 +173,20 @@ public class WorkspaceRestClientConfig {
         return restTemplate(resolveBase("sysman", sysmanOverride), securityTimeoutMs);
     }
 
+    // ═══════════════ 场景智能逻辑（2026-11-23 承接批） ═══════════════
+
+    /**
+     * 逻辑编排执行客户端（{@code AipPipelineRunClient} 唯一装配位）。
+     *
+     * <p>属主 = ai-engine（{@code /api/v1/aip/pipelines/{id}/execute}，aiming :18084 承流）。
+     * 编排可能串多个 llm/tool 节点，超时取认知推理同档 30s（同 {@code workspaceCognitiveInvokeRest}
+     * 的"推理不能 >30s"红线口径）；caller 侧再叠加服务端等待预算。</p>
+     */
+    @Bean("workspaceAipPipelineRest")
+    public RestTemplate workspaceAipPipelineRest() {
+        return restTemplate(resolveBase("aiming", aimingOverride) + "/api/v1", cognitiveTimeoutMs);
+    }
+
     // ═══════════════ MONOLITH 承流通道（凭据载体约束） ═══════════════
 
     /**

@@ -71,7 +71,10 @@ public final class GenericCommandRunner {
             options.pageSize(PageWalker.MAX_PAGE_SIZE);
         }
 
-        // --follow：对 getRun 走 streamRunEvents（SSE）真流；服务端降级（502 JSON）即如实 UNAVAILABLE
+        // --follow：对 getRun 走 streamRunEvents（SSE）真流；服务端降级（502 JSON）即如实 UNAVAILABLE。
+        // 2026-11-23 去 wagent 化：getRun/streamRunEvents 随 wagent 面下线，本分支当前无适用命令
+        // （条件恒不成立）。能力保留以便未来有 SSE 读面时复用；FollowStreamTest 已同批删除，
+        // 因被测端点不存在 —— 新增适用命令时必须同时恢复一条真流测试。
         if (options.flag("--follow") && "getRun".equals(op.operationId())
                 && registry.has("streamRunEvents")) {
             return followStream(registry, options, transport);

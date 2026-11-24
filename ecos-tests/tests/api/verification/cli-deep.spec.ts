@@ -113,16 +113,19 @@ test.describe('三、只读命令真实性（V-CLI-023~027）', () => {
     const { code, json } = await authed(['capabilities', 'list']);
     expect(code).toBe(0);
     const cmds = json?.data?.commands ?? [];
-    expect(cmds.length, '能力目录应为 17 条').toBe(17);
+    expect(cmds.length, '能力目录应为 8 条（2026-11-23 去 wagent 化 17→8）').toBe(8);
     const unwired = cmds.filter((c: any) => c.wired === false || c.status === 'NOT_IMPLEMENTED');
     // eslint-disable-next-line no-console
     console.log(`[V-CLI-023] total=${cmds.length} unwired=${unwired.length} names=${unwired.map((c: any) => c.name).join(',')}`);
   });
 
-  test('V-CLI-024 agent inspect：不存在 id 必须显式报错', async () => {
-    const { code, json } = await authed(['agent', 'inspect', 'VERIFY_NOT_EXIST_999']);
-    expect(code, '不存在 Run 必须非 0 退出（禁返回空成功）').not.toBe(0);
-    expect(json?.ok, 'ok 必须为 false').toBeFalsy();
+  test('V-CLI-024 cognition models list：只读面真实返回', async () => {
+    // 2026-11-23 去 wagent 化：原 `agent inspect` 已随 W 面端点删除（无对应契约 op），
+    // 本处改用同为只读的认知模型列表；「不存在 id 必须报错」的形态由 V-CLI-026 model list 承接。
+    const { code, json } = await authed(['cognition', 'models', 'list']);
+    expect(code, `cognition models list 应成功，stdout=${JSON.stringify(json)?.slice(0, 200)}`).toBe(0);
+    expect(json?.ok, 'ok 必须为 true').toBe(true);
+    expect(json?.data, '只读面应有 data').toBeTruthy();
   });
 
   test('V-CLI-026 model list 输出 items 信封且非空', async () => {
@@ -142,11 +145,15 @@ test.describe('三、只读命令真实性（V-CLI-023~027）', () => {
 });
 
 test.describe('四、写命令与审批墙（V-CLI-040）', () => {
-  test('V-CLI-040 ontology publish 无 approval-token 必须 BLOCKED 且退出码 2', async () => {
-    const { code, json } = await authed(['ontology', 'publish']);
-    expect(json?.status, 'L3 无审批必须 BLOCKED').toBe('BLOCKED');
-    expect(code, 'BLOCKED 退出码必须为 2（禁 0＝假成功）').toBe(2);
-    expect(JSON.stringify(json ?? ''), '应点名缺 --approval-token').toMatch(/approval-token/i);
+  test('V-CLI-040 写命令无 approval-token 必须 BLOCKED 或明确拒绝（退出码非 0）', async () => {
+    // 2026-11-23 去 wagent 化：原 L3 `ontology publish` 已随 W 面端点删除，现存写命令
+    // 只剩 L1 `cognition model validate`。L1 不要求审批凭证，故本用例改为断言
+    // 「写命令在缺必填参数时明确拒绝，绝不静默成功」(BLOCKED 腿的通用形态由 V-CLI-034 承接)。
+    const { code, json, stderr } = await authed(['cognition', 'model', 'validate']);
+    expect(code, '缺必填参数必须非 0（禁 0＝假成功）').not.toBe(0);
+    expect(json?.ok, 'ok 必须为 false').toBeFalsy();
+    const text = JSON.stringify(json ?? '') + stderr;
+    expect(text.length, '应给出拒绝原因').toBeGreaterThan(0);
   });
 
   test('V-CLI-040b 用法错误退出码 64（与业务失败区分）', async () => {

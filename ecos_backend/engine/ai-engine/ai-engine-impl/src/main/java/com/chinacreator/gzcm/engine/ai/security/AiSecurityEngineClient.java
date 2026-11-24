@@ -121,7 +121,7 @@ public class AiSecurityEngineClient {
      *
      * <p>此前 {@link #buildEvaluateBody} 硬编码 {@code role="user"} 且只发 {@code input.subject.role}，
      * 而 rbac.rego 读 {@code input.role} ⇒ 任何特权动作（candidate:publish / action:commit）恒 DENY。
-     * 本重载把 {@link com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.IdentityWithRoles}
+     * 本重载把 {@link com.chinacreator.gzcm.engine.ai.approval.AiIdentityResolver.IdentityWithRoles}
      * 解析出的真实角色集传入：{@code input.role} 取首角色（rbac 单值形态）、
      * {@code input.subject.roles} 发全集（data_access 集合形态），两个策略面同一次应答可读。
      * roles 为空集时 fail-closed 语义不变（OPA 侧无匹配规则即 deny）。</p>

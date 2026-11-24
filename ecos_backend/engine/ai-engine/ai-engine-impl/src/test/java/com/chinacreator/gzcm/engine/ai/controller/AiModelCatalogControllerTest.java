@@ -30,7 +30,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import com.chinacreator.gzcm.engine.ai.dao.LlmModelRegistryDao;
 import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
-import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
+import com.chinacreator.gzcm.engine.ai.approval.AiIdentityResolver;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
@@ -278,10 +278,10 @@ class AiModelCatalogControllerTest {
         return c;
     }
 
-    private static WAgentIdentityResolver adminIdentity() {
-        WAgentIdentityResolver r = mock(WAgentIdentityResolver.class);
+    private static AiIdentityResolver adminIdentity() {
+        AiIdentityResolver r = mock(AiIdentityResolver.class);
         when(r.requireWithRoles()).thenReturn(
-                new WAgentIdentityResolver.IdentityWithRoles("tenant-a", "u-admin", null,
+                new AiIdentityResolver.IdentityWithRoles("tenant-a", "u-admin", null,
                         java.util.List.of("ROLE_SUPER_ADMIN")));
         return r;
     }

@@ -42,6 +42,8 @@ public class ScenarioService {
         BINDING_ENDPOINTS.put("OBJECT_TYPE", "objectTypes");
         BINDING_ENDPOINTS.put("KNOWLEDGE_BASE", "knowledgeBases");
         BINDING_ENDPOINTS.put("RULE_SET", "ruleSets");
+        // PIPELINE（2026-11-23）：逻辑编排 id，场景运行 analysisType=PIPELINE 时按它执行
+        BINDING_ENDPOINTS.put("PIPELINE", "pipelines");
         BINDING_ENDPOINTS.put("AI_AGENT", "aiAgents");
         BINDING_ENDPOINTS.put("SECURITY_POLICY", "securityPolicies");
         BINDING_ENDPOINTS.put("INTERFACE", "interfaces");

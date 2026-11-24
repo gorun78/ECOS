@@ -59,6 +59,8 @@ public class BindingCatalog {
                 return "BookOpen";
             case AI_AGENT:
                 return "Bot";
+            case PIPELINE:
+                return "Workflow";
             case SECURITY_POLICY:
                 return "ShieldCheck";
             case INTERFACE:

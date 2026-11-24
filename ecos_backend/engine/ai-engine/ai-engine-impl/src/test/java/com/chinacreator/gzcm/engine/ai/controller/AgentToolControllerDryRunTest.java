@@ -7,7 +7,7 @@ import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
 import com.chinacreator.gzcm.engine.ai.service.ToolSchema;
-import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentToolContractDao;
+import com.chinacreator.gzcm.engine.ai.toolcontract.ToolContractDao;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +44,7 @@ class AgentToolControllerDryRunTest {
     private ToolRegistry toolRegistry;
     private AgentToolPolicyGate policyGate;
     private ToolSubjectResolver subjectResolver;
-    private WAgentToolContractDao toolContractDao;
+    private ToolContractDao toolContractDao;
     private MockMvc mockMvc;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -53,7 +53,7 @@ class AgentToolControllerDryRunTest {
         toolRegistry = mock(ToolRegistry.class);
         policyGate = mock(AgentToolPolicyGate.class);
         subjectResolver = mock(ToolSubjectResolver.class);
-        toolContractDao = mock(WAgentToolContractDao.class);
+        toolContractDao = mock(ToolContractDao.class);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AgentToolController(toolRegistry, policyGate,
                         subjectResolver, toolContractDao, new MockEnvironment()))

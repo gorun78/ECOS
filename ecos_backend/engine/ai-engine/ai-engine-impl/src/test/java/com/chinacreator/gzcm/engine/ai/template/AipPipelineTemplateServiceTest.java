@@ -10,11 +10,11 @@ import org.springframework.beans.factory.ObjectProvider;
 
 import com.chinacreator.gzcm.engine.ai.dao.AipPipelineDao;
 import com.chinacreator.gzcm.engine.ai.dataobject.AipPipelineDO;
-import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentMissionDao;
-import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentMissionDO;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.PlaybookContentSource;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.PlaybookRenderer;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan;
+import com.chinacreator.gzcm.engine.ai.toolcontract.MissionDao;
+import com.chinacreator.gzcm.engine.ai.toolcontract.MissionDO;
+import com.chinacreator.gzcm.engine.ai.plan.PlaybookContentSource;
+import com.chinacreator.gzcm.engine.ai.plan.PlaybookRenderer;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AipPipelineTemplateServiceTest {
 
-    private static WAgentMissionDO mission(String id, String ref, String version) {
-        WAgentMissionDO m = new WAgentMissionDO();
+    private static MissionDO mission(String id, String ref, String version) {
+        MissionDO m = new MissionDO();
         m.setId(id);
         m.setName("mission-" + id);
         m.setPlaybookGitRef(ref);
@@ -37,13 +37,13 @@ class AipPipelineTemplateServiceTest {
     }
 
     private static String playbookJson() {
-        return WAgentPlan.PlanCodec.toJson(new WAgentPlan.Plan(
-                com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.PlanSource.PLAYBOOK,
+        return AiPlan.PlanCodec.toJson(new AiPlan.Plan(
+                com.chinacreator.gzcm.engine.ai.plan.AiPlanEnums.PlanSource.PLAYBOOK,
                 "repo/pb1", "v1",
                 List.of(
-                        new WAgentPlan.Step("s1", "tool", "ont.query", null, 1, List.of(), Map.of(), false, false, null),
-                        new WAgentPlan.Step("s2", "human_gate", null, null, 1, List.of("s1"), Map.of(), true, false, "perm.approve"),
-                        new WAgentPlan.Step("s3", "sub_run", null, null, 1, List.of("s2"), Map.of(), false, false, null))));
+                        new AiPlan.Step("s1", "tool", "ont.query", null, 1, List.of(), Map.of(), false, false, null),
+                        new AiPlan.Step("s2", "human_gate", null, null, 1, List.of("s1"), Map.of(), true, false, "perm.approve"),
+                        new AiPlan.Step("s3", "sub_run", null, null, 1, List.of("s2"), Map.of(), false, false, null))));
     }
 
     private static <T> ObjectProvider<T> providerOf(T value) {
@@ -69,10 +69,10 @@ class AipPipelineTemplateServiceTest {
         }
     }
 
-    private static class FixedMissionDao extends WAgentMissionDao {
-        private final List<WAgentMissionDO> rows;
-        FixedMissionDao(List<WAgentMissionDO> rows) { this.rows = rows; }
-        @Override public List<WAgentMissionDO> findWithPlaybookRef(String tenantId) { return rows; }
+    private static class FixedMissionDao extends MissionDao {
+        private final List<MissionDO> rows;
+        FixedMissionDao(List<MissionDO> rows) { this.rows = rows; }
+        @Override public List<MissionDO> findWithPlaybookRef(String tenantId) { return rows; }
     }
 
     @Test

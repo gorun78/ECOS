@@ -106,12 +106,16 @@ class SseFrameSingleSourceGateTest {
             "stream/OagSseFrames.java");
 
     /**
-     * WAgent 写出面（B5-5b 起与另两条通道同形）。
+     * WAgent 写出面（2026-11-23 去 wagent 化：wagent 包整体下线 ⇒ 本面为空表）。
      *
-     * <p>控制器在列是必要的而非冗余：它是唯一碰 Spring SSE BuilderAPI 的地方
-     * （{@code sinkOf} 把帧名与 {@code id:} 位落成线格式），帧词若被内联回这里，写出器的单源就绕过了。</p>
+     * <p><b>为什么保留这张空表而不是删掉三条测试</b>：这三条判据的历史价值是"写出面禁内联帧词"；
+     * wagent 面删除后判据的<b>前提</b>（文件存在）不再成立。留空表 + 各自的"已下线"断言，
+     * 让任何"把 wagent 写出面悄悄加回来"的动作都会因本表为空而暴露（新面必须在此登记）。</p>
      */
-    private static final List<String> WAGENT_WRITE_SURFACE = List.of(
+    private static final List<String> WAGENT_WRITE_SURFACE = List.of();
+
+    /** 已下线的 W 写出面（存在即说明有人绕过本门禁把面加回来）。 */
+    private static final List<String> WAGENT_RETIRED_PATHS = List.of(
             "wagent/controller/WAgentRunEventStreamController.java",
             "wagent/stream/WAgentSseFrames.java");
 
@@ -172,8 +176,14 @@ class SseFrameSingleSourceGateTest {
     }
 
     @Test
-    @DisplayName("§10.3.6 W 写出面：零内联八帧词（含 degrade/milestone，探针词形取自单源）")
+    @DisplayName("§10.3.6 W 写出面已下线（2026-11-23 去 wagent 化）：退役路径不得复活")
     void wagentWriteSurfaceNeverInlinesWFrameWords() throws Exception {
+        for (String retired : WAGENT_RETIRED_PATHS) {
+            java.nio.file.Path p = java.nio.file.Paths.get(
+                    "src/main/java/com/chinacreator/gzcm/engine/ai").resolve(retired);
+            assertFalse(java.nio.file.Files.exists(p),
+                    "W 写出面已随 wagent 包下线，此路径不得复活（复活须先在本门禁登记写出面）: " + retired);
+        }
         for (String relative : WAGENT_WRITE_SURFACE) {
             Source source = aiSource(relative);
             List<String> inlined = matchedLines(source, W_FRAME_WORD_LITERAL).collect(Collectors.toList());
@@ -358,22 +368,9 @@ class SseFrameSingleSourceGateTest {
         assertTrue(keyRefs >= VOCABULARY_SIZE,
                 "控制器对单源键名的引用少于 7 —— done/error 尾帧键面已脱离词表；实测 " + keyRefs);
 
-        // W 通道：有真载体的六帧（meta/step/degrade/milestone/error/done）逐一经单源帧名常量装配
-        long wFrameRefs = matchedLines(aiSource("wagent/stream/WAgentSseFrames.java"),
-                Pattern.compile("SseFrameContract\\.FRAME_\\w+")).count();
-        assertTrue(wFrameRefs >= WAGENT_WRITER_FRAME_REFS_FLOOR,
-                "W 写出器对单源帧名的引用少于 6 —— token/delta/citation 三帧因零生产者不发（差距册 D-B5-19），"
-                        + "其余六帧若不引用单源，帧名就来自第三处；实测 " + wFrameRefs);
-        long wKeyRefs = matchedLines(aiSource("wagent/stream/WAgentSseFrames.java"),
-                Pattern.compile("SseFrameContract\\.KEY_\\w+")).count();
-        assertTrue(wKeyRefs >= WAGENT_FRAME_ORDER_SIZE,
-                "W 写出器对单源键名的引用少于 8 —— 键面若既不引用又不内联，则第四套键名藏在别处；实测 " + wKeyRefs);
-        assertTrue(matchedLines(aiSource("wagent/stream/WAgentSseFrames.java"),
-                        Pattern.compile("SseFrameContract\\.wagentFrame\\(")).findAny().isPresent(),
-                "W 写出器没走 wagentFrame() 装配入口 —— 键面白名单（非登记键即抛）被绕过");
-        assertTrue(matchedLines(aiSource("wagent/stream/WAgentSseFrames.java"),
-                        Pattern.compile("SseFrameContract\\.validateWagentSequence\\(")).findAny().isPresent(),
-                "W 写出器末帧前未复验帧序 —— 单源里的尾序校验成了没人调用的死码");
+        // W 通道（2026-11-23 去 wagent 化）：写出器随 wagent 包下线，原三条"引用单源帧名/键名/
+        // 走装配入口"的判据前提（文件存在）已不成立 —— 由 wagentWriteSurfaceNeverInlinesWFrameWords
+        // 以"退役路径不得复活"接管。此处不再断言已删除文件的内容。
     }
 
     // ═══ 7) 判据自身的误报自检 ═══

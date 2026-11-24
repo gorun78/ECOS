@@ -5,9 +5,9 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.GoalIntent;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.ExplorationPlanner;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlanEnums.GoalIntent;
+import com.chinacreator.gzcm.engine.ai.plan.ExplorationPlanner;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,7 +41,7 @@ class BuiltinPipelineTemplateCatalogTest {
     @DisplayName("骨架：human_gate 为首步、aggregate 依赖全部工具、工具序列取自 ExplorationPlanner 单源")
     void skeletonMirrorsExplorationPlanner() {
         for (GoalIntent intent : GoalIntent.values()) {
-            List<WAgentPlan.Step> steps = catalog.stepsOf(intent);
+            List<AiPlan.Step> steps = catalog.stepsOf(intent);
             List<String> tools = ExplorationPlanner.toolSequenceFor(intent.value());
 
             // 闸门 + 工具×n + 聚合
@@ -50,14 +50,14 @@ class BuiltinPipelineTemplateCatalogTest {
             assertEquals("human_gate", steps.get(0).stepType());
             assertTrue(steps.get(0).dependsOn().isEmpty(), "首步闸门无前驱");
 
-            WAgentPlan.Step aggregate = steps.get(steps.size() - 1);
+            AiPlan.Step aggregate = steps.get(steps.size() - 1);
             assertEquals(ExplorationPlanner.AGGREGATE_STEP_KEY, aggregate.stepKey());
             assertEquals("aggregate", aggregate.stepType());
             assertEquals(tools.size(), aggregate.dependsOn().size(), "聚合依赖全部工具步");
 
             List<String> toolNames = steps.stream()
-                    .filter(WAgentPlan.Step::isToolStep)
-                    .map(WAgentPlan.Step::toolName)
+                    .filter(AiPlan.Step::isToolStep)
+                    .map(AiPlan.Step::toolName)
                     .toList();
             assertEquals(tools, toolNames, "工具序列必须与 ExplorationPlanner 单源一致: " + intent);
         }
@@ -66,12 +66,12 @@ class BuiltinPipelineTemplateCatalogTest {
     @Test
     @DisplayName("骨架：确定性（同意图两次生成逐字段相等）+ 链式依赖无分叉")
     void skeletonIsDeterministic() {
-        List<WAgentPlan.Step> first = catalog.stepsOf(GoalIntent.DIAGNOSE);
-        List<WAgentPlan.Step> second = catalog.stepsOf(GoalIntent.DIAGNOSE);
+        List<AiPlan.Step> first = catalog.stepsOf(GoalIntent.DIAGNOSE);
+        List<AiPlan.Step> second = catalog.stepsOf(GoalIntent.DIAGNOSE);
         assertEquals(first, second, "同输入两次调用必须逐字段相等");
 
         String previous = ExplorationPlanner.HUMAN_GATE_STEP_KEY;
-        for (WAgentPlan.Step step : first.subList(1, first.size() - 1)) {
+        for (AiPlan.Step step : first.subList(1, first.size() - 1)) {
             assertEquals(List.of(previous), step.dependsOn(), "工具步应为单前驱链");
             previous = step.stepKey();
         }
@@ -81,10 +81,10 @@ class BuiltinPipelineTemplateCatalogTest {
     @DisplayName("骨架：可经拓扑排序（无环、无悬空依赖）")
     void skeletonPassesTopoOrder() {
         for (GoalIntent intent : GoalIntent.values()) {
-            WAgentPlan.Plan plan = new WAgentPlan.Plan(
-                    com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.PlanSource.PLAYBOOK,
+            AiPlan.Plan plan = new AiPlan.Plan(
+                    com.chinacreator.gzcm.engine.ai.plan.AiPlanEnums.PlanSource.PLAYBOOK,
                     null, null, catalog.stepsOf(intent));
-            assertEquals(catalog.stepsOf(intent).size(), WAgentPlan.topoOrder(plan).size(),
+            assertEquals(catalog.stepsOf(intent).size(), AiPlan.topoOrder(plan).size(),
                     "拓扑序应覆盖全部步骤: " + intent);
         }
     }

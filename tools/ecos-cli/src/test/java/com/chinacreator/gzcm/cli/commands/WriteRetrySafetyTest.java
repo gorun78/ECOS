@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  * 写命令重试安全性门禁：<b>自动生成的幂等键不得授权自动重试</b>。
  *
  * <p>背景（实测 2026-11-11）：{@code createCandidate} 每次都 {@code UUID.randomUUID()} 建新行，
- * 服务端<b>没有</b>按 {@code Idempotency-Key} 去重（全仓仅 {@code startRun} 有幂等通道）。
+ * 服务端<b>没有</b>按 {@code Idempotency-Key} 去重（原 {@code startRun} 幂等通道已随 wagent 面下线，现以 cognition model validate 为样本）。
  * 而 CLI 此前把「有键」等同于「可重试」，键又是缺省自动生成的 ⇒ 响应丢失后重试会
  * <b>重复落库</b>。计划原文是「写命令默认不重试（除非带幂等键）」，指调用方显式声明。
  *
@@ -45,7 +45,7 @@ class WriteRetrySafetyTest {
     @BeforeEach
     void setUp() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/api/v1/wagent/candidates", exchange -> {
+        server.createContext("/api/v1/cognitive/models/", exchange -> {
             attempts.set(attempts.get() + 1);
             keys.add(String.valueOf(exchange.getRequestHeaders().getFirst("Idempotency-Key")));
             exchange.getRequestBody().readAllBytes();
@@ -68,12 +68,12 @@ class WriteRetrySafetyTest {
     }
 
     private Map<String, Object> runExtract(String... extra) {
-        List<String> argv = new ArrayList<>(List.of("knowledge", "extract",
-                "--candidate-type", "KNOWLEDGE_ITEM", "--payload-json", "{}",
+        List<String> argv = new ArrayList<>(List.of("cognition", "model", "validate",
+                "--model-id", "m-1",
                 "--base-url", baseUrl, "--token", "t"));
         argv.addAll(List.of(extra));
-        CliOptions options = CliOptions.parse(argv.toArray(new String[0]), 2);
-        CliCommand command = CliCommands.find(CliCommands.KNOWLEDGE_EXTRACT);
+        CliOptions options = CliOptions.parse(argv.toArray(new String[0]), 3);
+        CliCommand command = CliCommands.find(CliCommands.COGNITION_MODEL_VALIDATE);
         assertNotNull(command);
         HttpTransport transport = new HttpTransport(options.baseUrl(), options.traceId(),
                 options.timeoutMs(), options.retryPolicy(), true);

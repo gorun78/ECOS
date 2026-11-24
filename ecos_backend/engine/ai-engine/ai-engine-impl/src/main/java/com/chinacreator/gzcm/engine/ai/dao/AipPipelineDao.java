@@ -78,8 +78,14 @@ public class AipPipelineDao extends JdbcTemplateDaoSupport {
      * 已发布候选来源行（批 3 模板来源扩面）：只取本租户已发布候选的 id/name/payload_json。
      * 属同域（ai-engine 读 {@code ecos_ai}）表，符合 ST07「引擎只读写自有 schema」。
      *
-     * <p>状态字面量取 {@code WAgentEnums.CandidateStatus.PUBLISHED.value()} = 小写
-     * {@code 'published'}（V238 CHECK 十值全小写）——写成大写会静默零行。</p>
+     * <p><b>2026-11-23 去 wagent 化后的数据来源状态</b>：候选<b>写入面</b>（建/校验/发布端点）
+     * 已随 wagent 控制面一并删除，本查询因此只可能读到<b>历史遗留行</b>，不会再有新行产生。
+     * 保留读取而不删：① 库里既有数据仍应可被 pipeline 模板引用；② 删查询会让模板来源面
+     * 静默变空，比读不到更难排查。若后续确认历史行也清零，应连同 {@code AipPipelineTemplateService}
+     * 的候选来源分支一起下线（届时须同步 {@code AipPipelineTemplateServiceTest} 的桩）。</p>
+     *
+     * <p>状态字面量固定为小写 {@code 'published'}（V238 CHECK 十值全小写）——写成大写会静默零行。
+     * 原 {@code WAgentEnums.CandidateStatus} 枚举已随 wagent 面删除，此处以字面量为准（历史行仍按此值）。</p>
      */
     public List<Map<String, Object>> queryCandidateTemplates(String tenantId) {
         return jdbcTemplate.queryForList("SELECT id, name, payload_json "

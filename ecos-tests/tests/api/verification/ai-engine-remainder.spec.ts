@@ -5,7 +5,7 @@ import { loginAsAdmin, call } from '../../helpers/ecos';
  * B2·AI 引擎 — 端点面补测（矩阵域03 的「本批未排入」28 条，2026-11-13 第二轮）。
  *
  * **路径口径**：矩阵里的多数条目只写了类名或估算前缀，本文件用源码实测到的真实映射：
- *  - W 面全部挂 `WAgentApiPaths.BASE_PREFIX = /api/v1/wagent`（常量单源，非硬编码猜测）
+ *  - 2026-11-23 去 wagent 化后仅 /api/v1/wagent/approval-tokens 存活（L3 审批凭证，CLI 契约依赖）
  *  - LLM 网关是 `POST /api/v1/llm/{chat,embedding}`（GET 列表不存在）
  *  - 护栏两块：`/api/v1/guardrails`（策略+校验）与 `/api/v1/aip/guardrails`（另一套 CRUD）
  *  - catalog 真实前缀是 `/api/v1/datanet/catalog`（不是 `/api/v1/catalog`）
@@ -34,91 +34,16 @@ async function post(request: any, path: string, data: unknown = {}) {
   return call(request, 'POST', path, { token, data });
 }
 
-test.describe('V-AI-060 W 工具契约（3 映射）', () => {
-  test('tools 列表返回 10 键摘要且自述权限过滤形态', async ({ request }) => {
-    const { status, json } = await get(request, '/api/v1/wagent/tools');
-    expect(status, 'wagent/tools 应 200').toBe(200);
-    const d = json!.data;
-    expect(Array.isArray(d.tools), 'tools 必须为数组').toBe(true);
-    expect(typeof d.total, 'total 必须为数值').toBe('number');
-    // 诚实标注：OPA 未接线时必须自述 local-floor 形态，不得宣称已做属主引擎裁决
-    expect(String(d.permission_filter ?? ''), '必须标注权限过滤形态（local-floor 或 policy-engine）')
-      .toMatch(/local-floor|policy-engine/);
-  });
-
-  test('describeTool 缺 version ⇒ 400（name+version 闭合定位），不 500', async ({ request }) => {
-    const { status, json } = await get(request, '/api/v1/wagent/tools/nonexistent');
-    expect(NOT_5XX, '不得 5xx').not.toContain(status);
-    expect(status, '缺 version 应 400（该契约按 name+version 闭合）').toBe(400);
-    expect(json?.errorCode, '400 应带 E-VALIDATION').toBe('E-VALIDATION');
-  });
-
-  test('describeTool 带 version 但工具不存在 ⇒ 404（合并隐私文案）', async ({ request }) => {
-    const { status, json } = await get(request, '/api/v1/wagent/tools/nonexistent?version=1.0.0');
-    expect(NOT_5XX).not.toContain(status);
-    expect(status, '工具不存在应 404').toBe(404);
-    // 隐私策略：权限不足与对象不存在合并，不要求区分
-    expect(String(json?.message ?? ''), '合并文案应同时提到权限与不存在')
-      .toMatch(/权限|不存在/);
-  });
-
-  test('searchTools 的 status 白名单：越界值 400，合法值 200', async ({ request }) => {
-    const ok = await get(request, '/api/v1/wagent/tools?status=active');
-    expect(ok.status, 'status=active 应 200').toBe(200);
-    expect(ok.json!.data.status_used, 'status_used 必须回显生效值').toBe('active');
-
-    const bad = await get(request, '/api/v1/wagent/tools?status=BOGUS');
-    expect(bad.status, 'status 越界必须 400（ToolContractStatus 六值单源）').toBe(400);
-    expect(NOT_5XX).not.toContain(bad.status);
-  });
-
-  test('validateToolContract：存在性通过后如实 501（五关执行器未接线，禁伪成功）', async ({ request }) => {
-    const { status, json } = await post(request, '/api/v1/wagent/tools/nonexistent/validate', {});
-    expect(NOT_5XX, '校验不得 500').not.toContain(status);
-    // 不存在 ⇒ 400/404；若存在则 501。断言的是「不得 200 伪成功」
-    expect([400, 404, 501], `实测 ${status}；若返回 200 说明伪成功（F10-17 禁止）`)
-      .toContain(status);
-    if (status === 501) {
-      expect(json?.data?.stub ?? json?.errorCode, '501 必须自述未接线').toBeTruthy();
-    }
-  });
-});
-
-test.describe('V-AI-057 / 058 / 059 / 055 / 056 W 其余面', () => {
-  test('V-AI-057 证据链：不存在 evidenceId ⇒ 404 且不 500', async ({ request }) => {
-    const { status } = await get(request, '/api/v1/wagent/evidence/nonexistent-id');
-    expect(NOT_5XX).not.toContain(status);
-    expect(status, '证据不存在应 404').toBe(404);
-  });
-
-  test('V-AI-058 熔断开关：GET 不被支持（405），说明它是写端点', async ({ request }) => {
-    const { status, json } = await get(request, '/api/v1/wagent/flags/kill-switch');
-    expect(status, 'kill-switch 只接受 POST（写），GET 应 405').toBe(405);
-    expect(json?.errorCode, '405 带 ECOS-SYS-405').toBe('ECOS-SYS-405');
-  });
-
-  test('V-AI-059 就绪度：不存在 questionId ⇒ 404 且不 500', async ({ request }) => {
-    const { status } = await get(request, '/api/v1/wagent/readiness/nonexistent-q');
-    expect(NOT_5XX).not.toContain(status);
-    expect(status, '就绪度不存在应 404').toBe(404);
-  });
-
-  test('V-AI-056 决策动作：空体 ⇒ 400 参数不合法（不得 500）', async ({ request }) => {
-    const { status, json } = await post(request, '/api/v1/wagent/decisions', {});
-    expect(NOT_5XX, '决策动作不得 5xx').not.toContain(status);
-    expect(status, '空体应 400').toBe(400);
-    expect(json?.errorCode, '400 应带 E-VALIDATION').toBe('E-VALIDATION');
-  });
-
+test.describe('V-AI-055 L3 审批凭证（wagent 面下线后唯一存活的 wagent 前缀端点）', () => {
   test('V-AI-055 审批凭证：真实签发腿可达，四眼与 scopeType 闸都在', async ({ request }) => {
-    // 真实映射是 `WAgentApiPaths.APPROVAL_TOKENS = /api/v1/wagent/approval-tokens`（POST）。
-    // 矩阵写的 approvals/tokens 是估算，不是路径单源。
+    // 2026-11-23 去 wagent 化：W 面（tools/evidence/kill-switch/readiness/decisions）随
+    // wagent 包删除，仅审批凭证签发面保留（CLI 契约依赖），路由仍在 /api/v1/wagent/approval-tokens。
     const empty = await post(request, '/api/v1/wagent/approval-tokens', {});
     expect(empty.status, '空体必须 400（缺 scopeType/scopeId），不得 404/500').toBe(400);
 
     const badScope = await post(request, '/api/v1/wagent/approval-tokens',
       { scopeType: 'NOT_A_SCOPE', scopeId: 'X' });
-    expect(badScope.status, 'scopeType 越界必须 400（白名单 CANDIDATE_PUBLISH|ACTION_COMMIT）').toBe(400);
+    expect(badScope.status, 'scopeType 越界必须 400（白名单见 L3ApprovalScope）').toBe(400);
 
     const selfApproval = await post(request, '/api/v1/wagent/approval-tokens',
       { scopeType: 'CANDIDATE_PUBLISH', scopeId: 'VERIFY-NOT-EXIST', requestedBy: 'u-admin' });
@@ -292,7 +217,7 @@ test.describe('V-AI-071 技能：MCP 未连时 501 且自述 stub', () => {
 test.describe('V-AI-092 无 token 访问 AI 面全部被拒', () => {
   test('六类 AI 端点无 token 必须 401/403，不得 200', async ({ request }) => {
     const paths: Array<[string, 'GET' | 'POST']> = [
-      ['/api/v1/wagent/tools', 'GET'],
+      ['/api/v1/wagent/approval-tokens', 'POST'],
       ['/api/v1/llm/chat', 'POST'],
       ['/api/v1/guardrails/policies', 'GET'],
       ['/api/v1/ai/capabilities', 'GET'],

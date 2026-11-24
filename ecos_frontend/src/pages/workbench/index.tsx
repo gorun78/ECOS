@@ -1,8 +1,13 @@
 /**
  * 工作台 L1 —「我的场景」首屏（F07-06 三层 IA 第一层）。
  *
- * <p>首屏只暴露业务语义（场景卡片 / 快捷入口 / 高级视图折叠区），
- * 不出现 Mind / Goal Tree / Causal 等技术概念或后端原始字段名。
+ * <p>首屏只暴露场景语义（场景卡片 / 快捷入口），不出现 Mind / Goal Tree / Causal 等技术概念
+ * 或后端原始字段名。</p>
+ *
+ * <p>2026-11-23 界面精简：按用户裁决摘除三处入口——「场景与认知闭环」按钮、
+ * 「高级视图」下拉面板、「预测与推演」快捷入口（预测/推演均依赖具体场景，
+ * 不得在 L1 以「取第一个场景」代跳，那会把别的场景的数据当成当前上下文）。</p>
+ *
  * 六态（§3.3）实装口径：加载（spinner）/ 错误+重试（含权限失败的后端
  * message 直排，未单拆 403 分支）/ 空与边界（无场景 → 引导空态）/
  * 离线（加载失败且 navigator.onLine=false 时横幅）。
@@ -12,15 +17,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
-  Brain,
   ArrowRight,
   Building,
-  ChevronDown,
-  ChevronUp,
   Inbox,
   LayoutDashboard,
   Plus,
-  SlidersHorizontal,
   WifiOff
 } from 'lucide-react';
 import { Icon } from '../../components/LucideIcon';
@@ -51,7 +52,6 @@ export default function WorkbenchHome() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -106,16 +106,15 @@ export default function WorkbenchHome() {
   // 快捷入口真实目标（2026-10-14 裁决订正）：
   // - 「新建场景」：L1 直接弹新建模态（原型 v2.0：模板 chips 预填 + 真实
   //   POST /api/v1/workspace/scenarios，创建即 DRAFT，成功跳 L2 详情）；
-  // - 「待我决策」「预测与推演」：目标页需 scenarioId ⇒ 取场景列表首项（最近场景）直达，无场景时不渲染（禁自环）；
+  // - 「待我决策」：目标页需 scenarioId ⇒ 取场景列表首项（最近场景）直达，无场景时不渲染（禁自环）；
   // - 「版本历史」：无独立真实路由/端点可指 ⇒ 已摘除（蓝图版本在 L2 内呈现，不在 L1 造入口）。
+  // - 「预测与推演」（2026-11-23 摘除）：预测/推演都是场景级动作，L1 代跳首个场景
+  //   会让用户误以为在看「自己的」预测；改由 L2「场景运行」页在明确场景下发起。
   const first = scenarios[0];
   type ResolvedEntry = { icon: string; labelKey: string; to: string; accent: (s: ThemeStyles) => string };
   const navEntries: ResolvedEntry[] = [
     first
       ? { icon: 'ShieldCheck', labelKey: 'workspace.l1.entry.pending', to: `/workbench/${first.id}/decisions`, accent: (s: ThemeStyles) => s.warningText }
-      : null,
-    first
-      ? { icon: 'TrendingUp', labelKey: 'workspace.l1.entry.forecast', to: `/workbench/${first.id}/forecast`, accent: (s: ThemeStyles) => s.infoText }
       : null,
   ].filter((e): e is ResolvedEntry => e !== null);
 
@@ -130,11 +129,6 @@ export default function WorkbenchHome() {
           <h1 className={`text-lg font-bold tracking-tight ${styles.appText}`}>{t('workspace.l1.title')}</h1>
         </div>
         <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('workspace.l1.subtitle')}</p>
-        <div className="mt-3">
-          <Link to="/cognitive-workbench" className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-semibold transition hover:opacity-80 ${styles.cardBorder} ${styles.cardText}`}>
-            <Brain size={14} /> {t('app.tab.cognitive_workbench')} <ArrowRight size={13} />
-          </Link>
-        </div>
       </div>
 
       {/* 离线 banner（离线态） */}
@@ -251,30 +245,6 @@ export default function WorkbenchHome() {
                 </Link>
               </article>
             ))}
-          </div>
-        )}
-      </section>
-
-      {/* 高级视图折叠区（默认折叠，面向治理/工程角色） */}
-      <section className="px-4 pb-6">
-        <button
-          onClick={() => setShowAdvanced((v) => !v)}
-          className={`w-full flex items-center justify-between px-3 py-2 rounded border text-xs font-bold cursor-pointer ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
-        >
-          <span className="flex items-center gap-2">
-            <SlidersHorizontal size={13} />
-            {t('workspace.l1.advanced')}
-          </span>
-          {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </button>
-        {showAdvanced && (
-          <div className={`mt-2 px-3 py-3 rounded border text-xs ${styles.cardBg} ${styles.cardBorder} ${styles.cardTextMuted}`}>
-            <p className="mb-2">{t('workspace.l1.advanced_hint')}</p>
-            <div className="flex flex-wrap gap-2">
-              <Link to="/project_workbench" className={`px-2.5 py-1 rounded border ${styles.inputBorder} ${styles.inputText} cursor-pointer`}>
-                {t('workspace.l1.advanced_toggle')}
-              </Link>
-            </div>
           </div>
         )}
       </section>

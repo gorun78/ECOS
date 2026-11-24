@@ -62,31 +62,24 @@ test.beforeAll(async ({ request }) => {
 const authed = (a: string[]) => run([...a, '--token-file', tokenFile]);
 
 test.describe('一、只读链路（V-CLI-025/071/070）', () => {
-  test('V-CLI-025 agent readiness 缺必填参数必须报错（禁默认值兜底）', async () => {
-    // 实测（2026-11-13）：readiness 必填 --agent-id/--question-id 类参数，缺参退出 64。
-    // 「就绪度查询真实」这一正面腿由 V-CLI-071 用有效参数补齐。
-    const { code, stderr } = await authed(['agent', 'readiness']);
-    expect(code, '缺必填参数必须 64（USAGE）').toBe(64);
+  test('V-CLI-025 只读命令缺必填参数必须报错（禁默认值兜底）', async () => {
+    // 2026-11-23 去 wagent 化：原 `agent readiness` 命令已删（W 面 readiness 随包下线）。
+    // 改用现存 L1 写命令 `cognition model validate` 的同形态断言：缺必填参数必须 64/非 0。
+    const { code, stderr } = await authed(['cognition', 'model', 'validate']);
+    expect(code, '缺必填参数必须非 0').not.toBe(0);
     expect(stderr, '应说明缺哪个参数').toMatch(/required|必填|--/i);
-    return;
-    const json: any = null;
-    expect(code, `readiness 应成功，stdout=${JSON.stringify(json)?.slice(0, 200)}`).toBe(0);
-    expect(json?.ok).toBe(true);
-    expect(json?.data, '就绪度应有 data').toBeTruthy();
-    // eslint-disable-next-line no-console
-    console.log(`[V-CLI-025] readiness keys=${Object.keys(json?.data ?? {}).join(',')}`);
   });
 
-  test('V-CLI-071 只读链路 model list → agent inspect → agent readiness 串通', async () => {
+  test('V-CLI-071 只读链路 model list → cognition models list → ontology validate 串通', async () => {
     const a = await authed(['model', 'list']);
     expect(a.code, 'model list 应成功').toBe(0);
-    const b = await authed(['agent', 'inspect', 'VERIFY_NOT_EXIST_999']);
-    expect(b.code, 'agent inspect 不存在 id 应非 0').not.toBe(0);
-    const c = await authed(['agent', 'readiness']);
-    // readiness 缺参 64 属正常拒绝；链路判定只要求三步都有明确结论（非挂起、非 5xx）
-    expect([0, 64], 'readiness 应成功或明确拒绝，实得 ' + c.code).toContain(c.code);
+    const b = await authed(['cognition', 'models', 'list']);
+    expect(b.code, 'cognition models list 应成功').toBe(0);
+    const c = await authed(['ontology', 'validate']);
+    // ontology validate 缺参 64 属正常拒绝；链路判定只要求三步都有明确结论（非挂起、非 5xx）
+    expect([0, 64], 'ontology validate 应成功或明确拒绝，实得 ' + c.code).toContain(c.code);
     // eslint-disable-next-line no-console
-    console.log(`[V-CLI-071] model list=${a.code} inspect(miss)=${b.code} readiness=${c.code}`);
+    console.log(`[V-CLI-071] model list=${a.code} cognition models=${b.code} ontology validate=${c.code}`);
   });
 
   test('V-CLI-070 冷启动 doctor 五项全绿', async () => {
@@ -127,8 +120,9 @@ test.describe('一、只读链路（V-CLI-025/071/070）', () => {
 });
 
 test.describe('二、写链路与审批墙（V-CLI-033~045/072）', () => {
-  test('V-CLI-034 knowledge validate 缺参必须报错（不静默）', async () => {
-    const { code, json, stderr } = await authed(['knowledge', 'validate']);
+  test('V-CLI-034 cognition model validate 缺参必须报错（不静默）', async () => {
+    // 2026-11-23 去 wagent 化：原 `knowledge validate` 已删（consistent with V-CLI-035 同命令）。
+    const { code, json, stderr } = await authed(['cognition', 'model', 'validate']);
     expect(code, '缺必填参数必须非 0').not.toBe(0);
     const text = JSON.stringify(json ?? '') + stderr;
     expect(/required|必填|missing|id/i.test(text), `应说明缺什么，实得 ${text.slice(0, 200)}`).toBe(true);
@@ -146,41 +140,58 @@ test.describe('二、写链路与审批墙（V-CLI-033~045/072）', () => {
     expect(json?.status, 'status 必须为 UNAVAILABLE').toBe('UNAVAILABLE');
   });
 
-  test('V-CLI-042 knowledge publish 无审批 ⇒ BLOCKED 退出码 2', async () => {
-    const { code, json } = await authed(['knowledge', 'publish']);
-    expect(json?.status, 'L3 无审批必须 BLOCKED').toBe('BLOCKED');
-    expect(code, 'BLOCKED 退出码 2').toBe(2);
+  test('V-CLI-042 写命令缺参 ⇒ 明确拒绝（BLOCKED 形态的替代腿）', async () => {
+    // 2026-11-23 去 wagent 化：原 `knowledge publish`（L3）已删。现存写命令只剩 L1
+    // `cognition model validate`/`cognition model run`，无审批凭证墙可测——
+    // 本用例退化为「写命令缺参必须明确拒绝」，与 V-CLI-034 同源断言。
+    const { code, json } = await authed(['cognition', 'model', 'validate']);
+    expect(code, '写命令缺参必须非 0').not.toBe(0);
+    expect(json?.ok, 'ok 必须 false').toBeFalsy();
   });
 
   test('V-CLI-043 action commit 无审批 ⇒ BLOCKED 退出码 2', async () => {
-    const { code, json } = await authed(['action', 'commit']);
-    expect(json?.status, 'L3 无审批必须 BLOCKED').toBe('BLOCKED');
-    expect(code, 'BLOCKED 退出码 2').toBe(2);
+    // 2026-11-23 去 wagent 化：`action commit` 命令已删（W 面决策动作端点下线）。
+    // 该用例语义（L3 无凭证 BLOCKED）当前无承载命令，改为断言命令面确实不含该命令
+    // （capabilities list 不得出现幽灵命令），防止 CLI 契约与代码树脱钩。
+    const { code, json } = await authed(['capabilities', 'list']);
+    expect(code).toBe(0);
+    const names = (json?.data?.commands ?? []).map((c: any) => String(c.name));
+    expect(names, 'action commit 已下线，能力目录不得再列出').not.toContain('action commit');
   });
 
-  test('V-CLI-044 伪造审批 token 必须被拒（不得当有效凭证）', async () => {
-    const { code, json } = await authed(['ontology', 'publish', '--approval-token', 'FORGED-TOKEN-XXXX']);
-    expect(code, '伪造 token 必须非 0').not.toBe(0);
+  test('V-CLI-044 非 L3 命令带 --approval-token 不得被当作审批凭证消费', async () => {
+    // 2026-11-23 去 wagent 化：原 `ontology publish --approval-token` 已删。
+    // `--approval-token` 仍是解析层认可的全局 flag（GenericCommandRunner 只在
+    // requiresApproval() 时才检查它），故 L1 命令带它不会报 USAGE——但必须
+    // 不被「消费」：命令照常按缺参拒绝，且输出不得回显该值。
+    const { code, json, stdout, stderr } = await authed([
+      'cognition', 'model', 'validate', '--approval-token', 'FORGED-TOKEN-XXXX']);
+    expect(code, '缺 --model-id 必须仍被拒（凭证不得替代业务参数）').not.toBe(0);
     expect(json?.ok, 'ok 必须 false').toBeFalsy();
+    expect(String(json?.status ?? ''), 'L1 不得因带 --approval-token 被升格成 BLOCKED').not.toBe('BLOCKED');
+    expect(stdout + stderr + JSON.stringify(json ?? ''), '伪造凭证不得被回显').not.toContain('FORGED-TOKEN-XXXX');
     // eslint-disable-next-line no-console
-    console.log(`[V-CLI-044] forged token → exit=${code} status=${json?.status}`);
+    console.log(`[V-CLI-044] forged token on L1 → exit=${code} status=${json?.status}`);
   });
 
   test('V-CLI-045 审批 token 不回显（输出与日志均不得出现原文）', async () => {
     const secret = 'SECRET-APPROVAL-VERIFY-98765';
-    const { stdout, stderr, json } = await authed(['ontology', 'publish', '--approval-token', secret]);
+    const { stdout, stderr, json } = await authed(['cognition', 'model', 'validate', '--approval-token', secret]);
     const text = stdout + stderr + JSON.stringify(json ?? '');
     expect(text.includes(secret), '输出不得回显审批 token 原文').toBe(false);
   });
 });
 
 test.describe('三、错误链路（V-CLI-073/041）', () => {
-  test('V-CLI-041 ontology publish 有 token 仍失败（OPA 策略缺口，按实际登记）', async () => {
-    const { code, json } = await authed(['ontology', 'publish', '--approval-token', 'PLACEHOLDER']);
-    // 登记口径：OPA 策略缺口致恒 403 ⇒ 预期失败，不当通过
-    expect(code, 'OPA 缺口下应失败（非 0）').not.toBe(0);
+  test('V-CLI-041 写命令无 --approval-token 时不得被当作需审批命令处理（L1 现况）', async () => {
+    // 2026-11-23 去 wagent 化：原 L3 `ontology publish` 已删，本仓现存写命令均为 L1，
+    // 无需审批凭证。原「OPA 策略缺口致恒 403」的登记口径随之失效——
+    // 改为断言「L1 写命令不被误判为 L3」：缺参时拒绝原因应指向参数，而非审批。
+    const { code, json } = await authed(['cognition', 'model', 'validate']);
+    expect(code, '缺参应失败（非 0）').not.toBe(0);
+    expect(String(json?.status ?? ''), 'L1 命令不得报 BLOCKED（无审批墙）').not.toBe('BLOCKED');
     // eslint-disable-next-line no-console
-    console.log(`[V-CLI-041] publish with token → exit=${code} status=${json?.status} err=${json?.error?.code}`);
+    console.log(`[V-CLI-041] l1 validate without args → exit=${code} status=${json?.status} err=${json?.error?.code}`);
   });
 
   test('V-CLI-073 错误 base-url → 明确错误而非挂起', async () => {
@@ -196,7 +207,8 @@ test.describe('三、错误链路（V-CLI-073/041）', () => {
 
 test.describe('四、命令级契约（V-CLI-006/033/037）', () => {
   test('V-CLI-006 --dry-run 存在且不产生副作用（L1+ 写命令）', async () => {
-    const { code, json, stderr } = await authed(['knowledge', 'extract', '--dry-run']);
+    // 2026-11-23 去 wagent 化：原 `knowledge extract` 已删，改用现存 L1 写命令。
+    const { code, json, stderr } = await authed(['cognition', 'model', 'validate', '--dry-run']);
     const text = JSON.stringify(json ?? '') + stderr;
     // 要么支持 dry-run 并输出计划（不落库），要么明确不支持；不得静默忽略该 flag
     const supported = /dry.?run|计划|plan/i.test(text);
@@ -207,7 +219,7 @@ test.describe('四、命令级契约（V-CLI-006/033/037）', () => {
   });
 
   test('V-CLI-037 幂等键参数被接受（--idempotency-key）', async () => {
-    const { code, stderr, json } = await authed(['knowledge', 'extract', '--idempotency-key', 'VERIFY-KEY-1']);
+    const { code, stderr, json } = await authed(['cognition', 'model', 'validate', '--idempotency-key', 'VERIFY-KEY-1']);
     const text = JSON.stringify(json ?? '') + stderr;
     expect(/idempotency/i.test(text) && code === 64,
       '若命令不支持该 flag 必须明说（exit 64），禁静默吞掉').toBe(code === 64);

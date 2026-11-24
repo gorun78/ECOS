@@ -24,8 +24,6 @@ import AgentSelector from '../../components/aiworkbench/chatbot/AgentSelector';
 import ConfigPanel from '../../components/aiworkbench/chatbot/ConfigPanel';
 import ChatPanel from '../../components/aiworkbench/chatbot/ChatPanel';
 import CitationList from '../../components/common/structured/CitationList';
-import EvidenceDrawer from '../../components/common/structured/EvidenceDrawer';
-import RunProgress from '../../components/common/structured/RunProgress';
 import DegradationBanner from '../../components/common/status/DegradationBanner';
 import ErrorPanel from '../../components/common/status/ErrorPanel';
 import { useAgentLoopStream, type AgentLoopRunResult } from '../../hooks/useAgentLoopStream';
@@ -35,8 +33,6 @@ import {
   POLL_INTERVAL_DEFAULT_SECONDS,
   TEXT_ABSENT,
   TOKEN_UNKNOWN,
-  citationToEvidence,
-  isDenialDecision,
   isToolStepOp,
 } from '../../services/sseFrames';
 import { agentLoopChat, createMeshAgent, updateMeshAgent, deleteMeshAgent, executeOntologyProposal } from './api';
@@ -144,8 +140,7 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   // 降级条如实显示「非实时」，禁把兜底轮渲染成流式。
   const [streamTurn, setStreamTurn] = useState<{ timestamp: string } | null>(null);
   const [streamFailure, setStreamFailure] = useState<{ reason: string; traceId: string | null } | null>(null);
-  const [evidenceIndex, setEvidenceIndex] = useState<number | null>(null);
-  const { state: stream, run: runStream, abort: abortStream, reset: resetStream } = useAgentLoopStream({
+  const { state: stream, run: runStream, reset: resetStream } = useAgentLoopStream({
     fallbackRunner: async (req) => {
       const data = await agentLoopChat({ agentId: req.agentId, message: req.message, sessionId: req.sessionId });
       if (!data || data.success === false || typeof data.content !== 'string' || !data.content) {
@@ -162,11 +157,12 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   const thinkingTrace = useMemo(() => traceOf(stream.steps), [stream.steps]);
 
   /** step 帧 → 时间线（帧是事后发出的既有事实，故落 done/failed 两态，不演 pending） */
+  // 2026-11-23 去 wagent 化：RunProgress 卡片已删，此处 runSteps 仅用于右栏是否可见与
+  // 思考链展示；步骤时间线的可视化随之取消（不再另立替代组件）。
   const runSteps = useMemo(
     () => stream.steps.map((s, i) => ({
       id: `${s.op}-${s.step}-${i}`,
       label: s.tool === TEXT_ABSENT ? s.op : `${s.op} · ${s.tool}`,
-      state: isDenialDecision(s.decision) ? ('failed' as const) : ('done' as const),
     })),
     [stream.steps],
   );
@@ -226,7 +222,7 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
     const um: ChatMessage = { id: `user-${Date.now()}`, sender: 'user', content: text, timestamp: ts };
     lastUserTextRef.current = text;
     setChatMessages(p => [...p, um]); setChatInput(''); setIsReplying(true);
-    setStreamFailure(null); setEvidenceIndex(null); setStreamTurn({ timestamp: ts });
+    setStreamFailure(null); setStreamTurn({ timestamp: ts });
     try {
       const result = await runStream({ agentId: activeChatbot.id, message: text });
       // 有据正文先固化；失败分支也保留已渲染内容（§13.4.5「error 进 ErrorPanel 且保留已渲染内容」）
@@ -360,7 +356,7 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
     }
   };
 
-  const hReset = () => { if(activeChatbot){ setChatMessages([{id:'welcome-reset',sender:'agent',content:t('aiworkbench.chatbot.resetWelcome').replace('{name}',activeChatbot.name),timestamp:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}]); setStreamFailure(null); setEvidenceIndex(null); resetStream(); showToast?.('info',t('aiworkbench.chatbot.toastClearHistory')); }};
+  const hReset = () => { if(activeChatbot){ setChatMessages([{id:'welcome-reset',sender:'agent',content:t('aiworkbench.chatbot.resetWelcome').replace('{name}',activeChatbot.name),timestamp:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}]); setStreamFailure(null); resetStream(); showToast?.('info',t('aiworkbench.chatbot.toastClearHistory')); }};
 
   return (
     <div className={`h-full w-full flex flex-col md:flex-row overflow-hidden ${styles.appBg} ${styles.appText} text-xs`}>
@@ -404,23 +400,11 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
                   onRetry={() => void hSend(lastUserTextRef.current)}
                 />
               )}
-              {(stream.running || runSteps.length > 0) && (
-                <RunProgress
-                  runId={runContext?.traceId ?? TEXT_ABSENT}
-                  progressChannel={stream.channel}
-                  pollIntervalSeconds={POLL_INTERVAL_DEFAULT_SECONDS}
-                  steps={runSteps}
-                  sseDisconnectCount={stream.disconnectCount}
-                  onCancel={async () => { abortStream(); }}
-                />
-              )}
               <section className={`rounded-xl border p-3 space-y-2 ${styles.cardBg} ${styles.cardBorder}`}>
                 <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('common.evidence.list.title')}</h3>
                 <CitationList
                   citations={stream.citations}
                   completed={stream.doneFrame !== null}
-                  onSelect={setEvidenceIndex}
-                  selected={evidenceIndex}
                 />
               </section>
               <section className={`rounded-xl border p-3 space-y-1 ${styles.cardBg} ${styles.cardBorder}`}>
@@ -452,12 +436,6 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
           {t('aiworkbench.chatbot.welcomeSelectAgent')}
         </div>
       )}
-      <EvidenceDrawer
-        open={evidenceIndex !== null}
-        claim={stream.citations[evidenceIndex ?? 0]?.forecastRunId}
-        evidence={evidenceIndex === null ? null : citationToEvidence(stream.citations[evidenceIndex])}
-        onClose={() => setEvidenceIndex(null)}
-      />
       <ConfirmDialog
         visible={!!pendingDeleteId}
         danger

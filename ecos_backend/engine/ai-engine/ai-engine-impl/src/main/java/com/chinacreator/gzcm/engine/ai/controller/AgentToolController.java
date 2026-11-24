@@ -10,10 +10,9 @@ import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
 import com.chinacreator.gzcm.engine.ai.service.ToolSchema;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
-import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentToolContractController;
-import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentToolContractController.ToolContractVO;
-import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentToolContractDao;
-import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentToolContractDO;
+import com.chinacreator.gzcm.engine.ai.toolcontract.ToolContractVO;
+import com.chinacreator.gzcm.engine.ai.toolcontract.ToolContractDao;
+import com.chinacreator.gzcm.engine.ai.toolcontract.ToolContractDO;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.context.annotation.Lazy;
@@ -65,13 +64,13 @@ public class AgentToolController {
     private final ToolRegistry toolRegistry;
     private final AgentToolPolicyGate policyGate;
     private final ToolSubjectResolver subjectResolver;
-    private final WAgentToolContractDao toolContractDao;
+    private final ToolContractDao toolContractDao;
     private final Environment environment;
 
     public AgentToolController(@Lazy ToolRegistry toolRegistry,
                                @Lazy AgentToolPolicyGate policyGate,
                                @Lazy ToolSubjectResolver subjectResolver,
-                               WAgentToolContractDao toolContractDao,
+                               ToolContractDao toolContractDao,
                                Environment environment) {
         this.toolRegistry = toolRegistry;
         this.policyGate = policyGate;
@@ -174,7 +173,7 @@ public class AgentToolController {
      *   <li>执行面 {@code executionSchema} ← {@link ToolRegistry#get}（与 {@code GET /tools}、
      *       {@code /{name}/validate} 同一单源，决定该工具当前能否被派发）；</li>
      *   <li>契约面 {@code contract} ← {@code ecos_ai.ecos_wagent_tool_contract}（V236）。
-     *       17 要素投影复用 {@link WAgentToolContractController.ToolContractVO}，
+     *       17 要素投影复用 {@link ToolContractVO}，
      *       与 {@code GET /api/v1/wagent/tools/{name}} 同源；<b>禁</b>由 {@link ToolSchema}
      *       反推 17 要素——超时/幂等/回滚/密级等列在 Schema 上无载体，补全是编造。</li>
      * </ul>
@@ -192,7 +191,7 @@ public class AgentToolController {
             @RequestParam(value = "version", required = false) String version) {
         String toolName = name == null ? "" : name.trim();
         ToolSchema schema = toolRegistry.get(toolName);
-        WAgentToolContractDO contract = resolveContract(toolName, version);
+        ToolContractDO contract = resolveContract(toolName, version);
         if (schema == null && contract == null) {
             return ResponseEntity.status(AiErrorClass.NOT_FOUND.httpStatus()).body(
                     ApiResponse.error(AiErrorClass.NOT_FOUND.httpStatus(),
@@ -371,8 +370,8 @@ public class AgentToolController {
 
     // ── 私有分态/工具方法 ───────────────────────────────────────────────
 
-    /** 契约面读法：版本闭合定位优先，缺省取 active 最新（{@code WAgentToolContractDao} 单源）。 */
-    private WAgentToolContractDO resolveContract(String name, String version) {
+    /** 契约面读法：版本闭合定位优先，缺省取 active 最新（{@code ToolContractDao} 单源）。 */
+    private ToolContractDO resolveContract(String name, String version) {
         if (version != null && !version.isBlank()) {
             return toolContractDao.findByNameAndVersion(name, version.trim()).orElse(null);
         }

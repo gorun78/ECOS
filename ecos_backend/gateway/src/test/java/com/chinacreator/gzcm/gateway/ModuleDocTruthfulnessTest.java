@@ -78,8 +78,12 @@ class ModuleDocTruthfulnessTest {
      * 46 → 47：+1 = #CLI-PROD-D（2026-11-11）{@code wagent/WAgentApprovalController}
      * （L3 审批凭证面；该批次漏改本锚，2026-11-13 验证批按实测订正：`git ls-tree HEAD` 同为 47，
      * 即基线陈旧而非本批新增）。
+     * 47 → 36：−11 = 2026-11-23 去 wagent 化，删除 {@code engine.ai.wagent.controller} 下 11 个
+     * Controller（Run/Goal/Question/Readiness/Candidate/Evidence/Decision/Approval/ToolContract/
+     * KillSwitch/RunEventStream）。保留的 L3 审批凭证面迁到 {@code engine.ai.controller.L3ApprovalController}
+     * （+1 已计入 36）。
      */
-    private static final int IMPL_CONTROLLER_BASELINE = 47;
+    private static final int IMPL_CONTROLLER_BASELINE = 36;
 
     private static Path backendRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();

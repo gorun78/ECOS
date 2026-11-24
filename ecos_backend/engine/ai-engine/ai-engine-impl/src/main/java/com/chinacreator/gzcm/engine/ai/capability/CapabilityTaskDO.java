@@ -1,17 +1,17 @@
 package com.chinacreator.gzcm.engine.ai.capability;
 
-import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentBaseDO;
+import com.chinacreator.gzcm.engine.ai.toolcontract.AiBaseDO;
 
 import java.math.BigDecimal;
 
 /**
  * 能力调用台账 DO（V269 {@code ecos_ai.ecos_ai_capability_task}）。
  *
- * <p>复用 {@link WAgentBaseDO} 通用基线列（tenant_id/org_id/domain/version_no/时间戳/is_deleted，DR05~DR08）；
+ * <p>复用 {@link AiBaseDO} 通用基线列（tenant_id/org_id/domain/version_no/时间戳/is_deleted，DR05~DR08）；
  * 只存<b>引用与元数据</b>，禁复制大文件或完整敏感输入（§10.5 末段红线）。
  * 布尔语义一律 SMALLINT 0/1（DR05）：{@code calibrated}/{@code degraded} 为 {@link Integer}。</p>
  */
-public class CapabilityTaskDO extends WAgentBaseDO {
+public class CapabilityTaskDO extends AiBaseDO {
 
     /** 主键 = taskId（MC01 应用侧 UUID；即 ModelCapabilityExecutor.submit 回显键）。 */
     private String id;

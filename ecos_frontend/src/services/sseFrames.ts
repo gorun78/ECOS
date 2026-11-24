@@ -97,10 +97,10 @@ export const TOKEN_UNKNOWN = -1;
 /** 字符串缺失标记（= AgentLoopTrace.ABSENT）。 */
 export const TEXT_ABSENT = "-";
 
-/** 断线自动切轮询阈值（§4.4）——前端单源，RunProgress/DegradationBanner 由此导入。 */
+/** 断线自动切轮询阈值（§4.4）——前端单源，`useAgentLoopStream`/`DegradationBanner` 由此导入。 */
 export const SSE_FALLBACK_THRESHOLD = 3;
 
-/** 轮询兜底默认间隔秒（§3.4，与 RunProgress 展示注记同口径）。 */
+/** 轮询兜底默认间隔秒（§3.4，与 `DegradationBanner` 展示注记同口径）。 */
 export const POLL_INTERVAL_DEFAULT_SECONDS = 3;
 
 export function isKnownFrame(event: string): event is AgentLoopFrameName {
@@ -276,26 +276,14 @@ export function isCitationUsable(frame: AgentLoopCitationFrame): boolean {
   );
 }
 
-/** 证据三要素（与 EvidenceDrawer 的 EvidenceBundle 同形，此处不引组件以免 services 依赖 React）。 */
-export interface EvidenceTriple {
-  source: string;
-  version: string;
-  snapshot: string;
-}
-
 /**
- * 引用帧 → 证据三要素（§13.4.5「来源·版本·快照定位符」）。
+ * 进度承流通道（`sse` 实时 / `poll` 降级轮询）。
  *
- * 不做任何补全：四要素不齐时逐字段落缺失标记，由 EvidenceDrawer 渲染「无来源」。
+ * <p>2026-11-23 去 wagent 化：原定义在已删除的 `structured/RunProgress.tsx`，
+ * 因 {@code DegradationBanner} 仍需此类型而迁入本模块——承流层是通道语义的属主，
+ * 组件不应是类型的唯一持有者。</p>
  */
-export function citationToEvidence(frame: AgentLoopCitationFrame): EvidenceTriple {
-  const parts = [
-    `${SSE_KEYS.forecastRunId}=${frame.forecastRunId}`,
-    `${SSE_KEYS.caliberId}=${frame.caliberId}`,
-  ];
-  const snapshot = [`${SSE_KEYS.asOfTime}=${frame.asOfTime}`, ...frame.links].join(" | ");
-  return { source: parts.join(" | "), version: frame.version, snapshot };
-}
+export type ProgressChannel = 'sse' | 'poll';
 
 export interface AgentLoopErrorFrame {
   traceId: string;

@@ -29,6 +29,8 @@ export interface AnalysisRunVO {
   diagnosis?: Record<string, unknown>;
   forecast?: Record<string, unknown>;
   simulation?: Record<string, unknown>;
+  /** PIPELINE 执行详情（节点轨迹/outputs/executionId；其它类型无此键，2026-11-23 additive）。 */
+  result?: Record<string, unknown>;
   strategy?: Record<string, unknown>;
   [key: string]: unknown;
 }

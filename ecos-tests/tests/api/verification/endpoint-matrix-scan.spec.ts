@@ -40,11 +40,7 @@ const ENDPOINTS: { id: string; method: 'GET' | 'POST'; path: string }[] = [
   { id: 'V-AI-045', method: 'GET', path: '/api/v1/aip/agents' },
   { id: 'V-AI-045b', method: 'GET', path: '/api/v1/agent-metrics' },
   { id: 'V-AI-046', method: 'GET', path: '/api/v1/aip/agent-templates' },
-  { id: 'V-AI-050', method: 'GET', path: '/api/v1/wagent/goals' },
-  { id: 'V-AI-051', method: 'GET', path: '/api/v1/wagent/questions' },
-  { id: 'V-AI-052', method: 'GET', path: '/api/v1/wagent/candidates' },
-  { id: 'V-AI-053', method: 'GET', path: '/api/v1/wagent/runs' },
-  { id: 'V-AI-054', method: 'GET', path: '/api/v1/wagent/approval-tokens' },
+  { id: 'V-AI-054', method: 'POST', path: '/api/v1/wagent/approval-tokens' }, // 2026-11-23：签发面是 POST，wagent 其余读面已下线
   // ── 域05 本体（V-ONTO-023~029/052~065）──
   { id: 'V-ONTO-026', method: 'GET', path: '/api/v1/ontology/functions/whitelist' },
   { id: 'V-ONTO-026b', method: 'GET', path: '/api/v1/ontology/functions/audit' },

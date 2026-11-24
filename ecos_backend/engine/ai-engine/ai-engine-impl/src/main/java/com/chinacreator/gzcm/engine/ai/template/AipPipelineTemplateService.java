@@ -16,11 +16,11 @@ import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.engine.ai.dao.AipPipelineDao;
 import com.chinacreator.gzcm.engine.ai.dataobject.AipPipelineDO;
-import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentMissionDao;
-import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentMissionDO;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.PlaybookContentSource;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.PlaybookRenderer;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan;
+import com.chinacreator.gzcm.engine.ai.toolcontract.MissionDao;
+import com.chinacreator.gzcm.engine.ai.toolcontract.MissionDO;
+import com.chinacreator.gzcm.engine.ai.plan.PlaybookContentSource;
+import com.chinacreator.gzcm.engine.ai.plan.PlaybookRenderer;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -37,7 +37,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * <p>{@link #instantiate} 双路径：内置 ref 直接取骨架步骤集（无内容源依赖）；
  * 其余 ref 读 Playbook 正文（{@link PlaybookContentSource}，Git 归档单源）→
- * {@link PlaybookRenderer} 确定性填槽 → {@link WAgentPlan.PlanCodec} 解析 →
+ * {@link PlaybookRenderer} 确定性填槽 → {@link AiPlan.PlanCodec} 解析 →
  * 共同经 {@link PlaybookToGraphConverter} 转画布 → 落 {@code ecos_aip_pipeline}。</p>
  *
  * <p><b>内容源缺席不伪装</b>：Playbook/candidate 来源的 ref 在 {@code PlaybookContentSource}
@@ -56,14 +56,14 @@ public class AipPipelineTemplateService {
     public static final String SOURCE_PLAYBOOK = "PLAYBOOK";
     public static final String SOURCE_CANDIDATE = "CANDIDATE";
 
-    private final WAgentMissionDao missionDao;
+    private final MissionDao missionDao;
     private final AipPipelineDao pipelineDao;
     private final PlaybookRenderer playbookRenderer;
     private final PlaybookToGraphConverter converter;
     private final ObjectProvider<PlaybookContentSource> contentSourceProvider;
     private final BuiltinPipelineTemplateCatalog builtinCatalog;
 
-    public AipPipelineTemplateService(WAgentMissionDao missionDao,
+    public AipPipelineTemplateService(MissionDao missionDao,
                                       AipPipelineDao pipelineDao,
                                       PlaybookRenderer playbookRenderer,
                                       PlaybookToGraphConverter converter,
@@ -109,7 +109,7 @@ public class AipPipelineTemplateService {
                 items.add(builtin);
             }
         }
-        for (WAgentMissionDO mission : missionDao.findWithPlaybookRef(tenantId)) {
+        for (MissionDO mission : missionDao.findWithPlaybookRef(tenantId)) {
             String ref = mission.getPlaybookGitRef();
             String version = mission.getPlaybookVersion();
             String key = ref + "@" + version;
@@ -168,7 +168,7 @@ public class AipPipelineTemplateService {
         if (builtinCatalog.isBuiltinRef(ref)) {
             return instantiateBuiltin(tenantId, operator, ref, requestedName);
         }
-        Optional<WAgentMissionDO> mission = missionDao.findWithPlaybookRef(tenantId).stream()
+        Optional<MissionDO> mission = missionDao.findWithPlaybookRef(tenantId).stream()
                 .filter(m -> ref.equals(m.getPlaybookGitRef()))
                 .findFirst();
         if (mission.isEmpty()) {
@@ -187,9 +187,9 @@ public class AipPipelineTemplateService {
         }
 
         String filled = playbookRenderer.fill(template, slots == null ? Map.of() : slots);
-        WAgentPlan.Plan plan;
+        AiPlan.Plan plan;
         try {
-            plan = WAgentPlan.PlanCodec.fromJson(filled);
+            plan = AiPlan.PlanCodec.fromJson(filled);
         } catch (RuntimeException e) {
             throw new TemplateValidationException("Playbook 正文不是合法计划: " + e.getMessage());
         }
@@ -207,18 +207,18 @@ public class AipPipelineTemplateService {
      * 该值不进画布也不落库，来源真相由 {@code template_ref} 的 {@code builtin/} 前缀承载。</p>
      */
     private InstantiateResult instantiateBuiltin(String tenantId, String operator, String ref, String name) {
-        com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.GoalIntent intent = builtinCatalog.intentOf(ref);
+        com.chinacreator.gzcm.engine.ai.plan.AiPlanEnums.GoalIntent intent = builtinCatalog.intentOf(ref);
         if (intent == null) {
             throw new TemplateNotFoundException("内置模板不存在: " + ref);
         }
-        WAgentPlan.Plan plan = new WAgentPlan.Plan(
-                com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.PlanSource.PLAYBOOK,
+        AiPlan.Plan plan = new AiPlan.Plan(
+                com.chinacreator.gzcm.engine.ai.plan.AiPlanEnums.PlanSource.PLAYBOOK,
                 null, null, builtinCatalog.stepsOf(intent));
         String finalName = name == null || name.isBlank() ? builtinCatalog.displayNameOf(intent) : name;
         return persist(tenantId, operator, ref, finalName, "builtin", convert(plan));
     }
 
-    private PlaybookToGraphConverter.ConvertedGraph convert(WAgentPlan.Plan plan) {
+    private PlaybookToGraphConverter.ConvertedGraph convert(AiPlan.Plan plan) {
         PlaybookToGraphConverter.ConvertedGraph graph;
         try {
             graph = converter.convert(plan);

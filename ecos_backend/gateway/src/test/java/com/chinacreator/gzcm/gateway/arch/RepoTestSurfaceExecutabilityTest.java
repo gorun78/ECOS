@@ -115,7 +115,7 @@ class RepoTestSurfaceExecutabilityTest {
     }
 
     @Test
-    @DisplayName("本批 7 枚原违例（6 枚 *IT＋1 枚具名类）确在扫描面内且已转可执行")
+    @DisplayName("本批原违例（*IT＋具名类）确在扫描面内且已转可执行")
     void theSevenFormerlyDeadFilesAreNowCovered() throws IOException {
         Path root = locateRepoRoot();
         Path backend = root.resolve("ecos_backend");
@@ -123,7 +123,6 @@ class RepoTestSurfaceExecutabilityTest {
         List<String> formerlyDead = List.of(
                 "engine/ai-engine/ai-engine-impl/src/test/java/com/chinacreator/gzcm/engine/ai/tool/CitationInducementIT.java",
                 "engine/ai-engine/ai-engine-impl/src/test/java/com/chinacreator/gzcm/engine/ai/tool/ScenarioToolInvocationIT.java",
-                "engine/ai-engine/ai-engine-impl/src/test/java/com/chinacreator/gzcm/engine/ai/wagent/web/WAgentGoalControllerIT.java",
                 "engine/data-engine/data-engine-impl/src/test/java/com/chinacreator/gzcm/engine/data/quality/DqPhase4E2eIT.java",
                 "runtime/llm-gateway/src/test/java/com/chinacreator/gzcm/runtime/llm/gateway/AiFaultInjectionIT.java",
                 "workspace/workspace-impl/src/test/java/com/chinacreator/gzcm/workspace/it/WorkspaceRouteReachabilityIT.java",

@@ -6,7 +6,7 @@ import com.chinacreator.gzcm.engine.ai.capability.web.AiCapabilityApiPaths;
 import com.chinacreator.gzcm.engine.ai.dao.LlmModelRegistryDao;
 import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
-import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
+import com.chinacreator.gzcm.engine.ai.approval.AiIdentityResolver;
 import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import org.slf4j.Logger;
@@ -105,7 +105,7 @@ public class AiModelCatalogController {
     private final AiSecurityEngineClient securityClient;
 
     /** 身份与角色（JWT claims）。 */
-    private final WAgentIdentityResolver identityResolver;
+    private final AiIdentityResolver identityResolver;
 
     /** Git 版本归档（表只承载在用版本，历史版本走 Git — 铁律 §2.5 配置/资产二分）。 */
     private final DesignAssetArchiver designAssetArchiver;
@@ -126,7 +126,7 @@ public class AiModelCatalogController {
     public AiModelCatalogController(@Autowired(required = false) LLMGateway llmGateway,
                                    @Autowired(required = false) LlmModelRegistryDao modelRegistryDao,
                                    @Autowired(required = false) AiSecurityEngineClient securityClient,
-                                   @Autowired(required = false) WAgentIdentityResolver identityResolver,
+                                   @Autowired(required = false) AiIdentityResolver identityResolver,
                                    @Autowired(required = false) DesignAssetArchiver designAssetArchiver) {
         this.llmGateway = llmGateway;
         this.modelRegistryDao = modelRegistryDao;

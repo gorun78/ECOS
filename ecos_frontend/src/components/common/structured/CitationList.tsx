@@ -1,11 +1,15 @@
 /**
- * CitationList — 引用帧累积列表（篇13 §13.4.5：`citation` 帧累积到 `<EvidenceDrawer>` 引用列表）。
+ * CitationList — 引用帧累积列表（篇13 §13.4.5：`citation` 帧累积成引用列表）。
  *
  * 真值纪律：
  * - 数据只从 props 传入（`services/sseFrames` 解析出的 citation 帧），组件不合成引用；
  * - 四要素不齐（`isCitationUsable=false`）显式标注「引用要素不齐」，不折叠掉、不补齐；
  * - 空列表按 `completed` 分两种诚实态：流未收 done ⇒「等待引用」；已收 done ⇒「本轮无引用」
  *   （把"还没到"渲染成"没有"就是假绿）。
+ *
+ * <p>2026-11-23 去 wagent 化：原 {@code EvidenceDrawer} 抽屉随五个结构化卡片一并删除，
+ * 故 {@code onSelect}/{@code selected} 改为可选——不传时渲染为只读列表（不再有点击态，
+ * 也不假装打开抽屉）。</p>
  * @license Apache-2.0
  */
 
@@ -23,9 +27,9 @@ export interface CitationListProps {
   citations: AgentLoopCitationFrame[];
   /** done 帧是否已收到（决定空列表的诚实态文案） */
   completed: boolean;
-  /** 点开某条引用（父级据此打开 EvidenceDrawer） */
-  onSelect: (index: number) => void;
-  /** 当前选中项（高亮用，null 表示抽屉未打开） */
+  /** 点开某条引用（可选；不传则为只读列表） */
+  onSelect?: (index: number) => void;
+  /** 当前选中项（高亮用，null 表示未选中） */
   selected?: number | null;
 }
 
@@ -53,32 +57,43 @@ export default function CitationList({
     );
   }
 
+  const rowClass = "w-full flex items-start gap-2 rounded-lg border px-2 py-1.5";
+
   return (
     <ul className="space-y-1" aria-label={t("common.evidence.list.title")}>
       {citations.map((frame, index) => {
         const usable = isCitationUsable(frame);
+        const body = (
+          <>
+            <Quote className={`w-3 h-3 shrink-0 mt-0.5 ${usable ? styles.accentText : styles.warningText}`} aria-hidden="true" />
+            <span className="flex-1 min-w-0 space-y-0.5">
+              <span className={`block truncate font-mono text-[10px] ${styles.cardText}`}>
+                {frame.forecastRunId} · {frame.caliberId}
+              </span>
+              <span className={`block text-[10px] ${usable ? styles.cardTextMuted : styles.warningText}`}>
+                {usable
+                  ? `${frame.version} · ${frame.asOfTime}`
+                  : t("common.evidence.list.incomplete", { missing: missingKeys(frame) })}
+              </span>
+            </span>
+          </>
+        );
         return (
           <li key={`${frame.forecastRunId}-${index}`}>
-            <button
-              type="button"
-              onClick={() => onSelect(index)}
-              aria-current={selected === index}
-              className={`w-full flex items-start gap-2 rounded-lg border px-2 py-1.5 text-left cursor-pointer ${styles.cardBorder} ${
-                selected === index ? styles.cardBg : ""
-              }`}
-            >
-              <Quote className={`w-3 h-3 shrink-0 mt-0.5 ${usable ? styles.accentText : styles.warningText}`} aria-hidden="true" />
-              <span className="flex-1 min-w-0 space-y-0.5">
-                <span className={`block truncate font-mono text-[10px] ${styles.cardText}`}>
-                  {frame.forecastRunId} · {frame.caliberId}
-                </span>
-                <span className={`block text-[10px] ${usable ? styles.cardTextMuted : styles.warningText}`}>
-                  {usable
-                    ? `${frame.version} · ${frame.asOfTime}`
-                    : t("common.evidence.list.incomplete", { missing: missingKeys(frame) })}
-                </span>
-              </span>
-            </button>
+            {onSelect ? (
+              <button
+                type="button"
+                onClick={() => onSelect(index)}
+                aria-current={selected === index}
+                className={`${rowClass} text-left cursor-pointer ${styles.cardBorder} ${
+                  selected === index ? styles.cardBg : ""
+                }`}
+              >
+                {body}
+              </button>
+            ) : (
+              <div className={`${rowClass} ${styles.cardBorder}`}>{body}</div>
+            )}
           </li>
         );
       })}

@@ -6,7 +6,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Brain, GitCompare, Play, RefreshCw, TrendingUp, Zap } from 'lucide-react';
+import { Brain, GitCompare, Play, RefreshCw, TrendingUp, Workflow, Zap } from 'lucide-react';
 import { useLanguage } from '../../../../components/LanguageContext';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useMediaQuery } from '../../../../hooks/useMediaQuery';
@@ -14,6 +14,7 @@ import type { AnalysisRunVO } from '../../../../services/scenarioAnalysisClient'
 import { compareScenarioAnalyses } from '../../../../services/scenarioAnalysisClient';
 import { showToastGlobal } from '../../../../components/common/Toast';
 import logger from '../../../../services/logger';
+import PipelineTracePanel from './PipelineTracePanel';
 
 interface Props {
   scenarioId: string;
@@ -22,12 +23,13 @@ interface Props {
   onRefresh: () => Promise<AnalysisRunVO[]>;
 }
 
-type AnalysisType = 'CAUSAL' | 'FORECAST' | 'SIMULATION';
+type AnalysisType = 'CAUSAL' | 'FORECAST' | 'SIMULATION' | 'PIPELINE';
 
 const TYPES: Array<{ key: AnalysisType; icon: React.ReactNode; labelKey: string; hintKey: string }> = [
   { key: 'CAUSAL', icon: <Brain size={16} />, labelKey: 'workspace.run.type.causal', hintKey: 'workspace.run.type.causalHint' },
   { key: 'FORECAST', icon: <TrendingUp size={16} />, labelKey: 'workspace.run.type.forecast', hintKey: 'workspace.run.type.forecastHint' },
   { key: 'SIMULATION', icon: <Zap size={16} />, labelKey: 'workspace.run.type.simulation', hintKey: 'workspace.run.type.simulationHint' },
+  { key: 'PIPELINE', icon: <Workflow size={16} />, labelKey: 'workspace.run.type.pipeline', hintKey: 'workspace.run.type.pipelineHint' },
 ];
 
 export default function RunTab({ scenarioId, analyses, onRun, onRefresh }: Props) {
@@ -47,6 +49,8 @@ export default function RunTab({ scenarioId, analyses, onRun, onRefresh }: Props
   const [running, setRunning] = useState(false);
   const [baselineId, setBaselineId] = useState('');
   const [candidateId, setCandidateId] = useState('');
+  /** 逻辑编排 id（PIPELINE 类型；单绑定可留空由服务端取绑定，多绑定必填）。 */
+  const [pipelineId, setPipelineId] = useState('');
   const [compareResult, setCompareResult] = useState<Record<string, unknown> | null>(null);
   const [comparing, setComparing] = useState(false);
 
@@ -61,6 +65,9 @@ export default function RunTab({ scenarioId, analyses, onRun, onRefresh }: Props
       const payload: Record<string, unknown> = { analysisType: type, runMode: mode };
       if (metric.trim()) payload.metric = metric.trim();
       if (deviation.trim()) payload.deviation = Number(deviation.trim());
+      if (type === 'PIPELINE' && pipelineId.trim()) {
+        payload.pipelineId = pipelineId.trim();
+      }
       if (type === 'FORECAST') {
         if (!caliberId.trim() || !caliberVersion.trim() || !asOfTime.trim() || !snapshotId.trim() || !formulaVersion.trim()) {
           showToastGlobal('info', t('workspace.run.forecast.missing'));
@@ -155,6 +162,17 @@ export default function RunTab({ scenarioId, analyses, onRun, onRefresh }: Props
               </label>
             ))}
           </div>
+        )}
+        {type === 'PIPELINE' && (
+          <label className="space-y-1 mt-3 block">
+            <span className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.run.pipeline.id')}</span>
+            <input
+              value={pipelineId}
+              onChange={(e) => setPipelineId(e.target.value)}
+              placeholder={t('workspace.run.pipeline.idPh')}
+              className={`w-full text-xs rounded border px-2.5 py-1.5 font-mono ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+            />
+          </label>
         )}
         <div className="mt-4 flex items-center gap-2">
           <button
@@ -272,6 +290,9 @@ export default function RunTab({ scenarioId, analyses, onRun, onRefresh }: Props
           </div>
         )}
       </section>
+
+      {/* 智能逻辑节点轨迹（服务端真值：属主返回的 nodeTraces / outputs，禁本地合成） */}
+      <PipelineTracePanel analyses={analyses} />
 
       {/* 复盘 */}
       <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>

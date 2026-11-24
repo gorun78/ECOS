@@ -54,9 +54,9 @@ class PaginationContractTest {
                 os.write(bytes);
             }
         });
-        server.createContext("/api/v1/wagent/runs/R1", exchange -> {
+        server.createContext("/api/v1/ontology/candidates/O1/validate", exchange -> {
             hits.incrementAndGet();
-            byte[] bytes = "{\"code\":0,\"data\":{\"runId\":\"R1\",\"state\":\"RUNNING\"}}"
+            byte[] bytes = "{\"code\":0,\"data\":{\"candidateId\":\"O1\",\"validation\":\"PASSED\"}}"
                     .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, bytes.length);
@@ -160,11 +160,11 @@ class PaginationContractTest {
     @DisplayName("非列表响应（对象）不被分页逻辑改写")
     void nonListResponseIsUntouched() {
         hits.set(0);
-        Map<String, Object> out = run("agent inspect",
-                new String[] {"agent", "inspect", "--run-id", "R1"}, 2);
+        Map<String, Object> out = run("ontology validate",
+                new String[] {"ontology", "validate", "--candidate-id", "O1"}, 2);
         Map<?, ?> dataMap = (Map<?, ?>) out.get("data");
-        assertEquals("R1", dataMap.get("runId"), "对象载荷必须原样保留");
-        assertEquals("RUNNING", dataMap.get("state"));
+        assertEquals("O1", dataMap.get("candidateId"), "对象载荷必须原样保留");
+        assertEquals("PASSED", dataMap.get("validation"));
         assertFalse(dataMap.containsKey("page"), "对象响应不得被塞入分页元数据");
     }
 }

@@ -25,7 +25,11 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 /**
- * CLI 预检（preflight）11 步 —— 详设-10 §10.3.5 / 详设-16 §16.7（CLI 生产化批 E）。
+ * CLI 预检（preflight）9 步 —— 详设-10 §10.3.5 / 详设-16 §16.7（CLI 生产化批 E）。
+ *
+ * <p><b>2026-11-23 去 wagent 化</b>：原 11 步 → 9 步。删除的两步探测的是 W 面端点
+ * （{@code /api/v1/wagent/tools/*} 与 {@code /api/v1/wagent/readiness/*}），
+ * 随 {@code engine.ai.wagent} 包一并下线；其余 HTTP 探测 10 条 → 8 条。</p>
  *
  * <p><b>只报告，不创建 Run</b>：不调用任何写通道，只对既有读端点做「可达 + 语义正确」探测，
  * 并对审批凭证存储做一次只读连通检查（SQL 住 DAO 层，见 {@link CliPreflightProbeDao}）。</p>
@@ -74,10 +78,8 @@ public class CliPreflightController {
                     "监控聚合面可达", "启动 runtime-monitor 或检查 gateway 加载", false),
             new Probe("cognitive.models", "GET", "/api/v1/cognitive/models",
                     "认知模型注册表可读", "启动 cognitive-engine 或装载对应 Controller", false),
-            new Probe("wagent.tools", "GET", "/api/v1/wagent/tools",
-                    "工具契约读面可读", "检查 ai-engine 装载与 ecos_ai 工具契约种子", false),
-            new Probe("wagent.candidates", "GET", "/api/v1/wagent/candidates",
-                    "候选读面可读（发布链上游）", "检查 ai-engine wagent 模块与候选表", false),
+            // 2026-11-23 去 wagent 化：原 wagent.tools / wagent.candidates 两步探测的端点已随
+            // wagent 控制面下线，探测面 11→9（下方测试与 e2e 断言同批改）。
             new Probe("ontology.candidates", "GET", "/api/v1/ontology/candidates",
                     "本体候选读面可读（ontology validate 上游）", "启动 ontology-engine", true),
             new Probe("data.governance.candidates", "GET", "/api/v1/data/governance/candidates",

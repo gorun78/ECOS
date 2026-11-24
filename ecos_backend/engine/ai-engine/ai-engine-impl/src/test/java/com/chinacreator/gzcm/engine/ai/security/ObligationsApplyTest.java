@@ -104,8 +104,9 @@ class ObligationsApplyTest {
             // 2026-10-11 实跑本门禁（历史各批 -DskipTests 从未执行）登记两条 wagent 面：
             // 二者只引用 PolicyEffect.ALLOW_WITH_MASK 枚举名作裁决效果判定，零本地脱敏算法
             // （algorithmHits 断言在同用例内已单独校验），符合 §2.4-7「只点名不实现」口径。
-            "WAgentEnums.java",              // PolicyEffect 四值单源：allow_with_mask 枚举字面量
-            "WAgentPolicyGuardPort.java",    // 依据 PolicyEffect 判定放行，不执行脱敏
+            // 2026-11-23 去 wagent 化：WAgentEnums.java 与 WAgentPolicyGuardPort.java 随 wagent 包删除，
+            // 本清单按「只减不增」方向同步移除两条（PolicyEffect 枚举的 allow_with_mask 字面量已不在
+            // 生产面，本门禁的 mask 命中面因此缩小而非放宽）。
             // 2026-11-09 Copilot 全生命周期工具批登记：CopilotToolCatalog 只把
             // security_mask_apply 工具名/属主端点（/api/security/mask）作为纯静态声明
             //（工具执行仍经 ToolExecutorService → AiSecurityEngineClient 单一出口），

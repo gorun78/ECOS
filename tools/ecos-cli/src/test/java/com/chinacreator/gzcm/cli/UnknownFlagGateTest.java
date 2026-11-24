@@ -38,22 +38,21 @@ class UnknownFlagGateTest {
     @Test
     @DisplayName("未知参数被拒（USAGE），且报错点名参数与命令")
     void unknownFlagIsRejected() {
-        CliOptions options = parse("agent", "inspect", "--run-id", "R", "--bogus-flag", "x");
-        CliCommand command = CliCommands.find(CliCommands.AGENT_INSPECT);
+        CliOptions options = parse("ontology", "validate", "--candidate-id", "O", "--bogus-flag", "x");
+        CliCommand command = CliCommands.find(CliCommands.ONTOLOGY_VALIDATE);
         CliException e = assertThrows(CliException.class,
                 () -> Cli.rejectUnknownFlags(options, command));
         assertEquals(ExitCodes.USAGE, e.exitCode());
         assertTrue(e.getMessage().contains("--bogus-flag"), "报错必须点名拼错的参数: " + e.getMessage());
-        assertTrue(e.getMessage().contains("agent inspect"), "报错必须点名命令: " + e.getMessage());
+        assertTrue(e.getMessage().contains("ontology validate"), "报错必须点名命令: " + e.getMessage());
     }
 
     @Test
     @DisplayName("拼错 --dry-run 的写命令必须被拒（否则会真实发货）")
     void typoDryRunOnWriteCommandIsRejected() {
-        CliOptions options = parse("knowledge", "publish", "--candidate-id", "C",
-                "--approval-token", "T", "--dry-runn", "true");
-        CliCommand command = CliCommands.find(CliCommands.KNOWLEDGE_PUBLISH);
-        assertTrue(command.requiresApproval(), "夹具前提失效：knowledge publish 应为 L3");
+        CliOptions options = parse("ontology", "validate", "--candidate-id", "C", "--dry-runn", "true");
+        CliCommand command = CliCommands.find(CliCommands.ONTOLOGY_VALIDATE);
+        assertEquals(CliCommands.ACCESS_WRITE, command.accessMode(), "夹具前提失效：样本应为写命令");
         CliException e = assertThrows(CliException.class,
                 () -> Cli.rejectUnknownFlags(options, command));
         assertTrue(e.getMessage().contains("--dry-runn"), e.getMessage());

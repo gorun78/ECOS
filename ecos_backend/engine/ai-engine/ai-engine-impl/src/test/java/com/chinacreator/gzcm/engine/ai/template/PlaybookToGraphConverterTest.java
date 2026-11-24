@@ -7,10 +7,10 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.PlanSource;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan.Plan;
-import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentPlan.Step;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlanEnums.PlanSource;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan.Plan;
+import com.chinacreator.gzcm.engine.ai.plan.AiPlan.Step;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -100,13 +100,13 @@ class PlaybookToGraphConverterTest {
     }
 
     @Test
-    @DisplayName("``WAgentPlan.PlanCodec`` 往返：序列化计划 JSON 能被转换器消费（集成腿）")
+    @DisplayName("``AiPlan.PlanCodec`` 往返：序列化计划 JSON 能被转换器消费（集成腿）")
     void consumesPlanCodecJson() {
         Plan plan = new Plan(PlanSource.PLAYBOOK, "ref", "v1", List.of(
                 step("n1", "tool", "kb.rag", List.of()),
                 step("n2", "llm", null, List.of("n1"))));
-        String json = WAgentPlan.PlanCodec.toJson(plan);
-        Plan reparsed = WAgentPlan.PlanCodec.fromJson(json);
+        String json = AiPlan.PlanCodec.toJson(plan);
+        Plan reparsed = AiPlan.PlanCodec.fromJson(json);
 
         PlaybookToGraphConverter.ConvertedGraph graph = converter.convert(reparsed);
         assertEquals(2, graph.nodes().size());
