@@ -434,9 +434,10 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
 
     /** 活跃算法（按分析类型；空即空，不造假条目）。 */
     public List<Map<String, Object>> listActiveAlgorithmsByType(String analysisType) {
+        // 只选表里真实存在的列：V361 建表没有 description，曾因多选一列整条 SQL 抛错被吞成空列表
         return jdbcTemplate.queryForList(
-            "SELECT id, name, analysis_type, version, provider_type, implementation_ref, description " +
-            "FROM ecos_algorithm_registry " +
+            "SELECT id, name, analysis_type, version, provider_type, implementation_ref " +
+            "FROM ecos_control.ecos_algorithm_registry " +
             "WHERE analysis_type = ? AND status = 'ACTIVE' AND is_deleted = 0 ORDER BY name",
             analysisType);
     }
