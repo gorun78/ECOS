@@ -389,6 +389,74 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             analysisType, sourceType, sourceId, definitionVersion, definitionDigest, runId);
     }
 
+    // ── 问题驱动运行（V363 新增八列的读写；2026-11-24 场景运行页重构）────────
+
+    /**
+     * 落一条问题驱动的运行记录。
+     *
+     * <p>{@code status} 由 {@code degraded} 决定（DEGRADED/COMPLETED），
+     * <b>不</b>把 degraded 写成 COMPLETED ——运行页据 status 展示真实状态。</p>
+     */
+    public int insertQuestionRun(String runId, String scenarioId, String question, String intent,
+                                 String intentDetail, String mentalModel, String hypothesesJson,
+                                 String algorithmId, String traceJson, String adviceJson, boolean degraded) {
+        return jdbcTemplate.update(
+            "INSERT INTO ecos_scenario_run " +
+            "(id, scenario_id, run_type, status, degraded, run_mode, sandbox_lineage, create_by, update_by, " +
+            " analysis_type, question, intent, intent_detail, mental_model, hypotheses, algorithm_id, " +
+            " exec_trace, advice) " +
+            "VALUES (?, ?, 'QUESTION_RUN', ?, ?, 'FORMAL', 'NONE', 'system', 'system', ?, ?, ?, ?, ?, " +
+            "        ?::jsonb, ?, ?::jsonb, ?::jsonb)",
+            runId, scenarioId, degraded ? "DEGRADED" : "COMPLETED", degraded,
+            "MENTAL_MODEL", question, intent, intentDetail, mentalModel, hypothesesJson,
+            algorithmId, traceJson, adviceJson);
+    }
+
+    /** 问题驱动运行列表（倒序，运行页对比用）。 */
+    public List<Map<String, Object>> listQuestionRuns(String scenarioId, int limit) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, scenario_id, question, intent, intent_detail, mental_model, hypotheses, " +
+            "       algorithm_id, exec_trace, advice, status, degraded, create_time " +
+            "FROM ecos_scenario_run " +
+            "WHERE scenario_id = ? AND run_type = 'QUESTION_RUN' AND is_deleted = 0 " +
+            "ORDER BY create_time DESC LIMIT ?",
+            scenarioId, limit);
+    }
+
+    /** 单条问题驱动运行（详情/对比）。 */
+    public List<Map<String, Object>> findQuestionRun(String runId) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, scenario_id, question, intent, intent_detail, mental_model, hypotheses, " +
+            "       algorithm_id, exec_trace, advice, status, degraded, create_time " +
+            "FROM ecos_scenario_run WHERE id = ? AND run_type = 'QUESTION_RUN' AND is_deleted = 0",
+            runId);
+    }
+
+    /** 活跃算法（按分析类型；空即空，不造假条目）。 */
+    public List<Map<String, Object>> listActiveAlgorithmsByType(String analysisType) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, name, analysis_type, version, provider_type, implementation_ref, description " +
+            "FROM ecos_algorithm_registry " +
+            "WHERE analysis_type = ? AND status = 'ACTIVE' AND is_deleted = 0 ORDER BY name",
+            analysisType);
+    }
+
+    /** 活跃心智模型目录（含承载编排 id）。 */
+    public List<Map<String, Object>> listActiveMentalModels() {
+        return jdbcTemplate.queryForList(
+            "SELECT id, code, name, description, pipeline_id, sort_order " +
+            "FROM ecos_mental_model_registry " +
+            "WHERE status = 'ACTIVE' AND is_deleted = 0 ORDER BY sort_order");
+    }
+
+    /** 知识库文档标题（假设检索的轻量语料；表不可用由调用方兜住）。 */
+    public List<Map<String, Object>> listKnowledgeBaseDocTitles(int limit) {
+        return jdbcTemplate.queryForList(
+            "SELECT title FROM ecos_knowledge.kb_doc " +
+            "WHERE is_deleted = 0 AND title IS NOT NULL ORDER BY update_time DESC NULLS LAST LIMIT ?",
+            limit);
+    }
+
     /** 定义摘要读取（运行引用；无当前版本返回 null，禁伪造）。 */
     public List<Map<String, Object>> findDefinitionPointer(String scenarioId) {
         return jdbcTemplate.queryForList(

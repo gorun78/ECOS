@@ -15,6 +15,7 @@ import { compareScenarioAnalyses } from '../../../../services/scenarioAnalysisCl
 import { showToastGlobal } from '../../../../components/common/Toast';
 import logger from '../../../../services/logger';
 import PipelineTracePanel from './PipelineTracePanel';
+import QuestionRunPanel from './QuestionRunPanel';
 
 interface Props {
   scenarioId: string;
@@ -128,6 +129,18 @@ export default function RunTab({ scenarioId, analyses, onRun, onRefresh, onEditD
           </button>
         </div>
       )}
+      {/*
+        2026-11-24 运行页重构：主视图改为「问题驱动」——
+        输入问题 → 智能体判意图 → 用户确认假设 → 选心智模型（决定路径）→ 执行 → 建议。
+        旧的「按分析类型直接跑」发起器保留为可折叠次级面，不删能力。
+      */}
+      <QuestionRunPanel scenarioId={scenarioId} />
+
+      <details className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg`}>
+        <summary className={`px-4 py-2 text-xs font-bold cursor-pointer ${styles.cardText} select-none`}>
+          {t('workspace.run.launcher.title')}
+        </summary>
+        <div className="px-4 pb-4 pt-1">
       {/* 发起器 */}
       <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
         <h3 className={`text-sm font-bold ${styles.cardText} mb-3`}>{t('workspace.run.launcher.title')}</h3>
@@ -267,6 +280,8 @@ export default function RunTab({ scenarioId, analyses, onRun, onRefresh, onEditD
           </>
         )}
       </section>
+        </div>
+      </details>
 
       {/* 运行记录 */}
       <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
