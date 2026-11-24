@@ -1,12 +1,11 @@
 /**
- * 工作台 L2 — 单场景工作区（场景定义 / 场景运行双 Tab，场景工作台简化 v0.3）。
+ * 工作台 L2 — 单场景工作区（场景运行 / 场景定义次级面，场景工作台简化 v0.4）。
  *
- * <p>默认落在「场景定义」；保留旧详情路由的加载/404/403/错误/离线六态。</p>
+ * <p>默认落在「场景运行」；保留旧详情路由的加载/404/403/错误/离线六态。</p>
  *
- * <p>2026-11-23 界面精简（用户裁决）：去掉「高级」折叠按钮。认知运行面
- * （{@link AdvancedDebugPanel}：运行编排 + 认知四卡 E1~E4 唯一挂载点）并入
- * 「场景运行」Tab 下方常驻，不再躲在按钮后面；蓝图工程面 BlueprintPanel 自 L2 摘除
- * （定义/版本/发布由「场景定义」页承接，融合/决策/Git 经「高级视图」链接可达）。
+ * <p>2026-11-24 界面精简（用户裁决）：运行页去掉「高级/调试」整块——
+ * 认知运行面（{@link AdvancedDebugPanel}：运行编排 + 认知四卡 E1~E4 唯一挂载点）
+ * 改挂「场景定义」次级面（?tab=definition），能力保留、入口收窄。
  * 场景上下文构建入口见「场景定义」页右上的按钮（见 definition/ScenarioContextBuilder）。</p>
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -25,7 +24,6 @@ import { useCognition } from '../../../hooks/useCognition';
 import { apiFetchData } from '../../../api';
 import { WORKSPACE_SCENARIOS_BASE } from '../../../services/scenarioActionClient';
 import { fetchScenarioDefinition } from '../../../services/scenarioDefinitionClient';
-import { fetchScenarioAnalyses, runScenarioAnalysis } from '../../../services/scenarioAnalysisClient';
 import logger from '../../../services/logger';
 import AdvancedDebugPanel from './advanced/AdvancedDebugPanel';
 import DefinitionTab from './definition/DefinitionTab';
@@ -56,7 +54,6 @@ export default function WorkbenchScenarioDetail() {
 
   const [scenario, setScenario] = useState<ScenarioDetailVO | null>(null);
   const [definition, setDefinition] = useState<Awaited<ReturnType<typeof fetchScenarioDefinition>> | null>(null);
-  const [analyses, setAnalyses] = useState<Awaited<ReturnType<typeof fetchScenarioAnalyses>>>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [denied, setDenied] = useState(false);
@@ -93,21 +90,14 @@ export default function WorkbenchScenarioDetail() {
   useEffect(() => {
     if (!scenario || !scenarioId) return;
     let cancelled = false;
-    Promise.all([
-      fetchScenarioDefinition(scenarioId).catch((e): Awaited<ReturnType<typeof fetchScenarioDefinition>> => {
+    fetchScenarioDefinition(scenarioId)
+      .catch((e): Awaited<ReturnType<typeof fetchScenarioDefinition>> => {
         logger.error('definition-load', e);
         return null as unknown as Awaited<ReturnType<typeof fetchScenarioDefinition>>;
-      }),
-      fetchScenarioAnalyses(scenarioId).catch((e): Awaited<ReturnType<typeof fetchScenarioAnalyses>> => {
-        logger.error('analyses-load', e);
-        return [];
-      }),
-    ]).then(([d, a]) => {
-      if (!cancelled) {
-        setDefinition(d);
-        setAnalyses(a);
-      }
-    });
+      })
+      .then((d) => {
+        if (!cancelled) setDefinition(d);
+      });
     return () => { cancelled = true; };
   }, [scenario, scenarioId]);
 
@@ -121,18 +111,8 @@ export default function WorkbenchScenarioDetail() {
     setSearchParams(p, { replace: true });
   };
 
-  const runAnalysis = async (payload: Record<string, unknown>) => {
-    try {
-      const result = await runScenarioAnalysis(scenarioId, payload);
-      const next = await fetchScenarioAnalyses(scenarioId).catch(() => analyses);
-      setAnalyses(next);
-      return result;
-    } catch (e) {
-      logger.error('analysis-run', e);
-      throw e;
-    }
-  };
-
+  // 2026-11-24：按分析类型直接发起的「发起运行」通道已自运行页摘除，
+  // 运行发起只走 QuestionRunPanel 的问题驱动链路（question-runs 端点）。
   return (
     <div className={`flex-1 flex flex-col overflow-y-auto ${styles.appBg} ${styles.appText}`}>
       <div className={`p-3 ${styles.cardBg} border-b ${styles.cardBorder} shrink-0 flex items-center gap-2`}>
@@ -236,67 +216,56 @@ export default function WorkbenchScenarioDetail() {
                 onSaved={(d) => setDefinition(d)}
                 onPublished={(d) => setDefinition(d)}
               />
-            </>
-          ) : (
-            <>
-              <RunTab
-                scenarioId={scenario.id}
-                definition={definition}
-                analyses={analyses}
-                onRun={runAnalysis}
-                onRefresh={async () => {
-                  const next = await fetchScenarioAnalyses(scenarioId);
-                  setAnalyses(next);
-                  return next;
-                }}
-                onEditDefinition={() => switchTab('definition')}
-              />
               {/*
-                认知运行面（原「高级」折叠区，2026-11-23 并入常驻）：
+                认知运行面（2026-11-24 自「场景运行」页迁入定义面）：
                 运行编排 CognitionPanel + 认知四卡 CognitiveRightPanel（E1~E4 全应用唯一挂载点，
-                E2E COG-IA 单实例断言依赖此唯一性）。
+                E2E COG-IA 单实例断言依赖此唯一性）。运行页只留问题驱动主链路，高级面不占首屏。
               */}
               <div className="px-4 pb-4">
                 <AdvancedDebugPanel scenarioId={scenario.id} />
               </div>
-            </>
-          )}
 
-          {/*
-            认知摘要（首屏常驻，不随 Tab 切换走）：
-            503 时渲染如实横幅 + 重试，禁静默——六态要求认知引擎不可用必须可见。
-            2026-11-23 回补：双 Tab 改造时曾误把本卡片整块移入高级区，导致认知降级在首屏不可见。
-          */}
-          <section className="px-4 pb-4">
-            <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} flex items-center gap-1.5`}>
-                  <BrainCircuit size={13} />
-                  {t('workspace.l2.cognition.title')}
-                </h2>
-                <Link
-                  to={`/workbench/${scenario.id}/forecast`}
-                  className={`text-xs font-bold px-2 py-1 rounded border cursor-pointer ${styles.accentBg} ${styles.accentBorder} ${styles.cardText}`}
-                >
-                  {t('workspace.l2.cognition.go_forecast')}
-                </Link>
-              </div>
+              {/*
+                认知摘要（随高级面一并自运行页移入定义面）：
+                503 时渲染如实横幅 + 重试，禁静默——六态要求认知引擎不可用必须可见。
+              */}
+              <section className="px-4 pb-4">
+                <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} flex items-center gap-1.5`}>
+                      <BrainCircuit size={13} />
+                      {t('workspace.l2.cognition.title')}
+                    </h2>
+                    <Link
+                      to={`/workbench/${scenario.id}/forecast`}
+                      className={`text-xs font-bold px-2 py-1 rounded border cursor-pointer ${styles.accentBg} ${styles.accentBorder} ${styles.cardText}`}
+                    >
+                      {t('workspace.l2.cognition.go_forecast')}
+                    </Link>
+                  </div>
 
-              {operationEval.unavailable && (
-                <div className={`px-3 py-2 rounded border text-xs mb-2 ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
-                  {t('workspace.l2.cognition.unavailable')}
-                  <button onClick={operationEval.reload} className="ml-2 underline cursor-pointer">
-                    {t('workspace.l1.retry')}
-                  </button>
+                  {operationEval.unavailable && (
+                    <div className={`px-3 py-2 rounded border text-xs mb-2 ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
+                      {t('workspace.l2.cognition.unavailable')}
+                      <button onClick={operationEval.reload} className="ml-2 underline cursor-pointer">
+                        {t('workspace.l1.retry')}
+                      </button>
+                    </div>
+                  )}
+                  {operationEval.loading && <p className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.l2.loading')}</p>}
+                  {!operationEval.loading && !operationEval.unavailable && !operationEval.data && (
+                    <p className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.l2.empty')}</p>
+                  )}
+                  {!operationEval.loading && operationEval.data && <OperationEvalView data={operationEval.data} />}
                 </div>
-              )}
-              {operationEval.loading && <p className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.l2.loading')}</p>}
-              {!operationEval.loading && !operationEval.unavailable && !operationEval.data && (
-                <p className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.l2.empty')}</p>
-              )}
-              {!operationEval.loading && operationEval.data && <OperationEvalView data={operationEval.data} />}
-            </div>
-          </section>
+              </section>
+            </>
+          ) : (
+            <RunTab
+              scenarioId={scenario.id}
+              onEditDefinition={() => switchTab('definition')}
+            />
+          )}
         </>
       )}
     </div>

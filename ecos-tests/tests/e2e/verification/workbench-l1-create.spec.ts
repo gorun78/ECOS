@@ -8,10 +8,11 @@ import { expectHealthyPage, expectNoErrorBoundary, injectAuth, loginAsAdmin, wat
  * 只有静态门禁与渲染腿、浏览器内未点验。本 spec 逐腿补上：</p>
  * <ul>
  *   <li>V-WS-001-a 「新建场景」快捷入口确实打开模态（不是跳转占位）；</li>
- *   <li>V-WS-001-b 高级视图折叠区默认收起、点击展开可见、再点收起复不可见；</li>
+ *   <li>V-WS-001-b 「场景模板」快捷入口跳模板管理页（2026-11-24 裁决：模板功能自配置页迁来，
+ *       点它不再新建场景）；</li>
  *   <li>V-WS-002-a 空名称提交 → info toast 且**不发 POST**（校验前置于网络）；</li>
  *   <li>V-WS-002-b 名称超长按 maxLength=255 截断（浏览器真实执行属性约束）；</li>
- *   <li>V-WS-002-c 模板 chips 预填业务目标与初始口径；</li>
+ *   <li>V-WS-002-c 模板 chips 取真实模板并以 definitionDefaults 预填业务目标；</li>
  *   <li>V-WS-002-d 防重复提交：提交窗口内按钮 disabled，连点两次只发 1 个 POST；</li>
  *   <li>V-WS-002-e 真实 POST 创建 → toast + 跳转 L2 + L1 列表出现新卡片（真库留痕后清理）。</li>
  * </ul>
@@ -23,8 +24,6 @@ import { expectHealthyPage, expectNoErrorBoundary, injectAuth, loginAsAdmin, wat
 
 const NEW_BTN = /新建场景/;
 const NAME_REQUIRED = '请先填写场景名称。';
-const ADV_HINT = '面向工程与治理角色的完整视图（默认折叠）。';
-const ADV_LINK = '展开技术视图';
 
 /**
  * L1 列表加载收敛上限。dev 库累积 200+ 场景时单次 GET 载荷 ~100KB、卡片渲染 200+ 张，
@@ -63,26 +62,21 @@ test.describe('workbench L1 / 新建场景模态 — UI 级补腿', () => {
     expectHealthyPage(page);
   });
 
-  test('V-WS-001-b 高级视图默认收起，点击展开，再点收起', async ({ page, request, context }) => {
+  test('V-WS-001-b 「场景模板」入口跳模板管理页（不再触发新建场景）', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
-    // 折叠区内 Link 指向 /project_workbench（该页 navConfig 缺 labelKey，W201 打 console.error）
-    watchPageHealth(page, { expectConsoleErrors: [/\[navConfig\] no tab labelKey/] });
+    watchPageHealth(page);
 
     await openL1(page);
-    // 默认收起：条件渲染 ⇒ 提示语与入口链接均不在 DOM
-    await expect(page.getByText(ADV_HINT)).toHaveCount(0);
-    await expect(page.getByRole('link', { name: ADV_LINK })).toHaveCount(0);
-
-    const toggle = page.getByRole('button', { name: /高级视图/ });
-    await expect(toggle).toBeVisible();
-    await toggle.click();
-    await expect(page.getByText(ADV_HINT)).toBeVisible();
-    await expect(page.getByRole('link', { name: ADV_LINK })).toBeVisible();
-
-    await toggle.click();
-    await expect(page.getByText(ADV_HINT)).toHaveCount(0);
-    await expect(page.getByRole('link', { name: ADV_LINK })).toHaveCount(0);
+    // 2026-11-24 裁决：模板功能自「场景配置」迁到独立页，L1 入口是真实路由而非新建动作
+    const entry = page.getByRole('link', { name: '场景模板' }).first();
+    await expect(entry).toBeVisible();
+    await entry.click();
+    await expect(page).toHaveURL(/#\/workbench\/templates/);
+    // 模板页必须真实渲染（列表标题 + 新建表单），且**不**出现新建场景模态
+    await expect(page.getByRole('heading', { name: '场景模板', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '模板列表' })).toBeVisible();
+    await expect(page.locator('#new-scenario-name')).toHaveCount(0);
     expectHealthyPage(page);
   });
 
@@ -120,23 +114,25 @@ test.describe('workbench L1 / 新建场景模态 — UI 级补腿', () => {
     expectHealthyPage(page);
   });
 
-  test('V-WS-002-c 模板 chips 预填业务目标与初始口径', async ({ page, request, context }) => {
+  test('V-WS-002-c 模板 chips 取真实模板并预填业务目标', async ({ page, request, context }) => {
     const token = await loginAsAdmin(request);
     await injectAuth(context, token);
     watchPageHealth(page);
 
     await openL1(page);
     await openCreateModal(page);
-    // 默认选中「经营预测模板」⇒ 目标与口径已预填
-    await expect(page.locator('#new-scenario-goal')).toHaveValue('2027 年利润达成 1.2 亿');
-    await expect(page.getByLabel('初始口径')).toHaveValue('cal-finance-v2.3');
 
-    await page.getByRole('button', { name: '成本诊断模板' }).click();
-    await expect(page.locator('#new-scenario-goal')).toHaveValue('定位项目成本偏差根因');
-    await expect(page.getByLabel('初始口径')).toHaveValue('cal-project-v1.1');
+    // 模板来自真实 GET /scenario-templates（无硬编码）：市测会议模板必须可选
+    const marketChip = page.getByRole('button', { name: '市场分析会议', exact: true });
+    await expect(marketChip).toBeVisible();
+    await marketChip.click();
+    // 预填值取自模板 definitionDefaults.goalStatement（真实字段，非前端写死）
+    await expect(page.locator('#new-scenario-goal')).toHaveValue('识别本季度市场机会与竞争威胁，形成可执行的市场策略');
+    // 再点一次取消选择 ⇒ 已预填的目标被清空（切回空白）
+    await marketChip.click();
+    await expect(page.locator('#new-scenario-goal')).toHaveValue('');
 
-    await page.getByRole('button', { name: '空白场景' }).click();
-    await expect(page.getByLabel('初始口径')).toHaveValue('—');
+    // 空态模板列表必须如实提示，不回落成假模板（真实端点为空的场景另测）
     expectHealthyPage(page);
   });
 
@@ -165,6 +161,8 @@ test.describe('workbench L1 / 新建场景模态 — UI 级补腿', () => {
 
     await openL1(page);
     await openCreateModal(page);
+    // 模板不再默认选中（2026-11-24）：显式选一枚真实模板，断言预填值进入 POST body
+    await page.getByRole('button', { name: '市场分析会议', exact: true }).click();
     await page.locator('#new-scenario-name').fill('E2E-DEDUP-UI');
     const confirm = page.getByRole('button', { name: /^确认$/ });
     await confirm.click();
@@ -176,7 +174,7 @@ test.describe('workbench L1 / 新建场景模态 — UI 级补腿', () => {
     expect(postCount, '同一次提交只允许 1 个 POST').toBe(1);
     const parsed = JSON.parse(body) as { name?: string; businessGoal?: string };
     expect(parsed.name).toBe('E2E-DEDUP-UI');
-    expect(parsed.businessGoal).toBe('2027 年利润达成 1.2 亿');
+    expect(parsed.businessGoal).toBe('识别本季度市场机会与竞争威胁，形成可执行的市场策略');
     expectHealthyPage(page);
   });
 

@@ -6,11 +6,11 @@
  * 是真实的两步，不是前端假装的确认框。</p>
  *
  * <p>端点与后端 {@code ScenarioQuestionRunController} 一一对应；路径基址复用
- * {@link WORKSPACE_BASE}（与其它 workspace 客户端同一单源）。</p>
+ * {@link WORKSPACE_ANALYSES_BASE}（`scenarioAnalysisBase` 已持有的 workspace 单源，
+ * 本文件不得再自拼 `/api/v1/workspace`——那会成为第二生产方被棘轮门判红）。</p>
  */
 import { apiFetchData } from '../api';
-
-const WORKSPACE_BASE = '/api/v1/workspace';
+import { WORKSPACE_ANALYSES_BASE as WORKSPACE_BASE } from './scenarioAnalysisBase';
 
 /** 一次运行的执行过程节点（真实耗时）。 */
 export interface ExecStep {

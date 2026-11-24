@@ -1,11 +1,8 @@
 /**
  * 新建场景模态（L1「我的场景」，原型 v2.0 §新建场景；2026-11-24 接真实模板）。
  *
- * <p>两种打开方式（由首页按钮决定）：
- * <ul>
- *   <li>{@code blank} —— 从「新建场景」按钮进，默认空白场景；</li>
- *   <li>{@code template} —— 从「场景模板」按钮进，直接展示模板清单供选择。</li>
- * </ul>
+ * <p>模板只作为新建流程的预填包出现（选模板 → 预填目标/成功标准）；
+ * 模板本身的增删改在独立「场景模板」页（{@code /workbench/templates}）。</p>
  *
  * <p>模板来源：{@code GET /api/v1/workspace/scenario-templates}（真实端点）。
  * 选中模板后用其 {@code definitionDefaults.goalStatement / successCriteria} 预填表单，
@@ -43,13 +40,10 @@ function presetOf(tpl: ScenarioTemplateVO | null): { goal: string; criteria: str
 
 export default function NewScenarioModal({
   isOpen,
-  mode = 'blank',
   onClose,
   onCreated,
 }: {
   isOpen: boolean;
-  /** blank=从「新建场景」进；template=从「场景模板」进（直接展示模板清单） */
-  mode?: 'blank' | 'template';
   onClose: () => void;
   /** 创建成功（真实 POST 返回后）触发，供 L1 刷新场景列表 */
   onCreated?: (created: CreatedScenarioVO) => void;
@@ -158,7 +152,7 @@ export default function NewScenarioModal({
     <Modal
       isOpen={isOpen}
       onClose={close}
-      title={mode === 'template' ? t('workspace.create.title_from_tpl') : t('workspace.create.title')}
+      title={t('workspace.create.title')}
       size="sm"
       closeOnOverlay={!submitting}
       closeOnEscape={!submitting}

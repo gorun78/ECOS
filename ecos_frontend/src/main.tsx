@@ -74,6 +74,7 @@ const WorkbenchScenarioDetail = lazy(() => import('./pages/workbench/[scenarioId
 const WorkbenchForecast = lazy(() => import('./pages/workbench/[scenarioId]/forecast.tsx'));
 const WorkbenchDecisions = lazy(() => import('./pages/workbench/[scenarioId]/decisions.tsx'));
 const WorkbenchConfig = lazy(() => import('./pages/workbench/config.tsx'));
+const WorkbenchTemplates = lazy(() => import('./pages/workbench/templates.tsx'));
 const NotFoundWorkbench = lazy(() => import('./pages/workbench/NotFoundWorkbench.tsx'));
 const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx'));
 const GatewayDiagnosticsPage = lazy(() => import('./pages/platform/GatewayDiagnosticsPage.tsx'));
@@ -201,6 +202,7 @@ createRoot(document.getElementById('root')!).render(
                 {/* F07-06 工作台三层 IA：我的场景 → 场景详情 → 预测推演 / 经营管控闭环（H-8 P08/P09） */}
                 <Route path="workbench" element={<WorkbenchHome />} />
                 <Route path="workbench/config" element={<WorkbenchConfig />} />
+                <Route path="workbench/templates" element={<WorkbenchTemplates />} />
                 <Route path="workbench/:scenarioId" element={<WorkbenchScenarioDetail />} />
                 {/* 场景工作台简化 v0.3：双 Tab 深链（旧书签零改动，统一落在 ?tab=） */}
                 <Route path="workbench/:scenarioId/definition" element={<Navigate to="?tab=definition" replace />} />

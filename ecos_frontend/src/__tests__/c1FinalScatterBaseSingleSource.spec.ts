@@ -102,7 +102,7 @@ const CANONICAL = 'services/httpClient.ts';
  * 全量 run 实走面值 686→**691**，只增；五枚均经 `KNOWLEDGE_BASE`/服务层取址，
  * 代码面零 `/api` 字面量与零 `${API_BASE}` 派生。
  */
-const PROD_FILES = 686; // 2026-11-23 去 wagent 化：删 wagentClient/wagentRunStream/wagentSseFrames 等 8 枚 + 本轮删
+const PROD_FILES = 689; // 2026-11-23 去 wagent 化：删 wagentClient/wagentRunStream/wagentSseFrames 等 8 枚 + 本轮删
 // structured/RunProgress/EvidenceDrawer 2 枚，692→684→682 实跑重设
 // 2026-11-24 AI 工作台本体绑定真值化批 +2：新增 OntologyBindingTab.tsx（本体与逻辑绑定页独立组件）
 // 与 services/agentMeshMapping.ts（AgentMesh 纯映射层，从 pages/aiworkbench/api.ts 抽出压低体积）；
@@ -111,6 +111,9 @@ const PROD_FILES = 686; // 2026-11-23 去 wagent 化：删 wagentClient/wagentRu
 // 全部复用既有导出函数、零 `${API_BASE}` 派生）⇒ 684→685 实跑重设
 // 2026-11-24 场景上下文版本解析批 +1：新增 services/scenarioSourceVersion.ts
 // （三条 reader 腿的版本读取单源；DATA_ASSET 引既有属主，ONTOLOGY/KNOWLEDGE 各一枚族根声明）⇒ 685→686 实跑重设
+// 2026-11-24 场景运行页重构批 +3：新增 run/QuestionRunPanel.tsx、run/QuestionRunResultPanel.tsx、
+// services/scenarioQuestionRunClient.ts、pages/workbench/templates.tsx 共 4 枚，删 run/PipelineTracePanel.tsx 1 枚
+// （按分析类型运行的老轨迹面随发起器一并摘除）⇒ 686−1+4 = 689 实跑重设
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [

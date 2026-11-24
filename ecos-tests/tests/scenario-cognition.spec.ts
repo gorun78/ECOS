@@ -12,7 +12,8 @@ import { loginAsAdmin, call, injectAuth, watchPageHealth, expectNoErrorBoundary 
  *  - UI 面：前端 http://localhost:3000/#/（HashRouter），token 经 localStorage.token 注入
  *    （helpers injectAuth）。:3000 不可达时默认 skip；`CognitiveRightPanel` 自 §3.8 R2
  *    （2026-10-11 双结构收敛）起唯一挂载点 = L2 场景详情，2026-11-23 起随「高级」折叠区
- *    并入「场景运行」Tab（#/workbench/{scenarioId}?tab=run），本组用例导航至该路由。
+ *    并入「场景运行」Tab；**2026-11-24 起该高级面改挂「场景定义」次级面**
+ *    （#/workbench/{scenarioId}?tab=definition，运行页只留问题驱动主链路），本组用例导航至该路由。
  *
  * 契约（后端 ScenarioCognitionController / CognitiveErrorMatrixIntegrationTest 对齐）：
  *  GET /api/v1/business/scenarios/{id}/cognition[/detect|/operation-eval|/hypotheses|/beliefs]
@@ -48,7 +49,7 @@ async function frontendAlive(request: APIRequestContext): Promise<boolean> {
   return !!res;
 }
 
-/** 打开 L2「场景运行」Tab 并等待认知右栏（§3.8 R2 唯一下沉落点；2026-11-23 起高级折叠区并入该 Tab）；前端离线或无场景数据时 skip。 */
+/** 打开 L2「场景定义」次级面并等待认知右栏（§3.8 R2 唯一下沉落点；2026-11-24 起自运行页迁到定义面）；前端离线或无场景数据时 skip。 */
 async function openCognitionPanel(page: Page, request: APIRequestContext): Promise<void> {
   test.skip(!(await frontendAlive(request)), `前端 ${ECOS_BASE} 不可用 — UI 用例默认跳过`);
   const token = await loginAsAdmin(request);
@@ -56,7 +57,7 @@ async function openCognitionPanel(page: Page, request: APIRequestContext): Promi
   test.skip(!id, '无可用场景数据 — 无法打开 L2 场景详情认知面板');
   await injectAuth(page.context(), token);
   await watchPageHealth(page);
-  await page.goto(`${ECOS_BASE}/#/workbench/${encodeURIComponent(id as string)}?tab=run`);
+  await page.goto(`${ECOS_BASE}/#/workbench/${encodeURIComponent(id as string)}?tab=definition`);
   await expectNoErrorBoundary(page);
   const panel = page.getByTestId('cognitive-right-panel');
   await expect(
@@ -199,7 +200,7 @@ test.describe('场景认知右栏 UI（:3000，离线默认 skip）', () => {
     test.skip(!id, '无可用场景数据 — 无法打开 L2 认知面板');
     await injectAuth(page.context(), token);
     await watchPageHealth(page);
-    await page.goto(`${ECOS_BASE}/#/workbench/${encodeURIComponent(id as string)}`);
+    await page.goto(`${ECOS_BASE}/#/workbench/${encodeURIComponent(id as string)}?tab=definition`);
     const panel = page.getByTestId('cognitive-right-panel');
     await expect(panel, '503 场景下认知面板本体仍须挂载（渲染降级横幅而非消失）').toBeVisible({ timeout: 15_000 });
     const banner = page.getByTestId('cog-engine-down-banner');
