@@ -36,6 +36,7 @@ import {
   isToolStepOp,
 } from '../../services/sseFrames';
 import { agentLoopChat, createMeshAgent, updateMeshAgent, deleteMeshAgent, executeOntologyProposal } from './api';
+import { getUserIdentity } from '../../services/auth';
 
 interface ChatMessage {
   id: string; sender: 'user' | 'agent' | 'system'; content: string; timestamp: string;
@@ -58,7 +59,8 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'prompt'|'ontology'|'knowledge'|'guardrails'|'publish'>('prompt');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState(''); const [isReplying, setIsReplying] = useState(false);
-  const [activeUserRole, setActiveUserRole] = useState<'AOC_DIRECTOR'|'EXTERNAL_CONTRACTOR'>('AOC_DIRECTOR');
+  // 沙箱模拟角色：默认取登录身份的任一角色（真值），无身份即空串（禁造演示角色）
+  const [activeUserRole, setActiveUserRole] = useState<string>(() => getUserIdentity()?.roles?.[0] ?? '');
   const [activeContextDataset, setActiveContextDataset] = useState<string>('all_ontology');
   const [tempName, setTempName] = useState(''); const [tempRole, setTempRole] = useState('');
   const [tempDesc, setTempDesc] = useState(''); const [tempModel, setTempModel] = useState('');
@@ -66,9 +68,9 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   const [tempTemperature, setTempTemperature] = useState(0.4);
   const [tempTopP, setTempTopP] = useState(0.9);
   const [tempMaxTokens, setTempMaxTokens] = useState(2048);
-  const [selectedObjects, setSelectedObjects] = useState<string[]>(['AviationFlight','AviationPilot']);
-  const [selectedActions, setSelectedActions] = useState<string[]>(['act_reschedule_flight']);
-  const [selectedFunctions, setSelectedFunctions] = useState<string[]>(['func_get_flight_weather']);
+  const [selectedObjects, setSelectedObjects] = useState<string[]>([]);
+  const [selectedActions, setSelectedActions] = useState<string[]>([]);
+  const [selectedFunctions, setSelectedFunctions] = useState<string[]>([]);
   const [selectedGuardrails, setSelectedGuardrails] = useState<string[]>([]);
   // §4.5 P0：预置假知识库文档已清除；仅承载用户本地上传的待同步暂存项（同步能力未上线）
   const [ragDocs, setRagDocs] = useState<RAGDocument[]>([]);
@@ -113,7 +115,8 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   useEffect(() => { if (activeChatbot) {
     setTempName(activeChatbot.name); setTempRole(activeChatbot.role); setTempDesc(activeChatbot.description);
     setTempModel(activeChatbot.modelId); setTempPrompt(activeChatbot.systemPrompt);
-    setSelectedObjects(['AviationFlight','AviationPilot']);
+    // 本体对象绑定读 metadata.ontologyBinding.objects（真值单源）；缺省即空，不预置演示对象
+    setSelectedObjects([...(activeChatbot.ontologyBinding?.objects ?? [])]);
     setSelectedActions([...activeChatbot.assignedTools.actionIds]);
     setSelectedFunctions([...activeChatbot.assignedTools.functionIds]);
     setSelectedGuardrails([...activeChatbot.guardrailIds]);
@@ -265,10 +268,8 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
       return;
     }
     try {
-      const vo = await executeOntologyProposal(pid, {
-        userRole: t('aiworkbench.chatbot.proposalUserRole'),
-        userName: t('aiworkbench.chatbot.proposalUserName'),
-      });
+      // 操作人身份由后端 UserContext（token 链路）解析，前端不再自报角色/姓名
+      const vo = await executeOntologyProposal(pid);
       setChatMessages(p => p.map(m => m.id===mid && m.actionProposal ? {...m, actionProposal:{...m.actionProposal, status:'approved' as const}} : m));
       const notReported = t('aiworkbench.chatbot.receiptNotReported');
       const ci = Array.isArray(vo.verificationMatrix) && vo.verificationMatrix.length > 0
@@ -285,7 +286,7 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
           .replace('{checkItems}', ci),
         timestamp:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) }]);
       onAddAuditLog({ id:`log-exec-${Date.now()}`, timestamp:new Date().toISOString().replace('T',' ').substring(0,19), source:'Ontology Engine',
-        assetName:activeChatbot?.name||'Chatbot', user:t('aiworkbench.chatbot.auditUser'), inputTokens:0, outputTokens:0, status:'allowed',
+        assetName:activeChatbot?.name||'Chatbot', user:getUserIdentity()?.username ?? t('aiworkbench.chatbot.auditUserAnonymous'), inputTokens:0, outputTokens:0, status:'allowed',
         actionTaken:t('aiworkbench.chatbot.auditReconciliationSuccess'), details:t('aiworkbench.chatbot.auditExecDetails').replace('{proposalId}', pid),
         localOrigin:true });
       showToast?.('success', t('aiworkbench.chatbot.toastWritebackSuccess'));
@@ -314,6 +315,8 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
       name:tempName.trim(), role:tempRole.trim(), description:tempDesc.trim(), modelId:tempModel,
       systemPrompt:tempPrompt.trim(), guardrailIds:selectedGuardrails,
       assignedTools:{ actionIds:selectedActions, functionIds:selectedFunctions },
+      // 本体对象绑定落 metadata.ontologyBinding（后端 PUT 浅合并，未传键不丢）
+      ontologyBinding:{ objects:selectedObjects, actions:selectedActions, functions:selectedFunctions },
       ...extended,
     };
     setIsSaving(true);
@@ -334,7 +337,7 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
     } finally { setIsSaving(false); }
   };
 
-  const hCreate = () => { setIsCreatingNew(true); setTempName(''); setTempRole(t('aiworkbench.chatbot.defaultRole')); setTempDesc(t('aiworkbench.chatbot.defaultDesc')); setTempModel('gemini-1.5-pro'); setTempPrompt(t('aiworkbench.chatbot.defaultPrompt')); setSelectedObjects(['AviationFlight','AviationPilot']); setSelectedActions(['act_reschedule_flight']); setSelectedFunctions(['func_get_flight_weather']); setSelectedGuardrails([]); setShowMetadataModal(true); };
+  const hCreate = () => { setIsCreatingNew(true); setTempName(''); setTempRole(t('aiworkbench.chatbot.defaultRole')); setTempDesc(t('aiworkbench.chatbot.defaultDesc')); setTempModel('gemini-1.5-pro'); setTempPrompt(t('aiworkbench.chatbot.defaultPrompt')); setSelectedObjects([]); setSelectedActions([]); setSelectedFunctions([]); setSelectedGuardrails([]); setShowMetadataModal(true); };
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 

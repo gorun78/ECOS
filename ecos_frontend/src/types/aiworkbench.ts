@@ -58,6 +58,12 @@ export interface AIPAgent {
   routes?: string[];
   /** 引擎工具白名单（真值 = metadata.toolWhitelist；空数组 = 未配置） */
   toolWhitelist?: string[];
+  /**
+   * 本体绑定（真值 = metadata.ontologyBinding；后端种子缺省为空数组，禁合成）。
+   * objects = 授权读取的本体对象类型 code/id 集合；
+   * actions/functions 与工具白名单同源冗余落此，便于整包读写。
+   */
+  ontologyBinding?: { objects: string[]; actions: string[]; functions: string[] };
   /** RAG 知识库绑定 {docIds, categories, topK} */
   rag?: { docIds: string[]; categories: string[]; topK: number };
   /** 发布与嵌入 {status, version, channel} */

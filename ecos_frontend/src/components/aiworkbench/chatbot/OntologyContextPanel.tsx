@@ -16,15 +16,6 @@ const Icon = ({ name, size, className }: { name: string; size?: number; classNam
   return <Comp size={size} className={className} />;
 };
 
-// ── Resolve name from ID using known lists ─────────────────────────
-function resolveName<T extends { id: string; name: string }>(list: T[], id: string): string {
-  return list.find(item => item.id === id)?.name || id;
-}
-
-function resolveIcon(list: { id: string; icon: string }[], id: string): string {
-  return list.find(item => item.id === id)?.icon || 'HelpCircle';
-}
-
 interface OntologyContextPanelProps {
   activeChatbot: AIPAgent;
   styles: Record<string, string>;
@@ -39,29 +30,8 @@ export default function OntologyContextPanel({
   const { t } = useLanguage();
   const [collapsed, setCollapsed] = useState(false);
 
-  // ── Known ontology data ───────────────────────────────────────
-  const KNOWN_OBJECTS: { id: string; name: string; icon: string; category: string }[] = [
-    { id: 'AviationFlight', name: 'AviationFlight', icon: 'Plane', category: t('aiworkbench.chatbot.ocpCategoryCore') },
-    { id: 'AviationPilot', name: 'AviationPilot', icon: 'User', category: t('aiworkbench.chatbot.ocpCategoryCore') },
-    { id: 'AviationCrew', name: 'AviationCrew', icon: 'Users', category: t('aiworkbench.chatbot.ocpCategoryCore') },
-    { id: 'AviationAircraft', name: 'AviationAircraft', icon: 'PlaneLanding', category: t('aiworkbench.chatbot.ocpCategoryCore') },
-    { id: 'FlightSchedule', name: 'FlightSchedule', icon: 'Calendar', category: t('aiworkbench.chatbot.ocpCategoryRelated') },
-    { id: 'WeatherReport', name: 'WeatherReport', icon: 'Cloud', category: t('aiworkbench.chatbot.ocpCategoryRelated') },
-  ];
-
-  const KNOWN_ACTIONS: { id: string; name: string; icon: string }[] = [
-    { id: 'act_reschedule_flight', name: t('aiworkbench.chatbot.ocpActionReschedule'), icon: 'RefreshCw' },
-    { id: 'act_cancel_flight', name: t('aiworkbench.chatbot.ocpActionCancel'), icon: 'XCircle' },
-    { id: 'act_assign_crew', name: t('aiworkbench.chatbot.ocpActionAssignCrew'), icon: 'UserPlus' },
-    { id: 'act_update_status', name: t('aiworkbench.chatbot.ocpActionUpdateStatus'), icon: 'Edit' },
-  ];
-
-  const KNOWN_FUNCTIONS: { id: string; name: string; icon: string }[] = [
-    { id: 'func_get_flight_weather', name: t('aiworkbench.chatbot.ocpFuncWeather'), icon: 'CloudRain' },
-    { id: 'func_get_pilot_status', name: t('aiworkbench.chatbot.ocpFuncPilotStatus'), icon: 'UserCheck' },
-    { id: 'func_calculate_fuel', name: t('aiworkbench.chatbot.ocpFuncFuel'), icon: 'Fuel' },
-  ];
-
+  /** 已绑定本体对象（真值 = metadata.ontologyBinding.objects）；空即不展示，禁预置演示实体 */
+  const boundObjectCodes = activeChatbot.ontologyBinding?.objects ?? [];
   const actionCount = activeChatbot.assignedTools?.actionIds?.length || 0;
   const functionCount = activeChatbot.assignedTools?.functionIds?.length || 0;
   const guardrailCount = activeChatbot.guardrailIds?.length || 0;
@@ -131,21 +101,17 @@ export default function OntologyContextPanel({
             <span>{t('aiworkbench.chatbot.ocpObjectTypes')}</span>
           </div>
           <div className="flex flex-wrap gap-1">
-            {KNOWN_OBJECTS.filter(o =>
-              actionCount > 0 || functionCount > 0 // Show all when bindings exist
-            ).slice(0, 4).map(obj => (
+            {boundObjectCodes.length > 0 ? boundObjectCodes.map(code => (
               <span
-                key={obj.id}
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold ${
-                  obj.category === t('aiworkbench.chatbot.ocpCategoryCore')
-                    ? `${styles.accentBg}/10 ${styles.accentText} border ${styles.accentBorder}/30`
-                    : `${styles.inputBg} ${styles.cardTextMuted} border ${styles.cardBorder}`
-                }`}
+                key={code}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold ${styles.accentBg}/10 ${styles.accentText} border ${styles.accentBorder}/30`}
               >
-                <Icon name={obj.icon} size={8} />
-                <span>{obj.name}</span>
+                <Icon name="Box" size={8} />
+                <span>{code}</span>
               </span>
-            ))}
+            )) : (
+              <span className={`text-[8px] ${styles.cardTextMuted} italic`}>{t('aiworkbench.chatbot.ocpNoObjects')}</span>
+            )}
           </div>
         </div>
 
@@ -158,14 +124,13 @@ export default function OntologyContextPanel({
           {actionCount > 0 ? (
             <div className="space-y-1">
               {activeChatbot.assignedTools.actionIds.map(actionId => {
-                const known = KNOWN_ACTIONS.find(a => a.id === actionId);
                 return (
                   <div
                     key={actionId}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded text-[9px] ${styles.inputBg} border ${styles.cardBorder}`}
                   >
-                    <Icon name={known?.icon || 'Zap'} size={9} className={styles.accentText} />
-                    <span className={`${styles.cardText} font-bold`}>{known?.name || actionId}</span>
+                    <Icon name="Zap" size={9} className={styles.accentText} />
+                    <span className={`${styles.cardText} font-bold`}>{actionId}</span>
                     <span className={`${styles.cardTextMuted} font-mono text-[8px] ml-auto`}>{actionId}</span>
                     <span className="text-emerald-500 text-[7px] font-bold px-1 rounded bg-emerald-500/10">RW</span>
                   </div>
@@ -188,14 +153,13 @@ export default function OntologyContextPanel({
           {functionCount > 0 ? (
             <div className="space-y-1">
               {activeChatbot.assignedTools.functionIds.map(funcId => {
-                const known = KNOWN_FUNCTIONS.find(f => f.id === funcId);
                 return (
                   <div
                     key={funcId}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded text-[9px] ${styles.inputBg} border ${styles.cardBorder}`}
                   >
-                    <Icon name={known?.icon || 'Code'} size={9} className={styles.cardTextMuted} />
-                    <span className={`${styles.cardText} font-bold`}>{known?.name || funcId}</span>
+                    <Icon name="Code" size={9} className={styles.cardTextMuted} />
+                    <span className={`${styles.cardText} font-bold`}>{funcId}</span>
                     <span className={`${styles.cardTextMuted} font-mono text-[8px] ml-auto`}>{funcId}</span>
                     <span className="text-blue-500 text-[7px] font-bold px-1 rounded bg-blue-500/10">RO</span>
                   </div>

@@ -8,6 +8,7 @@ import { AIPAgent, AIPGuardrail } from '../../../types/aiworkbench';
 import * as Icons from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import DemoBadge from '../DemoBadge';
+import OntologyBindingTab from './OntologyBindingTab';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -263,129 +264,17 @@ export default function ConfigPanel({
           </div>
         )}
 
-        {/* TAB 2: Ontology bindings */}
-        {activeWorkspaceTab === 'ontology' && (
-          <div className="space-y-4">
-            <div className={`p-3 ${styles.badgeBg} ${styles.accentText} rounded-xl border ${styles.accentBorder} flex items-start gap-2`}>
-              <Icon name="Info" size={14} className="shrink-0 mt-0.5" />
-              <p className="leading-relaxed">
-                <strong>{t('aiworkbench.chatbot.ontologyProtocol')}</strong>{t('aiworkbench.chatbot.ontologyProtocolDesc')}
-              </p>
-            </div>
-
-            {/* P1-Copilot 引擎工具面：metadata.toolWhitelist 真值展示（编辑经元数据弹窗的引擎工具清单） */}
-            {activeChatbot.toolWhitelist && activeChatbot.toolWhitelist.length > 0 && (
-              <div className={`p-3 ${styles.cardBg} border ${styles.cardBorder} rounded-xl space-y-2`}>
-                <h4 className={`text-[11px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono flex items-center gap-1`}>
-                  <Icon name="Wrench" size={11} />
-                  <span>{t('aiworkbench.chatbot.toolFaceTitle')}</span>
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${styles.badgeBg} ${styles.muted}`}>
-                    {activeChatbot.toolWhitelist.length}
-                  </span>
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {activeChatbot.toolWhitelist.slice(0, 18).map(name => (
-                    <span key={name} className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${styles.badgeBg} ${styles.cardTextMuted}`}>
-                      {name}
-                    </span>
-                  ))}
-                  {activeChatbot.toolWhitelist.length > 18 && (
-                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono ${styles.badgeBg} ${styles.muted}`}>
-                      +{activeChatbot.toolWhitelist.length - 18}
-                    </span>
-                  )}
-                </div>
-                <p className={`text-[10px] ${styles.cardTextMuted}`}>
-                  {t('aiworkbench.chatbot.toolFaceHint')}
-                </p>
-              </div>
-            )}
-
-            {/* 1. Object Types */}
-            <div className="space-y-2">
-              <h3 className={`text-[11px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono flex items-center gap-1`}>
-                <Icon name="Layers" size={11} className={styles.cardTextMuted} />
-                <span>{t('aiworkbench.chatbot.objectTypeBindings')}</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {[
-                  { id: 'AviationFlight', label: t('aiworkbench.chatbot.objFlight'), desc: t('aiworkbench.chatbot.objFlightDesc') },
-                  { id: 'AviationPilot', label: t('aiworkbench.chatbot.objPilot'), desc: t('aiworkbench.chatbot.objPilotDesc') },
-                  { id: 'AviationAirport', label: t('aiworkbench.chatbot.objAirport'), desc: t('aiworkbench.chatbot.objAirportDesc') },
-                  { id: 'AviationEquipment', label: t('aiworkbench.chatbot.objEquipment'), desc: t('aiworkbench.chatbot.objEquipmentDesc') }
-                ].map(obj => {
-                  const isBound = selectedObjects.includes(obj.id);
-                  return (
-                    <div
-                      key={obj.id}
-                      onClick={() => {
-                        setSelectedObjects(prev =>
-                          prev.includes(obj.id) ? prev.filter(x => x !== obj.id) : [...prev, obj.id]
-                        );
-                      }}
-                      className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
-                        isBound ? `${styles.badgeBg} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardBorder}`
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isBound}
-                        onChange={() => {}}
-                        className="mt-0.5 accent-blue-600 rounded"
-                      />
-                      <div className="flex flex-col">
-                        <span className={`font-bold ${styles.cardText} text-[11px]`}>{obj.label}</span>
-                        <span className={`text-[9px] ${styles.cardTextMuted} leading-tight mt-0.5`}>{obj.desc}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 2. Action Types */}
-            <div className="space-y-2">
-              <h3 className={`text-[11px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono flex items-center gap-1`}>
-                <Icon name="Settings" size={11} className={styles.cardTextMuted} />
-                <span>{t('aiworkbench.chatbot.actionTypeBindings')}</span>
-              </h3>
-              <div className="space-y-2">
-                {[
-                  { id: 'act_reschedule_flight', name: t('aiworkbench.chatbot.actionReschedule'), desc: t('aiworkbench.chatbot.actionRescheduleDesc'), target: ' DDL: ds_flights_clean.status' },
-                  { id: 'act_assign_pilot', name: t('aiworkbench.chatbot.actionAssignPilot'), desc: t('aiworkbench.chatbot.actionAssignPilotDesc'), target: ' DDL: ds_flights_clean.captain_id' }
-                ].map(act => {
-                  const isBound = selectedActions.includes(act.id);
-                  return (
-                    <div
-                      key={act.id}
-                      onClick={() => {
-                        setSelectedActions(prev =>
-                          prev.includes(act.id) ? prev.filter(x => x !== act.id) : [...prev, act.id]
-                        );
-                      }}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-3 ${
-                        isBound ? 'bg-indigo-50/50 border-indigo-200' : `${styles.cardBg} ${styles.cardBorder}`
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isBound}
-                        onChange={() => {}}
-                        className="mt-0.5 accent-indigo-600 rounded"
-                      />
-                      <div className="flex-1 flex flex-col">
-                        <div className="flex items-center justify-between">
-                          <span className={`font-bold ${styles.cardText} text-[11px]`}>{act.name}</span>
-                          <span className={`text-[9px] ${styles.appBg} ${styles.cardTextMuted} font-mono px-1 rounded`}>{act.target}</span>
-                        </div>
-                        <p className={`text-[9px] ${styles.cardTextMuted} mt-1 leading-normal`}>{act.desc}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+        {/* TAB 2: Ontology bindings — 真值端点（对象类型/动作算子），函数无注册表如实标注 */}
+        {activeWorkspaceTab === "ontology" && (
+          <OntologyBindingTab
+            activeChatbot={activeChatbot}
+            selectedObjects={selectedObjects}
+            setSelectedObjects={setSelectedObjects}
+            selectedActions={selectedActions}
+            setSelectedActions={setSelectedActions}
+            selectedFunctions={selectedFunctions}
+            styles={styles}
+          />
         )}
 
         {/* TAB 3: RAG / Document Source upload */}
@@ -652,7 +541,7 @@ export default function ConfigPanel({
                     {t('aiworkbench.chatbot.embedJsonDesc')}
                   </p>
                   <pre className={`${styles.inputBg} p-2.5 border ${styles.cardBorder} rounded-lg text-[9px] font-mono leading-relaxed ${styles.cardTextMuted} overflow-x-auto select-all`}>
-                    {`{\n  "widgetType": "AIP_CHATBOT_STUDIO",\n  "widgetId": "${activeChatbot.id}",\n  "chatbotName": "${activeChatbot.name}",\n  "engineModel": "${activeChatbot.modelId}",\n  "temperature": ${tempTemperature},\n  "bindings": {\n    "objects": ${JSON.stringify(selectedObjects)},\n    "actions": ${JSON.stringify(selectedActions)},\n    "functions": ${JSON.stringify(selectedFunctions)}\n  },\n  "security": {\n    "guardrails": ${JSON.stringify(selectedGuardrails)},\n    "roleLock": "AOC_DIRECTOR"\n  }\n}`}
+                    {`{\n  "widgetType": "AIP_CHATBOT_STUDIO",\n  "widgetId": "${activeChatbot.id}",\n  "chatbotName": "${activeChatbot.name}",\n  "engineModel": "${activeChatbot.modelId}",\n  "temperature": ${tempTemperature},\n  "bindings": {\n    "objects": ${JSON.stringify(selectedObjects)},\n    "actions": ${JSON.stringify(selectedActions)},\n    "functions": ${JSON.stringify(selectedFunctions)}\n  },\n  "security": {\n    "guardrails": ${JSON.stringify(selectedGuardrails)}\n  }\n}`}
                   </pre>
                 </div>
               )}
@@ -679,11 +568,11 @@ export default function ConfigPanel({
 
                 {apiLang === 'curl' ? (
                   <pre className={`${styles.inputBg} p-2.5 border ${styles.cardBorder} rounded-lg text-[9px] font-mono leading-relaxed ${styles.cardTextMuted} overflow-x-auto select-all`}>
-                    {`curl -X POST "https://ECOS_AIP_GATEWAY/api/chatbot/${activeChatbot.id}/query" \\\n  -H "Authorization: Bearer ***" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "query": "${t('aiworkbench.chatbot.apiExampleQuery')}",\n    "userRole": "AOC_DIRECTOR",\n    "stream": false\n  }'`}
+                    {`curl -X POST "https://ECOS_AIP_GATEWAY/api/chatbot/${activeChatbot.id}/query" \\\n  -H "Authorization: Bearer ***" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "query": "${t('aiworkbench.chatbot.apiExampleQuery')}",\n    "stream": false\n  }'`}
                   </pre>
                 ) : (
                   <pre className={`${styles.inputBg} p-2.5 border ${styles.cardBorder} rounded-lg text-[9px] font-mono leading-relaxed ${styles.cardTextMuted} overflow-x-auto select-all`}>
-                    {`import { AIPChatbotClient } from '@ecos/aip-sdk';\n\nconst client = new AIPChatbotClient({\n  apiKey: ***  gatewayUrl: 'https://ECOS_AIP_GATEWAY'\n});\n\nasync function runInference() {\n  const response = await client.chatbot.query({\n    chatbotId: '${activeChatbot.id}',\n    query: '${t('aiworkbench.chatbot.apiExampleQuery2')}',\n    userRole: 'AOC_DIRECTOR'\n  });\n  \n  console.log('Chatbot Reply:', response.content);\n  console.log('Thinking CoT:', response.thinkingTrace);\n}`}
+                    {`import { AIPChatbotClient } from '@ecos/aip-sdk';\n\nconst client = new AIPChatbotClient({\n  apiKey: ***  gatewayUrl: 'https://ECOS_AIP_GATEWAY'\n});\n\nasync function runInference() {\n  const response = await client.chatbot.query({\n    chatbotId: '${activeChatbot.id}',\n    query: '${t('aiworkbench.chatbot.apiExampleQuery2')}'\n  });\n  \n  console.log('Chatbot Reply:', response.content);\n  console.log('Thinking CoT:', response.thinkingTrace);\n}`}
                   </pre>
                 )}
               </div>

@@ -14,6 +14,11 @@ import { API_BASE, rawStreamUrlFetch } from '../../services/httpClient';
 import { ONTOLOGY_PROPOSALS_BASE } from '../../services/ontology/ontologyProposalApi';
 import { GUARDRAILS_POLICIES_BASE } from '../../services/cognitiveEngineApi';
 import { createSseParser, decodeFrameData, type SseRawEvent } from '../../services/sseParser';
+import {
+  convertMeshAgentToAIP,
+  toMeshAgentEntity,
+  type AgentMeshAgentRaw,
+} from '../../services/agentMeshMapping';
 import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog, AipPipelineTemplate, AipPipelineInstantiateResult } from '../../types/aiworkbench';
 
 /**
@@ -27,21 +32,7 @@ export const AIP_AUDIT_LOGS_BASE = `${API_BASE}/v1/aip/audit-logs`;
 
 // ── AgentMesh ──────────────────────────────────────────────────
 
-interface AgentMeshAgentRaw {
-  id: string;
-  name: string;
-  role: string;
-  description: string;
-  systemPrompt: string;
-  capability?: string;
-  model: string;
-  maxIterations: number;
-  status: string;
-  endpoint?: string;
-  metadata?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
+// AgentMesh: 记录映射单源在 services/agentMeshMapping（本文件只保留请求腿与 URL 站点）
 
 /**
  * AgentMesh 网关路径（VersionPrefixRewriteFilter: /api/v1/agent-mesh/ → /api/agent-mesh/），
@@ -51,92 +42,6 @@ export async function fetchAIPAgentsFromMesh(): Promise<AIPAgent[]> {
   // PMO-43 T3: no silent catch — caller renders error + retry state
   const raw = await apiFetchData<AgentMeshAgentRaw[]>(`${API_BASE}/v1/agent-mesh/agents`);
   return (Array.isArray(raw) ? raw : []).map(convertMeshAgentToAIP);
-}
-
-function convertMeshAgentToAIP(raw: AgentMeshAgentRaw): AIPAgent {
-  // metadata JSON 是唯一真值（Copilot 批）：systemPrompt/toolWhitelist/guardrails/rag/publish/engine/routes
-  // 全部经 metadata 持久化（后端 AgentRegistryEntity 派生 setter 读-改-写，PUT 合并不丢键）。
-  let meta: Record<string, any> = {};
-  try {
-    meta = raw.metadata ? JSON.parse(raw.metadata) : {};
-  } catch { /* plain metadata */ }
-
-  const systemPrompt: string = typeof meta.systemPrompt === 'string'
-    ? meta.systemPrompt : (raw.systemPrompt || '');
-  // 工具白名单：metadata.toolWhitelist 优先，capability.tools 兜底（旧 builtin 种子形态）
-  let toolNames: string[] = Array.isArray(meta.toolWhitelist) ? [...meta.toolWhitelist] : [];
-  if (toolNames.length === 0 && raw.capability) {
-    try {
-      const cap = JSON.parse(raw.capability);
-      if (cap && Array.isArray(cap.tools)) toolNames = [...cap.tools];
-    } catch { /* plain capability */ }
-  }
-  const actionIds = toolNames.filter((t: string) => t.startsWith('act_'));
-  const functionIds = toolNames.filter((t: string) => !t.startsWith('act_'));
-  // guardrailIds 存于 metadata.guardrails，无上报则为空数组（不合成）
-  const guardrailIds: string[] = Array.isArray(meta.guardrails) ? [...meta.guardrails] : [];
-
-  return {
-    id: raw.id,
-    name: raw.name || raw.id,
-    avatar: 'Bot',
-    role: raw.role || 'assistant',
-    description: typeof meta.description === 'string' && meta.description
-      ? meta.description : (raw.description || ''),
-    modelId: (typeof meta.model === 'string' && meta.model) || raw.model || 'deepseek-chat',
-    systemPrompt,
-    assignedTools: { actionIds, functionIds },
-    guardrailIds,
-    status: (raw.status || '').toUpperCase() === 'ACTIVE' ? 'active' : 'development',
-    lastModified: raw.updatedAt || raw.createdAt || new Date().toISOString(),
-    engine: typeof meta.engine === 'string' ? meta.engine : undefined,
-    routes: Array.isArray(meta.routes) ? [...meta.routes] : undefined,
-    toolWhitelist: toolNames,
-    rag: meta.rag && typeof meta.rag === 'object' ? {
-      docIds: Array.isArray(meta.rag.docIds) ? [...meta.rag.docIds] : [],
-      categories: Array.isArray(meta.rag.categories) ? [...meta.rag.categories] : [],
-      topK: typeof meta.rag.topK === 'number' ? meta.rag.topK : 5,
-    } : undefined,
-    publish: meta.publish && typeof meta.publish === 'object' ? {
-      status: meta.publish.status === 'published' ? 'published' : 'draft',
-      version: typeof meta.publish.version === 'number' ? meta.publish.version : 0,
-      channel: typeof meta.publish.channel === 'string' ? meta.publish.channel : undefined,
-    } : undefined,
-  };
-}
-
-/** AIPAgent → AgentMesh 注册实体（metadata 单源：SOUL/工具白名单/护栏/RAG/发布全量落 metadata） */
-function toMeshAgentEntity(a: Partial<AIPAgent> & { id: string }): Record<string, unknown> {
-  const toolWhitelist = a.toolWhitelist ?? [
-    ...(a.assignedTools?.actionIds ?? []),
-    ...(a.assignedTools?.functionIds ?? []),
-  ];
-  const rag = a.rag ?? { docIds: [], categories: [], topK: 5 };
-  const publish = a.publish ?? { status: 'draft', version: 0, channel: 'workbench' };
-  const metadata: Record<string, unknown> = {
-    systemPrompt: a.systemPrompt ?? '',
-    description: a.description ?? '',
-    model: a.modelId ?? 'deepseek-chat',
-    toolWhitelist,
-    guardrails: a.guardrailIds ?? [],
-    rag,
-    publish,
-  };
-  if (a.engine) metadata.engine = a.engine;
-  if (a.routes) metadata.routes = a.routes;
-  return {
-    id: a.id,
-    name: a.name ?? '',
-    role: a.role ?? 'assistant',
-    description: a.description ?? '',
-    systemPrompt: a.systemPrompt ?? '',
-    model: a.modelId ?? 'deepseek-chat',
-    maxIterations: 10,
-    status: a.status === 'development' ? 'INACTIVE' : 'ACTIVE',
-    metadata: JSON.stringify(metadata),
-    capability: JSON.stringify({ tools: toolWhitelist }),
-    endpoint: '',
-  };
 }
 
 /** 注册新 Agent — POST /api/v1/agent-mesh/agents（真实写 ecos_agent_registry） */
@@ -871,13 +776,13 @@ export async function submitOntologyProposal(body: {
   });
 }
 
-/** 执行提案 — POST /api/v1/ontology/proposals/{id}/execute（非 PENDING 状态 409 → 抛出） */
-export async function executeOntologyProposal(
-  id: string,
-  body: { userRole: string; userName: string }
-): Promise<OntologyProposalVo> {
+/**
+ * 执行提案 — POST /api/v1/ontology/proposals/{id}/execute（非 PENDING 状态 409 → 抛出）。
+ * 后端主体取服务端 UserContext（token 链路），不读请求体自报身份 ⇒ 本函数不再携带
+ * userRole/userName（F06-19-7 X-82 身份伪造面归零）。
+ */
+export async function executeOntologyProposal(id: string): Promise<OntologyProposalVo> {
   return apiFetchData<OntologyProposalVo>(`${API_BASE}/v1/ontology/proposals/${encodeURIComponent(id)}/execute`, {
     method: 'POST',
-    body: JSON.stringify(body),
   });
 }

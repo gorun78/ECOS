@@ -19,6 +19,8 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { AIPAgent } from '../../../types/aiworkbench';
 import * as Icons from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
+import { fetchRoles } from '../../../api/iamClient';
+import { getUserIdentity } from '../../../services/auth';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import OntologyContextPanel from './OntologyContextPanel';
@@ -52,6 +54,40 @@ export default function ChatPanel({
 }: ChatPanelProps) {
   const { t } = useLanguage();
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // ── 沙箱角色候选：真值 GET /api/v1/system/roles（禁写死演示角色） ──
+  const [roleList, setRoleList] = useState<{ code: string; name: string }[] | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchRoles()
+      .then((res) => {
+        if (cancelled) return;
+        const rows: any[] = Array.isArray(res?.data) ? res.data : [];
+        setRoleList(rows
+          .filter((r) => r && (r.roleCode || r.roleId))
+          .map((r) => ({ code: String(r.roleCode || r.roleId), name: String(r.roleName || r.roleCode || r.roleId) })));
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setRoleList([]);
+        setRoleError(e instanceof Error && e.message ? e.message : String(e));
+      });
+    return () => { cancelled = true; };
+  }, []);
+  /** 角色候选：真实角色列表 + 当前登录身份（列表未回前至少能显示自身），去重保序。 */
+  const roleOptions = (() => {
+    const opts = [...(roleList ?? [])];
+    const mine = getUserIdentity()?.roles ?? [];
+    for (const r of mine) {
+      if (!opts.some(o => o.code === r)) opts.push({ code: r, name: r });
+    }
+    if (opts.length === 0) opts.push({ code: activeUserRole, name: activeUserRole });
+    return opts;
+  })();
+
+  /** 数据上下文候选：已绑定本体对象（metadata.ontologyBinding.objects），空则不列二级项。 */
+  const boundObjects = activeChatbot.ontologyBinding?.objects ?? [];
 
   // ── Thread state (T7-1) ──────────────────────────────────────────
   const [threads, setThreads] = useState<ChatThread[]>([
@@ -264,23 +300,24 @@ export default function ChatPanel({
             <select
               value={activeUserRole}
               onChange={(e) => {
-                setActiveUserRole(e.target.value as any);
+                setActiveUserRole(e.target.value);
+                const picked = roleOptions.find(r => r.code === e.target.value);
                 showToast?.(
                   'info',
-                  t('aiworkbench.chatbot.toastRoleSwitch').replace('{role}',
-                    e.target.value === 'AOC_DIRECTOR'
-                      ? t('aiworkbench.chatbot.roleDirectorShort')
-                      : t('aiworkbench.chatbot.roleContractorShort')
-                  ),
+                  t('aiworkbench.chatbot.toastRoleSwitch').replace('{role}', picked?.name ?? e.target.value),
                 );
               }}
               className={`w-full p-1 ${styles.cardBg} border ${styles.cardBorder} rounded font-bold text-[10px] outline-none`}
             >
-              <option value="AOC_DIRECTOR">{t('aiworkbench.chatbot.roleDirector')}</option>
-              <option value="EXTERNAL_CONTRACTOR">
-                {t('aiworkbench.chatbot.roleContractor')}
-              </option>
+              {roleOptions.map(r => (
+                <option key={r.code} value={r.code}>{r.name} ({r.code})</option>
+              ))}
             </select>
+            {roleError && (
+              <span className={`text-[8px] ${styles.dangerText} block`}>
+                {t('aiworkbench.chatbot.bindingLoadFailed').replace('{message}', roleError)}
+              </span>
+            )}
           </div>
 
           <div className="space-y-1">
@@ -295,13 +332,17 @@ export default function ChatPanel({
               onChange={(e) => setActiveContextDataset(e.target.value)}
               className={`w-full p-1 ${styles.cardBg} border ${styles.cardBorder} rounded font-bold text-[10px] outline-none`}
             >
-              <option value="all_ontology">{t('aiworkbench.chatbot.scopeAll')}</option>
-              <option value="only_flights">
-                {t('aiworkbench.chatbot.scopeFlightOnly')}
-              </option>
+              <option value="all_ontology">{t('aiworkbench.chatbot.scopeAllBound')}</option>
+              {boundObjects.map(code => (
+                <option key={code} value={code}>{t('aiworkbench.chatbot.scopeOnlyObject').replace('{object}', code)}</option>
+              ))}
             </select>
           </div>
         </div>
+        {/* 诚实标注：两项均为调试上下文，鉴权与取数由服务端按登录身份裁决 */}
+        <p className={`text-[8px] ${styles.cardTextMuted} leading-normal`}>
+          {t('aiworkbench.chatbot.sandboxSimulationNote')}
+        </p>
       </div>
 
       {/* Ontology Context Panel (T7-3) — collapsible */}
@@ -367,8 +408,8 @@ interface ChatPanelProps {
   onSend: (textToSend?: string) => void;
   onProposalConsent: (msgId: string, approved: boolean) => void;
   onResetChat: () => void;
-  activeUserRole: 'AOC_DIRECTOR' | 'EXTERNAL_CONTRACTOR';
-  setActiveUserRole: (role: 'AOC_DIRECTOR' | 'EXTERNAL_CONTRACTOR') => void;
+  activeUserRole: string;
+  setActiveUserRole: (role: string) => void;
   activeContextDataset: string;
   setActiveContextDataset: (ds: string) => void;
   showToast?: (type: 'success' | 'info' | 'error', msg: string) => void;
