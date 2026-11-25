@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.chinacreator.gzcm.workspace.trace.TraceIdClientInterceptor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -185,6 +186,24 @@ public class WorkspaceRestClientConfig {
     @Bean("workspaceAipPipelineRest")
     public RestTemplate workspaceAipPipelineRest() {
         return restTemplate(resolveBase("aiming", aimingOverride) + "/api/v1", cognitiveTimeoutMs);
+    }
+
+    /**
+     * L3 沙盒研究执行器客户端（V365/§5.4，2026-11-25）。
+     *
+     * <p><b>为什么单独一个 Bean</b>：沙盒是「外部隔离执行环境」的独立内网地址，
+     * 不属于任何既有 owner service，不能借 aiming/sysman 的基址（会把研究请求打错面）。
+     * 按铁律 §「业务代码禁自建客户端」，构造必须收口在此处，业务类只注入。</p>
+     *
+     * <p><b>未配置即不装配</b>：{@code ecos.research.sandbox.base-url} 缺省 ⇒ 本 Bean 缺失，
+     * {@link com.chinacreator.gzcm.workspace.analysis.SandboxResearchExecutor} 随之不装配，
+     * 由只读执行器兜底（fail-closed 到「不执行代码」的档位）。</p>
+     */
+    @Bean("workspaceResearchSandboxRest")
+    @ConditionalOnProperty(name = "ecos.research.sandbox.base-url")
+    public RestTemplate workspaceResearchSandboxRest(
+            @Value("${ecos.research.sandbox.base-url}") String sandboxBaseUrl) {
+        return restTemplate(sandboxBaseUrl, cognitiveTimeoutMs);
     }
 
     // ═══════════════ MONOLITH 承流通道（凭据载体约束） ═══════════════

@@ -353,7 +353,7 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             definitionVersion, definitionDigest, operator, id);
     }
 
-    /** 运行锚点行插入（V361：定义版本/摘要/分析类型/来源）。 */
+    /** 运行锚点行插入（V361：定义版本/摘要/分析类型/来源；V365 补 run_level=ALGORITHM）。 */
     public int insertAnalysisAnchor(String runId, String scenarioId, String analysisType, String status,
                                     String metric, Object deviation, boolean degraded, String operator,
                                     String runMode, String sourceRunId, String definitionVersion,
@@ -362,8 +362,8 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             "INSERT INTO ecos_scenario_run " +
             "(id, scenario_id, run_type, status, metric, deviation, degraded, " +
             " run_mode, source_run_id, sandbox_lineage, create_by, update_by, " +
-            " definition_version, definition_digest, analysis_type, source_type, source_id) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NONE', ?, ?, ?, ?, ?, ?, ?)",
+            " definition_version, definition_digest, analysis_type, source_type, source_id, run_level) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'NONE', ?, ?, ?, ?, ?, ?, ?, 'ALGORITHM')",
             runId, scenarioId, analysisType, status, metric, deviation, degraded,
             runMode, sourceRunId, operator, operator,
             definitionVersion, definitionDigest, analysisType, sourceType, sourceId);
@@ -405,9 +405,9 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             "INSERT INTO ecos_scenario_run " +
             "(id, scenario_id, run_type, status, degraded, run_mode, sandbox_lineage, create_by, update_by, " +
             " analysis_type, question, intent, intent_detail, mental_model, hypotheses, algorithm_id, " +
-            " exec_trace, advice) " +
+            " exec_trace, advice, run_level) " +
             "VALUES (?, ?, 'QUESTION_RUN', ?, ?, 'FORMAL', 'NONE', 'system', 'system', ?, ?, ?, ?, ?, " +
-            "        ?::jsonb, ?, ?::jsonb, ?::jsonb)",
+            "        ?::jsonb, ?, ?::jsonb, ?::jsonb, 'MENTAL_MODEL')",
             runId, scenarioId, degraded ? "DEGRADED" : "COMPLETED", degraded,
             "MENTAL_MODEL", question, intent, intentDetail, mentalModel, hypothesesJson,
             algorithmId, traceJson, adviceJson);
@@ -430,6 +430,135 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             "SELECT id, scenario_id, question, intent, intent_detail, mental_model, hypotheses, " +
             "       algorithm_id, exec_trace, advice, status, degraded, create_time " +
             "FROM ecos_scenario_run WHERE id = ? AND run_type = 'QUESTION_RUN' AND is_deleted = 0",
+            runId);
+    }
+
+    // ── L3 研究循环（V365 分级与谱系；2026-11-25 首切片）──────────────────────
+
+    /** 一轮研究运行的落库行（不可变记录，字段与 V365 列一一对应）。 */
+    public record ResearchRunRow(String runId, String scenarioId, String question, int loopIndex,
+                                 String parentRunId, String sotaRunId, String branchKey,
+                                 String experimentSpecJson, String budgetJson,
+                                 String hypothesesJson, String traceJson, String adviceJson,
+                                 boolean degraded) {
+    }
+
+    /**
+     * 落一轮研究运行。
+     *
+     * <p>{@code run_mode='SANDBOX'}：研究轮次<b>不得</b>计入 {@code isFormalRunExists}，
+     * 正式口径只由人审批后发起的 FORMAL 运行产生（可行性报告 v2.0 §6.5）。</p>
+     */
+    public int insertResearchRun(ResearchRunRow r) {
+        return jdbcTemplate.update(
+            "INSERT INTO ecos_scenario_run " +
+            "(id, scenario_id, run_type, status, degraded, run_mode, sandbox_lineage, create_by, update_by, " +
+            " analysis_type, question, hypotheses, exec_trace, advice, run_level, parent_run_id, " +
+            " sota_run_id, branch_key, loop_index, experiment_spec, budget, stop_reason) " +
+            "VALUES (?, ?, 'RESEARCH_RUN', ?, ?, 'SANDBOX', 'SANDBOX', 'system', 'system', " +
+            "        'RESEARCH', ?, ?::jsonb, ?::jsonb, ?::jsonb, 'RD_AGENT', ?, ?, ?, ?, " +
+            "        ?::jsonb, ?::jsonb, ?)",
+            r.runId(), r.scenarioId(), r.degraded() ? "DEGRADED" : "COMPLETED", r.degraded(),
+            r.question(), r.hypothesesJson(), r.traceJson(), r.adviceJson(),
+            r.parentRunId(), r.sotaRunId(), r.branchKey(), r.loopIndex(),
+            r.experimentSpecJson(), r.budgetJson(), null);
+    }
+
+    /**
+     * 回写一轮研究的停止原因（只在校验/收敛后写一次）。
+     *
+     * <p>研究轮次先落「进行中」真相，结束时再补 {@code stop_reason}——
+     * 这样中途崩溃的轮次不会被伪造成「正常收敛」。</p>
+     */
+    public int updateResearchStopReason(String runId, String stopReason) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_scenario_run SET stop_reason = ?, update_time = NOW() " +
+            "WHERE id = ? AND run_type = 'RESEARCH_RUN' AND is_deleted = 0",
+            stopReason, runId);
+    }
+
+    /** 某场景的研究谱系（倒序，最多 limit 条）。 */
+    public List<Map<String, Object>> listResearchRuns(String scenarioId, int limit) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT id, scenario_id, question, run_level, run_type, loop_index, parent_run_id, " +
+            "       sota_run_id, branch_key, status, degraded, stop_reason, hypotheses, " +
+            "       experiment_spec, exec_trace, advice, budget, run_mode, create_time " +
+            "FROM ecos_scenario_run " +
+            "WHERE scenario_id = ? AND run_type = 'RESEARCH_RUN' AND is_deleted = 0 " +
+            "ORDER BY create_time DESC, loop_index ASC LIMIT ?",
+            scenarioId, limit);
+        rows.forEach(WorkspaceDataDao::normalizeJsonb);
+        return rows;
+    }
+
+    /** 单轮研究运行详情。 */
+    public List<Map<String, Object>> findResearchRun(String runId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT id, scenario_id, question, run_level, run_type, loop_index, parent_run_id, " +
+            "       sota_run_id, branch_key, status, degraded, stop_reason, hypotheses, " +
+            "       experiment_spec, exec_trace, advice, budget, run_mode, create_time " +
+            "FROM ecos_scenario_run " +
+            "WHERE id = ? AND run_type = 'RESEARCH_RUN' AND is_deleted = 0",
+            runId);
+        rows.forEach(WorkspaceDataDao::normalizeJsonb);
+        return rows;
+    }
+
+    /**
+     * 把 PGobject 包裹的 JSONB 归一为普通字符串。
+     *
+     * <p>部分驱动/序列化路径会把 JSONB 读成 {@code PGobject}，在 REST 层被摊平成
+     * {@code {"type":"jsonb","value":"{...}"}} —— 前端拿到的是字符串而非对象。
+     * 本方法只作用于 L3 新增的读面，不改动既有查询（避免影响 L1/L2 契约）。</p>
+     */
+    private static void normalizeJsonb(Map<String, Object> row) {
+        for (Map.Entry<String, Object> e : row.entrySet()) {
+            Object v = e.getValue();
+            if (v != null && "org.postgresql.util.PGobject".equals(v.getClass().getName())) {
+                try {
+                    Object raw = v.getClass().getMethod("getValue").invoke(v);
+                    e.setValue(raw);
+                } catch (Exception ignored) {
+                    // 取不到原值就保持驱动返回值，不在读面伪造
+                }
+            }
+        }
+    }
+
+    /** 某轮研究运行的产物引用（实体在对象存储，本表只存引用与摘要）。 */
+    public List<Map<String, Object>> listRunArtifacts(String runId) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, run_id, scenario_id, artifact_type, storage_ref, digest, size_bytes, create_time " +
+            "FROM ecos_scenario_run_artifact WHERE run_id = ? AND is_deleted = 0 ORDER BY create_time",
+            runId);
+    }
+
+    /**
+     * 落一条研究候选审批留痕（V366，append-only）。
+     *
+     * <p>候选就是 RESEARCH_RUN 行本身：本方法只追加审批记录，<b>不</b>复制运行数据、
+     * <b>不</b> UPDATE 既有审批历史（一次运行可被驳回后再次批准，历史必须完整）。</p>
+     */
+    public int insertResearchApproval(String id, String runId, String scenarioId, String decision,
+                                      String approvalRef, String reason, String approver,
+                                      String approverRoles, String runStopReason,
+                                      String runSotaRunId, String evidenceDigest) {
+        return jdbcTemplate.update(
+            "INSERT INTO ecos_scenario_run_approval " +
+            "(id, run_id, scenario_id, decision, approval_ref, reason, approver, approver_roles, " +
+            " run_stop_reason, run_sota_run_id, evidence_digest, create_by, update_by) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            id, runId, scenarioId, decision, approvalRef, reason, approver, approverRoles,
+            runStopReason, runSotaRunId, evidenceDigest, approver, approver);
+    }
+
+    /** 某轮研究运行的审批历史（倒序；空=尚未审批）。 */
+    public List<Map<String, Object>> listRunApprovals(String runId) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, run_id, scenario_id, decision, approval_ref, reason, approver, approver_roles, " +
+            "       run_stop_reason, run_sota_run_id, evidence_digest, create_time " +
+            "FROM ecos_scenario_run_approval WHERE run_id = ? AND is_deleted = 0 " +
+            "ORDER BY create_time DESC",
             runId);
     }
 
@@ -524,6 +653,9 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             "       run_mode, source_run_id, source_type, source_id, definition_version, definition_digest, " +
             "       diagnosis_result, forecast_result, simulation_result, strategy_result, create_time " +
             "FROM ecos_scenario_run WHERE scenario_id = ? AND is_deleted = 0 " +
+            // L3 研究轮次（V365）不是 L2 分析运行：排除它，保持既有分析列表的返回面不变。
+            // 若不排除，研究谱系会混入「场景分析」历史，改变 L1/L2 既有行为（红线）。
+            "       AND run_type <> 'RESEARCH_RUN' " +
             "ORDER BY create_time DESC LIMIT ?",
             scenarioId, limit);
     }
