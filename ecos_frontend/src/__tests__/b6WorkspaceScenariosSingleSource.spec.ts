@@ -39,12 +39,16 @@ import {
 const SRC_ROOT = fileURLToPath(new URL('../', import.meta.url));
 /** 两族收口后的唯一属主。 */
 const OWNER = 'services/scenarioActionClient.ts';
-/** 本批从属主 import 常量的四个消费方（rel → 导入腿全文）。 */
-const CONSUMERS: ReadonlyArray<{ rel: string; importLine: string }> = [
-  { rel: 'pages/ScenarioManagementView.tsx', importLine: "import { WORKSPACE_SCENARIOS_BASE } from '../services/scenarioActionClient';" },
-  { rel: 'pages/workbench/NewScenarioModal.tsx', importLine: "import { WORKSPACE_SCENARIOS_BASE } from '../../services/scenarioActionClient';" },
-  { rel: 'pages/workbench/index.tsx', importLine: "import { WORKSPACE_SCENARIOS_BASE } from '../../services/scenarioActionClient';" },
-  { rel: 'pages/workbench/[scenarioId]/index.tsx', importLine: "import { WORKSPACE_SCENARIOS_BASE } from '../../../services/scenarioActionClient';" },
+/**
+ * 本批从属主 import 常量的四个消费方（rel）。
+ * 只记相对路径：导入语句的成员表由判据解析（2026-11-25 删除场景批起，L2 同语句多带
+ * `deleteWorkspaceScenario`，钉整行字面会让合法新增导出变成假红）。
+ */
+const CONSUMERS: ReadonlyArray<{ rel: string }> = [
+  { rel: 'pages/ScenarioManagementView.tsx' },
+  { rel: 'pages/workbench/NewScenarioModal.tsx' },
+  { rel: 'pages/workbench/index.tsx' },
+  { rel: 'pages/workbench/[scenarioId]/index.tsx' },
 ];
 /** 本批收口的两个族（族体归一化后的键，与棘轮门同口径）。 */
 const CLOSED_FAMS = ['/v1/workspace/scenarios', '/v1/workspace/scenarios/{}'];
@@ -178,6 +182,12 @@ function constructors(): Map<string, number> {
 /**
  * 改前（HEAD 62bf1c12）五文件族腿面值快照，临时脚本 `b62cmp.cjs` 按 `git show HEAD:` 在本判据下
  * 实跑读出后原样收录。条数 3+1+1+1+3 = **9**。
+ *
+ * 2026-11-25 删除场景批（属主 +1 腿，9 → **10**）：属主 `services/scenarioActionClient.ts` 新增
+ * `scenarioUrl(id)`（`${WORKSPACE_SCENARIOS_BASE}/{id}`，同名 `encodeURIComponent` 转义）承载
+ * `DELETE /{id}`。**属主枚数不变**（仍只有这一处构造方，`constructors()` 恒 1），只是族腿面值 +1；
+ * 这是新增能力而非重复构造，与「多属主各写一份」形态无关 ⇒ dupBoth 面不受影响。
+ * 同批 L2 文件的导入腿由单名改成双名（+ `deleteWorkspaceScenario`），断言随之更新。
  */
 const HEAD_FACES: Readonly<Record<string, readonly string[]>> = {
   'pages/ScenarioManagementView.tsx': [
@@ -190,6 +200,7 @@ const HEAD_FACES: Readonly<Record<string, readonly string[]>> = {
   'pages/workbench/[scenarioId]/index.tsx': ['/api/v1/workspace/scenarios/${scenarioId}'],
   [OWNER]: [
     '/api/v1/workspace/scenarios',
+    '/api/v1/workspace/scenarios/${encodeURIComponent(scenarioId)}',
     '/api/v1/workspace/scenarios/${encodeURIComponent(scenarioId)}/actions',
     '/api/v1/workspace/scenarios/${encodeURIComponent(scenarioId)}/decisions',
   ],
@@ -210,13 +221,13 @@ describe('b6WorkspaceScenariosSingleSource — /v1/workspace/scenarios 两族单
     expect(scenarioActionsUrl('a/b')).toBe('/api/v1/workspace/scenarios/a%2Fb/actions');
   });
 
-  it('守恒：五文件族腿面值多重集与 HEAD 快照逐文件全等，总数 9 不变', () => {
+  it('守恒：五文件族腿面值多重集与 HEAD 快照逐文件全等，总数 10 不变', () => {
     for (const [rel, headFaces] of Object.entries(HEAD_FACES)) {
       expect(famFaces(read(rel)), `${rel} 族腿漂移`).toEqual([...headFaces].sort());
     }
     const total = Object.keys(HEAD_FACES).reduce((n, rel) => n + famFaces(read(rel)).length, 0);
     expect(total).toBe(HEAD_TOTAL);
-    expect(HEAD_TOTAL).toBe(9);
+    expect(HEAD_TOTAL).toBe(10);
   });
 
   it('属主唯一：两个收口族在全 src 生产面只有属主一个构造方', () => {
@@ -228,7 +239,17 @@ describe('b6WorkspaceScenariosSingleSource — /v1/workspace/scenarios 两族单
   it('消费方四文件：导入单源常量，且不再各自声明族基址', () => {
     for (const c of CONSUMERS) {
       const code = read(c.rel);
-      expect(code, `${c.rel} 缺单源导入腿`).toContain(c.importLine);
+      // 判据：该文件的 import 成员表里必须出现 WORKSPACE_SCENARIOS_BASE，
+      // 且 from 指向属主模块；允许同语句携带其它导出（如 deleteWorkspaceScenario）。
+      const importStmt = code
+        .split(/\r?\n/)
+        .find((l) => /^import\s*\{[^}]*\}\s*from\s*'[^']*services\/scenarioActionClient'/.test(l));
+      expect(importStmt, `${c.rel} 缺单源导入腿`).toBeTruthy();
+      const members = (importStmt!.match(/\{([^}]*)\}/)?.[1] ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      expect(members, `${c.rel} 未从属主导入族常量`).toContain('WORKSPACE_SCENARIOS_BASE');
       expect(codeLines(code).some((l) => DERIVED_DECL_RE.test(l) && l.includes('/v1/workspace/scenarios')),
         `${c.rel} 不得再自建族基址`).toBe(false);
     }

@@ -270,11 +270,6 @@
   "workspace.ctx.err.budget": "超出预算（429 ECOS-COG-429B），构建被拒",
   "workspace.ctx.err.engine": "必需依赖不可用（503 ECOS-COG-503D）——引擎降级横幅，禁伪空集合",
   "workspace.ctx.err.unknown": "上下文构建失败",
-  "workspace.adv.title": "高级/调试（认知运行面）",
-  "workspace.adv.cards": "认知四卡（E1~E4）",
-  "workspace.adv.collapse": "收起",
-  "workspace.adv.expand": "展开",
-  "workspace.adv.legacy_link": "高级视图（融合/决策/Git）",
   "workspace.l3.prov.title": "运行溯源",
   "workspace.l3.prov.hint": "字段一律取自真实端点回显；后端未提供的字段显示「—」并标注来源缺失，不做本地合成。",
   "workspace.l3.prov.reload": "刷新",
@@ -682,5 +677,11 @@
   "workspace.qrun.history_empty": "暂无历史运行",
   "workspace.qrun.compare": "对比所选",
   "workspace.qrun.compare_need_two": "请勾选两条运行记录",
-  "workspace.qrun.field": "字段"
+  "workspace.qrun.field": "字段",
+  "workspace.l2.delete": "删除场景",
+  "workspace.l2.deleteTitle": "删除场景",
+  "workspace.l2.deleteConfirm": "确定删除场景「{name}」吗？删除后该场景及其全部绑定关系将不再出现在工作台中，此操作不可撤销。",
+  "workspace.l2.deleting": "删除中…",
+  "workspace.l2.deleted": "已删除场景「{name}」",
+  "workspace.l2.deleteFailed": "删除失败：{msg}"
 }

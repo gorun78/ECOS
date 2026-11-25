@@ -4,8 +4,8 @@
  * <p>场景数据来自 {@code /api/v1/workspace/scenarios}（ecos_business_scenario 表），
  * 不再使用 localStorage mock。§3.8 R1~R2（2026-10-11 双结构收敛）：本页收编为
  * 「高级视图」，仅保留融合/决策/Git 三 Tab；原「认知」Tab（CognitionPanel 运行编排 +
- * CognitiveRightPanel 认知四卡）整体迁至 L2 场景详情「高级/调试」子面
- * （{@code pages/workbench/[scenarioId]/advanced/AdvancedDebugPanel.tsx}，迁一删一去重），
+ * CognitiveRightPanel 认知四卡）当时整体迁至 L2 场景详情「高级/调试」子面，
+ * 而该子面已于 2026-11-25 按用户裁决整块下线（连同四卡），故本页与 L2 均不再承载认知面。
  * 原「指标」Tab（MetricsTab 静态演示图表数据 = 假真理）随收敛清除。
  * Git 版本 UI 一律走 {@code services/gitService} 单一通道（经 GitPanel，只传 repositoryId），
  * 原假 git push 动画与 {@code ecos_cached_git_*} localStorage 伪持久化已删除（F05-17/B.9-5）。</p>

@@ -66,6 +66,11 @@ export function workspaceScenariosUrl(): string {
   return WORKSPACE_SCENARIOS_BASE;
 }
 
+/** 单场景：`/api/v1/workspace/scenarios/{id}`（GET 详情 / PUT 更新 / DELETE 逻辑删除）。 */
+export function scenarioUrl(scenarioId: string): string {
+  return `${WORKSPACE_SCENARIOS_BASE}/${encodeURIComponent(scenarioId)}`;
+}
+
 // ── 五必填单源（与 ActionProposalValidator 逐字对齐）────
 
 /**
@@ -363,6 +368,18 @@ export async function approveScenarioAction(actionId: string): Promise<ScenarioA
   const env = await rawCall(actionApproveUrl(actionId), { method: 'POST' });
   const data = unwrap(env);
   return (data && typeof data === 'object' ? data : {}) as ScenarioActionResult;
+}
+
+/**
+ * DELETE 场景（后端 `ScenarioService.delete` = **逻辑删除**，级联逻辑删除绑定）。
+ *
+ * 无可恢复入口：前端不得宣称「已归档/可撤销」，调用方必须经 ConfirmDialog 二次确认。
+ * 失败按 ScenarioActionError 分态（404 已被他人删除 / 403 无权 / NETWORK 网络断），
+ * 成功只认 HTTP 2xx **且** 信封 code ∈ {0,200}——不靠 `updated>0` 之类推断（DELETE 无 body）。
+ */
+export async function deleteWorkspaceScenario(scenarioId: string): Promise<void> {
+  const env = await rawCall(scenarioUrl(scenarioId), { method: 'DELETE' });
+  unwrap(env);
 }
 
 /**

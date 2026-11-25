@@ -72,6 +72,71 @@ export async function fetchSysConfigs(group?: string): Promise<SysConfigGrouped[
   }
 }
 
+/**
+ * 后端 /api/v1/system/config 的原始行（2026-11-25 live 实测字段）。
+ * 与 `SysConfigItem` 的区别：这里是**传输形态**，字段名/类型都按后端原样（snake_case、
+ * type 大小写混写、default_value 可为 null），归一交给页面侧纯函数做。
+ */
+export interface SysConfigRow {
+  id?: string;
+  config_group?: string;
+  config_key?: string;
+  config_value?: string | number | boolean | null;
+  config_type?: string;
+  config_label?: string;
+  config_label_en?: string;
+  description?: string;
+  sort_order?: number;
+  config_options?: unknown;
+  impact_scope?: string | null;
+  edition?: string | null;
+  default_value?: string | number | boolean | null;
+}
+
+/** 审计口单条消费态（只有这个接口给 is_consumed / consumed_by）。 */
+export interface ConfigConsumptionEntry {
+  config_key: string;
+  config_group?: string;
+  is_consumed?: boolean;
+  consumed_by?: string | null;
+  suggestion?: string | null;
+}
+
+/**
+ * GET /api/v1/system/config — **fail-loud** 版读取（与 fetchSysConfigs 的吞错返空相对）。
+ *
+ * 为什么不复用 fetchSysConfigs：那个函数 `catch → return []`，会把「后端 500 / 断网」
+ * 伪装成「平台没有任何配置」（前端规范 §五 fail-open 禁令）。平台治理页要让运维看见
+ * 故障本身，故单独走一条上抛腿；fetchSysConfigs 保持原状不动（其消费方在别处）。
+ */
+export async function fetchSysConfigRowsStrict(group?: string): Promise<SysConfigRow[]> {
+  const qs = group ? `?group=${encodeURIComponent(group)}` : '';
+  const resp = await apiFetch<{ data?: { data?: SysConfigRow[] } }>(`/v1/system/config${qs}`);
+  const rows = resp?.data?.data;
+  if (!Array.isArray(rows)) {
+    // 信封形态不符也是故障：宁可报错，也别让页面渲染成「空配置」
+    throw new Error('GET /v1/system/config: unexpected payload shape');
+  }
+  return rows;
+}
+
+/**
+ * GET /api/v1/system/config/audit — 配置消费态（fail-loud）。
+ * 返回 Map<config_key, entry>，key 与配置行同源，页面据此外显「已消费 / 未检测到消费」。
+ */
+export async function fetchConfigConsumptionStrict(): Promise<Map<string, ConfigConsumptionEntry>> {
+  const resp = await apiFetch<{ data?: { items?: ConfigConsumptionEntry[] } }>('/v1/system/config/audit');
+  const items = resp?.data?.items;
+  if (!Array.isArray(items)) {
+    throw new Error('GET /v1/system/config/audit: unexpected payload shape');
+  }
+  const map = new Map<string, ConfigConsumptionEntry>();
+  for (const it of items) {
+    if (it && typeof it.config_key === 'string' && it.config_key) map.set(it.config_key, it);
+  }
+  return map;
+}
+
 /** PUT /api/v1/system/config/{key} — update a single config value */
 export async function updateSysConfig(key: string, value: string): Promise<SysConfigItem> {
   return apiFetch<SysConfigItem>(`/v1/system/config/${encodeURIComponent(key)}`, {

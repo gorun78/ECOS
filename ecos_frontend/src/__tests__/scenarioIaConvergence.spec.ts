@@ -5,11 +5,12 @@
  * <p>冻结 2026-10-11 收敛结果，防止回潮：</p>
  * ① #/project_workbench（ScenarioManagementView）只允许 fusion/decision/git 三 Tab，
  *    不得重新 import CognitiveRightPanel / CognitionPanel / MetricsTab；
- * ② CognitiveRightPanel（认知四卡 E1~E4）全应用唯一挂载点 =
- *    L2「高级/调试」子面 AdvancedDebugPanel（迁一删一，E2E COG-IA 单实例断言的前提）；
+ * ② CognitiveRightPanel（认知四卡 E1~E4）**已下线**（2026-11-25 用户裁决）：
+ *    原唯一挂载点 L2「高级/调试」子面 AdvancedDebugPanel 已物理删除，
+ *    全应用不得再出现该组件的挂载点；恢复需重新立项；
  * ③ 假真理清除：MetricsTab.tsx 已删除，data.ts 不再导出 threatRadarData/efficiencyData
  *    静态演示图表数据，ScenarioManagementView 不得再出现硬编码 KPI 伪值；
- * ④ L2 场景详情必须挂载 AdvancedDebugPanel（运行面下沉落点）。
+ * ④ L2 场景详情不得重新挂载 AdvancedDebugPanel（整块下线，不是藏起来）。
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
@@ -60,23 +61,23 @@ describe('§3.8 R1~R4 双结构收敛守卫', () => {
     }
   });
 
-  it('CognitiveRightPanel 全应用唯一生产挂载点 = AdvancedDebugPanel（迁一删一）', () => {
+  it('认知四卡已下线：全应用零挂载点，且原高级/调试子面文件已删除', () => {
     const self = join(SRC, 'pages', 'scenario', 'cognition', 'CognitiveRightPanel.tsx');
     // 只计「值导入」（组件挂载）；`import type { … } from './CognitiveRightPanel'`
-    // 是子 Tab 复用 MindLoadState 类型，不构成第二渲染实例。
+    // 是子 Tab 复用 MindLoadState 类型，不构成渲染实例。
     const VALUE_IMPORT = /import\s+(?!type\s)[A-Za-z_$][\s\S]{0,80}?from\s+['"][^'"]*CognitiveRightPanel['"]/;
     const importers = srcFiles(join(SRC, 'pages'))
       .filter((f) => f !== self)
       .filter((f) => VALUE_IMPORT.test(codeOf(f)))
       .map((f) => f.split(sep).join('/'));
-    expect(importers.length, `CognitiveRightPanel import 必须唯一，实得:\n${importers.join('\n')}`).toBe(1);
-    expect(importers[0].endsWith('AdvancedDebugPanel.tsx'), '唯一挂载点必须是 L2 高级/调试子面').toBe(true);
+    // 2026-11-25 用户裁决：AdvancedDebugPanel 整块下线 ⇒ 该组件在全应用不得再有挂载点。
+    expect(importers, `认知四卡已下线，不得再有挂载点，实得:\n${importers.join('\n')}`).toEqual([]);
   });
 
-  it('AdvancedDebugPanel 存在且被 L2 场景详情挂载', () => {
-    expect(existsSync(ADV), 'L2 高级/调试子面文件必须存在（§3.8 R2 运行面落点）').toBe(true);
-    expect(/from '\.\/advanced\/AdvancedDebugPanel'/.test(codeOf(L2))).toBe(true);
-    expect(/<AdvancedDebugPanel\s/.test(codeOf(L2))).toBe(true);
+  it('AdvancedDebugPanel 已物理删除且 L2 不再挂载', () => {
+    expect(existsSync(ADV), 'AdvancedDebugPanel.tsx 已下线（2026-11-25 用户裁决），不得复活').toBe(false);
+    expect(/from '\.\/advanced\/AdvancedDebugPanel'/.test(codeOf(L2))).toBe(false);
+    expect(/<AdvancedDebugPanel\s/.test(codeOf(L2))).toBe(false);
   });
 
   it('MetricsTab 假演示面已物理删除且 data.ts 不再导出演示图表数据', () => {

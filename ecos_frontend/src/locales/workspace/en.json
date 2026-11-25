@@ -266,11 +266,6 @@
   "workspace.ctx.err.budget": "Budget exceeded (429 ECOS-COG-429B); build rejected",
   "workspace.ctx.err.engine": "Required dependency unavailable (503 ECOS-COG-503D) — engine banner, no fake empty pack",
   "workspace.ctx.err.unknown": "Context build failed",
-  "workspace.adv.title": "Advanced & debug (cognition run face)",
-  "workspace.adv.cards": "Cognitive cards (E1–E4)",
-  "workspace.adv.collapse": "Collapse",
-  "workspace.adv.expand": "Expand",
-  "workspace.adv.legacy_link": "Advanced view (fusion/decision/Git)",
   "workspace.l3.prov.title": "Run provenance",
   "workspace.l3.prov.hint": "Every field comes straight from real endpoint responses; fields the backend does not provide render as “—” with a missing-source note — nothing is synthesized locally.",
   "workspace.l3.prov.reload": "Refresh",
@@ -682,5 +677,11 @@
   "workspace.create.tpl_loading": "Loading scenario templates…",
   "workspace.create.tpl_failed": "Failed to load templates: {msg}",
   "workspace.create.tpl_empty": "No scenario templates available (create one on the Config page).",
-  "workspace.create.tpl_criteria": "Template success criteria"
+  "workspace.create.tpl_criteria": "Template success criteria",
+  "workspace.l2.delete": "Delete scenario",
+  "workspace.l2.deleteTitle": "Delete scenario",
+  "workspace.l2.deleteConfirm": "Delete scenario \"{name}\"? The scenario and all of its bindings will disappear from the workbench. This cannot be undone.",
+  "workspace.l2.deleting": "Deleting…",
+  "workspace.l2.deleted": "Scenario \"{name}\" deleted",
+  "workspace.l2.deleteFailed": "Delete failed: {msg}"
 }

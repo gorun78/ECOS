@@ -3,12 +3,12 @@
  *
  * <p>默认落在「场景运行」；保留旧详情路由的加载/404/403/错误/离线六态。</p>
  *
- * <p>2026-11-24 界面精简（用户裁决）：运行页去掉「高级/调试」整块——
- * 认知运行面（{@link AdvancedDebugPanel}：运行编排 + 认知四卡 E1~E4 唯一挂载点）
- * 改挂「场景定义」次级面（?tab=definition），能力保留、入口收窄。
- * 场景上下文构建入口见「场景定义」页右上的按钮（见 definition/ScenarioContextBuilder）。</p>
+ * <p>2026-11-25 用户裁决：定义页「高级/调试」整块下线——`advanced/AdvancedDebugPanel.tsx`
+ * 已物理删除，其左侧运行编排（CognitionPanel）与右侧认知四卡（CognitiveRightPanel，E1~E4）
+ * 随之不再渲染。运行发起统一走「场景运行」页的问题驱动链路（question-runs），
+ * 定义页不再保留第二个发起入口。认知四卡属**能力下线**，恢复需重新立项。</p>
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -16,16 +16,18 @@ import {
   BrainCircuit,
   FileQuestion,
   ShieldAlert,
+  Trash2,
 } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useCognition } from '../../../hooks/useCognition';
 import { apiFetchData } from '../../../api';
-import { WORKSPACE_SCENARIOS_BASE } from '../../../services/scenarioActionClient';
+import { WORKSPACE_SCENARIOS_BASE, deleteWorkspaceScenario } from '../../../services/scenarioActionClient';
 import { fetchScenarioDefinition } from '../../../services/scenarioDefinitionClient';
 import logger from '../../../services/logger';
-import AdvancedDebugPanel from './advanced/AdvancedDebugPanel';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { showToastGlobal } from '../../../components/common/Toast';
 import DefinitionTab from './definition/DefinitionTab';
 import RunTab from './run/RunTab';
 
@@ -58,6 +60,9 @@ export default function WorkbenchScenarioDetail() {
   const [notFound, setNotFound] = useState(false);
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** 删除确认门（危险操作必走 ConfirmDialog，禁 window.confirm） */
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const tab = useMemo<TabKey>(() => {
     // 2026-11-24：Tab 栏摘除，默认落运行面；定义编辑保留为次级入口（?tab=definition 深链可达，
@@ -111,6 +116,34 @@ export default function WorkbenchScenarioDetail() {
     setSearchParams(p, { replace: true });
   };
 
+  /**
+   * 删除场景：后端为逻辑删除（级联绑定）。
+   * 成功后回 L1 并刷新列表（navigate 到 /workbench，L1 挂载即重新取数）；
+   * 失败如实 toast 后端 message，**不**本地移除卡片伪装成功。
+   */
+  const handleDelete = useCallback(async () => {
+    if (!scenario) return;
+    const name = scenario.name;
+    setDeleting(true);
+    try {
+      await deleteWorkspaceScenario(scenario.id);
+      setDeleteOpen(false);
+      showToastGlobal('success', t('workspace.l2.deleted', { name }));
+      navigate('/workbench', { replace: true });
+    } catch (e) {
+      logger.error('workbench-delete', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      showToastGlobal('error', t('workspace.l2.deleteFailed', { msg }));
+      // 404 = 已被他人删除 ⇒ 关门并回列表，避免用户在幽灵页面上重复操作
+      if ((e as { status?: number }).status === 404) {
+        setDeleteOpen(false);
+        navigate('/workbench', { replace: true });
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }, [scenario, navigate, t]);
+
   // 2026-11-24：按分析类型直接发起的「发起运行」通道已自运行页摘除，
   // 运行发起只走 QuestionRunPanel 的问题驱动链路（question-runs 端点）。
   return (
@@ -143,6 +176,21 @@ export default function WorkbenchScenarioDetail() {
           >
             {t('workspace.l2.config')}
           </button>
+          {/*
+            删除场景（2026-11-25 用户要求）：危险操作，必走 ConfirmDialog；
+            仅在场景已成功加载（scenario 非空）时可点，加载/404/403 态不渲染死按钮。
+          */}
+          {scenario && (
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              disabled={deleting}
+              className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}
+            >
+              <Trash2 size={12} />
+              {t('workspace.l2.delete')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -216,14 +264,13 @@ export default function WorkbenchScenarioDetail() {
                 onSaved={(d) => setDefinition(d)}
                 onPublished={(d) => setDefinition(d)}
               />
+
               {/*
-                认知运行面（2026-11-24 自「场景运行」页迁入定义面）：
-                运行编排 CognitionPanel + 认知四卡 CognitiveRightPanel（E1~E4 全应用唯一挂载点，
-                E2E COG-IA 单实例断言依赖此唯一性）。运行页只留问题驱动主链路，高级面不占首屏。
+                2026-11-25 用户裁决：「高级/调试」整块下线（AdvancedDebugPanel 已物理删除）。
+                其中的运行编排（CognitionPanel）与认知四卡（CognitiveRightPanel，E1~E4）一并不再渲染：
+                运行发起统一走「场景运行」页的问题驱动链路；认知四卡能力**已下线**，不是藏起来——
+                组件文件与门禁断言同批移除，恢复需重新立项，不得在此静默挂回。
               */}
-              <div className="px-4 pb-4">
-                <AdvancedDebugPanel scenarioId={scenario.id} />
-              </div>
 
               {/*
                 认知摘要（随高级面一并自运行页移入定义面）：
@@ -268,6 +315,17 @@ export default function WorkbenchScenarioDetail() {
           )}
         </>
       )}
+
+      {/* 删除确认门：危险操作必走公共 ConfirmDialog（禁 window.confirm），文案含场景名 */}
+      <ConfirmDialog
+        open={deleteOpen}
+        title={t('workspace.l2.deleteTitle')}
+        message={t('workspace.l2.deleteConfirm', { name: scenario?.name ?? '' })}
+        confirmText={deleting ? t('workspace.l2.deleting') : t('workspace.l2.delete')}
+        onConfirm={() => void handleDelete()}
+        onCancel={() => { if (!deleting) setDeleteOpen(false); }}
+        danger
+      />
     </div>
   );
 }

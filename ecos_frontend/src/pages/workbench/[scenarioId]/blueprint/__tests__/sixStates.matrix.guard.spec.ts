@@ -119,13 +119,9 @@ const SURFACES: SurfaceContract[] = [
     branches: ['loading ? t(', 'error &&', 'result.passed', '!result.passed && result.reasons.length > 0'],
     i18nKeys: ['workspace.bp.validate', 'workspace.bp.validating', 'workspace.bp.error', 'workspace.bp.gate.empty'],
   },
-  {
-    // L2 高级调试折叠区（§2.3 三分下沉承接面）：折叠双分支 + CRP 容器 i18n
-    file: 'pages/workbench/[scenarioId]/advanced/AdvancedDebugPanel.tsx',
-    unionMembers: [],
-    branches: ['expanded ?'],
-    i18nKeys: ['workspace.adv.title', 'workspace.adv.cards', 'workspace.adv.legacy_link'],
-  },
+  // 2026-11-25 用户裁决：「高级/调试」整块下线，AdvancedDebugPanel.tsx 已物理删除。
+  // 原该面的六态条目随之移出本矩阵（文件不存在，留着即恒红）；
+  // 其四卡/折叠契约改由 scenarioIaConvergence + sevenStates 的「零挂载点」断言守。
 ];
 
 const FAKE_FALLBACK = /\b(?:mockData|fakeData|fallbackRows|placeholderRows|DEFAULT_ASSETS)\b|生成演示数据/;

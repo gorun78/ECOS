@@ -65,10 +65,11 @@ const render = (node: React.ReactElement): string =>
     </LanguageProvider>,
   );
 
-describe('COG-IA 认知四件套唯一入口（B.0 入口归一）', () => {
-  // 2026-10-11 §3.8 R2 双结构收敛：认知右栏自场景管理视图整体迁至 L2 场景详情
-  // 「高级/调试」子面（AdvancedDebugPanel），本用例锚点随迁一删一改钉新落点。
-  const PANEL_MOUNT = path.join('pages', 'workbench', '[scenarioId]', 'advanced', 'AdvancedDebugPanel.tsx');
+describe('COG-IA 认知四件套入口（B.0 入口归一）', () => {
+  // 2026-11-25 用户裁决：「高级/调试」整块下线 ⇒ 认知四卡（CognitiveRightPanel）随之不再挂载，
+  // 全应用零挂载点是当前正确态。本组用例改为钉「已下线且不得静默挂回」，组件自身渲染契约
+  // （E1~E4 Tab、503 横幅等）仍由下方 B 组用例直接渲染组件覆盖，能力验证不依赖挂载点。
+  const RETIRED_PANEL = path.join('pages', 'workbench', '[scenarioId]', 'advanced', 'AdvancedDebugPanel.tsx');
   const view = stripComments(read('pages/ScenarioManagementView.tsx'));
 
   /** 全仓生产源码中 JSX 挂载 `<CognitiveRightPanel ...>` 的文件清单（注释与测试文件不计）。 */
@@ -85,16 +86,14 @@ describe('COG-IA 认知四件套唯一入口（B.0 入口归一）', () => {
     return out;
   }
 
-  it('L2 高级/调试子面挂载 CognitiveRightPanel（四卡契约 E1~E4 唯一渲染入口）', () => {
-    const advanced = stripComments(read(PANEL_MOUNT));
-    expect(advanced).toContain('CognitiveRightPanel');
-    expect(advanced).toMatch(/<CognitiveRightPanel\s+scenarioId=\{scenarioId\}\s*\/>/);
+  it('原高级/调试子面已删除（整块下线，不得复活）', () => {
+    expect(fs.existsSync(path.join(SRC, RETIRED_PANEL)), 'AdvancedDebugPanel.tsx 应已物理删除').toBe(false);
   });
-  it('挂载点全应用唯一（双结构不得并存；多一处即回归）', () => {
+  it('认知四卡全应用零挂载点（已下线；多一处即误挂回）', () => {
     const mounts = listPanelMounts(path.join(SRC, 'pages')).map((f) => path.relative(SRC, f).replace(/\\/g, '/'));
-    expect(mounts, `CognitiveRightPanel 挂载点应唯一`).toEqual([PANEL_MOUNT.replace(/\\/g, '/')]);
+    expect(mounts, 'CognitiveRightPanel 已下线，不得再有挂载点').toEqual([]);
   });
-  it('场景管理视图不再挂载右栏（迁一删一，禁止回流出第二入口）', () => {
+  it('场景管理视图不得回流出第二入口', () => {
     expect(view).not.toMatch(/<CognitiveRightPanel\s/);
     expect(view).not.toMatch(/from\s+['"]\.\/scenario\/cognition\/CognitiveRightPanel['"]/);
   });

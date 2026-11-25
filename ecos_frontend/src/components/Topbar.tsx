@@ -345,19 +345,11 @@ export default function Topbar({
       {/* Right Box: Global search trigger & UTC Clock */}
       <div className="flex items-center gap-4 shrink-0">
 
-        {/* ECOS Copilot 入口（2026-10-14 用户裁决：悬浮按钮去除，落位 Topbar 右上角） */}
-        <button
-          type="button"
-          onClick={() => onCopilotOpen?.()}
-          className={`h-8 w-8 flex items-center justify-center rounded-lg ${styles.accentBg} ${styles.accentSolidText} transition hover:opacity-90 focus:outline-none focus:ring-2 ${styles.accentRing}`}
-          aria-label={t("app.copilot.open")}
-          title={t("app.copilot.open")}
-        >
-          <Bot className="w-4 h-4" />
-        </button>
-
-        {/* Theme Selector Switcher */}
-        <div className={`flex items-center gap-1.5 ${styles.inputBg} border ${styles.inputBorder} rounded-lg px-2.5 py-1 select-none shrink-0 shadow-3xs transition duration-150`}>
+        {/* Theme Selector Switcher
+            窄屏（<768px）隐藏：Copilot 移至用户设置之后成为最右一枚后，本组三项在 390px
+            视口下总宽 370px 必溢出（实测 right=661 > 390），把最右的 Copilot 挤出屏幕。
+            主题/语言属低频偏好设置、非关键操作，故与小屏隐藏用户名文字（hidden md:block）同法收窄。 */}
+        <div className={`hidden lg:flex items-center gap-1.5 ${styles.inputBg} border ${styles.inputBorder} rounded-lg px-2.5 py-1 select-none shrink-0 shadow-3xs transition duration-150`}>
           <Palette className={`w-3.5 h-3.5 ${styles.cardTextMuted}`} />
           <select
             value={activeTheme}
@@ -374,8 +366,8 @@ export default function Topbar({
           </select>
         </div>
 
-        {/* Language Selector Switcher */}
-        <div className={`flex items-center ${styles.inputBg} border ${styles.inputBorder} rounded-lg p-0.5 select-none shrink-0 shadow-3xs transition duration-150`}>
+        {/* Language Selector Switcher（窄屏隐藏，理由同上——保最右 Copilot 可见） */}
+        <div className={`hidden lg:flex items-center ${styles.inputBg} border ${styles.inputBorder} rounded-lg p-0.5 select-none shrink-0 shadow-3xs transition duration-150`}>
           <button type="button"
             onClick={() => setLocale("zh")}
             id="lang-switch-zh"
@@ -559,6 +551,18 @@ export default function Topbar({
           )}
 
         </div>
+
+        {/* ECOS Copilot 入口（2026-11-25 用户要求：移至用户配置设置按钮之后，成为右上角最末一枚）。
+            原位于主题/语言选择器之前。 */}
+        <button
+          type="button"
+          onClick={() => onCopilotOpen?.()}
+          className={`h-8 w-8 flex items-center justify-center rounded-lg ${styles.accentBg} ${styles.accentSolidText} transition hover:opacity-90 focus:outline-none focus:ring-2 ${styles.accentRing}`}
+          aria-label={t("app.copilot.open")}
+          title={t("app.copilot.open")}
+        >
+          <Bot className="w-4 h-4" />
+        </button>
 
       </div>
 

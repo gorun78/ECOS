@@ -79,7 +79,8 @@ const SITES_PER_FILE: Readonly<Record<string, number>> = {
 /** 本批闭合的两个目录根与其生产文件数（实跑读出，扫描根漂移成空集即红）。 */
 const DOMAIN_ROOTS: ReadonlyArray<{ dir: string; files: number }> = [
   { dir: 'scenario', files: 15 },
-  { dir: 'workbench', files: 31 }, // 2026-11-24：问题驱动运行面（QuestionRunPanel/QuestionRunResultPanel）+ 场景模板页各 1 枚，28→31 实跑重设（同批删 PipelineTracePanel 已计入）
+  { dir: 'workbench', files: 30 }, // 2026-11-24：问题驱动运行面（QuestionRunPanel/QuestionRunResultPanel）+ 场景模板页各 1 枚，28→31 实跑重设（同批删 PipelineTracePanel 已计入）
+  // 2026-11-25 定义页高级/调试下线批：删 [scenarioId]/advanced/AdvancedDebugPanel.tsx ⇒ workbench 31→30 实跑重设
 ];
 
 /** 私设基址判据：引号/反引号后紧跟 `/api`（与 `api-base-single-source` 同口径）。 */
@@ -207,7 +208,7 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
     expect(API_BASE).toBe('/api');
   });
 
-  it('两个目录根 36 个生产文件 + 根侧场景管理页代码行零私设基址，注释里的端点说明不计', () => {
+  it('两个目录根 45 个生产文件 + 根侧场景管理页代码行零私设基址，注释里的端点说明不计', () => {
     for (const { dir, files } of DOMAIN_ROOTS) {
       const rels = walk(join(PAGES_ROOT, dir), []);
       expect(rels.length, `${dir}/ 生产文件数应实跑等于 ${files}（扫描根漂移即红）`).toBe(files);
