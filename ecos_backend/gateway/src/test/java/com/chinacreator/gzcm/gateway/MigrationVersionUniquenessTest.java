@@ -207,9 +207,13 @@ class MigrationVersionUniquenessTest {
      * 2026-11-19 系统配置差距整改批：V351 default_value 列 + V352 ecos_mask_strategy 表 +
      * V353 引擎 DEFAULTS 回填 + V354 runtime 三组建组 + V355 OPA 配置化（只加不改，均 IF NOT EXISTS/NOT EXISTS 幂等）。
      * ⇒ 按实测订正 350→355 / 下一号 355→356。
+     * 2026-11-24 场景运行问题驱动批：V363（运行记录问题/意图/心智模型/假设/算法/执行过程/建议八列
+     * + 心智模型目录）、V364（五个心智模型承载编排）落地 ⇒ 按实测订正至 364 / 下一号 365。
+     * 2026-11-25 场景运行 L3 研究循环首切片：V365（运行分级/谱系控制列 + 运行产物引用表）落地
+     * ⇒ 按实测订正 364→365 / 下一号 365→366。
      */
-    private static final int MAX_BASELINE_VERSION = 364;
-    private static final int NEXT_FREE_VERSION = 365;
+    private static final int MAX_BASELINE_VERSION = 366;
+    private static final int NEXT_FREE_VERSION = 367;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
