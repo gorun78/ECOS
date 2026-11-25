@@ -1,13 +1,16 @@
 package com.chinacreator.gzcm.workspace.controller;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.workspace.analysis.ScenarioResearchApprovalService;
 import com.chinacreator.gzcm.workspace.analysis.ScenarioResearchRunService;
+import com.chinacreator.gzcm.workspace.analysis.task.ResearchRunAsyncDispatcher;
 import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 
 /**
@@ -34,13 +37,16 @@ public class ScenarioResearchRunController {
     private final ScenarioResearchRunService researchRunService;
     private final ScenarioResearchApprovalService approvalService;
     private final ScenarioReadGuard readGuard;
+    private final ResearchRunAsyncDispatcher asyncDispatcher;
 
     public ScenarioResearchRunController(ScenarioResearchRunService researchRunService,
                                          ScenarioResearchApprovalService approvalService,
-                                         ScenarioReadGuard readGuard) {
+                                         ScenarioReadGuard readGuard,
+                                         ResearchRunAsyncDispatcher asyncDispatcher) {
         this.researchRunService = researchRunService;
         this.approvalService = approvalService;
         this.readGuard = readGuard;
+        this.asyncDispatcher = asyncDispatcher;
     }
 
     /** 研究准备：场景上下文摘要 + 默认预算 + 首轮假设（不执行、不落库）。 */
@@ -52,11 +58,34 @@ public class ScenarioResearchRunController {
         return ApiResponse.success(researchRunService.prepare(scenarioId, question));
     }
 
-    /** 发起研究循环（首切片同步执行；预算与轮次由后端冻结）。 */
+    /**
+     * 发起研究循环。
+     *
+     * <p><b>同步</b>（默认）：阻塞到循环收敛后返回完整谱系——适合少量轮次。
+     * <b>异步</b>（{@code ?async=true}）：提交 runtime-task 后立即返回 {@code taskId}，
+     * 由前端轮询任务中心；循环本体走同一条实现（禁双轨）。异步底座未装配时如实回 501。</p>
+     */
     @PostMapping("/scenarios/{id}/research-runs")
     public ApiResponse<Map<String, Object>> run(@PathVariable("id") String scenarioId,
-                                                @RequestBody(required = false) Map<String, Object> body) {
-        return ApiResponse.success(researchRunService.run(scenarioId, body == null ? Map.of() : body));
+                                                @RequestBody(required = false) Map<String, Object> body,
+                                                @RequestParam(value = "async", defaultValue = "false") boolean async) {
+        Map<String, Object> payload = body == null ? Map.of() : body;
+        if (!async) {
+            return ApiResponse.success(researchRunService.run(scenarioId, payload));
+        }
+        try {
+            String taskId = asyncDispatcher.dispatch(scenarioId, payload);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("scenarioId", scenarioId);
+            out.put("async", true);
+            out.put("taskId", taskId);
+            out.put("note", "研究循环已提交 runtime-task；产物按轮落 ecos_scenario_run，"
+                    + "经 GET /scenarios/{id}/research-runs 观察谱系生长");
+            return ApiResponse.success(out);
+        } catch (ResearchRunAsyncDispatcher.ResearchAsyncUnavailableException e) {
+            // 501：底座缺失，禁降级成同步冒充「已异步」
+            throw new BusinessException(501, 501, "RESEARCH-501: " + e.getMessage());
+        }
     }
 
     /** 研究谱系列表（含轮次/父子/SOTA/停止原因）。 */
