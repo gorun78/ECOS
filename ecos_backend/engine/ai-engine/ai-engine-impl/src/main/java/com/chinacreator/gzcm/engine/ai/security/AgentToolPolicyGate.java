@@ -143,7 +143,11 @@ public class AgentToolPolicyGate {
             // 由 security 侧从 data-engine 属主只读端点做服务端真值解析（D-B4-29 信任边界）。
             Map<String, Object> data = securityClient.decideData(
                     AiSecurityEngineClient.decisionBody(decisionTable, decisionTables, sqlDigest,
-                            declaredProjectIds(request)));
+                            declaredProjectIds(request),
+                            // 2026-11-25：工具身份随裁决载荷下发，策略侧据此区分
+                            // 「非数据面只读工具」与数据面工具（缺键时策略按最严不豁免）。
+                            toolKey,
+                            request.action() == null ? null : request.action().operation()));
             long latency = elapsedMs(startNs);
             String verdict = AiSecurityEngineClient.verdictOf(data);
             if (AiSecurityEngineClient.V_DENY.equals(verdict)) {

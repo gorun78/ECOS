@@ -76,6 +76,20 @@
             <artifactId>sysman-impl</artifactId>
             <version>${databridge.version}</version>
         </dependency>
+        <!-- security-engine-impl: 独立 aiming 必须自带 security-engine crypto Bean。
+             SecurityEngineBridge（runtime/llm-gateway）按类名反射查找
+             ISecretService / IDataEncryptionService 来解析 LLM provider 密钥
+             （llm.gateway.default-api-key-ref，本机为 enc:<keyId>:<cipher>）。
+             sysman-impl 子模块不传递该依赖（只有 services/sysman 聚合 POM 与 gateway 声明），
+             缺它则两个 Bean 全找不到 → 密钥恒 null → ECOS-AI-503 GUARDRAIL_FAIL_CLOSED
+             「未取得 security-engine 密钥服务下发的 provider 密钥」。
+             2026-11-25 实测：aiming JAR 内无 security-engine-impl.jar，同请求直连 :8080
+             成功而经 :18084 全数 503；补依赖后两路一致。 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>security-engine-impl</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
 
         <!-- Spring Boot Web + Actuator -->
         <dependency>

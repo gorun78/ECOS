@@ -2,11 +2,11 @@
   "_provenance": {
     "note": "录制型 oracle —— 逐字取自本仓 data_access.rego 在真 Rego 引擎（dev 容器 ecos-opa 的 /opa）上的求值结果；serverBody 是 OPA server 对文档查询 POST /v1/data/ecos/data_access 的应答形态。Java 侧用例据此断言裁决链，禁手工编辑本文件：改了 rego 必须用同目录 record_data_access_oracles.mjs 重录。",
     "policySource": "ecos-docker/opa-policies/data_access.rego",
-    "policySha256": "bd95a3df5d182305dbcebf2dee50dc19ad350a28212c5a36d9d2d534f114a75d",
+    "policySha256": "e05cd17b5adaaeeb9f67d6aba17d599694d06a4129fdd18901777b1b8bf6805f",
     "opaVersion": "Version: 0.63.0\nBuild Commit: bb30b153692aa77738b982e29424c8b24a1ad14a\nBuild Timestamp: 2024-03-28T15:50:15Z\nBuild Hostname: 63421a8c0453\nGo Version: go1.22.1\nPlatform: linux/amd64\nWebAssembly: available",
     "command": "printf '<input-json>' | docker exec -i ecos-opa /opa eval -d /policies/data_access.rego -I --format json 'data.ecos.data_access'",
     "recorder": "record_data_access_oracles.mjs（同目录；仓根由脚本自身位置反解；含逐例 input 绑定自检）",
-    "recordedAt": "2026-10-17T06:42:56.194Z"
+    "recordedAt": "2026-11-25T09:18:18.937Z"
   },
   "cases": [
     {
@@ -25,6 +25,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": true,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -93,6 +97,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": true,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -146,6 +154,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": true,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -223,6 +235,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": true,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -339,6 +355,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": false,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -449,6 +469,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": false,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -552,6 +576,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": true,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -661,6 +689,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": true,
           "asset": "ecos_dw.fc_resource_input_fact",
           "data_roles": [
@@ -769,6 +801,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": true,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -869,6 +905,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": false,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -970,6 +1010,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": false,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -1071,6 +1115,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "allow": false,
           "asset": "ecos_dw.fc_cost_allocation_fact",
           "data_roles": [
@@ -1182,6 +1230,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "agent_channel": true,
           "allow": true,
           "asset": "",
@@ -1300,6 +1352,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "agent_channel": true,
           "allow": false,
           "asset": "",
@@ -1422,6 +1478,10 @@
       },
       "serverBody": {
         "result": {
+          "admin_plane_tool_prefixes": [
+            "ontology_",
+            "ai_"
+          ],
           "agent_channel": true,
           "allow": false,
           "asset": "",

@@ -68,10 +68,25 @@ public class SecurityDecisionService {
     }
 
     public DecisionBundle decide(AssetRef asset, DecisionBundle.Purpose purpose, DecisionContext ctx) {
-        if (asset == null || asset.getTable() == null || asset.getTable().isBlank()) {
+        DecisionBundle.Purpose p = purpose == null ? DecisionBundle.Purpose.PAGE : purpose;
+
+        // 2026-11-25（无资产形态，配套 DecisionController 的 AI 通道放开）：
+        // AI 通道的纯 REST 工具（本体列表、知识检索、场景查询等）不操作关系表，
+        // 载荷里没有 assetRef。它们**不存在数据面读数**，所以 RLS 谓词 / 列投影 /
+        // 脱敏三段在语义上不适用（不是"放行"，而是"无对象可判"）；
+        // OPA 护栏照常逐次裁决，绝不因无资产而跳过。
+        if (asset == null) {
+            if (p != DecisionBundle.Purpose.AI) {
+                // 页面/导出通道没有"无资产"语义：这里保持原契约的显式拒绝
+                // （控制器已在入口按 purpose 拦过一次，此处分层防御，禁被内部调用绕过）。
+                throw new IllegalArgumentException("assetRef.table 不能为空");
+            }
+            return decideAssetless(p, ctx);
+        }
+
+        if (asset.getTable() == null || asset.getTable().isBlank()) {
             throw new IllegalArgumentException("assetRef.table 不能为空");
         }
-        DecisionBundle.Purpose p = purpose == null ? DecisionBundle.Purpose.PAGE : purpose;
         String table = asset.getTable();
         String userId = ctx == null ? null : ctx.userId();
 
@@ -109,6 +124,60 @@ public class SecurityDecisionService {
                 columnCountOf(columnsPart), columnsPart.get(ColumnSurfaceContract.KEY_CLS_DENY_REASON),
                 masks.size(), opaPart.get(GuardrailDecisionContract.KEY_ALLOW));
         return new DecisionBundle(rlsPart, columnsPart, masks, opaPart, decisionId, traceId);
+    }
+
+    /**
+     * 无资产裁决（AI 通道专用，2026-11-25）。
+     *
+     * <p><b>为什么需要</b>：AI 工具里有大量不操作关系表的纯 REST 工具（本体列出对象类型、
+     * 知识检索、场景查询…）。它们不存在"针对哪张表"的问题，所以 RLS 谓词、列投影、
+     * 脱敏目录三段<b>没有裁决对象</b>——这与"策略放行"是两件事，必须在 bundle 上如实分态，
+     * 不能让消费方把"不适用"读成"全放行"（§4.5.4「不可用 ≠ 无权限」的同族纪律）。</p>
+     *
+     * <p><b>护栏不降级</b>：OPA 仍逐次裁决，input 的 {@code asset} 传空串（rego 里
+     * {@code asset := object.get(input, "asset", "")} 本就只用于义务文本可追溯性，
+     * AI 分支的违规判定只读 purpose/subject/environment/resource，不读 asset）。
+     * 因此无资产不会削弱任何一条 AI 策略判据。</p>
+     */
+    private DecisionBundle decideAssetless(DecisionBundle.Purpose purpose, DecisionContext ctx) {
+        // [1][2] RLS/列面：无表可判 ⇒ 显式"不适用"，绝非"允许一切"
+        Map<String, Object> rlsPart = notApplicableRlsPart();
+        Map<String, Object> columnsPart = notApplicableColumnsPart();
+        // [3] 脱敏：无列目录可查 ⇒ 空集（不放大任何权限）
+        List<Map<String, Object>> masks = new ArrayList<>();
+        // [4] OPA：照常裁决（护栏不因无资产而跳过）
+        Map<String, Object> opaPart = safeOpaByKey("", purpose, ctx);
+
+        String decisionId = uuid();
+        String traceId = ctx != null ? ctx.traceId() : null;
+        log.debug("decide(assetless): purpose={} → decisionId={} opaAllow={}",
+                purpose, decisionId, opaPart.get(GuardrailDecisionContract.KEY_ALLOW));
+        return new DecisionBundle(rlsPart, columnsPart, masks, opaPart, decisionId, traceId);
+    }
+
+    /** 无资产 RLS 段：与正常态同形（消费方按同一读法解析），但语义是"不适用"而非"无策略放行"。 */
+    private static Map<String, Object> notApplicableRlsPart() {
+        Map<String, Object> part = new LinkedHashMap<>();
+        part.put(RlsExecutionContract.KEY_PREDICATE_TEMPLATE, RlsExecutionContract.ALLOW_ALL_CLAUSE);
+        part.put("policyRefs", List.of());
+        // 无表 ⇒ 不注入任何行过滤；显式标记原因供消费方/审计区分"没策略"与"无对象"。
+        part.put(RlsExecutionContract.KEY_WHERE_CLAUSE, RlsExecutionContract.ALLOW_ALL_CLAUSE);
+        part.put(RlsExecutionContract.KEY_WHERE_PARAMS, List.of());
+        part.put(RlsExecutionContract.KEY_NO_POLICY_MATCHED, true);
+        part.put(RlsExecutionContract.KEY_RLS_DENY_REASON, "RLS_NOT_APPLICABLE_NO_ASSET");
+        return part;
+    }
+
+    /** 无资产列面：列全集来源 = NONE（既有语义：列面不可判定），不伪造列清单。 */
+    private static Map<String, Object> notApplicableColumnsPart() {
+        Map<String, Object> part = new LinkedHashMap<>();
+        part.put("mode", ColumnSurfaceContract.UNIVERSE_NONE);
+        part.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE, ColumnSurfaceContract.UNIVERSE_NONE);
+        part.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED, false);
+        part.put(ColumnSurfaceContract.KEY_VISIBLE_COLUMNS, List.of());
+        part.put(ColumnSurfaceContract.KEY_BLOCKED_COLUMNS, List.of());
+        part.put(ColumnSurfaceContract.KEY_CLS_DENY_REASON, "CLS_NOT_APPLICABLE_NO_ASSET");
+        return part;
     }
 
     // ── 四源各自的 fail-safe 隔离：某源异常不放大成整条抛错，而是保守拒绝 ──
@@ -337,6 +406,17 @@ public class SecurityDecisionService {
      * 该语义差已由 dev 容器 {@code /opa eval} 离线只读求值实测（差距文档 v1.0.20 行凭证）。</p>
      */
     private Map<String, Object> safeOpa(AssetRef asset, DecisionBundle.Purpose purpose, DecisionContext ctx) {
+        return safeOpaByKey(asset == null ? "" : asset.key(), purpose, ctx);
+    }
+
+    /**
+     * OPA 护栏源（键面取 {@code assetKey} 字符串，使无资产形态与有资产形态共用同一条裁决腿）。
+     *
+     * @param assetKey 资产定位符；无资产（AI 纯 REST 工具）传空串 —— rego 的
+     *                 {@code asset := object.get(input, "asset", "")} 只用于义务文本可追溯性，
+     *                 AI 分支违规判定不读该值，故空串不削弱任何判据
+     */
+    private Map<String, Object> safeOpaByKey(String assetKey, DecisionBundle.Purpose purpose, DecisionContext ctx) {
         Map<String, Object> subject = new LinkedHashMap<>();
         subject.put("userId", ctx != null ? ctx.userId() : null);
         subject.put("roles", ctx == null ? List.of() : ctx.roles());
@@ -353,7 +433,7 @@ public class SecurityDecisionService {
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("purpose", purposeWire);
         input.put("action", "data:" + purposeWire);
-        input.put("asset", asset.key());
+        input.put("asset", assetKey);
         input.put("subject", subject);
         // 调用方声明的请求域（AI 通道）：未声明即不写，禁写空段冒充"声明了空域"
         Map<String, Object> resource = DataScopeContract.toResourceSegment(
@@ -377,6 +457,14 @@ public class SecurityDecisionService {
             }
             if (ctx.sqlDigest() != null) {
                 input.put(DecisionChannelContract.KEY_SQL_DIGEST, ctx.sqlDigest());
+            }
+            // 2026-11-25 只增：AI 工具身份（策略侧据此区分非数据面只读工具与数据面工具）。
+            // 未携带时不写——策略侧对缺键按最严处理（不豁免），禁写空串冒充"声明过工具"。
+            if (ctx.tool() != null && !ctx.tool().isBlank()) {
+                input.put(DecisionChannelContract.KEY_TOOL, ctx.tool());
+            }
+            if (ctx.toolOperation() != null && !ctx.toolOperation().isBlank()) {
+                input.put(DecisionChannelContract.KEY_TOOL_OPERATION, ctx.toolOperation());
             }
         }
         String policyRef = "ecos." + OpaPolicyService.POLICY_DATA_ACCESS;

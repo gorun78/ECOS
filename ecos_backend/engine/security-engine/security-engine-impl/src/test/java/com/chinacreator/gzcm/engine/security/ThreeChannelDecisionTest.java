@@ -196,11 +196,42 @@ class ThreeChannelDecisionTest {
                 () -> svc.decide(new AssetRef("public", null, null), DecisionBundle.Purpose.PAGE, ctx()));
         assertThrows(IllegalArgumentException.class,
                 () -> svc.decide(null, DecisionBundle.Purpose.PAGE, ctx()));
+        // 2026-11-25：页面/导出通道无「无资产」语义 ⇒ null 资产仍必须拒绝（上两条即此意）。
+        assertThrows(IllegalArgumentException.class,
+                () -> svc.decide(null, DecisionBundle.Purpose.EXPORT, ctx()));
     }
 
     @Test
-    @DisplayName("7. RLS 源抛异常 → bundle.rls 发 1=0 拒绝片段（源异常不得表现为「没有 whereClause」）")
-    void rlsSourceFailureYieldsDenyShapeNotMissingField() {
+    @DisplayName("6b. AI 通道无资产 → 可裁决：RLS/列面显式不适用，OPA 照常逐次裁决（修 Copilot 503）")
+    void aiChannelAssetlessIsAdjudicable() {
+        // OPA 桩：返回一个明确的拒绝，证明护栏确实被咨询过（无资产不等于跳过护栏）
+        Map<String, Object> opaDeny = new LinkedHashMap<>();
+        opaDeny.put("allow", false);
+        opaDeny.put("policyState", "EVALUATED_DENY");
+        opaDeny.put("policyRef", "ecos.data_access");
+        opaDeny.put("obligations", List.of());
+        when(opa.evaluate(anyString(), anyMap())).thenReturn(opaDeny);
+
+        DecisionBundle b = svc.decide(null, DecisionBundle.Purpose.AI, ctx());
+
+        // [1] RLS：不适用标记，而不是「无策略放行」的沉默
+        assertEquals("RLS_NOT_APPLICABLE_NO_ASSET", b.rls().get("rlsDenyReason"),
+                "无资产必须显式声明 RLS 不适用，禁让消费方读成已放行");
+        // [2] 列面：列全集来源 NONE（既有语义：不可判定），不伪造列清单
+        assertEquals(ColumnSurfaceContract.UNIVERSE_NONE,
+                b.columns().get(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE));
+        // [3] 脱敏：无列目录可查 ⇒ 空集（不放大权限）
+        assertTrue(b.masks().isEmpty(), "无资产不得凭空产生 mask 义务");
+        // [4] OPA：照常裁决，且 input.asset 传空串不削弱判据
+        assertEquals(false, b.opa().get("allow"), "无资产形态下 OPA 仍须被真实调用并得出裁决");
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(opa).evaluate(anyString(), captor.capture());
+        assertEquals("", captor.getValue().get("asset"), "无资产时 input.asset 传空串");
+        assertEquals("t1", ((Map<?, ?>) captor.getValue().get("subject")).get("tenantId"),
+                "主体段不受无资产影响，仍带信任链上下文");    }
+
+    @Test
+    @DisplayName("7. RLS 源抛异常 → bundle.rls 发 1=0 拒绝片段（源异常不得表现为「没有 whereClause」）")    void rlsSourceFailureYieldsDenyShapeNotMissingField() {
         reset(rls);
         when(rls.apply(anyString(), any(RlsSubjectContext.class)))
                 .thenThrow(new RuntimeException("policy store down"));

@@ -76,10 +76,6 @@ public class DecisionController {
     @PostMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> decide(@RequestBody Map<String, Object> body) {
         AssetRef asset = AssetRef.fromMap(asMap(body.get(DecisionChannelContract.KEY_ASSET_REF)));
-        if (asset == null) {
-            return failure(ApiResponse.badRequest(DecisionChannelContract.KEY_ASSET_REF + "."
-                    + DecisionChannelContract.KEY_ASSET_TABLE + " 不能为空"));
-        }
         String rawPurpose = asStr(body.get(DecisionChannelContract.KEY_PURPOSE));
         DecisionBundle.Purpose purpose = resolvePurpose(rawPurpose);
         if (purpose == null) {
@@ -87,6 +83,20 @@ public class DecisionController {
             // 就以页面档的护栏矩阵被裁决并返回 200 —— 无错误、无日志、消费方无从察觉）。
             // 现按 400 显式拒绝；缺失/空白仍是既约定的 PAGE 默认，既有调用方行为不变。
             return failure(ApiResponse.badRequest(DecisionChannelContract.unrecognizedReason(rawPurpose)));
+        }
+        // 2026-11-25 修复 Copilot 全智能体 503（ECOS-AI-503 GUARDRAIL_FAIL_CLOSED）：
+        // 无资产形态。AI 通道的工具裁决里有大量**不操作关系表**的工具（本体列出对象类型、
+        // 知识检索、场景查询等纯 REST 工具），它们的载荷里没有 assetRef（客户端
+        // AiSecurityEngineClient.decisionBody 明确约定 assetKey 为空则不写 asset 段）。
+        // 原实现无条件 400 ⇒ 这些工具的裁决在 security 侧直接失败 ⇒ AgentToolPolicyGate
+        // 把传输异常归 FAIL_CLOSED ⇒ 用户看到 503「安全服务不可用」，而真正原因是协议不收。
+        // 现：仅 AI 通道允许无资产（页面/导出通道没有"无资产"语义，保持原 400 不放松）；
+        // 无资产时 RLS/列/脱敏三段显式标记 UNIVERSE_NONE/NOT_APPLICABLE 不适用，
+        // OPA 仍逐次裁决（不因无资产而跳过护栏）。
+        boolean assetless = asset == null;
+        if (assetless && purpose != DecisionBundle.Purpose.AI) {
+            return failure(ApiResponse.badRequest(DecisionChannelContract.KEY_ASSET_REF + "."
+                    + DecisionChannelContract.KEY_ASSET_TABLE + " 不能为空"));
         }
 
         String userId = ctxUserId();
@@ -127,7 +137,12 @@ public class DecisionController {
                     // safeOpa 仅在 purpose==AI 时写出，非 AI 通道即使收到也忽略（载荷不变）。
                     .withAiAdjudication(aiChannelOf(asMap(body.get(DecisionChannelContract.KEY_ENVIRONMENT))),
                             aiTablesOf(body.get(DecisionChannelContract.KEY_TABLES)),
-                            aiSqlDigestOf(body.get(DecisionChannelContract.KEY_SQL_DIGEST)));
+                            aiSqlDigestOf(body.get(DecisionChannelContract.KEY_SQL_DIGEST)))
+                    // 2026-11-25 只增：AI 工具身份（工具标识 + 操作类型）。策略侧据这对键
+                    // 识别「非数据面只读工具」并豁免数据访问策略（本体建模、智能体配置等
+                    // 不读业务数据行的工具）；未携带＝null，策略按最严处理不豁免。
+                    .withToolIdentity(asStr(body.get(DecisionChannelContract.KEY_TOOL)),
+                            asStr(body.get(DecisionChannelContract.KEY_TOOL_OPERATION)));
             DecisionBundle bundle = service.decide(asset, purpose, ctx);
             return ok(ApiResponse.success(bundle.toMap()));
         } catch (IllegalArgumentException e) {

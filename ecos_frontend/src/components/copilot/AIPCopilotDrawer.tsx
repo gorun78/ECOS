@@ -131,7 +131,30 @@ export default function AIPCopilotDrawer({
     return () => { cancelled = true; };
   }, []);
 
-  // 路由变化 → 回到该页面的默认智能体（清掉手动覆盖）
+  /**
+   * 清空对话（2026-11-25 用户要求：切换智能体时清空对话框内容）。
+   *
+   * <p>对话上下文属于「一个智能体的一次会话」，跨智能体留痕会造成两种失真：
+   * ① 上一个智能体的工具调用过程/结论被误读成本智能体说的；
+   * ② 后端 sessionId 仍复用 ⇒ 新智能体的 agent-loop 会带着旧会话历史继续跑。</p>
+   *
+   * <p>三件事同批做：清掉除首条欢迎语外的全部消息（欢迎语是本组件固有开场，不是对话内容）、
+   * 换新 sessionId（新智能体开新会话，绝不复用旧上下文）、清空输入框与建议面板残态。</p>
+   */
+  const resetConversation = useCallback(() => {
+    setMessages((prev) => prev.filter((m) => m.id === 'welcome'));
+    sessionIdRef.current = `copilot-${Date.now()}`;
+    setInputText('');
+    setSuggestOpen(false);
+  }, [setMessages]);
+
+  /** 手动切换智能体：只记手动覆盖，实际清空由下方「生效智能体变化」单点触发（点同一个不白清）。 */
+  const handleAgentSelect = useCallback((agentId: string) => {
+    setManualAgentId(agentId);
+  }, []);
+
+  // 路由变化 → 回到该页面的默认智能体（清掉手动覆盖）。
+  // 这里只负责「解除手动覆盖」，不直接清对话：是否算切换由下方生效值判定。
   useEffect(() => {
     setManualAgentId(null);
   }, [location.pathname]);
@@ -144,6 +167,20 @@ export default function AIPCopilotDrawer({
     ? manualAgentId
     : (routeAgent?.id ?? 'agent-ai');
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+
+  /**
+   * 生效智能体变化 → 清空对话（2026-11-25 用户要求：「切换智能体时清空对话框内容」）。
+   *
+   * <p>挂在**生效值**而非点击事件上，一次覆盖两条切换路径：手动点切换器、路由变化导致的
+   * 默认智能体回落（例如从数据工作台切到本体工作台）。点当前已在用的智能体时值不变，
+   * 不会白清一次。挂载首帧同样跳过 —— 此时本就是初始欢迎语，重置只会白扔一次 sessionId。</p>
+   */
+  const prevAgentIdRef = useRef(selectedAgentId);
+  useEffect(() => {
+    if (prevAgentIdRef.current === selectedAgentId) return;
+    prevAgentIdRef.current = selectedAgentId;
+    resetConversation();
+  }, [selectedAgentId, resetConversation]);
 
   // 动态建议：当前智能体能力建议 + 本会话最近用户提问（用户数据驱动）
   const suggestions = useMemo(() => {
@@ -273,7 +310,7 @@ export default function AIPCopilotDrawer({
       <CopilotAgentSwitcher
         agents={agents}
         selectedId={selectedAgentId}
-        onSelect={setManualAgentId}
+        onSelect={handleAgentSelect}
         disabled={busy}
       />
 

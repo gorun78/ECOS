@@ -193,6 +193,8 @@ public class AgentLoopService {
         List<Map<String, Object>> toolCallRecords = new ArrayList<>();
         // F06-12 引用后校验的比对基准（工具返回体原文）+ F06-13 规则 3 的失败分类计数
         List<String> toolResultBodies = new ArrayList<>();
+        // 2026-11-25：能产生引用块的工具结果（F06-12 校验的真实基准；区别于全部成功结果）
+        List<ToolExecutorService.ToolResult> citationBearingResults = new ArrayList<>();
         List<AiErrorClass> toolFailureClasses = new ArrayList<>();
         // P0-2：承流段护栏（仅 deltaSink 非空时创建；null ⇒ 非流式路径零变化）
         GuardedDeltaStreamer streamer = deltaSink == null ? null : new GuardedDeltaStreamer(deltaSink);
@@ -343,7 +345,7 @@ public class AgentLoopService {
 
                     ToolExecutorService.ToolResult tr = executeTool(tc, resolvedConfig);
                     long actElapsed = System.currentTimeMillis() - actStart;
-                    recordToolOutcome(tr, toolResultBodies, toolFailureClasses);
+                    recordToolOutcome(tr, toolResultBodies, citationBearingResults, toolFailureClasses);
 
                     // T0a: trace 记录 + F06-06 结构化行（tool_call 一次；裁决态来自护栏咽喉，缺失记 NA）
                     AgentLoopTrace.Decision toolDecision = decisionOf(tr.getDecision());
@@ -422,7 +424,13 @@ public class AgentLoopService {
             CitationSnapshot citation = new CitationSnapshot();
             // 校验面 = 有取数的一轮 ∪ 场景受控工具白名单的一轮（PRD §4.3-2 诱导项：模型可以
             // 干脆不调工具直接报数，只按"有工具结果"设闸会留这条缝）
-            boolean citationScope = !toolResultBodies.isEmpty()
+            // 2026-11-25：加入 `citationBearing` 判据 —— 只有**真的产出引用块**的工具结果
+            // 才让本轮进入引用校验（引用块只会由场景受控工具生成）。Copilot 目录工具
+            // （ontology_*/ai_*/data_* 等纯 REST 工具）不产生引用块，其回答里的普通数字
+            // （列表序号、对象编码里的数字）不该按"无据数值"整段拦截——
+            // 否则每次列对象类型都会 422，把"查到了正确数据"报成"无法提供有依据的数值"。
+            // 场景白名单腿保留：堵住"模型不调工具直接报数"的诱导项。
+            boolean citationScope = !citationBearingResults.isEmpty()
                     || ScenarioToolCatalog.isScenarioWhitelist(resolvedConfig.getToolWhitelist());
             if (citationCheck == null) {
                 if (citationScope) {
@@ -2063,11 +2071,23 @@ public class AgentLoopService {
     /** 记录单工具结局：成功体进引用比对基准，失败分类进规则 3 的众数统计。 */
     private static void recordToolOutcome(ToolExecutorService.ToolResult tr,
                                          List<String> toolResultBodies,
+                                         List<ToolExecutorService.ToolResult> citationBearingResults,
                                          List<AiErrorClass> toolFailureClasses) {
         if (tr == null) return;
         if (tr.isSuccess()) {
             if (tr.getContent() != null) {
                 toolResultBodies.add(tr.getContent());
+            }
+            // 2026-11-25 修复 Copilot 全智能体 422（ECOS-AI-422 CITATION_MISSING）：
+            // 只有**能产生引用块**的工具结果才构成 F06-12 引用后校验的基准。
+            // 引用块是场景受控工具的产物（forecastRunId/caliberId/version/asOfTime 四要素），
+            // 而 Copilot 目录工具（ontology_*/ai_*/data_* 等纯 REST 工具）**不产生引用块** ——
+            // 它们返回的是名称/编码列表，本就没有"口径/版本/截至时间"可言。
+            // 原实现把任何成功结果都纳入校验基准，于是这类工具的回答里只要出现任何数字
+            // （连返回体里的排序号 1/2/3 都算），就命中 MISSING_CITATION_BLOCK，
+            // 重生成两次后整段替换为 422 —— 用户看到的"无法提供有依据的数值"与事实无关。
+            if (tr.getCitationBlock() != null && !tr.getCitationBlock().isBlank()) {
+                citationBearingResults.add(tr);
             }
         } else {
             AiErrorClass cls = aiErrorClassOf(tr.getErrorClass());

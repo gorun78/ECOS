@@ -110,6 +110,25 @@ public final class DecisionChannelContract {
     /** 请求体：AI 工具 SQL 摘要（string；禁 SQL 原文入裁决载荷，F06-02 要点 1 同源纪律）。 */
     public static final String KEY_SQL_DIGEST = "sqlDigest";
 
+    /**
+     * 请求体：AI 工具标识（string，如 {@code ontology_list_objects}）；未携带＝不写。
+     *
+     * <p><b>为什么需要</b>（2026-11-25）：{@code /decision} 并流后载荷只带 asset/purpose/
+     * environment/tables/sqlDigest，<b>工具身份在唯一入口上丢失</b>，策略侧无法区分
+     * 「读业务数据的工具」与「纯管理面工具」（本体建模、智能体配置…），只能一律按
+     * 数据访问策略裁决 ⇒ admin 这类无数据角色的管理账号连"列出对象类型"都被拒。
+     * 只增键：页面/导出通道不携带，载荷逐字节不变。</p>
+     */
+    public static final String KEY_TOOL = "tool";
+
+    /**
+     * 请求体：AI 工具操作类型（{@code read} / {@code write}，取工具声明值非按方法猜测）。
+     *
+     * <p>策略侧据它与 {@link #KEY_TOOL} 共同判定"非数据面只读工具"豁免；缺省＝不写，
+     * 未携带时策略按最严（不豁免）处理。</p>
+     */
+    public static final String KEY_TOOL_OPERATION = "toolOperation";
+
     private DecisionChannelContract() {
     }
 

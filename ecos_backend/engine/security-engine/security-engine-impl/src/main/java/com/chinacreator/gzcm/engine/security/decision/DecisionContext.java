@@ -35,6 +35,9 @@ public final class DecisionContext {
     private final String environmentChannel;  // 可为 null（＝未携带 environment 段）
     private final List<String> tables;        // 可为 null（＝未携带 tables 段）
     private final String sqlDigest;           // 可为 null（＝未携带 sqlDigest 段）
+    // ── 2026-11-25 只增：AI 工具身份（策略侧据此区分「非数据面只读工具」与数据面工具）──
+    private final String tool;                // 可为 null（＝未携带 tool 段）
+    private final String toolOperation;       // 可为 null（＝未携带 toolOperation 段）
 
     public DecisionContext(String userId, String tenantId, String orgId,
                            Integer clearanceLevel, List<String> roles, String traceId) {
@@ -64,6 +67,21 @@ public final class DecisionContext {
                            Integer clearanceLevel, List<String> roles, String traceId,
                            DataScopeContract.Declared dataScope,
                            String environmentChannel, List<String> tables, String sqlDigest) {
+        this(userId, tenantId, orgId, clearanceLevel, roles, traceId, dataScope,
+                environmentChannel, tables, sqlDigest, null, null);
+    }
+
+    /**
+     * 全字段构造器（2026-11-25 只增：加 AI 工具身份两键，其余签名逐字沿用）。
+     *
+     * @param tool            工具标识（如 {@code ontology_list_objects}）；未携带＝{@code null}
+     * @param toolOperation   工具操作类型（{@code read}/{@code write}，取声明值）；未携带＝{@code null}
+     */
+    public DecisionContext(String userId, String tenantId, String orgId,
+                           Integer clearanceLevel, List<String> roles, String traceId,
+                           DataScopeContract.Declared dataScope,
+                           String environmentChannel, List<String> tables, String sqlDigest,
+                           String tool, String toolOperation) {
         this.userId = userId;
         this.tenantId = tenantId;
         this.orgId = orgId;
@@ -74,6 +92,8 @@ public final class DecisionContext {
         this.environmentChannel = environmentChannel;
         this.tables = tables == null ? null : List.copyOf(tables);
         this.sqlDigest = sqlDigest;
+        this.tool = tool;
+        this.toolOperation = toolOperation;
     }
 
     public String userId()     { return userId; }
@@ -82,6 +102,12 @@ public final class DecisionContext {
     public Integer clearanceLevel() { return clearanceLevel; }
     public List<String> roles()     { return roles; }
     public String traceId()    { return traceId; }
+
+    /** AI 工具标识；未携带时为 {@code null}（页面/导出通道恒为 null）。 */
+    public String tool() { return tool; }
+
+    /** AI 工具操作类型（read/write，取声明值）；未携带时为 {@code null}。 */
+    public String toolOperation() { return toolOperation; }
 
     /** 调用方声明的请求数据域；未声明时为 {@code null}（禁读成"全域"）。 */
     public DataScopeContract.Declared dataScope() {
@@ -116,7 +142,7 @@ public final class DecisionContext {
      */
     public DecisionContext withDataScope(DataScopeContract.Declared scope) {
         return new DecisionContext(userId, tenantId, orgId, clearanceLevel, roles, traceId, scope,
-                environmentChannel, tables, sqlDigest);
+                environmentChannel, tables, sqlDigest, tool, toolOperation);
     }
 
     /**
@@ -125,7 +151,17 @@ public final class DecisionContext {
      */
     public DecisionContext withAiAdjudication(String channel, List<String> tables, String sqlDigest) {
         return new DecisionContext(userId, tenantId, orgId, clearanceLevel, roles, traceId, dataScope,
-                channel, tables, sqlDigest);
+                channel, tables, sqlDigest, tool, toolOperation);
+    }
+
+    /**
+     * 只增式副本：挂 AI 工具身份（工具标识 + 操作类型，2026-11-25），其余字段逐字沿用。
+     *
+     * <p>{@code null} 实参＝该键未携带；策略侧对"未携带"按最严处理（不豁免）。</p>
+     */
+    public DecisionContext withToolIdentity(String tool, String toolOperation) {
+        return new DecisionContext(userId, tenantId, orgId, clearanceLevel, roles, traceId, dataScope,
+                environmentChannel, tables, sqlDigest, tool, toolOperation);
     }
 
     /** 从 raw map 组装（REST 只接受 userId/tenantId 显式字段；orgId/clearanceLevel 走服务端派生）。 */

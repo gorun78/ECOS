@@ -287,6 +287,25 @@ public class AiSecurityEngineClient {
     public static Map<String, Object> decisionBody(String assetKey,
                                                    List<String> tables, String sqlDigest,
                                                    List<String> projectIds) {
+        return decisionBody(assetKey, tables, sqlDigest, projectIds, null, null);
+    }
+
+    /**
+     * 四参之上再带 <b>AI 工具身份</b>（工具标识 + 操作类型，2026-11-25 只增）。
+     *
+     * <p><b>为什么要带</b>：{@code /decision} 并流后策略侧只看得到 asset/purpose/environment，
+     * 无法区分「读业务数据的工具」与「纯管理面工具」（本体建模、智能体配置等）。
+     * 缺这层身份，管理面只读工具也被按数据访问策略裁决 ⇒ 无数据角色的管理账号
+     * 连"列出对象类型"都被拒（表现为 403，此前更因协议不收而表现为 503）。
+     * 策略侧只对「AI 通道 + read + 无资产无表无 SQL + 管理域工具」豁免，其余照常。</p>
+     *
+     * @param tool          工具标识（如 {@code ontology_list_objects}）；null/空白＝不落
+     * @param toolOperation 操作类型（{@code read}/{@code write}，取工具声明值）；null/空白＝不落
+     */
+    public static Map<String, Object> decisionBody(String assetKey,
+                                                   List<String> tables, String sqlDigest,
+                                                   List<String> projectIds,
+                                                   String tool, String toolOperation) {
         Map<String, Object> body = new LinkedHashMap<>();
         if (assetKey != null && !assetKey.isBlank()) {
             Map<String, Object> asset = new LinkedHashMap<>();
@@ -302,6 +321,13 @@ public class AiSecurityEngineClient {
         }
         if (sqlDigest != null && !sqlDigest.isBlank()) {
             body.put(DecisionChannelContract.KEY_SQL_DIGEST, sqlDigest);
+        }
+        // 工具身份：未携带时不写（策略侧对缺键按最严处理，不豁免）。
+        if (tool != null && !tool.isBlank()) {
+            body.put(DecisionChannelContract.KEY_TOOL, tool);
+        }
+        if (toolOperation != null && !toolOperation.isBlank()) {
+            body.put(DecisionChannelContract.KEY_TOOL_OPERATION, toolOperation);
         }
         // 声明域段：departmentId 恒为 null（写出侧没有该通道），未声明项目集 ⇒ toResourceSegment
         // 返回 null ⇒ 整段不写，与三参重载同形。

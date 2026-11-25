@@ -69,7 +69,16 @@ import com.chinacreator.gzcm.sysman.controller.SysConfigController;
         // sysman.config ⇒ LlmSettingsSource 从未装配 ⇒ AgentConfigResolver 静默回落 yml
         // 的 llm.default-model（deepseek-chat），与 sys_config 里已播种的正确模型名脱钩。
         // 只补 cache 子包（配置读取适配器）；sysman 安全 controller 仍不入本服务。
-        "com.chinacreator.gzcm.sysman.cache"
+        "com.chinacreator.gzcm.sysman.cache",
+        // 2026-11-25 修复 Copilot「HTTP 503 拒绝会话」（ECOS-AI-503 GUARDRAIL_FAIL_CLOSED）：
+        // SecurityEngineBridge（runtime/llm-gateway）按类名反射取 ISecretService /
+        // IDataEncryptionService 来解析 provider 密钥（本机 ref = enc:<keyId>:<cipher>）。
+        // 这两个 Bean 由 CryptoBeanConfig（com.chinacreator.gzcm.engine.security.crypto）声明，
+        // 而原扫描面完全没有 engine.security ⇒ 即使 pom 补了 security-engine-impl 依赖、
+        // JAR 内类也在，Bean 仍不会被装配，密钥恒 null ⇒ 每次对话 503。
+        // 只补 crypto 子包（密钥/加解密 Bean），**不**扫 engine.security 根：
+        // 根包下的安全管理 controller 属 sysman 域，不得并入 aiming（与原设计一致）。
+        "com.chinacreator.gzcm.engine.security.crypto"
 }, excludeFilters = {
         // agent-service 独立启动器 (自身 @ComponentScan, 双启动冲突)
         @ComponentScan.Filter(type = FilterType.REGEX,

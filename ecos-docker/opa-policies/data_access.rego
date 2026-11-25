@@ -88,15 +88,54 @@ is_finance := count(finance_roles & subject_roles) > 0
 
 # ── 违规集（拒绝原因的单点判定；多条并存时逐字全部落 deniedReason）──────────
 
+# ── 非数据面只读工具豁免（2026-11-25）────────────────────────────────────────
+#
+# 背景：/decision 并流后，Copilot 的**全部** AI 工具都经本策略裁决。但工具里有一批
+# 完全不读写业务数据行的**管理面只读**工具（本体建模 ontology_* / 智能体配置 ai_*），
+# 它们与 data_access 策略（角色×通道数据访问矩阵）在语义上无关。此前无区分手段，
+# 表现为：管理账号（如只有 ROLE_SUPER_ADMIN，不在 data_roles 内）连"列出对象类型"
+# 都被 NO_DATA_ACCESS_ROLE 拒绝。
+#
+# 豁免判据刻意收窄——**五条同时成立才放行**，任一缺失即回到原数据访问矩阵：
+#   1) purpose == "ai"           仅 AI 工具通道（页面/导出无此语义）
+#   2) input.tool                工具身份必须显式携带（缺键不豁免）
+#   3) input.toolOperation=="read" 只放行只读；write 一律走原矩阵
+#   4) 无 asset / 无 tables / 无 sqlDigest  真正"不碰数据面"才豁免
+#   5) 工具属管理域名前缀         白名单前缀，未知工具不豁免
+#
+# 安全边界（为什么这样收窄足够）：
+#   * 豁免只影响「是否需要数据访问角色」这一个判据；工具执行本身仍受
+#     AgentToolPolicyGate 的主体校验 + 审计留痕（三态全留痕）约束，不是无裁决放行。
+#   * 会读业务数据行的工具（data_* / knowledge_* / scenario_*）不在白名单前缀内，
+#     仍走原矩阵；写类工具（T2/T3）因判据 3 恒不豁免。
+#   * knowledge_* 虽属 dccheng 管理域，但其检索会触及业务文档内容，故**不列入**
+#     白名单（宁严勿宽）。
+admin_plane_tool_prefixes := ["ontology_", "ai_"]
+
+is_admin_plane_readonly_tool {
+	purpose == "ai"
+	tool_name := object.get(input, "tool", "")
+	tool_name != ""
+	object.get(input, "toolOperation", "") == "read"
+	asset == ""
+	count(object.get(input, "tables", [])) == 0
+	object.get(input, "sqlDigest", "") == ""
+	admin_plane_tool_prefixes[_] = prefix
+	startswith(tool_name, prefix)
+}
+
 violation["NO_DATA_ACCESS_ROLE"] {
 	not has_data_role
+	not is_admin_plane_readonly_tool
 }
 
 # AI 通道禁全域扫描：非财务主体必须显式声明请求域
+# （管理面只读工具无数据面语义，不适用本条 —— 与 NO_DATA_ACCESS_ROLE 同源豁免）
 violation["AI_SCOPE_NOT_DECLARED"] {
 	has_data_role
 	not is_finance
 	purpose == "ai"
+	not is_admin_plane_readonly_tool
 	count(requested_project_ids) == 0
 }
 

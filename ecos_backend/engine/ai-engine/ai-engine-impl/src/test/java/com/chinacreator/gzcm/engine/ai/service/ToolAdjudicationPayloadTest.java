@@ -123,8 +123,12 @@ class ToolAdjudicationPayloadTest {
         assertFalse(scope.containsKey(DataScopeContract.KEY_DEPARTMENT_ID),
                 "所属域只允许 security 侧向属主域取真值展开，AI 写出侧不得有任何该键通道: " + rendered);
         // ⑤ 键面枚举防漂移（只许写真实存在的键，禁静默加键）
+        // 2026-11-25：显式纳入 tool/toolOperation（AI 工具身份，策略侧据此豁免
+        // 非数据面只读工具）。加键是经本断言审计的显式变更，不是静默漂移。
         assertEquals(Set.of(DecisionChannelContract.KEY_PURPOSE, DecisionChannelContract.KEY_ENVIRONMENT,
-                        DataScopeContract.KEY_RESOURCE),
+                        DataScopeContract.KEY_RESOURCE,
+                        DecisionChannelContract.KEY_TOOL,
+                        DecisionChannelContract.KEY_TOOL_OPERATION),
                 body.keySet(), rendered);
     }
 
@@ -205,12 +209,15 @@ class ToolAdjudicationPayloadTest {
                 "恰一张受控表时资产归属必须宣告: " + rendered);
         // ④ 非白名单入参不落 wire（/decision 键面里根本没有它们的键位，连 resource 段都不存在）
         assertFalse(rendered.contains("scenarioId"), "非白名单业务参数漏出到 wire: " + rendered);
+        // 2026-11-25：显式纳入 tool/toolOperation（AI 工具身份，供策略侧识别非数据面只读工具）。
         assertEquals(Set.of(
                         DecisionChannelContract.KEY_ASSET_REF,
                         DecisionChannelContract.KEY_PURPOSE,
                         DecisionChannelContract.KEY_ENVIRONMENT,
                         DecisionChannelContract.KEY_TABLES,
-                        DecisionChannelContract.KEY_SQL_DIGEST),
+                        DecisionChannelContract.KEY_SQL_DIGEST,
+                        DecisionChannelContract.KEY_TOOL,
+                        DecisionChannelContract.KEY_TOOL_OPERATION),
                 body.keySet(), rendered);
     }
 
