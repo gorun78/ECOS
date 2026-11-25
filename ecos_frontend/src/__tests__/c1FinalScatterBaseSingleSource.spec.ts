@@ -102,7 +102,7 @@ const CANONICAL = 'services/httpClient.ts';
  * 全量 run 实走面值 686→**691**，只增；五枚均经 `KNOWLEDGE_BASE`/服务层取址，
  * 代码面零 `/api` 字面量与零 `${API_BASE}` 派生。
  */
-const PROD_FILES = 691; // 2026-11-23 去 wagent 化：删 wagentClient/wagentRunStream/wagentSseFrames 等 8 枚 + 本轮删
+const PROD_FILES = 693; // 2026-11-23 去 wagent 化：删 wagentClient/wagentRunStream/wagentSseFrames 等 8 枚 + 本轮删
 // structured/RunProgress/EvidenceDrawer 2 枚，692→684→682 实跑重设
 // 2026-11-24 AI 工作台本体绑定真值化批 +2：新增 OntologyBindingTab.tsx（本体与逻辑绑定页独立组件）
 // 与 services/agentMeshMapping.ts（AgentMesh 纯映射层，从 pages/aiworkbench/api.ts 抽出压低体积）；
@@ -121,6 +121,9 @@ const PROD_FILES = 691; // 2026-11-23 去 wagent 化：删 wagentClient/wagentRu
 // 2026-11-25 定义页高级/调试下线批 −1：删 pages/workbench/[scenarioId]/advanced/AdvancedDebugPanel.tsx
 // （用户裁决整块下线，CognitiveRightPanel 四卡随之不再挂载；其内零私设基址，删除不影响派生态面）
 // ⇒ 692−1 = 691 实跑重设
+// 2026-11-25 场景运行 L3 研究循环首切片 +2：新增 run/ResearchRunPanel.tsx（研究模式面板，
+// 默认折叠）与 services/scenarioResearchRunClient.ts（研究谱系客户端，基址复用 WORKSPACE_ANALYSES_BASE）；
+// 两枚均零私设基址 / 零 `${API_BASE}` 派生 ⇒ 691+2 = 693 实跑重设
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [

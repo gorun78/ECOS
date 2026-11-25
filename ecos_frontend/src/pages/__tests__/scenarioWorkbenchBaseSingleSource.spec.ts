@@ -79,8 +79,9 @@ const SITES_PER_FILE: Readonly<Record<string, number>> = {
 /** 本批闭合的两个目录根与其生产文件数（实跑读出，扫描根漂移成空集即红）。 */
 const DOMAIN_ROOTS: ReadonlyArray<{ dir: string; files: number }> = [
   { dir: 'scenario', files: 15 },
-  { dir: 'workbench', files: 30 }, // 2026-11-24：问题驱动运行面（QuestionRunPanel/QuestionRunResultPanel）+ 场景模板页各 1 枚，28→31 实跑重设（同批删 PipelineTracePanel 已计入）
+  { dir: 'workbench', files: 31 }, // 2026-11-24：问题驱动运行面（QuestionRunPanel/QuestionRunResultPanel）+ 场景模板页各 1 枚，28→31 实跑重设（同批删 PipelineTracePanel 已计入）
   // 2026-11-25 定义页高级/调试下线批：删 [scenarioId]/advanced/AdvancedDebugPanel.tsx ⇒ workbench 31→30 实跑重设
+  // 2026-11-25 场景运行 L3 首切片：新增 [scenarioId]/run/ResearchRunPanel.tsx ⇒ 30→31 实跑重设
 ];
 
 /** 私设基址判据：引号/反引号后紧跟 `/api`（与 `api-base-single-source` 同口径）。 */
