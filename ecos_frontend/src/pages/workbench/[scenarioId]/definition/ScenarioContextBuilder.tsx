@@ -63,6 +63,9 @@ function assetsFromBindings(definition: DefinitionVO | null): ContextSourceRefIn
     // 场景定义侧绑定的是「知识库」而非单篇文章 ⇒ 用 KNOWLEDGE_BASE（按库聚合读版本）。
     // 早期误映射成 KNOWLEDGE 时，会把库 id 当文章 id 去读，后端恒 404。
     { key: 'knowledgeBases', sourceType: 'KNOWLEDGE_BASE' },
+    // V367 批次 E：单篇文章走 KNOWLEDGE reader，认知资产走 COGNITIVE reader
+    { key: 'knowledgeArticles', sourceType: 'KNOWLEDGE' },
+    { key: 'cognitiveAssets', sourceType: 'COGNITIVE' },
   ];
   const out: ContextSourceRefInput[] = [];
   const seen = new Set<string>();

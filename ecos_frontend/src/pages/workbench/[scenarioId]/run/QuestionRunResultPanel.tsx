@@ -5,16 +5,18 @@
  * 执行失败时如实显示失败态与原因，不给「假结论文本」。</p>
  */
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Clock, Lightbulb, ListChecks } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, FlaskConical, Lightbulb, ListChecks } from 'lucide-react';
 import { useLanguage } from '../../../../components/LanguageContext';
 import { useTheme } from '../../../../components/ThemeContext';
 import type { ExecStep, QuestionRunResult } from '../../../../services/scenarioQuestionRunClient';
 
 interface Props {
   result: QuestionRunResult | null;
+  /** V367 批次 C：打开本次运行的复盘抽屉（服务端按 run 聚合）。 */
+  onOpenRetro?: () => void;
 }
 
-export default function QuestionRunResultPanel({ result }: Props) {
+export default function QuestionRunResultPanel({ result, onOpenRetro }: Props) {
   const { styles } = useTheme();
   const { t } = useLanguage();
 
@@ -31,9 +33,20 @@ export default function QuestionRunResultPanel({ result }: Props) {
             <Clock size={12} />
             {t('workspace.qrun.trace')}
           </h4>
-          <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
-            {result.trace.length} {t('workspace.qrun.steps')} · {totalMs}ms
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
+              {result.trace.length} {t('workspace.qrun.steps')} · {totalMs}ms
+            </span>
+            {onOpenRetro && (
+              <button
+                type="button"
+                onClick={onOpenRetro}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded border cursor-pointer ${styles.cardBorder} ${styles.cardText}`}
+              >
+                {t('workspace.retro.open')}
+              </button>
+            )}
+          </div>
         </div>
         <ol className="space-y-1.5">
           {result.trace.map((s: ExecStep, i) => (
@@ -49,10 +62,51 @@ export default function QuestionRunResultPanel({ result }: Props) {
         </ol>
       </section>
 
+      {/* 算法执行结果（数值唯一来源；LLM 只解释） */}
+      {result.algorithmStatus && result.algorithmStatus !== 'SKIPPED' && (
+        <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
+              <FlaskConical size={12} />
+              {t('workspace.qrun.algo.title')}
+            </h4>
+            <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
+              {result.algorithmStatus} · {result.algorithmResult?.elapsedMs ?? 0}ms
+            </span>
+          </div>
+          <div className={`text-[11px] mb-1 ${styles.cardText}`}>
+            <span className="font-semibold">{result.algorithmResult?.name ?? result.algorithmId}</span>
+            {result.algorithmResult?.code ? (
+              <span className={`font-mono ${styles.cardTextMuted}`}> ({result.algorithmResult.code})</span>
+            ) : null}
+          </div>
+          {result.algorithmResult?.message ? (
+            <p className={`text-[11px] ${styles.warningText} break-all`}>{result.algorithmResult.message}</p>
+          ) : null}
+          {result.algorithmResult?.metrics && Object.keys(result.algorithmResult.metrics).length > 0 && (
+            <pre className={`text-[10px] font-mono whitespace-pre-wrap break-all ${styles.cardText} max-h-64 overflow-y-auto`}>
+              {JSON.stringify(result.algorithmResult.metrics, null, 2)}
+            </pre>
+          )}
+          {(result.algorithmResult?.assumptions ?? []).length > 0 && (
+            <ul className={`mt-1 space-y-0.5 text-[10px] ${styles.cardTextMuted}`}>
+              {(result.algorithmResult?.assumptions ?? []).map((a, i) => (
+                <li key={`${a}-${i}`}>· {a}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {/* 分析结论 */}
       <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
         <h4 className={`text-xs font-bold ${styles.cardText} mb-2`}>
           {t('workspace.qrun.conclusion')} · {result.mentalModelName}
+          {result.executorType ? (
+            <span className={`ml-1 text-[10px] font-mono ${styles.cardTextMuted}`}>
+              [{result.executorType}:{result.executorId}]
+            </span>
+          ) : null}
         </h4>
         {result.degraded || !result.result ? (
           <div className={`px-3 py-2 rounded border text-xs ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>

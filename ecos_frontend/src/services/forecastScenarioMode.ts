@@ -26,3 +26,17 @@ export const FORECAST_REAL_SOURCES_CONNECTED = false;
 export function isForecastDemoMode(): boolean {
   return !FORECAST_REAL_SOURCES_CONNECTED;
 }
+
+/**
+ * 单个评估面的 DEMO 徽标判定（V367 批次 D）。
+ *
+ * <p>全局开关未解除时，只有「全部指标 applicable=true 且 actualValueSource=ACTION_OUTCOME」
+ * 才可隐藏该面的徽标；任一指标缺实际值即保持显示（禁提前摘牌）。</p>
+ */
+export function shouldShowDemoBadge(
+  metrics?: ReadonlyArray<{ applicable?: boolean; actualValueSource?: string }>,
+): boolean {
+  if (!isForecastDemoMode()) return false;
+  if (!metrics || metrics.length === 0) return true;
+  return !metrics.every((m) => m.applicable === true && m.actualValueSource === 'ACTION_OUTCOME');
+}

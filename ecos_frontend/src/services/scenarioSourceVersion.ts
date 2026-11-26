@@ -27,6 +27,7 @@ import { DATANET_ASSETS_BASE } from '../api/dataClient';
 const ONTOLOGY_ENTITIES = `${API_BASE}/v1/ecos/ontologies/entities`;
 const KNOWLEDGE_ARTICLES = `${API_BASE}/v1/knowledge/articles`;
 const KNOWLEDGE_BASES = `${API_BASE}/v1/knowledge-bases`;
+const COGNITIVE_ASSETS = `${API_BASE}/v1/cognitive/assets`;
 
 /** 版本字段取值顺序（与后端 reader 的 firstText 候选表同源）。 */
 function pickVersion(data: unknown): string | null {
@@ -61,6 +62,9 @@ export async function resolveSourceVersion(sourceType: string, sourceId: string)
       case 'KNOWLEDGE_BASE':
         // 整个知识库：取库内最新文档更新时间作为作用域版本（与后端 reader 同口径）
         return pickVersion(await apiFetchData<unknown>(`${KNOWLEDGE_BASES}/${enc}`));
+      case 'COGNITIVE':
+        // V367 批次 E：认知资产（bel/hyp/mod）版本从 resolve 回读
+        return pickVersion(await apiFetchData<unknown>(`${COGNITIVE_ASSETS}/${enc}/resolve`));
       default:
         // COGNITIVE / CAPABILITY 等其它 reader 腿本批不预填（见 ScenarioContextBuilder 口径）
         return null;

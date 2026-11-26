@@ -31,6 +31,7 @@ import {
   type QuestionRunResult,
 } from '../../../../services/scenarioQuestionRunClient';
 import QuestionRunResultPanel from './QuestionRunResultPanel';
+import RetrospectiveDrawer from './RetrospectiveDrawer';
 
 interface Props {
   scenarioId: string;
@@ -48,7 +49,11 @@ export default function QuestionRunPanel({ scenarioId }: Props) {
   const [prep, setPrep] = useState<QuestionRunPrepare | null>(null);
   const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
   const [modelCode, setModelCode] = useState('');
+  const [executorType, setExecutorType] = useState<'MENTAL_MODEL' | 'SCENARIO_PIPELINE' | 'AI_AGENT'>('MENTAL_MODEL');
+  const [executorId, setExecutorId] = useState('');
   const [algorithmId, setAlgorithmId] = useState('');
+  const [algorithmInputsText, setAlgorithmInputsText] = useState('');
+  const [retroRunId, setRetroRunId] = useState<string | null>(null);
   const [result, setResult] = useState<QuestionRunResult | null>(null);
   const [history, setHistory] = useState<QuestionRunRecord[]>([]);
   const [baseA, setBaseA] = useState('');
@@ -80,7 +85,9 @@ export default function QuestionRunPanel({ scenarioId }: Props) {
       setPrep(p);
       setHypotheses(p.hypotheses ?? []);
       setModelCode(p.mentalModels?.[0]?.code ?? '');
-      setAlgorithmId(p.algorithms?.[0]?.id ?? '');
+      setExecutorType('MENTAL_MODEL');
+      setExecutorId('');
+      setAlgorithmId((p.algorithms ?? []).find((a) => a.executable)?.id ?? '');
       setPhase('confirm');
     } catch (e) {
       logger.error('qrun-prepare', e);
@@ -90,17 +97,31 @@ export default function QuestionRunPanel({ scenarioId }: Props) {
   };
 
   const execute = async () => {
-    if (!modelCode) {
-      showToastGlobal('info', t('workspace.qrun.model_required'));
+    const effectiveId = executorType === 'MENTAL_MODEL' ? modelCode : executorId;
+    if (!effectiveId) {
+      showToastGlobal('info', t(executorType === 'MENTAL_MODEL'
+        ? 'workspace.qrun.model_required' : 'workspace.qrun.executor.required'));
       return;
+    }
+    let algorithmInputs: Record<string, unknown> | undefined;
+    if (algorithmId && algorithmInputsText.trim()) {
+      try {
+        algorithmInputs = JSON.parse(algorithmInputsText) as Record<string, unknown>;
+      } catch {
+        showToastGlobal('error', t('workspace.qrun.algo.inputs_invalid'));
+        return;
+      }
     }
     setPhase('running');
     try {
       const r = await executeQuestionRun(scenarioId, {
         question: question.trim(),
-        mentalModel: modelCode,
+        mentalModel: executorType === 'MENTAL_MODEL' ? modelCode : undefined,
+        executorType,
+        executorId: effectiveId,
         hypotheses,
         algorithmId: algorithmId || undefined,
+        algorithmInputs,
       });
       setResult(r);
       setPhase('done');
@@ -220,52 +241,124 @@ export default function QuestionRunPanel({ scenarioId }: Props) {
             )}
           </div>
 
-          {/* 心智模型（决定运行路径） */}
+          {/* 主执行载体（心智模型 / 场景编排 / 智能体，三选一） */}
           <div>
-            <div className={`text-[11px] font-bold ${styles.cardText} mb-1.5`}>{t('workspace.qrun.mental_model')}</div>
-            <div className={`grid gap-1.5 ${isMobile ? 'grid-cols-2' : 'grid-cols-3'}`}>
-              {(prep.mentalModels ?? []).map((m) => {
-                const pid = m.pipelineId ?? m.pipeline_id;
-                const runnable = !!(pid && String(pid).trim());
-                return (
-                  <button
-                    key={m.code}
-                    type="button"
-                    onClick={() => runnable && setModelCode(m.code)}
-                    disabled={!runnable}
-                    title={m.description ?? ''}
-                    className={`text-left px-2 py-1.5 rounded border text-[11px] transition ${
-                      modelCode === m.code
-                        ? `${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`
-                        : `${styles.cardBg} ${styles.cardText} ${styles.cardBorder}`
-                    } ${runnable ? 'cursor-pointer hover:opacity-90' : 'opacity-40 cursor-not-allowed'}`}
-                  >
-                    <span className="font-bold flex items-center gap-1"><Brain size={11} />{m.name}</span>
-                    {!runnable && <span className="block text-[10px] mt-0.5">{t('workspace.qrun.not_wired')}</span>}
-                  </button>
-                );
-              })}
-              {(prep.mentalModels ?? []).length === 0 && (
-                <p className={`text-[11px] ${styles.cardTextMuted} col-span-full`}>{t('workspace.qrun.models_empty')}</p>
-              )}
+            <div className={`text-[11px] font-bold ${styles.cardText} mb-1.5`}>{t('workspace.qrun.executor.title')}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {(['MENTAL_MODEL', 'SCENARIO_PIPELINE', 'AI_AGENT'] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => {
+                    setExecutorType(k);
+                    setExecutorId(k === 'MENTAL_MODEL' ? modelCode : '');
+                  }}
+                  className={`px-2.5 py-1 rounded border text-[11px] font-bold cursor-pointer transition ${
+                    executorType === k
+                      ? `${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`
+                      : `${styles.cardBg} ${styles.cardText} ${styles.cardBorder}`
+                  }`}
+                >
+                  {t(`workspace.qrun.executor.${k.toLowerCase()}`)}
+                </button>
+              ))}
             </div>
+            <p className={`text-[10px] mt-1 ${styles.cardTextMuted}`}>{t('workspace.qrun.executor.hint')}</p>
           </div>
 
-          {/* 算法（可选） */}
-          {(prep.algorithms ?? []).length > 0 && (
+          {executorType === 'MENTAL_MODEL' && (
+            <div>
+              <div className={`text-[11px] font-bold ${styles.cardText} mb-1.5`}>{t('workspace.qrun.mental_model')}</div>
+              <div className={`grid gap-1.5 ${isMobile ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                {(prep.mentalModels ?? []).map((m) => {
+                  const pid = m.pipelineId ?? m.pipeline_id;
+                  const runnable = !!(pid && String(pid).trim());
+                  return (
+                    <button
+                      key={m.code}
+                      type="button"
+                      onClick={() => runnable && setModelCode(m.code)}
+                      disabled={!runnable}
+                      title={m.description ?? ''}
+                      className={`text-left px-2 py-1.5 rounded border text-[11px] transition ${
+                        modelCode === m.code
+                          ? `${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`
+                          : `${styles.cardBg} ${styles.cardText} ${styles.cardBorder}`
+                      } ${runnable ? 'cursor-pointer hover:opacity-90' : 'opacity-40 cursor-not-allowed'}`}
+                    >
+                      <span className="font-bold flex items-center gap-1"><Brain size={11} />{m.name}</span>
+                      {!runnable && <span className="block text-[10px] mt-0.5">{t('workspace.qrun.not_wired')}</span>}
+                    </button>
+                  );
+                })}
+                {(prep.mentalModels ?? []).length === 0 && (
+                  <p className={`text-[11px] ${styles.cardTextMuted} col-span-full`}>{t('workspace.qrun.models_empty')}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {executorType !== 'MENTAL_MODEL' && (
             <label className="block">
-              <span className={`text-[11px] font-bold ${styles.cardText}`}>{t('workspace.qrun.algorithm')}</span>
+              <span className={`text-[11px] font-bold ${styles.cardText}`}>
+                {t(executorType === 'SCENARIO_PIPELINE'
+                  ? 'workspace.qrun.executor.pipeline_pick'
+                  : 'workspace.qrun.executor.agent_pick')}
+              </span>
               <select
-                value={algorithmId}
-                onChange={(e) => setAlgorithmId(e.target.value)}
+                value={executorId}
+                onChange={(e) => setExecutorId(e.target.value)}
                 className={`mt-1 w-full text-xs rounded border px-2.5 py-1.5 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
               >
-                <option value="">{t('workspace.qrun.algorithm_none')}</option>
-                {(prep.algorithms ?? []).map((a) => (
-                  <option key={a.id} value={a.id}>{a.name} ({a.analysisType ?? a.analysis_type})</option>
-                ))}
+                <option value="">{t('workspace.qrun.executor.select')}</option>
+                {(executorType === 'SCENARIO_PIPELINE'
+                  ? (prep.executors?.pipelines ?? [])
+                  : (prep.executors?.agents ?? [])
+                ).map((b) => {
+                  const id = b.target_id ?? b.targetId ?? '';
+                  return <option key={id} value={id}>{id}</option>;
+                })}
               </select>
+              {((executorType === 'SCENARIO_PIPELINE'
+                ? (prep.executors?.pipelines ?? [])
+                : (prep.executors?.agents ?? [])).length === 0) && (
+                <p className={`text-[10px] mt-1 ${styles.cardTextMuted}`}>{t('workspace.qrun.executor.none_bound')}</p>
+              )}
             </label>
+          )}
+
+          {/* 算法（可选，执行结果作为唯一数值事实） */}
+          {(prep.algorithms ?? []).length > 0 && (
+            <div>
+              <label className="block">
+                <span className={`text-[11px] font-bold ${styles.cardText}`}>{t('workspace.qrun.algorithm')}</span>
+                <select
+                  value={algorithmId}
+                  onChange={(e) => setAlgorithmId(e.target.value)}
+                  className={`mt-1 w-full text-xs rounded border px-2.5 py-1.5 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+                >
+                  <option value="">{t('workspace.qrun.algorithm_none')}</option>
+                  {(prep.algorithms ?? []).map((a) => (
+                    <option key={a.id} value={a.id} disabled={a.executable === false}>
+                      {a.name} ({a.category ?? a.analysisType ?? a.analysis_type})
+                      {a.executable === false ? ` · ${a.unavailableReason ?? t('workspace.qrun.algo.unavailable')}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {algorithmId && (
+                <>
+                  <p className={`text-[10px] mt-1 ${styles.cardTextMuted}`}>{t('workspace.qrun.algo.inputs_hint')}</p>
+                  <textarea
+                    value={algorithmInputsText}
+                    onChange={(e) => setAlgorithmInputsText(e.target.value)}
+                    rows={3}
+                    placeholder='{"x":[1,2,3],"y":[3,5,7]}'
+                    className={`mt-1 w-full text-[11px] font-mono rounded border px-2 py-1.5 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+                  />
+                </>
+              )}
+            </div>
           )}
 
           <button
@@ -281,7 +374,15 @@ export default function QuestionRunPanel({ scenarioId }: Props) {
       )}
 
       {/* ③ 执行过程与结果 */}
-      <QuestionRunResultPanel result={result} />
+      <QuestionRunResultPanel result={result} onOpenRetro={result ? () => setRetroRunId(result.runId) : undefined} />
+
+      {retroRunId && (
+        <RetrospectiveDrawer
+          scenarioId={scenarioId}
+          runId={retroRunId}
+          onClose={() => setRetroRunId(null)}
+        />
+      )}
 
       {/* ④ 历史运行 + 对比 */}
       <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
@@ -313,7 +414,14 @@ export default function QuestionRunPanel({ scenarioId }: Props) {
                   <span className={`px-1 rounded border font-mono text-[10px] shrink-0 ${h.degraded ? styles.warningBorder + ' ' + styles.warningText : styles.successBorder + ' ' + styles.successText}`}>
                     {h.mental_model}
                   </span>
-                  <span className={`${styles.cardText} break-all`}>{h.question}</span>
+                  <span className={`${styles.cardText} break-all flex-1`}>{h.question}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRetroRunId(h.id)}
+                    className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border cursor-pointer ${styles.cardBorder} ${styles.cardTextMuted}`}
+                  >
+                    {t('workspace.retro.open')}
+                  </button>
                 </li>
               ))}
             </ul>

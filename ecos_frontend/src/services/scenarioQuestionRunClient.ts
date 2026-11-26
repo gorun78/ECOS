@@ -34,9 +34,29 @@ export interface AlgorithmOption {
   name: string;
   analysis_type?: string;
   analysisType?: string;
+  category?: string;
+  description?: string;
+  executor_kind?: string;
+  executorKind?: string;
+  executable?: boolean;
+  unavailableReason?: string;
   version?: string;
   implementation_ref?: string;
   implementationRef?: string;
+}
+
+/** 场景绑定的执行载体（PIPELINE / AI_AGENT）。 */
+export interface ExecutorBinding {
+  binding_type?: string;
+  bindingType?: string;
+  target_id?: string;
+  targetId?: string;
+}
+
+export interface ScenarioExecutors {
+  mentalModels: MentalModelOption[];
+  pipelines: ExecutorBinding[];
+  agents: ExecutorBinding[];
 }
 
 /** 心智模型选项。 */
@@ -58,6 +78,7 @@ export interface QuestionRunPrepare {
   hypotheses: Hypothesis[];
   algorithms: AlgorithmOption[];
   mentalModels: MentalModelOption[];
+  executors?: ScenarioExecutors;
   trace: ExecStep[];
 }
 
@@ -81,6 +102,22 @@ export interface QuestionRunResult {
   pipelineId: string;
   hypotheses: Hypothesis[];
   algorithmId?: string;
+  algorithmStatus?: string;
+  algorithmResult?: {
+    algorithmId?: string;
+    name?: string;
+    category?: string;
+    code?: string;
+    status?: string;
+    degraded?: boolean;
+    metrics?: Record<string, unknown>;
+    assumptions?: string[];
+    message?: string;
+    elapsedMs?: number;
+  } | null;
+  executorType?: string;
+  executorId?: string;
+  executorSessionId?: string | null;
   trace: ExecStep[];
   degraded: boolean;
   result: string | null;
@@ -97,6 +134,11 @@ export interface QuestionRunRecord {
   mental_model: string;
   hypotheses?: unknown;
   algorithm_id?: string;
+  algorithm_status?: string;
+  algorithm_result?: unknown;
+  executor_type?: string;
+  executor_id?: string;
+  executor_session_id?: string | null;
   exec_trace?: unknown;
   advice?: unknown;
   status: string;
@@ -117,9 +159,12 @@ export function executeQuestionRun(
   scenarioId: string,
   payload: {
     question: string;
-    mentalModel: string;
+    mentalModel?: string;
+    executorType?: 'MENTAL_MODEL' | 'SCENARIO_PIPELINE' | 'AI_AGENT';
+    executorId?: string;
     hypotheses: Hypothesis[];
     algorithmId?: string;
+    algorithmInputs?: Record<string, unknown>;
   },
 ): Promise<QuestionRunResult> {
   return apiFetchData<QuestionRunResult>(

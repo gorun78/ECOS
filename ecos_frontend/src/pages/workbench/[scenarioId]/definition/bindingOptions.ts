@@ -28,11 +28,18 @@ import { fetchOntologyDataObjects } from '../../../../services/ontology/ontology
 import { fetchKnowledgeBases } from '../../../../services/agentConfig';
 import { fetchPipelineDefinitions, fetchManagedAgents } from '../../../aiworkbench/api';
 import { fetchGuardrailPolicies } from '../../../../services/cognitiveEngineApi';
+import { fetchScenarioRuleOptions } from '../../../../services/scenarioRulesClient';
+import {
+  fetchCognitiveAssetOptions,
+  fetchKnowledgeArticleOptions,
+} from '../../../../services/scenarioContextAssetsClient';
 
 export type BindingGroupKey =
   | 'datasets'
   | 'objectTypes'
   | 'knowledgeBases'
+  | 'knowledgeArticles'
+  | 'cognitiveAssets'
   | 'ruleSets'
   | 'pipelines'
   | 'aiAgents'
@@ -77,7 +84,8 @@ function asArray(v: unknown): any[] {
 export async function loadBindingOptions(enabled: boolean): Promise<Record<BindingGroupKey, BindingOptionsState>> {
   if (!enabled) {
     const idle: Record<string, BindingOptionsState> = {};
-    (['datasets', 'objectTypes', 'knowledgeBases', 'ruleSets', 'pipelines', 'aiAgents', 'securityPolicies', 'interfaces'] as BindingGroupKey[])
+    (['datasets', 'objectTypes', 'knowledgeBases', 'knowledgeArticles', 'cognitiveAssets',
+      'ruleSets', 'pipelines', 'aiAgents', 'securityPolicies', 'interfaces'] as BindingGroupKey[])
       .forEach((k) => { idle[k] = EMPTY(false); });
     return idle as Record<BindingGroupKey, BindingOptionsState>;
   }
@@ -108,6 +116,8 @@ export async function loadBindingOptions(enabled: boolean): Promise<Record<Bindi
     datasets,
     objectTypes,
     knowledgeBases,
+    knowledgeArticles,
+    cognitiveAssets,
     ruleSets,
     pipelines,
     aiAgents,
@@ -144,12 +154,31 @@ export async function loadBindingOptions(enabled: boolean): Promise<Record<Bindi
     }, '暂无知识库'),
 
     wrap(async () => {
-      // 规则集：既无导出 fetcher，直写 `${API_BASE}/v1/ecos/rules` 会与 RulesPage 形成第二生产方
-      // （URL 双形态棘轮红）；裸写 "/v1/ecos/rules" 又缺 /api 前缀（实测 404）。
-      // 后端 RULE_SET 仅做存取、无运行期解析（ScenarioService 只登记不过滤），
-      // 且规则库当前 0 行 ⇒ 如实返回空并说明，不新增站点也不造数据。
-      return [];
-    }, '规则库暂无规则集（后端未提供绑定候选端点）'),
+      const rows = await fetchKnowledgeArticleOptions();
+      return asArray(rows).map((r): BindingOption => ({
+        value: String(r.id),
+        label: String(r.name || r.id),
+      }));
+    }, '暂无知识文章'),
+
+    wrap(async () => {
+      const rows = await fetchCognitiveAssetOptions();
+      return asArray(rows).map((r): BindingOption => ({
+        value: String(r.id),
+        label: String(r.name || r.id),
+        hint: r.type ? String(r.type) : undefined,
+      }));
+    }, '暂无认知资产'),
+
+    wrap(async () => {
+      // 规则集：V367 批次 E 起由 workspace 代理 buszhi 规则中心（单一通道，不直写 /ecos/rules）
+      const rows = await fetchScenarioRuleOptions();
+      return asArray(rows).map((r): BindingOption => ({
+        value: String(r.id),
+        label: String(r.name || r.code || r.id),
+        hint: r.ruleType ? String(r.ruleType) : undefined,
+      }));
+    }, '规则库暂无规则集'),
 
     wrap(async () => {
       const rows = await fetchPipelineDefinitions();
@@ -184,5 +213,8 @@ export async function loadBindingOptions(enabled: boolean): Promise<Record<Bindi
     }, '后端暂无接口注册端点，无法选择接口绑定'),
   ]);
 
-  return { datasets, objectTypes, knowledgeBases, ruleSets, pipelines, aiAgents, securityPolicies, interfaces };
+  return {
+    datasets, objectTypes, knowledgeBases, knowledgeArticles, cognitiveAssets,
+    ruleSets, pipelines, aiAgents, securityPolicies, interfaces,
+  };
 }

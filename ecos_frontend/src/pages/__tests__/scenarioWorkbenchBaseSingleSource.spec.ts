@@ -54,11 +54,6 @@ const PAGES_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /** 本批改动的 8 文件 + 各自到 httpClient 的正确相对路径（目录深度不同，写错即编译不过）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
-  { rel: 'scenario/CognitionPanel.tsx', importPath: "../../services/httpClient" },
-  { rel: 'scenario/OverrideTab.tsx', importPath: "../../services/httpClient" },
-  { rel: 'scenario/ReplayTab.tsx', importPath: "../../services/httpClient" },
-  { rel: 'scenario/CounterfactualTab.tsx', importPath: "../../services/httpClient" },
-  { rel: 'scenario/MentalReviewTab.tsx', importPath: "../../services/httpClient" },
   { rel: 'workbench/index.tsx', importPath: "../../services/httpClient" },
   { rel: 'workbench/[scenarioId]/index.tsx', importPath: "../../../services/httpClient" },
   { rel: 'ScenarioManagementView.tsx', importPath: "../services/httpClient" },
@@ -66,11 +61,6 @@ const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
 
 /** 本批每文件应还原出的派生态条数（实跑读出，防「剪一处漏一处」）。 */
 const SITES_PER_FILE: Readonly<Record<string, number>> = {
-  'scenario/CognitionPanel.tsx': 3,
-  'scenario/OverrideTab.tsx': 2,
-  'scenario/ReplayTab.tsx': 2,
-  'scenario/CounterfactualTab.tsx': 1,
-  'scenario/MentalReviewTab.tsx': 1,
   'workbench/index.tsx': 1,
   'workbench/[scenarioId]/index.tsx': 1,
   'ScenarioManagementView.tsx': 6,
@@ -78,8 +68,8 @@ const SITES_PER_FILE: Readonly<Record<string, number>> = {
 
 /** 本批闭合的两个目录根与其生产文件数（实跑读出，扫描根漂移成空集即红）。 */
 const DOMAIN_ROOTS: ReadonlyArray<{ dir: string; files: number }> = [
-  { dir: 'scenario', files: 15 },
-  { dir: 'workbench', files: 31 }, // 2026-11-24：问题驱动运行面（QuestionRunPanel/QuestionRunResultPanel）+ 场景模板页各 1 枚，28→31 实跑重设（同批删 PipelineTracePanel 已计入）
+  { dir: 'scenario', files: 4 }, // 2026-11-26 孤儿清理：仅保留 ScenarioEditor/ScenarioList/SimulationResultPanel/CognitionStateViews
+  { dir: 'workbench', files: 23 }, // 2026-11-26：+RetrospectiveDrawer 后删 9 枚 blueprint 孤儿（32→23）
   // 2026-11-25 定义页高级/调试下线批：删 [scenarioId]/advanced/AdvancedDebugPanel.tsx ⇒ workbench 31→30 实跑重设
   // 2026-11-25 场景运行 L3 首切片：新增 [scenarioId]/run/ResearchRunPanel.tsx ⇒ 30→31 实跑重设
 ];
@@ -180,20 +170,12 @@ function derivedValues(src: string): string[] {
 }
 
 /**
- * 改前裸形态快照（17 条，带定界符原样收录，便于人工逐条核对）：
- * CognitionPanel 3 + OverrideTab 2 + ReplayTab 2 + CounterfactualTab 1 + MentalReviewTab 1 +
+ * 改前裸形态快照（8 条，带定界符原样收录，便于人工逐条核对）：
  * workbench/index 1 + workbench/[scenarioId]/index 1 + ScenarioManagementView 6。
+ * 2026-11-26 孤儿清理：认知面板五文件（CognitionPanel/Override/Replay/Counterfactual/MentalReview）
+ * 已删除，对应 9 条快照一并移除（能力已由复盘抽屉与 E1~E4 后端读面承接）。
  */
 const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
-  '`/api/v1/workspace/scenarios/${scenario.id}/runs?limit=20`',
-  "'/api/v1/cognitive/models'",
-  '`/api/v1/workspace/scenarios/${scenario.id}/runs`',
-  '`/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}`',
-  '`/api/v1/cognitive/beliefs/${encodeURIComponent(variable.trim())}/override`',
-  '`/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}`',
-  '`/api/v1/cognitive/beliefs/${encodeURIComponent(variableValue)}/${encodeURIComponent(version.trim())}/replay?${params.toString()}`',
-  "'/api/v1/cognitive/counterfactual'",
-  '`/api/v1/cognitive/mental-reviews?${params.toString()}`',
   "'/api/v1/workspace/scenarios'",
   '`/api/v1/workspace/scenarios/${scenarioId}`',
   "'/api/v1/workspace/scenarios'",
@@ -256,8 +238,8 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
       'workbench/index.tsx',
     ]);
     expect(movedOf('ONTOLOGY_PROPOSALS_BASE')).toEqual(['ScenarioManagementView.tsx']);
-    // #145/B6-15：beliefs 列表腿上收面＝恰好两枚列表腿所在页（两文件的子路径腿不在面里）
-    expect(movedOf('COGNITIVE_BELIEFS_BASE')).toEqual(['scenario/OverrideTab.tsx', 'scenario/ReplayTab.tsx']);
+    // 2026-11-26：认知面板五文件删除后，beliefs 族在页面层已无消费面
+    expect(movedOf('COGNITIVE_BELIEFS_BASE')).toEqual([]);
   });
 
   it('派生形态唯一：`${API_BASE}` 后必接 /（防漏段），八文件零 /api/api 双前缀', () => {
@@ -269,22 +251,22 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
     }
   });
 
-  it('面值逐字不变：还原后的 URL 多重集 = 改前快照（17 条）且逐文件条数对得上', () => {
+  it('面值逐字不变：还原后的 URL 多重集 = 改前快照（8 条）且逐文件条数对得上', () => {
     const all: string[] = [];
     for (const { rel } of FILES) {
       const vals = derivedValues(read(rel));
       expect(vals.length, `${rel} 派生态条数`).toBe(SITES_PER_FILE[rel]);
       all.push(...vals);
     }
-    expect(all.length).toBe(17);
+    expect(all.length).toBe(8);
     expect([...all].sort()).toEqual([...RAW_PRE_BATCH_URL_LITERALS.map((s) => s.slice(1, -1))].sort());
   });
 
-  it('快照自身可校验：17 条 = 6 单引号 + 11 反引号 + 0 双引号且全部以 /api/ 开头（防快照清空成恒真）', () => {
-    expect(RAW_PRE_BATCH_URL_LITERALS.length).toBe(17);
+  it('快照自身可校验：8 条 = 4 单引号 + 4 反引号 + 0 双引号且全部以 /api/ 开头（防快照清空成恒真）', () => {
+    expect(RAW_PRE_BATCH_URL_LITERALS.length).toBe(8);
     expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith('"')).length).toBe(0);
-    expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith("'")).length).toBe(6);
-    expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith('`')).length).toBe(11);
+    expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith("'")).length).toBe(4);
+    expect(RAW_PRE_BATCH_URL_LITERALS.filter((s) => s.startsWith('`')).length).toBe(4);
     for (const v of RAW_PRE_BATCH_URL_LITERALS) expect(v.slice(1, -1).startsWith('/api/')).toBe(true);
   });
 

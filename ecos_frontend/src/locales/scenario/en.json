@@ -471,6 +471,7 @@
   "scenario.p09.quad.col.rel_error": "Relative error",
   "scenario.p09.quad.col.applicable": "Applicability",
   "scenario.p09.quad.col.calc_ref": "Calculation ref",
+  "scenario.p09.quad.col.actual_source": "Actual source",
   "scenario.p09.quad.applicable": "Applicable",
   "scenario.p09.quad.not_applicable": "Not applicable",
   "scenario.p09.quad.empty_metrics": "The evaluation returned no metric rows",

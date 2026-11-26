@@ -75,6 +75,8 @@ export interface OutcomeMetricEvaluation {
   applicable?: boolean;
   notApplicableReason?: string;
   caliberId?: string;
+  /** V367：实际值来源（ACTION_OUTCOME=action-outcomes 真值 / ABSENT=无值） */
+  actualValueSource?: string;
 }
 
 /** 诊断行（对齐后端 `OutcomeDiagnosis`；verdict 三态由服务端单源，禁前端推断）。 */

@@ -25,18 +25,20 @@ interface Props {
 }
 
 /**
- * 场景定义页的绑定分组（2026-11-24 用户裁决：只保留数据侧四类）。
+ * 场景定义页的绑定分组（2026-11-26 批次 H：恢复「智能体」绑定）。
  *
- * <p>移除 aiAgents / securityPolicies / interfaces 三组：场景运行统一由 AI 工作台提供的
- * 「场景智能逻辑」（pipelines）驱动，不再在场景侧重复绑定 Agent / 安全策略 / 接口。
- * 后端 BINDING_ENDPOINTS 八值保留（历史数据可读、API 不改签名），仅前端不再提供入口。</p>
+ * <p>执行载体三选一需要场景侧能声明可用的编排与智能体；仍保留 securityPolicies / interfaces
+ * 的后端枚举（历史数据可读），但前端不提供入口。规则集与知识资产绑定见批次 E。</p>
  */
 const GROUPS: Array<{ key: BindingGroupKey; labelKey: string; hintKey: string }> = [
   { key: 'datasets', labelKey: 'workspace.def.data.datasets', hintKey: 'workspace.def.data.datasetsHint' },
   { key: 'objectTypes', labelKey: 'workspace.def.data.objects', hintKey: 'workspace.def.data.objectsHint' },
   { key: 'knowledgeBases', labelKey: 'workspace.def.knowledge.bases', hintKey: 'workspace.def.knowledge.basesHint' },
+  { key: 'knowledgeArticles', labelKey: 'workspace.def.knowledge.articles', hintKey: 'workspace.def.knowledge.articlesHint' },
+  { key: 'cognitiveAssets', labelKey: 'workspace.def.knowledge.cognitive', hintKey: 'workspace.def.knowledge.cognitiveHint' },
   { key: 'ruleSets', labelKey: 'workspace.def.knowledge.rules', hintKey: 'workspace.def.knowledge.rulesHint' },
   { key: 'pipelines', labelKey: 'workspace.def.capability.pipelines', hintKey: 'workspace.def.capability.pipelinesHint' },
+  { key: 'aiAgents', labelKey: 'workspace.def.capability.agents', hintKey: 'workspace.def.capability.agentsHint' },
 ];
 
 function safeMap(def: DefinitionVO | null): Record<string, string[]> {
@@ -48,6 +50,8 @@ const BINDING_TYPE_BY_GROUP: Record<BindingGroupKey, string> = {
   datasets: 'DATASET',
   objectTypes: 'OBJECT_TYPE',
   knowledgeBases: 'KNOWLEDGE_BASE',
+  knowledgeArticles: 'KNOWLEDGE_ARTICLE',
+  cognitiveAssets: 'COGNITIVE_ASSET',
   ruleSets: 'RULE_SET',
   pipelines: 'PIPELINE',
   aiAgents: 'AI_AGENT',
@@ -60,7 +64,7 @@ const BINDING_TYPE_BY_GROUP: Record<BindingGroupKey, string> = {
  * 保证「UI 不提供入口」不等于「把已存数据清空」。
  */
 const ALL_GROUP_KEYS: BindingGroupKey[] = [
-  'datasets', 'objectTypes', 'knowledgeBases', 'ruleSets',
+  'datasets', 'objectTypes', 'knowledgeBases', 'knowledgeArticles', 'cognitiveAssets', 'ruleSets',
   'pipelines', 'aiAgents', 'securityPolicies', 'interfaces',
 ];
 
@@ -69,6 +73,8 @@ function emptyBindingState(): Record<BindingGroupKey, string[]> {
     datasets: [],
     objectTypes: [],
     knowledgeBases: [],
+    knowledgeArticles: [],
+    cognitiveAssets: [],
     ruleSets: [],
     pipelines: [],
     aiAgents: [],

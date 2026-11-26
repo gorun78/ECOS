@@ -29,6 +29,7 @@ import MobileDataTable from '../../../../components/common/MobileDataTable';
 import type { ColumnConfig } from '../../../../components/common/DataTable';
 import Badge from '../../../../components/common/Badge';
 import DemoBadge from '../../../../components/common/status/DemoBadge';
+import { shouldShowDemoBadge } from '../../../../services/forecastScenarioMode';
 import {
   CognitiveEmptyState,
   CognitiveErrorState,
@@ -129,6 +130,11 @@ export default function OutcomeQuadView({ runId, scenarioId }: OutcomeQuadViewPr
         render: (v) => <span className="font-mono">{raw(v as string | number | null)}</span>,
       },
       {
+        key: 'actualValueSource',
+        label: t('scenario.p09.quad.col.actual_source'),
+        render: (v) => <span className="font-mono text-[10px]" data-testid="quad-actual-source">{v == null ? '—' : String(v)}</span>,
+      },
+      {
         key: 'applicable',
         label: t('scenario.p09.quad.col.applicable'),
         render: (_v, record) =>
@@ -167,7 +173,7 @@ export default function OutcomeQuadView({ runId, scenarioId }: OutcomeQuadViewPr
               {t('scenario.p09.quad.run', { runId })}
             </span>
           )}
-          <DemoBadge />
+          {shouldShowDemoBadge(current?.metrics) && <DemoBadge />}
         </div>
       </header>
 
