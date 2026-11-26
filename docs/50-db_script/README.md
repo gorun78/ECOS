@@ -131,3 +131,15 @@ V1~V349 共 **298 枚** `V*.sql` 已整体 `git mv` 归档至 **`../90-归档/50
 
 - IR03 实测 **46 处**，逐脚本：`V315`×4 + `V323/V324/V325`×各 1 + `V349`×39 = 46（`V126`×8 与 `V350`×11 因 `IR03-EXEMPT:` 标记已豁免，不计入）。
 - 差额来自 V350 及后续批次的号段推进（42 → 46 全部落在**已归档历史脚本**，非新脚本引入）；V361/V362 本轮新增零 IR03 命中（V361 的 `ALTER TABLE ... ADD COLUMN` 不匹配 `ALTER TABLE ... DROP` 判据）。
+
+### 2026-11-26 补测（320 枚语料 = 归档 298 + 活单源 22）
+
+上段 310 枚口径已过期：V363~V370（场景工作台批次）+ 本轮 V371/V372 使活单源从 12 增至 22。
+四处门禁（`MigrationVersionUniquenessTest` / `Mc02` / `Mc03` / `DrBaselineColumns`）按实测
+重钉为 `MAX_BASELINE_VERSION=372`、`NEXT_FREE_VERSION=373`、三枚 `SCRIPT_FLOOR=320`，
+实跑 **24 passed / 0 failed**。
+
+- V371（认知/本体 Context 来源 RLS 读策略种子）与 V372（旧内置 Agent 元数据模型名对齐）
+  均为**纯 DML**（INSERT/UPDATE），零 CREATE/ALTER 类型头 ⇒ 对类型白名单与 PG 方言名录零新增。
+- IR03 计数不变（两枚新脚本零 DROP/ALTER）。本段不改上段 46 处的历史归因，只订正语料数与钉值。
+
