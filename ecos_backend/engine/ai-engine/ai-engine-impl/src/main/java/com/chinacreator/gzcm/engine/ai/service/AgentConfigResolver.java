@@ -104,6 +104,17 @@ public class AgentConfigResolver {
     }
 
     /**
+     * 当前 L1 生效默认模型（{@code sys_config llm.default-model} → yml 缺省）。
+     *
+     * <p>供「配置对象未携带 model」的调用方取同一真值，避免各处再写死供应商模型名
+     * （内网 OpenAI 兼容网关不提供 {@code deepseek-chat}，写死即 {@code 503 model_not_found}，
+     * 2026-11-26 活体实证）。</p>
+     */
+    public String currentDefaultModel() {
+        return l1Settings().defaultModel();
+    }
+
+    /**
      * 执行三层解析，返回最终合并后的配置。
      *
      * @param agentId         Agent 标识（可为 "default"、builtin ID、或用户实例 ID）

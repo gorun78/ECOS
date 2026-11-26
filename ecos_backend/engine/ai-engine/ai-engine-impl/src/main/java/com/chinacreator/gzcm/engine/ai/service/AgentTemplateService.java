@@ -124,8 +124,10 @@ public class AgentTemplateService {
                 String.valueOf(template.getOrDefault("description", "")));
         String systemPrompt = getOverride(overrideParams, "systemPrompt",
                 String.valueOf(template.getOrDefault("systemPrompt", "")));
+        // 模板未声明 model 时留空：由运行时 L1（sys_config llm.default-model）解析，
+        // 禁在实例化时冻结一个具体供应商模型名（换网关即失效，2026-11-26 实证）。
         String model = getOverride(overrideParams, "model",
-                String.valueOf(template.getOrDefault("model", "deepseek-chat")));
+                template.get("model") == null ? null : String.valueOf(template.get("model")));
         Integer maxIterations = getOverrideInt(overrideParams, "maxIterations",
                 template.containsKey("maxIterations")
                         ? ((Number) template.get("maxIterations")).intValue() : 5);
@@ -152,7 +154,11 @@ public class AgentTemplateService {
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("description", description);
         meta.put("systemPrompt", systemPrompt);
-        meta.put("model", model);
+        // null = 未固定模型（metadata 不落该键），运行时按 L1 解析；落 null 会让
+        // getModel() 返回 null 后仍能正确回落，但显式不写更利于「未配置」可读。
+        if (model != null && !model.isBlank()) {
+            meta.put("model", model);
+        }
         meta.put("maxIterations", maxIterations);
         meta.put("temperature", temperature);
         meta.put("templateId", templateId);

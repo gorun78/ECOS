@@ -107,7 +107,9 @@ public class AgentCronTaskRegistrar {
             }
 
             AgentLoopConfig loopConfig = new AgentLoopConfig();
-            loopConfig.setModel("deepseek-chat");
+            // model 留空 ⇒ AgentConfigResolver 的 L1（sys_config llm.default-model）解析；
+            // 禁写死供应商模型名（内网网关无 deepseek-chat，2026-11-26 实证 503）。
+            loopConfig.setModel(null);
             loopConfig.setTemperature(0.3);
             loopConfig.setMaxTokens(2048);
 

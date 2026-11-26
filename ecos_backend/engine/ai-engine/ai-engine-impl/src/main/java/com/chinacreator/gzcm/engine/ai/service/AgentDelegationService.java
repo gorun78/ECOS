@@ -41,8 +41,9 @@ public class AgentDelegationService {
     /** 子 Agent 结果最大字符数（超过截断） */
     private static final int SUB_AGENT_RESULT_MAX_CHARS = 3000;
 
-    /** 子 Agent 默认模型 */
-    private static final String DEFAULT_MODEL = "deepseek-chat";
+    /** 子 Agent 默认模型：不填 = 交给运行时 L1（sys_config llm.default-model）解析，
+     *  禁硬编码具体供应商名（内网网关无 deepseek-chat ⇒ 503 model_not_found，2026-11-26 实证）。 */
+    private static final String DEFAULT_MODEL = null;
 
     /** 子 Agent 默认温度 */
     private static final double DEFAULT_TEMPERATURE = 0.7;

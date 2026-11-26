@@ -59,6 +59,28 @@ public class AgentEvaluator {
     @Autowired(required = false)
     private com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway llmGateway;
 
+    /** 生效的模型名单源（sys_config llm 组 → yml 缺省）；required=false 仅服务单测装配。 */
+    @Autowired(required = false)
+    private com.chinacreator.gzcm.runtime.llm.config.LlmSettingsSource llmSettingsSource;
+
+    /**
+     * 生效默认模型：{@code sys_config llm.default-model} → {@code LlmSettings.DEFAULTS}。
+     *
+     * <p>评测两处（被测 Agent 循环 + judge 裁判）都必须与平台生效模型同名，禁各自硬编码
+     * 供应商名（内网网关无 {@code deepseek-chat}，2026-11-26 活体 503 实证）。</p>
+     */
+    private String effectiveModel() {
+        if (llmSettingsSource != null) {
+            try {
+                String m = llmSettingsSource.settings().defaultModel();
+                if (m != null && !m.isBlank()) return m.trim();
+            } catch (RuntimeException e) {
+                log.warn("[Eval] 读取 llm.default-model 失败，回落目录缺省: {}", e.getMessage());
+            }
+        }
+        return com.chinacreator.gzcm.runtime.llm.config.LlmSettings.DEFAULTS.defaultModel();
+    }
+
     // ═══════════════════════════════════════════════════════════════
     //  内嵌 POJO
     // ═══════════════════════════════════════════════════════════════
@@ -394,7 +416,7 @@ public class AgentEvaluator {
         try {
             // 执行 Agent 推理
             AgentLoopConfig config = new AgentLoopConfig();
-            config.setModel("deepseek-chat");
+            config.setModel(effectiveModel());
             config.setTemperature(0.3);
             config.setMaxTokens(2048);
 
@@ -500,7 +522,7 @@ public class AgentEvaluator {
             user.append("仅输出 JSON（d1~d5 各为 1-5 整数，含义：工具准确性/关键词覆盖/回答质量/执行效率/幻觉抵抗）");
 
             com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest request =
-                    new com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest("deepseek-chat",
+                    new com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest(effectiveModel(),
                             List.of(
                                     new com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage("system",
                                             "你是严格的 Agent 评估裁判。只输出 JSON，禁止输出任何解释文字。"),

@@ -73,7 +73,8 @@ public class AgentStudioController {
         // 构建 agentDef — 测试时以请求体中的参数覆盖 Agent 定义
         Map<String, Object> agentDef = new LinkedHashMap<>(body);
         agentDef.putIfAbsent("systemPrompt", body.getOrDefault("systemPrompt", ""));
-        agentDef.putIfAbsent("model", body.getOrDefault("model", "deepseek-chat"));
+        // model 缺省留空：由 AgentStudioService→AgentConfigResolver 的 L1 解析，
+        // 禁在此硬编码供应商模型名（内网网关无该名 ⇒ 503 model_not_found）。
         agentDef.putIfAbsent("temperature", body.getOrDefault("temperature", 0.7));
         agentDef.putIfAbsent("maxTokens", body.getOrDefault("maxTokens", 4096));
 

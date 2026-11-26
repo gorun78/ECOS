@@ -1144,9 +1144,10 @@ public class AgentLoopService {
             chatMessages.add(cm);
         }
 
-        // 构建请求 — 使用解析后的配置（L1/L2/L3已合并），安全兜底
+        // 构建请求 — 使用解析后的配置（L1/L2/L3已合并）；缺模型时取 L1 生效值，
+        // 禁兜底具体供应商名（内网网关无 deepseek-chat ⇒ 503 model_not_found）。
         String model = config != null && config.getModel() != null
-                ? config.getModel() : "deepseek-chat";
+                ? config.getModel() : agentConfigResolver.currentDefaultModel();
         Double temperature = config != null && config.getTemperature() != null
                 ? config.getTemperature() : 0.3;
         Integer maxTokens = config != null && config.getMaxTokens() != null

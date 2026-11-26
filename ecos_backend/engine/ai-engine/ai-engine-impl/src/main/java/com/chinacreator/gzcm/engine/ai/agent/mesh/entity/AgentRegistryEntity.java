@@ -121,18 +121,29 @@ public class AgentRegistryEntity {
         return capability != null ? capability : "";
     }
 
-    /** 从 metadata JSON 提取 model */
+    /**
+     * 从 metadata JSON 提取 model。
+     *
+     * <p><b>缺失即 null，禁兜底具体供应商模型名</b>（2026-11-26）：原实现回退
+     * {@code deepseek-chat}，在内网 OpenAI 兼容网关（{@code llm.gateway.base-url}）下
+     * 必然 {@code 503 model_not_found}，且掩盖「该 Agent 未配置模型」这一事实。
+     * null 由 {@code AgentConfigResolver} 按 L1（{@code sys_config llm.default-model}
+     * → 目录缺省）解析。</p>
+     */
     public String getModel() {
         if (metadata != null && metadata.contains("model")) {
             try {
                 com.fasterxml.jackson.databind.ObjectMapper m = new com.fasterxml.jackson.databind.ObjectMapper();
                 var node = m.readTree(metadata);
-                if (node.has("model")) return node.get("model").asText();
+                if (node.has("model") && !node.get("model").isNull()) {
+                    String v = node.get("model").asText();
+                    if (v != null && !v.isBlank()) return v;
+                }
             } catch (Exception ignored) {
-                log.debug("Agent metadata JSON 解析失败，model 回退 deepseek-chat: id={} reason={}", id, ignored.getMessage());
+                log.debug("Agent metadata JSON 解析失败，model 交给 L1 解析: id={} reason={}", id, ignored.getMessage());
             }
         }
-        return "deepseek-chat";
+        return null;
     }
 
     /** 从 metadata JSON 提取 maxIterations */

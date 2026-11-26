@@ -450,7 +450,10 @@ public class AgentLoopController {
     private AgentLoopConfig buildConfig(Map<String, Object> body) {
         AgentLoopConfig config = new AgentLoopConfig();
         config.setSystemPrompt((String) body.get("systemPrompt"));
-        config.setModel((String) body.getOrDefault("model", "deepseek-chat"));
+        // 未传 model 即留 null，由 AgentConfigResolver 的 L1（sys_config llm.default-model）
+        // 解析；硬编码供应商模型名会在内网网关下 503 model_not_found（2026-11-26 实证）。
+        Object model = body.get("model");
+        config.setModel(model == null ? null : String.valueOf(model));
         config.setTemperature(getDouble(body, "temperature", 0.7));
         config.setMaxTokens(getInt(body, "maxTokens", 4096));
         return config;

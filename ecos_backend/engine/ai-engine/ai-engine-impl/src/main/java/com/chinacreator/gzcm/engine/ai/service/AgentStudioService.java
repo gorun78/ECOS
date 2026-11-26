@@ -81,6 +81,29 @@ public class AgentStudioService {
     @Autowired(required = false)
     private ObjectProvider<ServiceEndpointResolver> endpointProvider;
 
+    /** 生效模型名单源（sys_config llm 组 → 目录缺省）；required=false 仅服务单测装配。 */
+    @Autowired(required = false)
+    private com.chinacreator.gzcm.runtime.llm.config.LlmSettingsSource llmSettingsSource;
+
+    /**
+     * 生效默认模型：{@code sys_config llm.default-model} → {@code LlmSettings.DEFAULTS}。
+     *
+     * <p>编排 llm 节点与编排器循环都不得硬编码供应商模型名 —— 内网 OpenAI 兼容网关
+     * （{@code llm.gateway.base-url}）不提供 {@code deepseek-chat}，写死即 503
+     * {@code model_not_found}（2026-11-26 活体实证）。</p>
+     */
+    private String effectiveModel() {
+        if (llmSettingsSource != null) {
+            try {
+                String m = llmSettingsSource.settings().defaultModel();
+                if (m != null && !m.isBlank()) return m.trim();
+            } catch (RuntimeException e) {
+                log.warn("[AgentStudio] 读取 llm.default-model 失败，回落目录缺省: {}", e.getMessage());
+            }
+        }
+        return com.chinacreator.gzcm.runtime.llm.config.LlmSettings.DEFAULTS.defaultModel();
+    }
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     /** 流水线执行记录 — 内存存储（后续迁移至 PG） */
@@ -129,7 +152,10 @@ public class AgentStudioService {
             // 构建 AgentLoopConfig
             AgentLoopConfig config = new AgentLoopConfig();
             config.setSystemPrompt(String.valueOf(agentDef.getOrDefault("systemPrompt", "")));
-            config.setModel(String.valueOf(agentDef.getOrDefault("model", "deepseek-chat")));
+            // 缺省模型名不在此硬编码：null 交由 AgentLoopService→AgentConfigResolver 的 L1
+            // （sys_config llm.default-model → yml/目录缺省）解析。写死旧供应商名会在内网
+            // OpenAI 兼容网关下必然 503 model_not_found（2026-11-26 活体实证）。
+            config.setModel(agentDef.get("model") == null ? null : String.valueOf(agentDef.get("model")));
             config.setTemperature(getDouble(agentDef, "temperature", 0.7));
             config.setMaxTokens(getInt(agentDef, "maxTokens", 4096));
 
@@ -568,7 +594,8 @@ public class AgentStudioService {
         String prompt = firstNonBlank(
                 text(def.config.get("prompt")), text(params.get("prompt")),
                 previousOutput, "请执行节点：" + def.label);
-        String model = firstNonBlank(text(def.config.get("model")), "deepseek-chat");
+        String model = firstNonBlank(text(def.config.get("model")),
+                text(params.get("model")), effectiveModel());
         List<ChatMessage> messages = new ArrayList<>();
         String sysPrompt = text(def.config.get("systemPrompt"));
         if (!isBlank(sysPrompt)) {
@@ -855,7 +882,8 @@ public class AgentStudioService {
             // 构建默认编排配置
             AgentLoopConfig config = new AgentLoopConfig();
             config.setSystemPrompt("你是一个智能编排助手，能够根据用户需求协调多个专业Agent完成任务。");
-            config.setModel("deepseek-chat");
+            // model 留空 ⇒ L1（sys_config llm.default-model）解析；禁硬编码供应商名。
+            config.setModel(null);
             config.setTemperature(0.7);
             config.setMaxTokens(4096);
 
