@@ -63,6 +63,16 @@ final class CodeExecutor {
             Map.entry("读环境敏感值", Pattern.compile("\\b(System\\s*\\.\\s*(getenv|getProperties))\\b"))
     );
 
+    /** Python 的静态禁用片段（同样是防呆，不是安全边界）。 */
+    private static final List<Map.Entry<String, Pattern>> DENY_PY = List.of(
+            Map.entry("启动外部进程", Pattern.compile("\\b(subprocess|os\\.system|os\\.popen|os\\.exec\\w*|os\\.spawn\\w*|pty\\.)\\b")),
+            Map.entry("网络", Pattern.compile("\\b(socket|urllib|requests|httpx|http\\.client|ftplib|smtplib|telnetlib|xmlrpc)\\b")),
+            Map.entry("写文件", Pattern.compile("\\b(open\\s*\\([^)]*['\\\"][wax+]|shutil\\.(copy|move|rmtree)|os\\.(remove|unlink|rmdir|rename|makedirs))\\b")),
+            Map.entry("动态求值", Pattern.compile("\\b(eval|exec|compile|__import__)\\s*\\(")),
+            Map.entry("读环境敏感值", Pattern.compile("\\b(os\\.environ|os\\.getenv)\\b")),
+            Map.entry("导入系统模块", Pattern.compile("\\b(import|from)\\s+(ctypes|cffi|importlib|pickle|marshal|sysconfig)\\b"))
+    );
+
     private CodeExecutor() {
     }
 
@@ -137,6 +147,62 @@ final class CodeExecutor {
             out.put("truncated", run.truncated);
             out.put("timeoutMs", timeout);
             out.put("heapMb", heap);
+            out.put("measuredMetric", parseMetric(run.stdout));
+            out.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
+            return out;
+        } catch (IOException e) {
+            throw new SandboxError(500, "执行环境异常: " + e.getMessage());
+        } finally {
+            deleteQuietly(work);
+        }
+    }
+
+    /**
+     * 执行一段 Python 源码（仅标准库）。
+     *
+     * <p>与 Java 档共用同一套：静态防呆、一次性子进程、硬超时强杀、输出截断。
+     * Python 不需要编译阶段，故直接运行。</p>
+     */
+    static Map<String, Object> runPython(String code, Long timeoutMs) {
+        long started = System.nanoTime();
+
+        if (code == null || code.isBlank()) {
+            throw new SandboxError(400, "code 不能为空");
+        }
+        byte[] codeBytes = code.getBytes(StandardCharsets.UTF_8);
+        if (codeBytes.length > MAX_CODE_BYTES) {
+            throw new SandboxError(413, "源码 " + codeBytes.length + "B 超上限 " + MAX_CODE_BYTES + "B");
+        }
+
+        for (Map.Entry<String, Pattern> rule : DENY_PY) {
+            if (rule.getValue().matcher(code).find()) {
+                throw new SandboxError(403, "代码包含受限用法：" + rule.getKey()
+                        + "（沙盒只允许纯计算；如确需该能力须走人工评审）");
+            }
+        }
+
+        long timeout = timeoutMs == null ? DEFAULT_TIMEOUT_MS
+                : Math.max(1000L, Math.min(timeoutMs, MAX_TIMEOUT_MS));
+
+        Path work = null;
+        try {
+            work = Files.createTempDirectory("sbxpy");
+            Path src = work.resolve("main.py");
+            Files.writeString(src, code, StandardCharsets.UTF_8);
+
+            // -I 隔离模式（不读用户 site-packages / PYTHONPATH）、-B 不写 pyc
+            ProcResult run = exec(List.of("python3", "-I", "-B", src.toString()), work, timeout);
+
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("language", "python");
+            out.put("compiled", true);          // Python 无独立编译阶段，语义上视为通过
+            out.put("stage", run.timedOut ? "timeout" : "run");
+            out.put("exitCode", run.exit);
+            out.put("stdout", run.stdout);
+            out.put("stderr", run.stderr);
+            out.put("timedOut", run.timedOut);
+            out.put("truncated", run.truncated);
+            out.put("timeoutMs", timeout);
             out.put("measuredMetric", parseMetric(run.stdout));
             out.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
             return out;

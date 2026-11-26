@@ -104,8 +104,9 @@ public final class SandboxServer {
             data.put("network", false);
             data.put("operators", new ArrayList<>(new TreeSet<>(ALLOWED_OPS)));
             data.put("codeExecution", true);
+            data.put("languages", new ArrayList<>(List.of("java", "python")));
             data.put("codeExecutionNote",
-                    "受控 Java 代码执行：容器无网络/只读根/cap-drop/非 root，"
+                    "受控 Java/Python 代码执行：容器无网络/只读根/cap-drop/非 root，"
                             + "单次执行硬超时强杀；静态筛查仅防呆，安全边界在容器");
             data.put("note", "声明式算子沙盒：不接受任意代码，不连库，不出网");
             respond(ex, 200, envelope(0, data, null));
@@ -131,12 +132,22 @@ public final class SandboxServer {
                     throw new SandboxError(400, "请求体必须是 JSON 对象");
                 }
                 String code = asText(payload.get("code"));
+                String language = asText(payload.get("language"));
+                if (language == null || language.isBlank()) {
+                    language = "java";   // 默认保持既有行为（Java），新增语言须显式声明
+                }
                 Long timeoutMs = payload.get("timeoutMs") instanceof BigDecimal b
                         ? b.longValue() : null;
                 Integer heapMb = payload.get("heapMb") instanceof BigDecimal b
                         ? b.intValue() : null;
 
-                Map<String, Object> result = CodeExecutor.run(code, timeoutMs, heapMb);
+                Map<String, Object> result;
+                switch (language.toLowerCase()) {
+                    case "java" -> result = CodeExecutor.run(code, timeoutMs, heapMb);
+                    case "python", "python3", "py" -> result = CodeExecutor.runPython(code, timeoutMs);
+                    default -> throw new SandboxError(400,
+                            "不支持的语言: " + language + "（支持 java / python）");
+                }
                 respond(ex, 200, envelope(0, result, null));
             } catch (SandboxError e) {
                 respond(ex, 200, envelope(e.code, null, e.getMessage()));

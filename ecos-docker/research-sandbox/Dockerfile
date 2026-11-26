@@ -1,17 +1,28 @@
-# ECOS L3 研究沙盒镜像（Phase 1 + 受控代码执行，2026-11-25 用户授权）
+# ECOS L3 研究沙盒镜像（Phase 1 + Java/Python 受控代码执行，2026-11-25）
 #
-# 基础镜像选用 maven:3.9-eclipse-temurin-17 而非 jre：
+# 基础镜像选用 maven:3.9-eclipse-temurin-17：
 #   代码执行需要 javac，JRE 镜像没有编译器（实测 "Module jdk.compiler not in boot Layer"）。
 #   本机 Docker Hub 不可达，只能用本地已有镜像。
 #
-# 镜像偏大（JDK 269M）是必要代价：没有编译器就没有「代码进化」能力。
-# 注意：镜像保留 maven 自带的 /root/.m2 知识无害——容器以 10001 非 root 运行，
-#   且 /root 不可写（只读根文件系统）。
+# Python 的获取方式（2026-11-25 用户要求「沙盒应同时支持 python」）：
+#   Docker Hub 拉不到 python 官方镜像，但**容器内 apt 源可达**（实测）。
+#   Ubuntu 官方源 archive.ubuntu.com 返回 502，阿里云镜像返回 200，
+#   故构建时切到阿里云源安装 python3。实测可得 Python 3.12.3。
 #
-# 隔离参数在 docker-compose.yml 的 research-sandbox 段下发：
-#   非 root(10001) / 只读根 + tmpfs / cap-drop ALL / no-new-privileges /
-#   无出网(仅回环发布) / 内存与 PID 配额。
+# 镜像偏大（JDK 269M + Python ~50M）是必要代价：没有运行时就没有「代码进化」能力。
 FROM maven:3.9-eclipse-temurin-17
+
+# ── Python 运行时（仅标准库，不装 pip 包） ──────────────────────────────
+# 为什么只装 python3 而不装 pip：受控执行只允许标准库计算，
+# 装 pip 等于给沙盒开一条「运行时可装任意代码」的通道，与隔离目标冲突。
+RUN set -eux; \
+    printf 'Types: deb\nURIs: https://mirrors.aliyun.com/ubuntu/\nSuites: noble noble-updates\nComponents: main universe\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+        > /etc/apt/sources.list.d/ubuntu.sources; \
+    apt-get update -qq; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends python3; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/*; \
+    python3 --version
 
 COPY out /app/classes
 WORKDIR /app

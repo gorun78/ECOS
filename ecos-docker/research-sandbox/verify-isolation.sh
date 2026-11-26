@@ -91,6 +91,50 @@ docker exec "$CONTAINER" sh -c 'test ! -e /var/run/docker.sock' 2>/dev/null \
 mounts=$(docker inspect "$CONTAINER" --format '{{range .Mounts}}{{.Source}} {{end}}' 2>/dev/null | tr -d '\r')
 [ -z "$mounts" ] && ok "no host mounts" || bad "host mounts: $mounts"
 
+echo "=== M. Python runtime present and computes ==="
+resp=$(run_code '{"language":"python","code":"import statistics\nprint(\"METRIC\", round(statistics.mean([1,2,3,4]),2))"}')
+echo "$resp" | grep -q '"measuredMetric":2.5' && ok "python computes (mean=2.5)" \
+  || bad "python compute failed: $(echo "$resp" | head -c 150)"
+
+echo "=== N. Python static guards reject dangerous APIs ==="
+# 注意：payload 用单引号包住 Python 里的双引号，且用 python 的 <code> 形式传参，
+# 避免 shell 拼接出非法 JSON（早期这里漏转义，让 eval 用例假失败过一次）。
+py_guard() {
+  local name="$1" code="$2"
+  # 用 jq 风格手工转义：把 JSON 需要的字符替换掉
+  code_escaped=$(printf '%s' "$code" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n' ' ')
+  local body="{\"language\":\"python\",\"code\":\"$code_escaped\"}"
+  local resp
+  resp=$(run_code "$body")
+  if echo "$resp" | grep -q '"code":403'; then
+    ok "python $name blocked"
+  else
+    bad "python $name NOT blocked: $(echo "$resp" | head -c 120)"
+  fi
+}
+py_guard "network"  'import urllib.request'
+py_guard "process"  'import subprocess'
+py_guard "eval"     'eval("1+1")'
+
+echo "=== O. Python cannot write read-only root (container level) ==="
+# 用 io.FileIO 刻意绕过静态规则：验证容器才是真防线
+resp=$(run_code '{"language":"python","code":"import io\np=\"/app/\"+\"pwn\"\ntry:\n    h=io.FileIO(p,\"w\")\n    print(\"WROTE_ROOT\")\nexcept Exception as e:\n    print(\"BLOCKED\")"}')
+if echo "$resp" | grep -q 'BLOCKED'; then
+  ok "python root write blocked by container"
+elif echo "$resp" | grep -q 'WROTE_ROOT'; then
+  bad "python WROTE to read-only root!"
+else
+  bad "python root-write test inconclusive: $(echo "$resp" | head -c 150)"
+fi
+
+echo "=== P. Python infinite loop killed by timeout ==="
+resp=$(run_code '{"language":"python","code":"while True: pass","timeoutMs":3000}')
+echo "$resp" | grep -q '"timedOut":true' && ok "python timeout enforced" || bad "python timeout not enforced"
+
+echo "=== Q. Java still works after adding Python ==="
+resp=$(run_code '{"code":"public class J{public static void main(String[] a){System.out.println(\"METRIC \"+(6*7));}}"}')
+echo "$resp" | grep -q '"measuredMetric":42' && ok "java regression ok (42)" || bad "java regression broken"
+
 echo
 echo "=============================================="
 echo "  PASS=$PASS  FAIL=$FAIL"
