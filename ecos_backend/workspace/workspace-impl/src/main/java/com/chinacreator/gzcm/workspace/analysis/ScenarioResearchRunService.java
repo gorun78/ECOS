@@ -242,7 +242,13 @@ public class ScenarioResearchRunService {
         return out;
     }
 
-    /** 谱系对比：逐字段给两侧原值，不判优劣（人的判断）。 */
+    /**
+     * 谱系对比：逐字段给两侧原值，不判优劣（人的判断）。
+     *
+     * <p>除字段差异外，另给出两轮在谱系中的<b>关系</b>（{@code relation}）与各自
+     * 到最近公共祖先的深度——这是报告 §5.2「升级两两对比为树对比」的落地：
+     * 树的信息体现在「谁是谁的祖先/同支兄弟/跨支」与深度上，而不是把整棵树塞进对比结果。</p>
+     */
     public Map<String, Object> compare(String a, String b) {
         List<Map<String, Object>> ra = dao.findResearchRun(a);
         List<Map<String, Object>> rb = dao.findResearchRun(b);
@@ -265,7 +271,108 @@ public class ScenarioResearchRunService {
         out.put("left", left);
         out.put("right", right);
         out.put("diff", diff);
+        out.put("tree", treeRelation(a, b));
         return out;
+    }
+
+    /**
+     * 两轮在同一谱系中的关系（报告 §5.2 树对比）。
+     *
+     * <p>只读同一场景的谱系全集，在内存里回溯父链。返回：</p>
+     * <ul>
+     *   <li>{@code relation}：{@code ANCESTOR}（a 是 b 祖先）/ {@code DESCENDANT} /
+     *       {@code SIBLING}（同父，含同父分支）/ {@code CROSS_BRANCH}（不同分支）/ {@code SAME}；</li>
+     *   <li>{@code commonAncestor}：最近公共祖先 id（无则 null）；</li>
+     *   <li>{@code leftDepthFromCommon} / {@code rightDepthFromCommon}：各自到公共祖先的边数。</li>
+     * </ul>
+     */
+    Map<String, Object> treeRelation(String a, String b) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (a.equals(b)) {
+            out.put("relation", "SAME");
+            out.put("commonAncestor", a);
+            out.put("leftDepthFromCommon", 0);
+            out.put("rightDepthFromCommon", 0);
+            return out;
+        }
+
+        List<Map<String, Object>> all = dao.findResearchRun(a);
+        List<Map<String, Object>> other = dao.findResearchRun(b);
+        String scenarioId = all.isEmpty() ? null : str(all.get(0).get("scenario_id"));
+        if (scenarioId == null && !other.isEmpty()) {
+            scenarioId = str(other.get(0).get("scenario_id"));
+        }
+        // 全谱系（足够大的窗口）用于回溯父链；限量 200 防病态数据拖慢
+        List<Map<String, Object>> lineage = scenarioId == null
+                ? List.of() : dao.listResearchRuns(scenarioId, 200);
+        Map<String, String> parentOf = new LinkedHashMap<>();
+        for (Map<String, Object> row : lineage) {
+            parentOf.put(str(row.get("id")), str(row.get("parent_run_id")));
+        }
+        // 两侧自身的父链也纳入（导出窗口可能截断，缺则按链末端处理）
+        parentOf.putIfAbsent(a, str(all.isEmpty() ? null : all.get(0).get("parent_run_id")));
+        parentOf.putIfAbsent(b, str(other.isEmpty() ? null : other.get(0).get("parent_run_id")));
+
+        List<String> chainA = chainOf(a, parentOf);
+        List<String> chainB = chainOf(b, parentOf);
+
+        // a 是 b 的祖先？
+        if (chainB.contains(a)) {
+            out.put("relation", "ANCESTOR");
+            out.put("commonAncestor", a);
+            out.put("leftDepthFromCommon", 0);
+            out.put("rightDepthFromCommon", chainB.indexOf(a));
+            return out;
+        }
+        if (chainA.contains(b)) {
+            out.put("relation", "DESCENDANT");
+            out.put("commonAncestor", b);
+            out.put("leftDepthFromCommon", chainA.indexOf(b));
+            out.put("rightDepthFromCommon", 0);
+            return out;
+        }
+
+        String common = null;
+        for (String node : chainA) {
+            if (chainB.contains(node)) {
+                common = node;
+                break;
+            }
+        }
+        if (common != null) {
+            int depthA = chainA.indexOf(common);
+            int depthB = chainB.indexOf(common);
+            out.put("relation", depthA == 1 && depthB == 1 ? "SIBLING" : "CROSS_BRANCH");
+            out.put("commonAncestor", common);
+            out.put("leftDepthFromCommon", depthA);
+            out.put("rightDepthFromCommon", depthB);
+            return out;
+        }
+        out.put("relation", "CROSS_BRANCH");
+        out.put("commonAncestor", null);
+        out.put("leftDepthFromCommon", chainA.size() - 1);
+        out.put("rightDepthFromCommon", chainB.size() - 1);
+        return out;
+    }
+
+    /** 从某节点回溯到根的链（含自身，自身在 index 0）；带环保护。 */
+    private static List<String> chainOf(String id, Map<String, String> parentOf) {
+        List<String> chain = new ArrayList<>();
+        String cursor = id;
+        int guard = 0;
+        while (cursor != null && !cursor.isBlank() && guard++ < 64) {
+            if (chain.contains(cursor)) {
+                break; // 环：到此为止，不伪造更长的链
+            }
+            chain.add(cursor);
+            cursor = parentOf.get(cursor);
+        }
+        return chain;
+    }
+
+    /** 空安全的字符串取值（DAO 返回 Object，null/空统一成 ""）。 */
+    private static String str(Object v) {
+        return v == null ? "" : String.valueOf(v);
     }
 
     // ── 内部 ────────────────────────────────────────────────────────────────

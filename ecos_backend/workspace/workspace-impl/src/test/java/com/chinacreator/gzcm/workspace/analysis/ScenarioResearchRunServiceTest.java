@@ -220,4 +220,62 @@ class ScenarioResearchRunServiceTest {
             return out;
         }
     }
+
+    // ── 谱系树关系（报告 §5.2「升级两两对比为树对比」）──────────────────────
+
+    /** 造一行最小运行记录（只放树关系需要读的列）。 */
+    private static Map<String, Object> row(String id, String parent, String scenarioId) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", id);
+        m.put("parent_run_id", parent);
+        m.put("scenario_id", scenarioId);
+        return m;
+    }
+
+    /** 树：r0 ← r1 ← r2，另 r1 ← r2b（r2 与 r2b 同父）。 */
+    private void stubTree() {
+        List<Map<String, Object>> all = List.of(
+                row("r0", null, "sc-1"),
+                row("r1", "r0", "sc-1"),
+                row("r2", "r1", "sc-1"),
+                row("r2b", "r1", "sc-1"));
+        when(dao.listResearchRuns(eq("sc-1"), anyInt())).thenReturn(all);
+        for (Map<String, Object> m : all) {
+            when(dao.findResearchRun(String.valueOf(m.get("id")))).thenReturn(List.of(m));
+        }
+    }
+
+    @Test
+    @DisplayName("树关系：祖先 / 后代 / 同父兄弟 / 跨支，各按父链判定而非凭 loop_index 猜")
+    void treeRelationCoversAllShapes() {
+        stubTree();
+
+        Map<String, Object> anc = service.treeRelation("r0", "r2");
+        assertEquals("ANCESTOR", anc.get("relation"));
+        assertEquals("r0", anc.get("commonAncestor"));
+        assertEquals(0, anc.get("leftDepthFromCommon"));
+        assertEquals(2, anc.get("rightDepthFromCommon"));
+
+        Map<String, Object> desc = service.treeRelation("r2", "r0");
+        assertEquals("DESCENDANT", desc.get("relation"));
+        assertEquals(2, desc.get("leftDepthFromCommon"));
+
+        Map<String, Object> sib = service.treeRelation("r2", "r2b");
+        assertEquals("SIBLING", sib.get("relation"));
+        assertEquals("r1", sib.get("commonAncestor"));
+        assertEquals(1, sib.get("leftDepthFromCommon"));
+        assertEquals(1, sib.get("rightDepthFromCommon"));
+
+        Map<String, Object> same = service.treeRelation("r2", "r2");
+        assertEquals("SAME", same.get("relation"));
+    }
+
+    @Test
+    @DisplayName("树关系：跨支给最近公共祖先与两侧深度，不判优劣")
+    void treeRelationReportsCommonAncestorForCrossBranch() {
+        stubTree();
+        Map<String, Object> r = service.treeRelation("r2", "r2b");
+        assertEquals("r1", r.get("commonAncestor"));
+        assertFalse(Boolean.TRUE.equals(r.get("preferred")), "树关系不得携带优劣判断");
+    }
 }
