@@ -51,14 +51,20 @@ public class SandboxResearchExecutor implements ResearchExecutorPort {
     private final ReadOnlyResearchExecutor fallback;
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final ResearchCodeGenerator codeGenerator;
+
+    /** 代码进化默认语言（RD-Agent 原生用 Python；沙盒已支持 java/python 双档）。 */
+    private static final String LANG_PYTHON = ResearchCodeGenerator.LANG_PYTHON;
 
     public SandboxResearchExecutor(ReadOnlyResearchExecutor fallback,
                                    @Qualifier("workspaceResearchSandboxRest") RestTemplate restTemplate,
-                                   @Value("${ecos.research.sandbox.base-url}") String baseUrl) {
+                                   @Value("${ecos.research.sandbox.base-url}") String baseUrl,
+                                   ResearchCodeGenerator codeGenerator) {
         this.fallback = fallback;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         // 客户端由 WorkspaceRestClientConfig 构造（业务代码禁自建，F07-17 门禁）；基址已在该 Bean 内绑定
         this.restTemplate = restTemplate;
+        this.codeGenerator = codeGenerator;
         log.info("L3 沙盒研究执行器已启用 baseUrl={}（代码执行在外部隔离沙盒，不在 ECOS 进程内）", this.baseUrl);
     }
 
@@ -149,6 +155,12 @@ public class SandboxResearchExecutor implements ResearchExecutorPort {
         trace.add(step("insight", sandboxData.get("insight") == null ? "skipped" : "success",
                 sandboxData.get("insight") == null ? "单组或不可比，无描述性对比" : "已产出描述性对比（不含因果）"));
 
+        // ── 代码进化（2026-11-25）：LLM 依假设生成代码 → 隔离沙盒执行 ──────────
+        // 声明式算子是**确定性基线**；代码实验是**进化尝试**。两者都入 trace，
+        // 失败如实记录（state=failed），绝不因为「基线成功」就掩盖代码实验失败。
+        Map<String, Object> codeExperiment = runCodeExperiment(
+                question, hypotheses, trace);
+
         Map<String, Object> spec = new LinkedHashMap<>();
         spec.put("loopIndex", loopIndex);
         spec.put("question", question);
@@ -175,7 +187,126 @@ public class SandboxResearchExecutor implements ResearchExecutorPort {
         out.put("insight", insight);
         out.put("snapshotDigest", sandboxData.get("snapshotDigest"));
         out.put("sandbox", sandboxData.get("sandbox"));
+        out.put("codeExperiment", codeExperiment);
         return out;
+    }
+
+    /**
+     * 跑一轮「LLM 生成代码 → 隔离沙盒执行」。
+     *
+     * <p><b>任何失败都不抛出、也不伪造</b>：生成失败/沙盒拒绝/编译错/超时，
+     * 一律在返回值与 trace 里如实记录（{@code state=failed}）。
+     * 理由：代码实验是<b>探索</b>，失败属正常；若因它抛异常会让整轮研究中断，
+     * 反而丢掉已经拿到的确定性基线读数。但失败必须<b>可见</b>，不能悄悄跳过。</p>
+     */
+    private Map<String, Object> runCodeExperiment(String question,
+                                                  List<Map<String, Object>> hypotheses,
+                                                  List<Map<String, Object>> trace) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        String hypothesis = hypotheses == null || hypotheses.isEmpty()
+                ? "" : String.valueOf(hypotheses.get(0).get("text"));
+
+        // 1) LLM 生成
+        Map<String, Object> generated;
+        try {
+            generated = codeGenerator.generate(LANG_PYTHON, question, hypothesis,
+                    List.of(), null);
+        } catch (ResearchCodeGenerator.CodeGenerationException e) {
+            out.put("state", "failed");
+            out.put("stage", "generate");
+            out.put("reason", e.getMessage());
+            out.put("metric", null);
+            trace.add(step("code_generate", "failed", "LLM 生成失败：" + e.getMessage()));
+            return out;
+        }
+        String language = String.valueOf(generated.get("language"));
+        String code = String.valueOf(generated.get("code"));
+        out.put("language", language);
+        out.put("code", code);
+        out.put("rationale", generated.get("rationale"));
+        // 审计必需：trace 里要留代码本身。只记「已生成 430 字符」无法事后查证
+        // LLM 到底写了什么，出了偏差将无从追溯。代码截断到 2000 字符防 trace 膨胀。
+        trace.add(step("code_generate", "success",
+                "已生成 " + language + " 代码（" + code.length() + " 字符）"
+                        + (generated.get("rationale") == null ? ""
+                        : "；理由：" + abbreviate(String.valueOf(generated.get("rationale"))))
+                        + "\n--- 代码 ---\n" + abbreviateCode(code)));
+
+        // 2) 沙盒执行
+        Map<String, Object> result;
+        try {
+            result = executeCode(language, code, null);
+        } catch (RuntimeException e) {
+            out.put("state", "failed");
+            out.put("stage", "execute");
+            out.put("reason", e.getMessage());
+            out.put("metric", null);
+            trace.add(step("code_execute", "failed", "沙盒执行失败：" + e.getMessage()));
+            return out;
+        }
+
+        // 3) 判定（编译失败/超时/无指标都不是成功）
+        Object metric = result.get("measuredMetric");
+        boolean timedOut = Boolean.TRUE.equals(result.get("timedOut"));
+        boolean compiled = Boolean.TRUE.equals(result.get("compiled"));
+        out.put("execution", result);
+
+        if (timedOut) {
+            out.put("state", "failed");
+            out.put("stage", "timeout");
+            out.put("metric", null);
+            trace.add(step("code_execute", "failed", "执行超时（" + result.get("timeoutMs") + "ms）"));
+        } else if (!compiled || !isZero(result.get("exitCode"))) {
+            out.put("state", "failed");
+            out.put("stage", "compile_or_run");
+            out.put("metric", null);
+            trace.add(step("code_execute", "failed",
+                    "编译或运行失败 exit=" + result.get("exitCode")
+                            + " stderr=" + abbreviate(String.valueOf(result.get("stderr")))));
+        } else if (metric == null) {
+            // 跑通了但没按契约打印 METRIC：不算成功（禁把「有输出」当「有指标」）
+            out.put("state", "failed");
+            out.put("stage", "no_metric");
+            out.put("metric", null);
+            trace.add(step("code_execute", "failed",
+                    "运行成功但未输出 METRIC 行（契约要求）"));
+        } else {
+            out.put("state", "success");
+            out.put("stage", "done");
+            out.put("metric", metric);
+            // 审计必需：留下 stdout 事实（不止数字），便于复核指标怎么算出来的
+            trace.add(step("code_execute", "success",
+                    "代码实验产出指标 " + metric
+                            + (result.get("stdout") == null ? ""
+                            : "；stdout：" + abbreviate(String.valueOf(result.get("stdout"))))
+                            + "（" + result.get("elapsedMs") + "ms）"));
+        }
+        return out;
+    }
+
+    /** 代码入 trace 时的截断（保留头尾，中间省略；防 trace 膨胀）。 */
+    private static String abbreviateCode(String code) {
+        if (code == null) {
+            return "";
+        }
+        String t = code.trim();
+        if (t.length() <= 2000) {
+            return t;
+        }
+        return t.substring(0, 1400) + "\n... (省略 " + (t.length() - 1800) + " 字符) ...\n"
+                + t.substring(t.length() - 400);
+    }
+
+    private static boolean isZero(Object v) {
+        return v instanceof Number n && n.intValue() == 0;
+    }
+
+    private static String abbreviate(String s) {
+        if (s == null) {
+            return "";
+        }
+        String t = s.replace('\n', ' ').trim();
+        return t.length() <= 160 ? t : t.substring(0, 160) + "...";
     }
 
     /** 与只读档同形的 trace 步骤。 */
@@ -185,6 +316,61 @@ public class SandboxResearchExecutor implements ResearchExecutorPort {
         s.put("status", status);
         s.put("detail", detail);
         return s;
+    }
+
+    /**
+     * 把一段代码提交给隔离沙盒执行（2026-11-25 代码进化能力）。
+     *
+     * <p><b>本方法不在 ECOS 进程内做任何执行</b>：只把源码转发给沙盒，
+     * 由 {@code /research/execute} 在无网络/只读根/cap-drop/非 root 的容器内编译运行。
+     * 沙盒侧还有静态防呆与硬超时强杀。</p>
+     *
+     * <p><b>失败语义</b>：沙盒不可达、业务码非 0、或编译失败都<b>如实返回</b>，
+     * 不伪造指标；调用方据 {@code compiled}/{@code timedOut}/{@code measuredMetric}
+     * 判定本轮是否有效。</p>
+     *
+     * @param language {@code java} 或 {@code python}
+     * @param code     源码
+     * @param timeoutMs 可选，沙盒侧钳制在 [1s, 30s]
+     * @return 沙盒原样结果（含 stdout/stderr/measuredMetric/timedOut/truncated）
+     */
+    public Map<String, Object> executeCode(String language, String code, Long timeoutMs) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        CallerCredentialSource.applyTo(headers);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("language", language == null || language.isBlank() ? "java" : language);
+        body.put("code", code);
+        if (timeoutMs != null) {
+            body.put("timeoutMs", timeoutMs);
+        }
+
+        ResponseEntity<Map> resp;
+        try {
+            resp = restTemplate.exchange(URI.create(baseUrl + "/research/execute"),
+                    HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("沙盒代码执行不可用: " + e.getMessage(), e);
+        }
+        Map<String, Object> envelope = resp.getBody();
+        if (envelope == null) {
+            throw new IllegalStateException("沙盒代码执行应答为空");
+        }
+        Object code0 = envelope.get("code");
+        if (code0 instanceof Number n && n.intValue() != 0) {
+            // 静态筛查拒绝（403）等属业务拒绝：如实抛出，让调用方看到原因
+            throw new IllegalStateException("沙盒拒绝执行 code=" + n.intValue()
+                    + " " + envelope.get("message"));
+        }
+        Object data = envelope.get("data");
+        if (!(data instanceof Map<?, ?> dm)) {
+            throw new IllegalStateException("沙盒代码执行应答缺 data 段");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> out = new LinkedHashMap<>((Map<String, Object>) dm);
+        return out;
     }
 
     @Override

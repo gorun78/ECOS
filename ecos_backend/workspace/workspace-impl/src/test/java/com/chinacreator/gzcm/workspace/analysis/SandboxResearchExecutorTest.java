@@ -40,7 +40,19 @@ class SandboxResearchExecutorTest {
     private final ReadOnlyResearchExecutor fallback = new ReadOnlyResearchExecutor(dao);
 
     private SandboxResearchExecutor withTemplate(RestTemplate template) {
-        return new SandboxResearchExecutor(fallback, template, "http://sandbox.local");
+        // 用「必失败的生成器」：既有用例关注声明式算子与契约同构，
+        // 不该被 LLM 网络调用干扰；代码进化路径由 researchCodeEvolution 用例单独覆盖。
+        return new SandboxResearchExecutor(fallback, template, "http://sandbox.local",
+                failingGenerator());
+    }
+
+    /** 始终抛 CodeGenerationException 的生成器替身（模拟 LLM 未装配）。 */
+    @SuppressWarnings("unchecked")
+    private static ResearchCodeGenerator failingGenerator() {
+        org.springframework.beans.factory.ObjectProvider<RestTemplate> provider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);   // 未装配 ⇒ generate 抛异常
+        return new ResearchCodeGenerator(provider);
     }
 
     @Test
@@ -154,7 +166,18 @@ class SandboxResearchExecutorTest {
         assertEquals("SANDBOX", ((Map) out.get("experimentSpec")).get("executor"));
         assertTrue(out.get("metric") instanceof Map);
         assertEquals("sha256:abc", out.get("snapshotDigest"));
-        assertEquals(3, ((List) out.get("trace")).size(), "trace 应含 sandbox_call/metric/insight 三步");
+        // trace 含沙盒三步 + 代码进化一步（本用例生成器不可用 ⇒ code_generate=failed）。
+        // 断言「关键步骤都在」而非写死总数，避免以后加步骤又要改（但少一步必须红）。
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> trace = (List<Map<String, Object>>) out.get("trace");
+        for (String must : List.of("sandbox_call", "metric", "insight", "code_generate")) {
+            assertTrue(trace.stream().anyMatch(s -> must.equals(s.get("step"))),
+                    "trace 缺少步骤: " + must + "，实际: "
+                            + trace.stream().map(s -> s.get("step")).toList());
+        }
+        // 代码进化失败必须可见（不因基线成功而隐藏）
+        assertTrue(out.get("codeExperiment") instanceof Map,
+                "必须回传 codeExperiment 段（哪怕失败）");
 
         // 评估口径同源：绑定>0 且 命中>0 ⇒ accepted，且恒定降级（无业务真值）
         Map<String, Object> eval = executor.evaluate("sc-1", out, List.of());
