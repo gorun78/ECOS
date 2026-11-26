@@ -141,6 +141,24 @@ class ScenarioResearchApprovalServiceTest {
     }
 
     @Test
+    @DisplayName("审批不预设审批角色：仅要求已认证主体 + approvalRef（裁决 2026-11-25「维持现状」）")
+    void anyAuthenticatedRoleMayApproveByDesign() {
+        // 裁决依据：与全仓既有 DQ 规则审批、DataGovernance 候选审批同构——两者均不做
+        // 角色鉴权，权限委派给 security-engine / OPA。此处用最小角色锁定该决策：
+        // 若未来要加严，必须连同 DQ 面一起裁，并同步改本断言，禁静默收紧。
+        ServiceContext.set(ServiceContext.of("t-2", "u-plain", "user",
+                "tenant-a", "default", "workspace"));
+        stubRun("run-1", "ACCEPTED");
+        when(dao.insertResearchApproval(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
+
+        Map<String, Object> out = service.decide("run-1", "APPROVED", "APR-2026-003", null, null);
+
+        assertEquals("APPROVED", out.get("decision"));
+        assertEquals("u-plain", out.get("approver"));
+    }
+
+    @Test
     @DisplayName("证据摘要稳定：同输入同摘要，且形如 sha256:<64hex>")
     void evidenceDigestIsStable() {
         String a = ScenarioResearchApprovalService.digestOf("run-1", "ACCEPTED", "adv", "[]");
