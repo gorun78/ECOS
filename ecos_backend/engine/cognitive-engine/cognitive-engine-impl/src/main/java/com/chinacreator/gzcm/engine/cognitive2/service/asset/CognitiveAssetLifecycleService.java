@@ -130,6 +130,13 @@ public class CognitiveAssetLifecycleService {
         dto.put("lifecycleState", lifecycle);
         dto.put("lifecycleSource", lifecycle != null ? "V268" : "legacy-fallback");
         dto.put("legacyStatus", clean(row.get("status")));
+        // Context Builder 的 COGNITIVE reader 要求真实版本/时点（禁回显请求版本）
+        Object ver = row.get("version");
+        if (ver == null || String.valueOf(ver).isBlank()) {
+            ver = row.get("update_time");
+        }
+        dto.put("version", ver == null ? null : String.valueOf(ver));
+        dto.put("updatedAt", row.get("update_time") == null ? null : String.valueOf(row.get("update_time")));
         if (KEY_BELIEF.equals(ref.assetType())) {
             setConfidenceTriplet(dto, row);
         }
@@ -295,7 +302,12 @@ public class CognitiveAssetLifecycleService {
                     CognitiveErrorCode.MSG_INVALID_PARAM, "assetId");
         }
         String id = assetId.trim();
-        String prefix = id.length() >= 3 ? id.toLowerCase().substring(0, 3) : id.toLowerCase();
+        String lower = id.toLowerCase();
+        // 兼容存量种子 id（cog_hyp_/cog_bel_/cog_mod_ 前缀）——解析只定类，查询仍用完整 id
+        if (lower.startsWith("cog_hyp")) return new AssetRef(id, KEY_HYPOTHESIS);
+        if (lower.startsWith("cog_bel")) return new AssetRef(id, KEY_BELIEF);
+        if (lower.startsWith("cog_mod")) return new AssetRef(id, KEY_MODEL);
+        String prefix = id.length() >= 3 ? lower.substring(0, 3) : lower;
         return switch (prefix) {
             case "bel" -> new AssetRef(id, KEY_BELIEF);
             case "hyp" -> new AssetRef(id, KEY_HYPOTHESIS);

@@ -115,7 +115,7 @@ public class HypothesisDao extends JdbcTemplateDaoSupport {
     public Map<String, Object> findLifecycleStateById(String id) {
         try {
             return jdbcTemplate.queryForMap(
-                "SELECT id, hypothesis_code, domain, status, is_valid, lifecycle_state " +
+                "SELECT id, hypothesis_code, domain, status, is_valid, lifecycle_state, update_time " +
                 "FROM ecos_cognitive_hypothesis WHERE id = ? AND is_deleted = 0", id);
         } catch (EmptyResultDataAccessException e) {
             return null;

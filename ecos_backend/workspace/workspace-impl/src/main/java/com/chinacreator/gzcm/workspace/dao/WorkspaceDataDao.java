@@ -400,24 +400,31 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
      */
     public int insertQuestionRun(String runId, String scenarioId, String question, String intent,
                                  String intentDetail, String mentalModel, String hypothesesJson,
-                                 String algorithmId, String traceJson, String adviceJson, boolean degraded) {
+                                 String algorithmId, String algorithmStatus, String algorithmResultJson,
+                                 Integer algorithmElapsedMs, String executorType, String executorId,
+                                 String executorSessionId, String traceJson, String adviceJson,
+                                 boolean degraded) {
         return jdbcTemplate.update(
             "INSERT INTO ecos_scenario_run " +
             "(id, scenario_id, run_type, status, degraded, run_mode, sandbox_lineage, create_by, update_by, " +
             " analysis_type, question, intent, intent_detail, mental_model, hypotheses, algorithm_id, " +
-            " exec_trace, advice, run_level) " +
+            " algorithm_status, algorithm_result, algorithm_elapsed_ms, " +
+            " executor_type, executor_id, executor_session_id, exec_trace, advice, run_level) " +
             "VALUES (?, ?, 'QUESTION_RUN', ?, ?, 'FORMAL', 'NONE', 'system', 'system', ?, ?, ?, ?, ?, " +
-            "        ?::jsonb, ?, ?::jsonb, ?::jsonb, 'MENTAL_MODEL')",
+            "        ?::jsonb, ?, ?, ?::jsonb, ?, ?, ?, ?, ?::jsonb, ?::jsonb, 'MENTAL_MODEL')",
             runId, scenarioId, degraded ? "DEGRADED" : "COMPLETED", degraded,
             "MENTAL_MODEL", question, intent, intentDetail, mentalModel, hypothesesJson,
-            algorithmId, traceJson, adviceJson);
+            algorithmId, algorithmStatus, algorithmResultJson, algorithmElapsedMs,
+            executorType, executorId, executorSessionId, traceJson, adviceJson);
     }
 
     /** 问题驱动运行列表（倒序，运行页对比用）。 */
     public List<Map<String, Object>> listQuestionRuns(String scenarioId, int limit) {
         return jdbcTemplate.queryForList(
             "SELECT id, scenario_id, question, intent, intent_detail, mental_model, hypotheses, " +
-            "       algorithm_id, exec_trace, advice, status, degraded, create_time " +
+            "       algorithm_id, algorithm_status, algorithm_result, algorithm_elapsed_ms, " +
+            "       executor_type, executor_id, executor_session_id, " +
+            "       exec_trace, advice, status, degraded, create_time " +
             "FROM ecos_scenario_run " +
             "WHERE scenario_id = ? AND run_type = 'QUESTION_RUN' AND is_deleted = 0 " +
             "ORDER BY create_time DESC LIMIT ?",
@@ -428,7 +435,9 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
     public List<Map<String, Object>> findQuestionRun(String runId) {
         return jdbcTemplate.queryForList(
             "SELECT id, scenario_id, question, intent, intent_detail, mental_model, hypotheses, " +
-            "       algorithm_id, exec_trace, advice, status, degraded, create_time " +
+            "       algorithm_id, algorithm_status, algorithm_result, algorithm_elapsed_ms, " +
+            "       executor_type, executor_id, executor_session_id, " +
+            "       exec_trace, advice, status, degraded, create_time " +
             "FROM ecos_scenario_run WHERE id = ? AND run_type = 'QUESTION_RUN' AND is_deleted = 0",
             runId);
     }
@@ -564,12 +573,50 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
 
     /** 活跃算法（按分析类型；空即空，不造假条目）。 */
     public List<Map<String, Object>> listActiveAlgorithmsByType(String analysisType) {
-        // 只选表里真实存在的列：V361 建表没有 description，曾因多选一列整条 SQL 抛错被吞成空列表
+        // V367 起补 category/executor_kind/description；只选真实存在的列，多选一列会整条 SQL 抛错被吞成空列表
         return jdbcTemplate.queryForList(
-            "SELECT id, name, analysis_type, version, provider_type, implementation_ref " +
+            "SELECT id, name, analysis_type, category, version, provider_type, executor_kind, " +
+            "       implementation_ref, description " +
             "FROM ecos_control.ecos_algorithm_registry " +
-            "WHERE analysis_type = ? AND status = 'ACTIVE' AND is_deleted = 0 ORDER BY name",
+            "WHERE analysis_type = ? AND status = 'ACTIVE' AND is_deleted = 0 ORDER BY category, name",
             analysisType);
+    }
+
+    /** 按 id 取算法登记行（执行前校验状态与执行器类型）。 */
+    public List<Map<String, Object>> findAlgorithmById(String id) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, name, analysis_type, category, version, provider_type, executor_kind, " +
+            "       implementation_ref, description, status " +
+            "FROM ecos_control.ecos_algorithm_registry WHERE id = ? AND is_deleted = 0",
+            id);
+    }
+
+    /** 按 id 取运行产物引用（下载面用）。 */
+    public List<Map<String, Object>> findRunArtifact(String id) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, run_id, scenario_id, artifact_type, storage_ref, digest, size_bytes " +
+            "FROM ecos_scenario_run_artifact WHERE id = ? AND is_deleted = 0",
+            id);
+    }
+
+    /** 运行产物引用落库（V367 批次 F：实体落对象存储，DB 只存引用与摘要）。 */
+    public int insertRunArtifact(String id, String runId, String scenarioId, String artifactType,
+                                 String storageRef, String digest, long sizeBytes) {
+        return jdbcTemplate.update(
+            "INSERT INTO ecos_scenario_run_artifact " +
+            "(id, run_id, scenario_id, artifact_type, storage_ref, digest, size_bytes, " +
+            " domain, version_no, is_deleted, create_by, create_time) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, 'default', '1', 0, 'system', NOW())",
+            id, runId, scenarioId, artifactType, storageRef, digest, sizeBytes);
+    }
+
+    /** 场景绑定的指定类型资源（V367 批次 H：PIPELINE / AI_AGENT 的可用性与归属校验）。 */
+    public List<Map<String, Object>> listScenarioBindings(String scenarioId, String bindingType) {
+        return jdbcTemplate.queryForList(
+            "SELECT binding_type, COALESCE(target_id, target_ref) AS target_id, target_ref " +
+            "FROM ecos_control.ecos_scenario_binding " +
+            "WHERE scenario_id = ? AND binding_type = ? AND is_deleted = 0 ORDER BY target_id",
+            scenarioId, bindingType);
     }
 
     /** 活跃心智模型目录（含承载编排 id）。 */

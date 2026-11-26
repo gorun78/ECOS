@@ -67,7 +67,8 @@ public class ResearchCodeGenerator {
      */
     public Map<String, Object> generate(String language, String question, String hypothesis,
                                         List<String> columns, String previousEvidence) {
-        String lang = LANG_PYTHON.equalsIgnoreCase(language) ? LANG_PYTHON : LANG_JAVA;
+        // 2026-11-26 沙盒仅保留 Python 执行器：生成侧固定 Python，不再产出 Java 代码
+        String lang = LANG_PYTHON;
         String raw = callLlm(buildSystemPrompt(lang), buildUserPrompt(
                 question, hypothesis, columns, previousEvidence), 1400);
         String code = extractCode(raw);

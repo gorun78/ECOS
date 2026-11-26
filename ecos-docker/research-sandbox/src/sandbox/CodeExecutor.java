@@ -42,27 +42,6 @@ final class CodeExecutor {
     static final int MAX_OUTPUT_BYTES = 256 * 1024;
     /** 源码上限。 */
     static final int MAX_CODE_BYTES = 64 * 1024;
-    /** 堆上限（MB）。 */
-    static final int MAX_HEAP_MB = 256;
-    static final int DEFAULT_HEAP_MB = 96;
-
-    /**
-     * 静态禁用的 API 片段（防呆层，不声称是安全边界）。
-     *
-     * <p>刻意用「完整类名/方法签名」而不是宽泛关键词，减少误伤合法命名
-     * （例如变量叫 {@code processCount} 不应被拦）。</p>
-     */
-    private static final List<Map.Entry<String, Pattern>> DENY = List.of(
-            Map.entry("启动外部进程", Pattern.compile("\\b(Runtime\\s*\\.\\s*getRuntime|ProcessBuilder)\\b")),
-            Map.entry("反射越权", Pattern.compile("\\b(Class\\.forName|setAccessible\\s*\\(|MethodHandles|Unsafe)\\b")),
-            Map.entry("写文件", Pattern.compile("\\b(Files\\s*\\.\\s*(write|createFile|delete|move|copy)|FileOutputStream|FileWriter|RandomAccessFile)\\b")),
-            Map.entry("网络", Pattern.compile("\\b(Socket|ServerSocket|URL|URLConnection|HttpClient|DatagramSocket|InetAddress)\\b")),
-            Map.entry("加载本地库", Pattern.compile("\\b(System\\s*\\.\\s*load|System\\s*\\.\\s*loadLibrary)\\b")),
-            Map.entry("关闭JVM", Pattern.compile("\\b(System\\s*\\.\\s*(exit|halt)|Runtime\\s*\\.\\s*halt)\\b")),
-            Map.entry("线程爆炸", Pattern.compile("\\b(new\\s+Thread\\s*\\(|Executors\\s*\\.)\\b")),
-            Map.entry("读环境敏感值", Pattern.compile("\\b(System\\s*\\.\\s*(getenv|getProperties))\\b"))
-    );
-
     /** Python 的静态禁用片段（同样是防呆，不是安全边界）。 */
     private static final List<Map.Entry<String, Pattern>> DENY_PY = List.of(
             Map.entry("启动外部进程", Pattern.compile("\\b(subprocess|os\\.system|os\\.popen|os\\.exec\\w*|os\\.spawn\\w*|pty\\.)\\b")),
@@ -77,91 +56,10 @@ final class CodeExecutor {
     }
 
     /**
-     * 执行一段 Java 源码，返回结构化结果。
-     *
-     * <p>调用方必须已确认容器隔离生效——本类不重复做容器级检查。</p>
-     */
-    static Map<String, Object> run(String code, Long timeoutMs, Integer heapMb) {
-        long started = System.nanoTime();
-
-        if (code == null || code.isBlank()) {
-            throw new SandboxError(400, "code 不能为空");
-        }
-        byte[] codeBytes = code.getBytes(StandardCharsets.UTF_8);
-        if (codeBytes.length > MAX_CODE_BYTES) {
-            throw new SandboxError(413, "源码 " + codeBytes.length + "B 超上限 " + MAX_CODE_BYTES + "B");
-        }
-
-        // 静态防呆：命中即拒，并在信息里指明命中的类别（便于作者修正）
-        for (Map.Entry<String, Pattern> rule : DENY) {
-            if (rule.getValue().matcher(code).find()) {
-                throw new SandboxError(403, "代码包含受限用法：" + rule.getKey()
-                        + "（沙盒只允许纯计算；如确需该能力须走人工评审）");
-            }
-        }
-
-        if (!code.contains("class ")) {
-            throw new SandboxError(400, "源码必须包含一个 class 定义");
-        }
-        String mainClass = detectMainClass(code);
-
-        long timeout = timeoutMs == null ? DEFAULT_TIMEOUT_MS
-                : Math.max(1000L, Math.min(timeoutMs, MAX_TIMEOUT_MS));
-        int heap = heapMb == null ? DEFAULT_HEAP_MB
-                : Math.max(32, Math.min(heapMb, MAX_HEAP_MB));
-
-        Path work = null;
-        try {
-            work = Files.createTempDirectory("sbxrun");
-            Path src = work.resolve(mainClass + ".java");
-            Files.writeString(src, code, StandardCharsets.UTF_8);
-
-            // 1) 编译（也有超时，防病态泛型把编译器拖死）
-            ProcResult compile = exec(List.of("javac", "-encoding", "UTF-8", "-nowarn",
-                    "-d", work.toString(), src.toString()), work, Math.min(timeout, 15_000L));
-            if (compile.exit != 0) {
-                Map<String, Object> out = new LinkedHashMap<>();
-                out.put("compiled", false);
-                out.put("stage", "compile");
-                out.put("stderr", compile.stderr);
-                out.put("stdout", compile.stdout);
-                out.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
-                return out;
-            }
-
-            // 2) 运行（独立进程 + 硬超时）
-            List<String> cmd = new ArrayList<>(List.of("java",
-                    "-Xmx" + heap + "m", "-XX:+UseSerialGC",
-                    "-XX:TieredStopAtLevel=1",      // 缩短 JIT，减少启动开销与攻击面
-                    "-Djava.security.manager=disallow",
-                    "-cp", work.toString(), mainClass));
-            ProcResult run = exec(cmd, work, timeout);
-
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("compiled", true);
-            out.put("stage", run.timedOut ? "timeout" : "run");
-            out.put("exitCode", run.exit);
-            out.put("stdout", run.stdout);
-            out.put("stderr", run.stderr);
-            out.put("timedOut", run.timedOut);
-            out.put("truncated", run.truncated);
-            out.put("timeoutMs", timeout);
-            out.put("heapMb", heap);
-            out.put("measuredMetric", parseMetric(run.stdout));
-            out.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
-            return out;
-        } catch (IOException e) {
-            throw new SandboxError(500, "执行环境异常: " + e.getMessage());
-        } finally {
-            deleteQuietly(work);
-        }
-    }
-
-    /**
      * 执行一段 Python 源码（仅标准库）。
      *
-     * <p>与 Java 档共用同一套：静态防呆、一次性子进程、硬超时强杀、输出截断。
-     * Python 不需要编译阶段，故直接运行。</p>
+     * <p>2026-11-26 用户裁决：沙盒<b>只保留 Python 执行器</b>，Java 编译/执行路径已移除。
+     * 共用静态防呆、一次性子进程、硬超时强杀、输出截断。</p>
      */
     static Map<String, Object> runPython(String code, Long timeoutMs) {
         long started = System.nanoTime();
@@ -204,6 +102,7 @@ final class CodeExecutor {
             out.put("truncated", run.truncated);
             out.put("timeoutMs", timeout);
             out.put("measuredMetric", parseMetric(run.stdout));
+            out.put("measuredResult", parseResult(run.stdout));
             out.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
             return out;
         } catch (IOException e) {
@@ -213,27 +112,25 @@ final class CodeExecutor {
         }
     }
 
-    /** 从 {@code class Xxx} 声明里取主类名（取第一个 public 类或第一个类）。 */
-    static String detectMainClass(String code) {
-        var m = Pattern.compile("\\bclass\\s+([A-Za-z_$][A-Za-z0-9_$]*)").matcher(code);
-        String first = null;
-        while (m.find()) {
-            String name = m.group(1);
-            if (first == null) {
-                first = name;
-            }
-            // 优先选带 main 的类
-            int from = m.end();
-            int to = Math.min(code.length(), from + 4000);
-            String tail = code.substring(from, to);
-            if (tail.contains("void main(") || tail.contains("void main (")) {
-                return name;
-            }
+    /**
+     * 从程序输出里提取结构化结果（V367 批次 B0）。
+     *
+     * <p>约定：程序把结果以 {@code RESULT <json>} 单行打印（≤64KB）；没有则返回 null。
+     * 只认这一行，避免把日志里的其它 JSON 当结论。</p>
+     */
+    static Object parseResult(String stdout) {
+        if (stdout == null) return null;
+        var m = Pattern.compile("(?m)^\\s*RESULT\\s+(.+?)\\s*$").matcher(stdout);
+        if (!m.find()) return null;
+        String json = m.group(1);
+        if (json.length() > 64 * 1024) {
+            throw new SandboxError(413, "RESULT 超过 64KB");
         }
-        if (first == null) {
-            throw new SandboxError(400, "无法从源码中识别类名");
+        try {
+            return MiniJson.parse(json);
+        } catch (RuntimeException e) {
+            throw new SandboxError(422, "RESULT 不是合法 JSON: " + e.getMessage());
         }
-        return first;
     }
 
     /**

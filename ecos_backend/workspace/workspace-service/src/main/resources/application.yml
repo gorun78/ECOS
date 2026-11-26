@@ -79,6 +79,12 @@ ecos:
   workspace:
     query-history:
       persistent: ${ECOS_WS_QUERY_HISTORY_PERSISTENT:true}
+  # ── V367 批次 B3：Python 算法沙盒（本机 compose 映射 127.0.0.1:18099）────────
+  # 有值 ⇒ SandboxResearchExecutor 生效（@ConditionalOnProperty），PYTHON_SANDBOX 算法可执行；
+  # 容器未起时执行如实 503/FAILED，不静默回退 Java 假实现。
+  research:
+    sandbox:
+      base-url: ${ECOS_RESEARCH_SANDBOX_BASE_URL:http://127.0.0.1:18099}
   # ── 卷07 F07-01 要点 3（R-24 已批准为 B 案）：两态鉴权等价 ──────────────────
   # 键名收口：原 `ecos.header-auth.enabled` 是死键（全仓 0 读取方，
   # HeaderAuthAutoConfiguration 只认 `ecos.security.header-auth`），

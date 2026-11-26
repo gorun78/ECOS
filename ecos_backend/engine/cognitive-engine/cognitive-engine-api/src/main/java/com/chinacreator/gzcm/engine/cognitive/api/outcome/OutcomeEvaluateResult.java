@@ -56,6 +56,20 @@ public class OutcomeEvaluateResult {
     /** 幂等命中标记（true = 本次返回既有评估记录，未重复计算）。 */
     private boolean idempotentReplay;
 
+    /**
+     * 实际值接缝是否就绪（V367 批次 D）：有 {@link OutcomeMetricValueReader} bean ⇒ true。
+     * 前端 DEMO 徽标解除的判定依据之一；false ≠ 假绿。
+     */
+    private Boolean valueSeamReady;
+
+    public Boolean getValueSeamReady() {
+        return valueSeamReady;
+    }
+
+    public void setValueSeamReady(Boolean valueSeamReady) {
+        this.valueSeamReady = valueSeamReady;
+    }
+
     /** 追踪 ID 回显（§12.2）。 */
     private String traceId;
 

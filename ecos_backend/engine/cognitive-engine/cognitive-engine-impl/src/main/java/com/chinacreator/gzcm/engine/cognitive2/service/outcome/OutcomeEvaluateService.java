@@ -501,6 +501,7 @@ public class OutcomeEvaluateService {
                 m.setCalculationRef(rv.calculationRef());
             }
         }
+        m.setActualValueSource(m.getActual() != null ? "ACTION_OUTCOME" : "ABSENT");
         return m;
     }
 
@@ -756,6 +757,7 @@ public class OutcomeEvaluateService {
             row.put("applicable", m.isApplicable());
             row.put("notApplicableReason", m.getNotApplicableReason());
             row.put("caliberId", m.getCaliberId());
+            row.put("actualValueSource", m.getActualValueSource());
             rows.add(row);
         }
         return rows;
@@ -786,6 +788,7 @@ public class OutcomeEvaluateService {
         r.setMape(agg.mape());
         r.setTotalSampleCount(agg.sampleCount());
         r.setApplicableSampleCount(agg.maeSampleCount());
+        r.setValueSeamReady(valueSeamReady());
         return r;
     }
 
@@ -802,6 +805,9 @@ public class OutcomeEvaluateService {
             m.setCalculationRef(str(row.get("calculationRef")));
             m.setCaliberId(str(row.get("caliberId")));
             m.setNotApplicableReason(str(row.get("notApplicableReason")));
+            String source = str(row.get("actualValueSource"));
+            m.setActualValueSource(source != null ? source
+                    : (m.getActual() != null ? "ACTION_OUTCOME" : "ABSENT"));
             Object applicable = row.get("applicable");
             m.setApplicable(applicable == null || Boolean.parseBoolean(String.valueOf(applicable)));
             out.add(m);

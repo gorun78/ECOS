@@ -104,10 +104,10 @@ public final class SandboxServer {
             data.put("network", false);
             data.put("operators", new ArrayList<>(new TreeSet<>(ALLOWED_OPS)));
             data.put("codeExecution", true);
-            data.put("languages", new ArrayList<>(List.of("java", "python")));
+            data.put("languages", new ArrayList<>(List.of("python")));
             data.put("codeExecutionNote",
-                    "受控 Java/Python 代码执行：容器无网络/只读根/cap-drop/非 root，"
-                            + "单次执行硬超时强杀；静态筛查仅防呆，安全边界在容器");
+                    "仅 Python 代码执行（Java 执行器已按 2026-11-26 裁决移除）：容器无网络/只读根/"
+                            + "cap-drop/非 root，单次执行硬超时强杀；静态筛查仅防呆，安全边界在容器");
             data.put("note", "声明式算子沙盒：不接受任意代码，不连库，不出网");
             respond(ex, 200, envelope(0, data, null));
         }
@@ -134,19 +134,16 @@ public final class SandboxServer {
                 String code = asText(payload.get("code"));
                 String language = asText(payload.get("language"));
                 if (language == null || language.isBlank()) {
-                    language = "java";   // 默认保持既有行为（Java），新增语言须显式声明
+                    language = "python";
                 }
                 Long timeoutMs = payload.get("timeoutMs") instanceof BigDecimal b
                         ? b.longValue() : null;
-                Integer heapMb = payload.get("heapMb") instanceof BigDecimal b
-                        ? b.intValue() : null;
 
                 Map<String, Object> result;
                 switch (language.toLowerCase()) {
-                    case "java" -> result = CodeExecutor.run(code, timeoutMs, heapMb);
                     case "python", "python3", "py" -> result = CodeExecutor.runPython(code, timeoutMs);
                     default -> throw new SandboxError(400,
-                            "不支持的语言: " + language + "（支持 java / python）");
+                            "不支持的语言: " + language + "（沙盒仅支持 python；Java 执行器已移除）");
                 }
                 respond(ex, 200, envelope(0, result, null));
             } catch (SandboxError e) {
@@ -195,6 +192,10 @@ public final class SandboxServer {
 
     static Map<String, Object> runRound(Map<String, Object> payload) {
         long started = System.nanoTime();
+        long deadlineMs = payload.get("deadlineMs") instanceof BigDecimal b
+                ? b.longValue() : 30_000L;
+        deadlineMs = Math.max(1_000L, Math.min(deadlineMs, 30_000L));
+        long deadlineAt = started + deadlineMs * 1_000_000L;
 
         Object snapObj = payload.get("snapshot");
         if (!(snapObj instanceof Map<?, ?> snapshot)) {
@@ -244,6 +245,9 @@ public final class SandboxServer {
 
         List<Map<String, Object>> results = new ArrayList<>();
         for (Map.Entry<String, List<Map<String, Object>>> e : groups.entrySet()) {
+            if (System.nanoTime() > deadlineAt) {
+                throw new SandboxError(408, "声明式执行超过 deadlineMs=" + deadlineMs);
+            }
             for (Object m : metricsList) {
                 if (!(m instanceof Map<?, ?> spec)) {
                     throw new SandboxError(400, "metrics 元素必须是对象");

@@ -49,8 +49,8 @@ class BindingCatalogContractTest {
         for (BindingType t : BindingType.values()) {
             count.merge(t.tier(), 1, Integer::sum);
         }
-        assertEquals(Integer.valueOf(5), count.get(ScenarioTier.SUBGRAPH),
-                "子图层 = DATASET/OBJECT_TYPE/KNOWLEDGE_BASE/RULE_SET/PIPELINE");
+        assertEquals(Integer.valueOf(7), count.get(ScenarioTier.SUBGRAPH),
+                "子图层 = DATASET/OBJECT_TYPE/KNOWLEDGE_BASE/KNOWLEDGE_ARTICLE/COGNITIVE_ASSET/RULE_SET/PIPELINE");
         assertEquals(Integer.valueOf(1), count.get(ScenarioTier.CROSSCUT),
                 "横切层 = AI_AGENT");
         assertEquals(Integer.valueOf(2), count.get(ScenarioTier.EXIT),

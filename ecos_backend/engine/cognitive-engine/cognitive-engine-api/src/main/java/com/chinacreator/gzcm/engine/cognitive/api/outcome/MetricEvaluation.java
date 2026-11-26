@@ -72,6 +72,20 @@ public class MetricEvaluation {
     private String intervalValueSource;
 
     /**
+     * 实际值来源（V367 批次 D）：{@code ACTION_OUTCOME} = datanet action-outcomes 真值，
+     * {@code ABSENT} = 无实际值；null = 旧记录未标注。
+     */
+    private String actualValueSource;
+
+    public String getActualValueSource() {
+        return actualValueSource;
+    }
+
+    public void setActualValueSource(String actualValueSource) {
+        this.actualValueSource = actualValueSource;
+    }
+
+    /**
      * 契约校验：返回问题列表（空 = 合法）。
      *
      * <p>规则：</p>

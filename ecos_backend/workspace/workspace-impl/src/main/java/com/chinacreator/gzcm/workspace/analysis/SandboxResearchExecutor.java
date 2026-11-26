@@ -235,7 +235,7 @@ public class SandboxResearchExecutor implements ResearchExecutorPort {
         // 2) 沙盒执行
         Map<String, Object> result;
         try {
-            result = executeCode(language, code, null);
+            result = executeCode(language, code, 10_000L);
         } catch (RuntimeException e) {
             out.put("state", "failed");
             out.put("stage", "execute");
@@ -335,13 +335,18 @@ public class SandboxResearchExecutor implements ResearchExecutorPort {
      * @return 沙盒原样结果（含 stdout/stderr/measuredMetric/timedOut/truncated）
      */
     public Map<String, Object> executeCode(String language, String code, Long timeoutMs) {
+        // 2026-11-26 裁决：沙盒只保留 Python 执行器；其它语言显式拒绝，不静默降级
+        String lang = language == null || language.isBlank() ? "python" : language.trim().toLowerCase();
+        if (!"python".equals(lang) && !"python3".equals(lang) && !"py".equals(lang)) {
+            throw new IllegalArgumentException("沙盒仅支持 python（Java 执行器已移除）: " + language);
+        }
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         CallerCredentialSource.applyTo(headers);
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("language", language == null || language.isBlank() ? "java" : language);
+        body.put("language", "python");
         body.put("code", code);
         if (timeoutMs != null) {
             body.put("timeoutMs", timeoutMs);

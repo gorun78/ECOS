@@ -79,7 +79,19 @@ public class SecurityEngineContextTrimmer implements ContextSecurityTrimmer {
         if (ref == null || ref.getSourceType() == null) {
             return TrimDecision.deny();
         }
-        String table = SOURCE_TABLES.get(ref.getSourceType().toUpperCase());
+        String type = ref.getSourceType().toUpperCase();
+        String table = SOURCE_TABLES.get(type);
+        // COGNITIVE 是资产族而非单表：按 id 前缀路由到 belief/hypothesis/model 真载体
+        if ("COGNITIVE".equals(type) && ref.getSourceId() != null) {
+            String id = ref.getSourceId().toLowerCase();
+            if (id.startsWith("cog_hyp") || id.startsWith("hyp")) {
+                table = "ecos_cognitive.ecos_cognitive_hypothesis";
+            } else if (id.startsWith("cog_mod") || id.startsWith("mod")) {
+                table = "ecos_cognitive.ecos_cognitive_model";
+            } else {
+                table = "ecos_cognitive.ecos_cognitive_belief";
+            }
+        }
         if (table == null) {
             log.warn("Context 裁剪：未登记来源类型，按 DENY 处置 type={}", ref.getSourceType());
             return TrimDecision.deny();

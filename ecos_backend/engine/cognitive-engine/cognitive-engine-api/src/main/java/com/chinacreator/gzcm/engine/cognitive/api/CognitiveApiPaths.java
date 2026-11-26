@@ -64,9 +64,19 @@ public final class CognitiveApiPaths {
     /** §5 Context Builder（请求态 Context Pack，不建认知上下文表；聚合装配见 impl）。 */
     public static final String CONTEXT_BUILD = COGNITIVE + "/context/build";
 
+    /**
+     * V367 批次 A：认知算法通用执行面（workspace 场景运行按登记 id 调用）。
+     * 数值唯一来源；LLM 只解释，不参与计算。
+     */
+    public static final String ALGORITHMS = COGNITIVE + "/algorithms";
+    public static final String PARAM_ALGORITHM_CODE = "code";
+    public static final String ALGORITHM_EXECUTE_REL = "/{" + PARAM_ALGORITHM_CODE + "}/execute";
+
     /** §8 认知资产目录 / 只读解析 / 受控提案（属主 cognitive，只增子路径）。 */
     public static final String PARAM_ASSET_ID   = "assetId";
     public static final String ASSETS_CATALOG   = COGNITIVE + "/assets/catalog";
+    /** V367 批次 E：可绑定认知资产实例（bel/hyp/mod），供场景上下文选择。 */
+    public static final String ASSETS_INSTANCES_REL = "/assets/instances";
     public static final String ASSETS_RESOLVE   = COGNITIVE + "/assets/{" + PARAM_ASSET_ID + "}/resolve";
     public static final String ASSETS_PROPOSALS = COGNITIVE + "/assets/{" + PARAM_ASSET_ID + "}/proposals";
 

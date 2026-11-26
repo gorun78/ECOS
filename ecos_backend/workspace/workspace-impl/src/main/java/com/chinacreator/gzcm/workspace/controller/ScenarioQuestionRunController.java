@@ -54,8 +54,13 @@ public class ScenarioQuestionRunController {
         String algorithmId = text(body.get("algorithmId"));
         List<Map<String, Object>> hypotheses = body.get("hypotheses") instanceof List<?> l
                 ? (List<Map<String, Object>>) l : List.of();
+        Map<String, Object> algorithmInputs = body.get("algorithmInputs") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : Map.of();
+        String executorType = text(body.get("executorType"));
+        String executorId = text(body.get("executorId"));
         return ApiResponse.success(
-                questionRunService.run(scenarioId, question, modelCode, hypotheses, algorithmId));
+                questionRunService.run(scenarioId, question, modelCode, hypotheses, algorithmId,
+                        algorithmInputs, executorType, executorId));
     }
 
     /** 历史运行列表（倒序）。 */

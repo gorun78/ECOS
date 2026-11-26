@@ -44,9 +44,12 @@ public class WorkspaceScenarioRunValueReader implements OutcomeMetricValueReader
     private static final Logger log = LoggerFactory.getLogger(WorkspaceScenarioRunValueReader.class);
 
     static final String RUNS_PATH = "/api/v1/workspace/scenarios/%s/runs?limit=50";
+    /** V367 批次 D：真实实际值来源（datanet action-outcomes，V279 表）。 */
+    static final String ACTUALS_PATH = "/api/v1/datanet/facts/action-outcomes?forecastRunId=%s";
     static final String REASON_ACTUAL_ABSENT = "actual value ref absent (no authoritative actual projection)";
     static final String REASON_ACTUAL_NOT_DEPLOYED =
             "actual value projection channel not deployed (asset-level actuals unavailable)";
+    static final String REASON_ACTUAL_NOT_FOUND = "actual value not found in action-outcomes (V279)";
 
     private final RestTemplate restTemplate;
     private final ServiceEndpointResolver endpointResolver;
@@ -65,13 +68,15 @@ public class WorkspaceScenarioRunValueReader implements OutcomeMetricValueReader
             return out;
         }
         Map<String, Object> run = findRun(query);
+        Map<String, BigDecimal> actuals = findActuals(query);
         for (MetricRefPair pair : query.pairs()) {
-            out.add(resolveOne(query, run, pair));
+            out.add(resolveOne(query, run, pair, actuals));
         }
         return out;
     }
 
-    private ResolvedValue resolveOne(ResolveQuery query, Map<String, Object> run, MetricRefPair pair) {
+    private ResolvedValue resolveOne(ResolveQuery query, Map<String, Object> run, MetricRefPair pair,
+                                     Map<String, BigDecimal> actuals) {
         String metricRef = pair.metricRef();
         String actualReason = pair.actualRef() == null ? REASON_ACTUAL_ABSENT : REASON_ACTUAL_NOT_DEPLOYED;
 
@@ -95,8 +100,95 @@ public class WorkspaceScenarioRunValueReader implements OutcomeMetricValueReader
             return new ResolvedValue(metricRef, null, null, text(run.get("id")),
                     Map.of(), "forecast result has no point value (run produced no deterministic number)");
         }
-        return new ResolvedValue(metricRef, predicted, null, text(run.get("id")),
-                Map.of(), actualReason);
+        BigDecimal actual = metricRef == null ? null : actuals.get(metricRef);
+        if (actual == null && runMetric != null) {
+            actual = actuals.get(runMetric);
+        }
+        if (actual == null) {
+            return new ResolvedValue(metricRef, predicted, null, text(run.get("id")),
+                    Map.of(), actualReason);
+        }
+        return new ResolvedValue(metricRef, predicted, actual, text(run.get("id")),
+                Map.of(), null);
+    }
+
+    /**
+     * 读 datanet action-outcomes 真实实际值（V367 批次 D）。
+     *
+     * <p>键 = {@code detail_json.metricRef}（缺省 {@code fact_id}/{@code action_id}），
+     * 值 = {@code actual_impact}。通道/数据缺失返回空表，由逐指标写明 unavailableReason。</p>
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, BigDecimal> findActuals(ResolveQuery query) {
+        String runId = firstNonBlank(query.forecastRunId(), firstForecastCalculationId(query.pairs()));
+        if (runId == null) return Map.of();
+        String base = endpointResolver
+                .resolve("datanet", ServiceEndpointResolver.RouteMode.MONOLITH)
+                .orElse(null);
+        if (base == null) {
+            log.warn("结果评估数值接缝：route-manifest 未登记 datanet，实际值按不可用处置");
+            return Map.of();
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        String url = base + String.format(ACTUALS_PATH, runId);
+        try {
+            ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET,
+                    new HttpEntity<>(headers), Map.class);
+            Map<String, Object> body = resp.getBody();
+            if (body == null) return Map.of();
+            Object code = body.get("code");
+            if (code instanceof Number n && n.intValue() != 0) {
+                log.warn("结果评估数值接缝：action-outcomes 业务错误 code={}", n);
+                return Map.of();
+            }
+            if (!(body.get("data") instanceof List<?> rows)) return Map.of();
+            Map<String, BigDecimal> out = new LinkedHashMap<>();
+            for (Object o : rows) {
+                if (!(o instanceof Map<?, ?> row)) continue;
+                BigDecimal actual = toDecimal(row.get("actual_impact"));
+                if (actual == null) actual = toDecimal(row.get("actualImpact"));
+                if (actual == null) continue;
+                String metric = metricOf(row);
+                if (metric != null && !out.containsKey(metric)) out.put(metric, actual);
+            }
+            return out;
+        } catch (RestClientException | ClassCastException e) {
+            log.warn("结果评估数值接缝：action-outcomes 读取失败 {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private static String metricOf(Map<?, ?> row) {
+        Object detail = row.get("detail_json");
+        if (detail == null) detail = row.get("detailJson");
+        if (detail instanceof String s && !s.isBlank()) {
+            try {
+                detail = new com.fasterxml.jackson.databind.ObjectMapper().readValue(s, Map.class);
+            } catch (Exception ignore) {
+                // 非 JSON 明细不阻断：退回 fact_id
+            }
+        }
+        if (detail instanceof Map<?, ?> dm) {
+            Object m = dm.get("metricRef");
+            if (m == null) m = dm.get("metric_ref");
+            if (m != null && !String.valueOf(m).isBlank()) return String.valueOf(m);
+        }
+        Object factId = row.get("fact_id");
+        if (factId == null) factId = row.get("factId");
+        if (factId != null && !String.valueOf(factId).isBlank()) return String.valueOf(factId);
+        Object actionId = row.get("action_id");
+        if (actionId == null) actionId = row.get("actionId");
+        return actionId == null ? null : String.valueOf(actionId);
+    }
+
+    private static BigDecimal toDecimal(Object v) {
+        if (v instanceof BigDecimal b) return b;
+        if (v instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
+        if (v instanceof String s && !s.isBlank()) {
+            try { return new BigDecimal(s.trim()); } catch (NumberFormatException ignore) { return null; }
+        }
+        return null;
     }
 
     private String runIdOf(ResolveQuery query, MetricRefPair pair) {

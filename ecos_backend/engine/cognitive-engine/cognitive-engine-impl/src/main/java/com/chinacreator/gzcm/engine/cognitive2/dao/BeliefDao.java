@@ -110,7 +110,7 @@ public class BeliefDao extends JdbcTemplateDaoSupport {
         try {
             return jdbcTemplate.queryForMap(
                 "SELECT id, variable_name, domain, status, version, lifecycle_state, " +
-                "probability, prob_kind, calibration_ref, model_ref, scope_ref, as_of_time " +
+                "probability, prob_kind, calibration_ref, model_ref, scope_ref, as_of_time, update_time " +
                 "FROM ecos_cognitive_belief WHERE id = ? AND is_deleted = 0", id);
         } catch (EmptyResultDataAccessException e) {
             return null;

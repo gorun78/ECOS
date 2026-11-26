@@ -41,6 +41,9 @@ public class ScenarioService {
         BINDING_ENDPOINTS.put("DATASET", "datasets");
         BINDING_ENDPOINTS.put("OBJECT_TYPE", "objectTypes");
         BINDING_ENDPOINTS.put("KNOWLEDGE_BASE", "knowledgeBases");
+        // V367 批次 E：知识文章（向量/文档）与认知资产作为「其他知识」绑定
+        BINDING_ENDPOINTS.put("KNOWLEDGE_ARTICLE", "knowledgeArticles");
+        BINDING_ENDPOINTS.put("COGNITIVE_ASSET", "cognitiveAssets");
         BINDING_ENDPOINTS.put("RULE_SET", "ruleSets");
         // PIPELINE（2026-11-23）：逻辑编排 id，场景运行 analysisType=PIPELINE 时按它执行
         BINDING_ENDPOINTS.put("PIPELINE", "pipelines");

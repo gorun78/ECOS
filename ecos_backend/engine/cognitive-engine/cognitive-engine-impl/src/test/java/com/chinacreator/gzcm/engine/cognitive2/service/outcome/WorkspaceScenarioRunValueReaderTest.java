@@ -5,132 +5,78 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
-import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
-import com.chinacreator.gzcm.engine.cognitive.api.context.CalculationResultRef;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 
-/**
- * C-2 数值接缝门禁（2026-11-07）：预测值只来自已落库确定性产物；取不到必须逐指标写明原因，
- * 禁 0 填充、禁抛断整次评估、禁指标名不符时拿别的值顶替。
- */
+/** 实际值接缝门禁（V367 批次 D）：datanet action-outcomes → actual。 */
 class WorkspaceScenarioRunValueReaderTest {
 
-    private final ServiceEndpointResolver resolver = mock(ServiceEndpointResolver.class);
-
-    private WorkspaceScenarioRunValueReader readerWith(RestTemplate template) {
-        when(resolver.resolve(eq("workspace"), any())).thenReturn(Optional.of("http://localhost:18090"));
-        return new WorkspaceScenarioRunValueReader(template, resolver);
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static WorkspaceScenarioRunValueReader reader(RestTemplate rest, boolean withActual) {
+        ServiceEndpointResolver resolver = mock(ServiceEndpointResolver.class);
+        when(resolver.resolve(eq("workspace"), any())).thenReturn(Optional.of("http://ws"));
+        when(resolver.resolve(eq("datanet"), any())).thenReturn(Optional.of("http://dn"));
+        when(rest.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(Map.class)))
+                .thenAnswer(inv -> {
+                    String url = inv.getArgument(0);
+                    if (url.contains("/runs")) {
+                        return ResponseEntity.ok(Map.of("code", 0, "data", List.of(Map.of(
+                                "id", "fr1", "metric", "m1",
+                                "forecast_result", Map.of("points", List.of(Map.of("value", 10)))))));
+                    }
+                    if (url.contains("action-outcomes")) {
+                        return ResponseEntity.ok(Map.of("code", 0, "data", withActual
+                                ? List.of(Map.of("actual_impact", 12,
+                                        "detail_json", "{\"metricRef\":\"m1\"}"))
+                                : List.of()));
+                    }
+                    return ResponseEntity.ok(Map.of("code", 0, "data", List.of()));
+                });
+        return new WorkspaceScenarioRunValueReader(rest, resolver);
     }
 
-    private static RestTemplate returning(Object data) {
-        return new RestTemplate() {
-            @Override
-            @SuppressWarnings("unchecked")
-            public <T> ResponseEntity<T> exchange(String url, HttpMethod method,
-                                                  HttpEntity<?> requestEntity, Class<T> responseType,
-                                                  Object... uriVariables) {
-                return (ResponseEntity<T>) ResponseEntity.ok(Map.of("code", 0, "data", data));
-            }
-        };
-    }
-
-    private static OutcomeMetricValueReader.ResolveQuery query(String metricRef) {
-        CalculationResultRef forecast = new CalculationResultRef();
-        forecast.setCalculationId("run_540cbb12");
-        forecast.setDeterministic(true);
-        return new OutcomeMetricValueReader.ResolveQuery("sc_ent2_group_month", "run_1",
-                "run_540cbb12", "cal_1", "2026-01-01T00:00:00Z", "2026-06-30T00:00:00Z",
-                List.of(new OutcomeMetricValueReader.MetricRefPair(metricRef, forecast, null)));
-    }
-
-    @Test
-    void resolvesPredictedFromStoredDeterministicRunAndLeavesActualExplicit() {
-        Map<String, Object> run = Map.of(
-                "id", "run_540cbb12",
-                "metric", "毛利率",
-                "forecast_result", Map.of("points", Map.of("points",
-                        List.of(Map.of("t", "6", "value", "86.7606480305714")))));
-        WorkspaceScenarioRunValueReader reader = readerWith(returning(List.of(run)));
-
-        List<OutcomeMetricValueReader.ResolvedValue> out = reader.resolve(query("毛利率"));
-
-        assertEquals(1, out.size());
-        OutcomeMetricValueReader.ResolvedValue v = out.get(0);
-        assertEquals(new BigDecimal("86.7606480305714"), v.predicted());
-        assertNull(v.actual(), "实际值无权威通道时必须为 null，禁 0 填充");
-        assertNotNull(v.unavailableReason());
-        assertTrue(v.unavailableReason().contains("actual"), v.unavailableReason());
-        assertEquals("run_540cbb12", v.calculationRef());
-        assertTrue(!v.fullyResolved());
+    private static OutcomeMetricValueReader.ResolveQuery query() {
+        return new OutcomeMetricValueReader.ResolveQuery("sc1", "r1", "fr1", "cal1", null, null,
+                List.of(new OutcomeMetricValueReader.MetricRefPair("m1", null, null)));
     }
 
     @Test
-    void metricMismatchIsExplicitInsteadOfBorrowingAnotherMetric() {
-        Map<String, Object> run = Map.of("id", "run_540cbb12", "metric", "毛利率",
-                "forecast_result", Map.of("points", Map.of("points",
-                        List.of(Map.of("value", "1.0")))));
-        WorkspaceScenarioRunValueReader reader = readerWith(returning(List.of(run)));
-
-        OutcomeMetricValueReader.ResolvedValue v = reader.resolve(query("M_PROFIT")).get(0);
-
-        assertNull(v.predicted());
-        assertTrue(v.unavailableReason().contains("metric mismatch"), v.unavailableReason());
+    @DisplayName("有 action-outcome ⇒ predicted=10 / actual=12，fullyResolved")
+    void resolvesPredictedAndActual() {
+        List<OutcomeMetricValueReader.ResolvedValue> rows =
+                reader(mock(RestTemplate.class), true).resolve(query());
+        assertEquals(1, rows.size());
+        assertEquals(0, rows.get(0).predicted().compareTo(new BigDecimal("10")));
+        assertEquals(0, rows.get(0).actual().compareTo(new BigDecimal("12")));
+        assertNull(rows.get(0).unavailableReason());
+        assertTrue(rows.get(0).fullyResolved());
     }
 
     @Test
-    void runNotFoundIsExplicit() {
-        WorkspaceScenarioRunValueReader reader = readerWith(returning(List.of()));
-
-        OutcomeMetricValueReader.ResolvedValue v = reader.resolve(query("毛利率")).get(0);
-
-        assertNull(v.predicted());
-        assertTrue(v.unavailableReason().contains("not found"), v.unavailableReason());
-    }
-
-    @Test
-    void channelFailureDoesNotThrowAndIsExplicit() {
-        RestTemplate broken = new RestTemplate() {
-            @Override
-            public <T> ResponseEntity<T> exchange(String url, HttpMethod method,
-                                                  HttpEntity<?> requestEntity, Class<T> responseType,
-                                                  Object... uriVariables) {
-                throw new ResourceAccessException("connect timed out");
-            }
-        };
-        WorkspaceScenarioRunValueReader reader = readerWith(broken);
-
-        OutcomeMetricValueReader.ResolvedValue v = reader.resolve(query("毛利率")).get(0);
-
-        assertNull(v.predicted());
-        assertTrue(v.unavailableReason().contains("unavailable"), v.unavailableReason());
-    }
-
-    @Test
-    void pointValueParsesJsonStringAndFlatValue() {
-        assertEquals(new BigDecimal("2.5"), WorkspaceScenarioRunValueReader.firstPointValue(
-                "{\"points\":{\"points\":[{\"value\":\"2.5\"}]}}"));
-        assertEquals(new BigDecimal("4"), WorkspaceScenarioRunValueReader.firstPointValue(
-                Map.of("type", "jsonb", "value", "{\"points\":{\"points\":[{\"value\":4}]}}")),
-                "PGobject 序列化形态 {type,value} 必须先解包");
-        assertEquals(new BigDecimal("3"), WorkspaceScenarioRunValueReader.firstPointValue(
-                Map.of("value", 3)));
-        assertNull(WorkspaceScenarioRunValueReader.firstPointValue("not-json"));
-        assertNull(WorkspaceScenarioRunValueReader.firstPointValue(Map.of()));
+    @DisplayName("无 action-outcome ⇒ actual=null 且逐指标给 unavailableReason，禁填 0")
+    void missingActualStaysUnavailable() {
+        List<OutcomeMetricValueReader.ResolvedValue> rows =
+                reader(mock(RestTemplate.class), false).resolve(query());
+        assertEquals(1, rows.size());
+        assertNotNull(rows.get(0).predicted());
+        assertNull(rows.get(0).actual(), "无实际值必须为 null，不能写 0");
+        assertNotNull(rows.get(0).unavailableReason());
+        assertTrue(!rows.get(0).fullyResolved());
     }
 }

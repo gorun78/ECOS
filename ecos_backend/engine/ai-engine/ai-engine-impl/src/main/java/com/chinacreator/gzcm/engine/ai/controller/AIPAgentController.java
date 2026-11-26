@@ -400,7 +400,8 @@ public class AIPAgentController {
         agentDef.put("systemPrompt",
                 body.getOrDefault("systemPrompt", meta.getOrDefault("systemPrompt", agent.getSystemPrompt())));
         agentDef.put("model",
-                body.getOrDefault("model", meta.getOrDefault("model", agent.getModel())));
+                body.getOrDefault("model", meta.getOrDefault("model",
+                        meta.getOrDefault("modelName", agent.getModel()))));
         agentDef.put("temperature",
                 body.getOrDefault("temperature", meta.getOrDefault("temperature", 0.7)));
         agentDef.put("maxTokens",
@@ -414,6 +415,57 @@ public class AIPAgentController {
             return ResponseEntity.ok(ApiResponse.success(data));
         }
         // F06-14/15：失败态走 D.5 分类状态，禁 ApiResponse.success(...) 伪成功（A3）
+        return AiResponseSupport.failure(result.getErrorClass(), result.getErrorCode(),
+                result.getErrorMsg(), result.getErrorTraceId(), data);
+    }
+
+    /**
+     * 场景运行统一调用门面（V367 批次 H）：{@code POST /api/v1/aip/agents/{id}/invoke}。
+     *
+     * <p>与 {@code /test} 的区别：<b>不接受</b> systemPrompt/model 覆盖，只按已登记人格执行；
+     * 供 workspace 场景运行把「主执行载体 = AI_AGENT」落到真实 Agent 循环。
+     * body {@code {message, context?}}；返回 {@code answer/turns/tokens/toolCalls/elapsedMs}。</p>
+     */
+    @PostMapping("/agents/{id}/invoke")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> invokeAgent(
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, Object> body) {
+        if (studioService == null) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(AiResponseSupport.<Map<String, Object>>dependencyUnavailable("AgentStudioService"));
+        }
+        if (agentRepo == null) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(AiResponseSupport.<Map<String, Object>>dependencyUnavailable("AgentRegistryRepository"));
+        }
+        AgentRegistryEntity agent = agentRepo.findById(id);
+        if (agent == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(AiResponseSupport.<Map<String, Object>>classified(
+                            AiErrorClass.NOT_FOUND, "Agent " + id + " 不存在"));
+        }
+        Map<String, Object> b = body == null ? Map.of() : body;
+        String message = String.valueOf(b.getOrDefault("message", "")).trim();
+        if (message.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.<Map<String, Object>>badRequest("AIP-AGENT-400: message 必填"));
+        }
+        Map<String, Object> meta = parseMetadata(agent.getMetadata());
+        Map<String, Object> agentDef = new LinkedHashMap<>();
+        agentDef.put("systemPrompt", meta.getOrDefault("systemPrompt", agent.getSystemPrompt()));
+        agentDef.put("model", meta.getOrDefault("model",
+                meta.getOrDefault("modelName", agent.getModel())));
+        agentDef.put("temperature", meta.getOrDefault("temperature", 0.7));
+        agentDef.put("maxTokens", meta.getOrDefault("maxTokens", 4096));
+
+        AgentTestResult result = studioService.createAndTest(agentDef, message);
+        Map<String, Object> data = result.toMap();
+        data.put("agentId", id);
+        data.put("answer", result.toMap().get("response"));
+        data.put("elapsedMs", data.get("durationMs"));
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(ApiResponse.success(data));
+        }
         return AiResponseSupport.failure(result.getErrorClass(), result.getErrorCode(),
                 result.getErrorMsg(), result.getErrorTraceId(), data);
     }

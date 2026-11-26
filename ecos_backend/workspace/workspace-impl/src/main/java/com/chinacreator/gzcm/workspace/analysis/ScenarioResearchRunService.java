@@ -58,12 +58,22 @@ public class ScenarioResearchRunService {
     private final WorkspaceDataDao dao;
     private final ScenarioService scenarioService;
     private final ResearchExecutorPort executor;
+    private final com.chinacreator.gzcm.workspace.scenario.WorkspaceSecurityAudit audit;
 
+    /** 测试/兼容构造（无审计）。 */
     public ScenarioResearchRunService(WorkspaceDataDao dao, ScenarioService scenarioService,
                                       ResearchExecutorPort executor) {
+        this(dao, scenarioService, executor, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ScenarioResearchRunService(WorkspaceDataDao dao, ScenarioService scenarioService,
+                                      ResearchExecutorPort executor,
+                                      com.chinacreator.gzcm.workspace.scenario.WorkspaceSecurityAudit audit) {
         this.dao = dao;
         this.scenarioService = scenarioService;
         this.executor = executor;
+        this.audit = audit;
     }
 
     /**
@@ -222,6 +232,21 @@ public class ScenarioResearchRunService {
         out.put("evaluationDegraded", evaluationDegraded);
         out.put("elapsedMs", System.currentTimeMillis() - startedAt);
         out.put("candidateOnly", true);
+
+        // V367 批次 F：研究循环执行审计（不落代码正文）
+        if (audit != null) {
+            try {
+                java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
+                meta.put("scenarioId", scenarioId);
+                meta.put("rounds", rounds.size());
+                meta.put("stopReason", stopReason);
+                meta.put("executor", executor.describe());
+                String auditRunId = sotaRunId != null ? sotaRunId : branchKey;
+                audit.record("scenario_run_sandbox_execute", auditRunId, meta);
+            } catch (RuntimeException e) {
+                log.warn("研究循环审计投递失败 branch={} err={}", branchKey, e.getMessage());
+            }
+        }
         return out;
     }
 

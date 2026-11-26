@@ -219,7 +219,7 @@ services:
   # 隔离清单：非 root(10001) / 只读根 + tmpfs / cap-drop ALL /
   # no-new-privileges / 无 docker socket / 无宿主卷 / 内存 PID CPU 配额。
   research-sandbox:
-    image: ecos-research-sandbox:1.0.0
+    image: ecos-research-sandbox:1.1.1
     container_name: ecos-research-sandbox
     restart: unless-stopped
     ports:

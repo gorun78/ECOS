@@ -84,6 +84,64 @@ public class MentalReviewService {
         return resp;
     }
 
+    /**
+     * 按 run 聚合复盘（V367 批次 C）：从 {@code ecos_cognitive_run_invalidation.run_id} 反查
+     * 失效假设与其证据，再按 run 取告警；<b>不</b>要求 bucket 级 reviewTag（tag 面保留兼容）。
+     *
+     * <p>无认知侧数据时返回空段（不 400）——「本次运行没有失效/告警」是合法结论。</p>
+     */
+    public Map<String, Object> aggregateByRun(String runId) {
+        if (runId == null || runId.isBlank()) {
+            throw new BusinessException(400, "COG-400: runId 必填");
+        }
+        String id = runId.trim();
+        List<Map<String, Object>> invalidations = mentalReviewDao.invalidationsByRun(id);
+
+        java.util.LinkedHashSet<String> hypothesisIds = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> row : invalidations) {
+            Object hid = row.get("hypothesis_id");
+            if (hid != null && !String.valueOf(hid).isBlank()) hypothesisIds.add(String.valueOf(hid));
+        }
+        List<Map<String, Object>> hypotheses = mentalReviewDao.hypothesesByIds(new ArrayList<>(hypothesisIds));
+
+        java.util.LinkedHashSet<String> evidenceIds = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"([^\"]{1,64})\"").matcher("");
+        for (Map<String, Object> h : hypotheses) {
+            Object raw = h.get("evidence_ids");
+            if (raw == null) continue;
+            m.reset(String.valueOf(raw));
+            while (m.find()) evidenceIds.add(m.group(1));
+        }
+        List<Map<String, Object>> evidence = mentalReviewDao.evidenceByIds(new ArrayList<>(evidenceIds));
+
+        List<Map<String, Object>> warnAlerts;
+        try {
+            warnAlerts = mentalReviewDao.warnAlertsByRun(id);
+        } catch (RuntimeException e) {
+            log.warn("复盘 by-run：告警表不可用，降级空列表: {}", e.getMessage());
+            warnAlerts = List.of();
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("hypothesesTotal", hypotheses.size());
+        summary.put("hypothesesInvalidated", hypotheses.stream()
+                .filter(h -> Boolean.FALSE.equals(h.get("is_valid"))).count());
+        summary.put("evidenceCount", evidence.size());
+        summary.put("invalidations", invalidations.size());
+        summary.put("warnAlerts", warnAlerts.size());
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("runId", id);
+        resp.put("runScoped", true);
+        resp.put("reconstructionMode", "run-scoped:V130-invalidation+V128-hypothesis+V127-evidence+V131-warn");
+        resp.put("invalidations", invalidations);
+        resp.put("hypotheses", hypotheses);
+        resp.put("evidence", evidence);
+        resp.put("warnAlerts", warnAlerts);
+        resp.put("summary", summary);
+        return resp;
+    }
+
     /** belief 版本时间线（variable 分组，版本升序；since 过滤按版本行 update_time）。 */
     private List<Map<String, Object>> beliefTimelines(LocalDateTime since) {
         java.sql.Timestamp sinceTs = since == null ? null : java.sql.Timestamp.valueOf(since);

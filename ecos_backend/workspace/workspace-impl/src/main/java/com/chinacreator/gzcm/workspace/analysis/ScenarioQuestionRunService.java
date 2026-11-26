@@ -54,6 +54,10 @@ public class ScenarioQuestionRunService {
 
     private final WorkspaceDataDao dao;
     private final AipPipelineRunClient pipelineRunClient;
+    private final AlgorithmExecutionService algorithmExecutionService;
+    private final com.chinacreator.gzcm.workspace.scenario.ScenarioRuleEvaluator ruleEvaluator;
+    private final ScenarioRunArtifactWriter artifactWriter;
+    private final com.chinacreator.gzcm.workspace.scenario.WorkspaceSecurityAudit audit;
     private final RestTemplate llmRestTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -67,9 +71,17 @@ public class ScenarioQuestionRunService {
 
     public ScenarioQuestionRunService(WorkspaceDataDao dao,
                                       AipPipelineRunClient pipelineRunClient,
+                                      AlgorithmExecutionService algorithmExecutionService,
+                                      com.chinacreator.gzcm.workspace.scenario.ScenarioRuleEvaluator ruleEvaluator,
+                                      ScenarioRunArtifactWriter artifactWriter,
+                                      com.chinacreator.gzcm.workspace.scenario.WorkspaceSecurityAudit audit,
                                       @Qualifier("workspaceAipPipelineRest") RestTemplate llmRestTemplate) {
         this.dao = dao;
         this.pipelineRunClient = pipelineRunClient;
+        this.algorithmExecutionService = algorithmExecutionService;
+        this.ruleEvaluator = ruleEvaluator;
+        this.artifactWriter = artifactWriter;
+        this.audit = audit;
         this.llmRestTemplate = llmRestTemplate;
         this.llmModel = firstNonBlank(System.getenv("ECOS_QRUN_LLM_MODEL"),
                 System.getenv("LLM_DEFAULT_MODEL"), "Qwen3.8-27B");
@@ -102,7 +114,8 @@ public class ScenarioQuestionRunService {
         trace.add(step("hypotheses", "success", "候选假设 " + hypotheses.size() + " 条", t1));
 
         long t2 = System.currentTimeMillis();
-        List<Map<String, Object>> algorithms = recommendAlgorithms(String.valueOf(intent.get("intent")));
+        List<Map<String, Object>> algorithms = recommendAlgorithms(String.valueOf(intent.get("intent")))
+                .stream().map(algorithmExecutionService::decorate).toList();
         trace.add(step("algorithms", "success", "候选算法 " + algorithms.size() + " 条", t2));
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -113,6 +126,11 @@ public class ScenarioQuestionRunService {
         out.put("hypotheses", hypotheses);
         out.put("algorithms", algorithms);
         out.put("mentalModels", listMentalModels());
+        Map<String, Object> executors = new LinkedHashMap<>();
+        executors.put("mentalModels", listMentalModels());
+        executors.put("pipelines", listBoundExecutors(scenarioId, "PIPELINE"));
+        executors.put("agents", listBoundExecutors(scenarioId, "AI_AGENT"));
+        out.put("executors", executors);
         out.put("trace", trace);
         return out;
     }
@@ -124,21 +142,52 @@ public class ScenarioQuestionRunService {
      * @param modelCode  选定的心智模型码（FIRST_PRINCIPLES / INVERT / ...）
      */
     public Map<String, Object> run(String scenarioId, String question, String modelCode,
-                                   List<Map<String, Object>> hypotheses, String algorithmId) {
+                                   List<Map<String, Object>> hypotheses, String algorithmId,
+                                   Map<String, Object> algorithmInputs,
+                                   String executorType, String executorId) {
         if (question == null || question.isBlank()) {
             throw new BusinessException(400, "SCENARIO-Q-400: question 必填");
         }
-        if (modelCode == null || modelCode.isBlank()) {
-            throw new BusinessException(400, "SCENARIO-Q-400: 心智模型必选（决定运行路径）");
-        }
-        Map<String, Object> model = findMentalModel(modelCode);
-        if (model == null) {
-            throw new BusinessException(400, "SCENARIO-Q-400: 心智模型未登记: " + modelCode);
-        }
-        // DAO 返回的是库列名（snake_case）；两种命名都认，避免「有值却被判未接线」
-        String pipelineId = str(model, "pipelineId", "pipeline_id");
-        if (pipelineId == null || pipelineId.isBlank()) {
-            throw new BusinessException(409, "SCENARIO-Q-409: 心智模型 " + modelCode + " 尚未接线承载编排");
+        // 主执行载体三选一（V367 批次 H）：MENTAL_MODEL（默认）/ SCENARIO_PIPELINE / AI_AGENT
+        String execType = executorType == null || executorType.isBlank()
+                ? "MENTAL_MODEL" : executorType.trim().toUpperCase();
+        String execId = executorId;
+        String pipelineId = null;
+        Map<String, Object> model = null;
+        String execName;
+        switch (execType) {
+            case "MENTAL_MODEL" -> {
+                if (modelCode == null || modelCode.isBlank()) {
+                    throw new BusinessException(400, "SCENARIO-Q-400: 心智模型必选（决定运行路径）");
+                }
+                model = findMentalModel(modelCode);
+                if (model == null) {
+                    throw new BusinessException(400, "SCENARIO-Q-400: 心智模型未登记: " + modelCode);
+                }
+                pipelineId = str(model, "pipelineId", "pipeline_id");
+                if (pipelineId == null || pipelineId.isBlank()) {
+                    throw new BusinessException(409, "SCENARIO-Q-409: 心智模型 " + modelCode + " 尚未接线承载编排");
+                }
+                execId = modelCode;
+                execName = String.valueOf(model.get("name"));
+            }
+            case "SCENARIO_PIPELINE" -> {
+                if (execId == null || execId.isBlank()) {
+                    throw new BusinessException(400, "SCENARIO-Q-400: 场景编排必选 executorId");
+                }
+                assertBound(scenarioId, "PIPELINE", execId);
+                pipelineId = execId;
+                execName = "场景编排 " + execId;
+            }
+            case "AI_AGENT" -> {
+                if (execId == null || execId.isBlank()) {
+                    throw new BusinessException(400, "SCENARIO-Q-400: 智能体必选 executorId");
+                }
+                assertBound(scenarioId, "AI_AGENT", execId);
+                execName = "智能体 " + execId;
+            }
+            default -> throw new BusinessException(400,
+                    "SCENARIO-Q-400: executorType 非法（MENTAL_MODEL|SCENARIO_PIPELINE|AI_AGENT）: " + executorType);
         }
 
         long t0 = System.currentTimeMillis();
@@ -147,39 +196,129 @@ public class ScenarioQuestionRunService {
         Map<String, Object> intent = detectIntent(question);
         trace.add(step("intent", "success", "意图=" + intent.get("intent"), t0));
 
-        // 装配心智模型输入：问题 + 已确认假设 + 场景绑定的知识与数据资产
+        // ── 算法执行（V367）：选的算法必须真跑，数值是后续 prompt 的唯一事实来源 ──
+        Map<String, Object> algorithmResult = null;
+        String algorithmStatus = "SKIPPED";
+        Integer algorithmElapsedMs = null;
+        boolean algorithmFailed = false;
+        if (algorithmId != null && !algorithmId.isBlank()) {
+            long ta = System.currentTimeMillis();
+            try {
+                algorithmResult = algorithmExecutionService.execute(algorithmId, algorithmInputs);
+                algorithmStatus = String.valueOf(algorithmResult.getOrDefault("status", "FAILED"));
+                Object elapsed = algorithmResult.get("elapsedMs");
+                if (elapsed instanceof Number n) algorithmElapsedMs = n.intValue();
+                algorithmFailed = !"SUCCEEDED".equalsIgnoreCase(algorithmStatus)
+                        && !"DEGRADED".equalsIgnoreCase(algorithmStatus);
+                trace.add(step("algorithm", algorithmFailed ? "failed" : "success",
+                        "算法 " + algorithmResult.get("name") + " → " + algorithmStatus, ta));
+            } catch (RuntimeException e) {
+                algorithmFailed = true;
+                algorithmStatus = "FAILED";
+                algorithmElapsedMs = (int) (System.currentTimeMillis() - ta);
+                algorithmResult = new LinkedHashMap<>();
+                algorithmResult.put("status", "FAILED");
+                algorithmResult.put("algorithmId", algorithmId);
+                algorithmResult.put("message", e.getMessage());
+                trace.add(step("algorithm", "failed", "算法执行失败: " + e.getMessage(), ta));
+            }
+        }
+        String algorithmFacts = buildAlgorithmFacts(algorithmResult);
+
+        // 装配心智模型输入：问题 + 已确认假设 + 场景绑定的知识与数据资产 + 算法事实
         // （需求「装配获取心智模型需要的数据和知识资产」落在这三项上：模型拿到的不只是问题本身）
         KnowledgeContext modelCtx = loadKnowledgeContext(scenarioId, question);
+
+        // ── 规则求值（V367 批次 E）：绑定规则只读求值，结果进轨迹与 prompt ──
+        List<Map<String, Object>> rules = new ArrayList<>();
+        long tr = System.currentTimeMillis();
+        try {
+            List<String> ruleIds = new ArrayList<>();
+            for (Map<String, Object> b : listBoundExecutors(scenarioId, "RULE_SET")) {
+                String id = str(b, "target_id", "targetId");
+                if (id != null && !id.isBlank()) ruleIds.add(id);
+            }
+            Map<String, Object> facts = new LinkedHashMap<>();
+            facts.put("hypothesisCount", hypotheses == null ? 0 : hypotheses.size());
+            facts.put("knowledgeBindingCount", modelCtx.bindings().size());
+            // 场景指标（metrics JSONB）进规则事实表：表达式可直接引用业务指标名
+            try {
+                String metricsJson = dao.selectScenarioMetrics(scenarioId);
+                if (metricsJson != null && !metricsJson.isBlank()) {
+                    Object parsed = objectMapper.readValue(metricsJson, Map.class);
+                    if (parsed instanceof Map<?, ?> mm) {
+                        mm.forEach((k, v) -> facts.put(String.valueOf(k), v));
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("场景规则事实：metrics 读取/解析失败（跳过）: {}", e.getMessage());
+            }
+            if (algorithmResult != null && algorithmResult.get("metrics") instanceof Map<?, ?> mm) {
+                mm.forEach((k, v) -> facts.put(String.valueOf(k), v));
+            }
+            rules = ruleEvaluator.evaluate(ruleIds, facts);
+            long matched = rules.stream().filter(r -> Boolean.TRUE.equals(r.get("matched"))).count();
+            trace.add(step("rules", rules.isEmpty() ? "skipped" : "success",
+                    "规则命中 " + matched + "/" + rules.size(), tr));
+        } catch (RuntimeException e) {
+            trace.add(step("rules", "failed", "规则求值不可用: " + e.getMessage(), tr));
+        }
+        String ruleFacts = buildRuleFacts(rules);
+
         Map<String, Object> inputs = new LinkedHashMap<>();
-        inputs.put("prompt", buildModelPrompt(question, hypotheses, modelCtx));
+        inputs.put("prompt", buildModelPrompt(question, hypotheses, modelCtx, algorithmFacts, ruleFacts));
         inputs.put("scenarioId", scenarioId);
         inputs.put("confirmedHypotheses", hypotheses == null ? List.of() : hypotheses);
         inputs.put("knowledgeBindings", modelCtx.bindings());
+        inputs.put("algorithmFacts", algorithmFacts);
+        inputs.put("ruleFacts", ruleFacts);
 
         long t1 = System.currentTimeMillis();
         String execStatus;
         String execDetail;
-        Map<String, Object> execData = null;
         String modelOutput = null;
-        boolean degraded;
-        try {
-            execData = pipelineRunClient.execute(pipelineId, inputs);
-            Object outputs = execData.get("outputs");
-            modelOutput = extractContent(outputs);
-            Object degradedFlag = execData.get("degraded");
-            degraded = Boolean.TRUE.equals(degradedFlag);
-            execStatus = degraded ? "failed" : "success";
-            execDetail = String.valueOf(execData.get("message"));
-        } catch (RuntimeException e) {
-            log.warn("场景问题运行：心智模型执行通道故障 model={} pipeline={}", modelCode, pipelineId, e);
-            throw new BusinessException(503, "SCENARIO-Q-503: 心智模型执行不可用（" + e.getMessage() + "）");
+        boolean modelDegraded;
+        String sessionId = null;
+        if ("AI_AGENT".equals(execType)) {
+            Map<String, Object> context = new LinkedHashMap<>();
+            context.put("scenarioId", scenarioId);
+            context.put("confirmedHypotheses", hypotheses == null ? List.of() : hypotheses);
+            context.put("algorithmFacts", algorithmFacts);
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("message", inputs.get("prompt"));
+            payload.put("context", context);
+            try {
+                Map<String, Object> resp = pipelineRunClient.invokeAgent(execId, payload);
+                modelOutput = str(resp, "answer", "response");
+                sessionId = str(resp, "sessionId");
+                modelDegraded = !Boolean.TRUE.equals(resp.get("success"))
+                        || modelOutput == null || modelOutput.isBlank();
+                execStatus = modelDegraded ? "failed" : "success";
+                execDetail = "agent turns=" + resp.getOrDefault("turns", "-")
+                        + " tokens=" + resp.getOrDefault("tokens", "-");
+            } catch (RuntimeException e) {
+                log.warn("场景问题运行：智能体调用通道故障 agent={}", execId, e);
+                throw new BusinessException(503, "SCENARIO-Q-503: 智能体调用不可用（" + e.getMessage() + "）");
+            }
+        } else {
+            try {
+                Map<String, Object> execData = pipelineRunClient.execute(pipelineId, inputs);
+                modelOutput = extractContent(execData.get("outputs"));
+                modelDegraded = Boolean.TRUE.equals(execData.get("degraded"));
+                execStatus = modelDegraded ? "failed" : "success";
+                execDetail = String.valueOf(execData.get("message"));
+            } catch (RuntimeException e) {
+                log.warn("场景问题运行：编排执行通道故障 type={} id={}", execType, pipelineId, e);
+                throw new BusinessException(503, "SCENARIO-Q-503: 编排执行不可用（" + e.getMessage() + "）");
+            }
         }
-        trace.add(step("execute", execStatus, execDetail, t1));
+        trace.add(step("execute", execStatus, execType + " " + execName + " → " + execStatus, t1));
+        boolean degraded = modelDegraded || algorithmFailed;
 
         // 决策建议：拿真实执行结论去要建议，执行失败时不给「假建议」
         long t2 = System.currentTimeMillis();
         Map<String, Object> advice;
-        if (degraded || modelOutput == null || modelOutput.isBlank()) {
+        if (modelDegraded || modelOutput == null || modelOutput.isBlank()) {
             advice = Map.of(
                     "summary", "本次执行未产出有效结论，无法给出建议（执行状态：" + execStatus + "）",
                     "actions", List.of(),
@@ -187,7 +326,8 @@ public class ScenarioQuestionRunService {
                     "confidence", "LOW");
             trace.add(step("advice", "skipped", "执行未成功，不给建议", t2));
         } else {
-            advice = buildAdvice(question, String.valueOf(model.get("name")), modelOutput);
+            advice = buildAdvice(question, execName, modelOutput);
+            if (algorithmFailed) advice = forceLow(advice);
             trace.add(step("advice", "success", "建议已生成", t2));
         }
 
@@ -195,9 +335,26 @@ public class ScenarioQuestionRunService {
         String hypothesesJson = writeJson(hypotheses == null ? List.of() : hypotheses);
         String traceJson = writeJson(trace);
         String adviceJson = writeJson(advice);
+        String algorithmResultJson = algorithmResult == null ? null : writeJson(algorithmResult);
         dao.insertQuestionRun(runId, scenarioId, question, String.valueOf(intent.get("intent")),
                 String.valueOf(intent.get("detail")), modelCode, hypothesesJson, algorithmId,
-                traceJson, adviceJson, degraded);
+                algorithmStatus, algorithmResultJson, algorithmElapsedMs,
+                execType, execId, sessionId, traceJson, adviceJson, degraded);
+
+        // ── 产物留档（V367 批次 F）：算法结果与执行轨迹各一份，失败不阻断 ──
+        artifactWriter.writeJson(runId, scenarioId, "ALGORITHM_RESULT", algorithmResult);
+        artifactWriter.writeJson(runId, scenarioId, "EXEC_TRACE", trace);
+
+        // ── 审计留痕（不落正文）：执行载体 / 算法状态 / 降级 ──
+        try {
+            audit.record("scenario_question_run", runId, Map.of(
+                    "executorType", execType,
+                    "executorId", String.valueOf(execId),
+                    "algorithmStatus", algorithmStatus,
+                    "degraded", degraded));
+        } catch (RuntimeException e) {
+            log.warn("场景运行审计投递失败 run={} err={}", runId, e.getMessage());
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("runId", runId);
@@ -206,10 +363,15 @@ public class ScenarioQuestionRunService {
         out.put("intent", intent.get("intent"));
         out.put("intentDetail", intent.get("detail"));
         out.put("mentalModel", modelCode);
-        out.put("mentalModelName", model.get("name"));
+        out.put("mentalModelName", execName);
         out.put("pipelineId", pipelineId);
         out.put("hypotheses", hypotheses == null ? List.of() : hypotheses);
         out.put("algorithmId", algorithmId);
+        out.put("algorithmStatus", algorithmStatus);
+        out.put("algorithmResult", algorithmResult);
+        out.put("executorType", execType);
+        out.put("executorId", execId);
+        out.put("executorSessionId", sessionId);
         out.put("trace", trace);
         out.put("degraded", degraded);
         out.put("result", modelOutput);
@@ -432,6 +594,25 @@ public class ScenarioQuestionRunService {
         }
     }
 
+    /** 场景绑定的执行载体（PIPELINE / AI_AGENT）；读失败降级空表，不伪造。 */
+    private List<Map<String, Object>> listBoundExecutors(String scenarioId, String bindingType) {
+        try {
+            return dao.listScenarioBindings(scenarioId, bindingType);
+        } catch (RuntimeException e) {
+            log.warn("场景问题运行：{} 绑定读取失败: {}", bindingType, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** 归属校验：只能调用本场景绑定的编排/智能体，禁止跨场景裸 id。 */
+    private void assertBound(String scenarioId, String bindingType, String targetId) {
+        for (Map<String, Object> row : listBoundExecutors(scenarioId, bindingType)) {
+            if (targetId.equals(str(row, "target_id", "targetId"))) return;
+        }
+        throw new BusinessException(403,
+                "SCENARIO-Q-403: " + bindingType + " 未绑定到本场景: " + targetId);
+    }
+
     private Map<String, Object> findMentalModel(String code) {
         for (Map<String, Object> m : listMentalModels()) {
             if (code.equals(String.valueOf(m.get("code")))) return m;
@@ -487,8 +668,49 @@ public class ScenarioQuestionRunService {
         return s;
     }
 
+    private static Map<String, Object> forceLow(Map<String, Object> advice) {
+        Map<String, Object> out = new LinkedHashMap<>(advice);
+        out.put("confidence", "LOW");
+        List<Object> risks = new ArrayList<>();
+        if (advice.get("risks") instanceof List<?> l) risks.addAll(l);
+        risks.add("算法执行未成功，建议仅基于心智模型定性分析");
+        out.put("risks", risks);
+        return out;
+    }
+
+    /** 算法事实块：只允许模型解释这些数字，不允许新增。 */
+    private String buildAlgorithmFacts(Map<String, Object> algorithmResult) {
+        if (algorithmResult == null) return "";
+        String status = String.valueOf(algorithmResult.getOrDefault("status", "UNKNOWN"));
+        if (!"SUCCEEDED".equalsIgnoreCase(status) && !"DEGRADED".equalsIgnoreCase(status)) {
+            return "算法执行未成功（" + status + "）：" + algorithmResult.getOrDefault("message", "无详情");
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("算法：").append(algorithmResult.getOrDefault("name", algorithmResult.get("algorithmId")));
+        sb.append("（").append(algorithmResult.getOrDefault("code", "")).append("）\n");
+        sb.append("结构化数值：").append(writeJson(algorithmResult.getOrDefault("metrics", Map.of()))).append('\n');
+        Object assumptions = algorithmResult.get("assumptions");
+        if (assumptions instanceof List<?> l && !l.isEmpty()) {
+            sb.append("算法限制：").append(String.join("；", l.stream().map(String::valueOf).toList())).append('\n');
+        }
+        return sb.toString();
+    }
+
+    private String buildRuleFacts(List<Map<String, Object>> rules) {
+        if (rules == null || rules.isEmpty()) return "本场景未绑定规则";
+        StringBuilder sb = new StringBuilder();
+        for (Map<String, Object> r : rules) {
+            sb.append("- ").append(r.getOrDefault("name", r.get("ruleId")))
+              .append(": matched=").append(r.get("matched"));
+            if (r.get("error") != null) sb.append(" error=").append(r.get("error"));
+            if (r.get("action") != null) sb.append(" action=").append(r.get("action"));
+            sb.append('\n');
+        }
+        return sb.toString();
+    }
+
     private static String buildModelPrompt(String question, List<Map<String, Object>> hypotheses,
-                                           KnowledgeContext ctx) {
+                                           KnowledgeContext ctx, String algorithmFacts, String ruleFacts) {
         StringBuilder sb = new StringBuilder();
         sb.append("问题：").append(question).append('\n');
         if (hypotheses != null && !hypotheses.isEmpty()) {
@@ -504,6 +726,13 @@ public class ScenarioQuestionRunService {
         // 知识资产同样进模型输入：心智模型不该在「不知道本场景有哪些资料」的情况下推理
         if (ctx != null && !ctx.isEmpty()) {
             sb.append('\n').append(ctx.render());
+        }
+        if (algorithmFacts != null && !algorithmFacts.isBlank()) {
+            sb.append('\n').append("算法事实（只能解释，不得新增或改动数字）：\n")
+              .append(algorithmFacts);
+        }
+        if (ruleFacts != null && !ruleFacts.isBlank()) {
+            sb.append('\n').append("规则事实（只读求值结果）：\n").append(ruleFacts);
         }
         return sb.toString();
     }

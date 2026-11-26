@@ -57,6 +57,10 @@ public class BindingCatalog {
                 return "Boxes";
             case KNOWLEDGE_BASE:
                 return "BookOpen";
+            case KNOWLEDGE_ARTICLE:
+                return "FileText";
+            case COGNITIVE_ASSET:
+                return "BrainCircuit";
             case AI_AGENT:
                 return "Bot";
             case PIPELINE:

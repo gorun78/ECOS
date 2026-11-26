@@ -111,7 +111,8 @@ class DcchengClientCredentialRelayTest {
                 "src/main/java/com/chinacreator/gzcm/workspace/scenario/DcchengClient.java")));
         assertEquals(0, src.split("getHeader\\(", -1).length - 1,
                 "凭证只允许经 CallerCredentialSource 单源中继，类内出现 getHeader( 即复制体回潮");
-        assertEquals(6, src.split("CallerCredentialSource\\.applyTo", -1).length - 1,
-                "六条出站腿各中继一次（post/postJson/detect GET/unbind DELETE/active PUT/scenario-minds GET），多一次即出现第二套真值");
+        assertEquals(7, src.split("CallerCredentialSource\\.applyTo", -1).length - 1,
+                "七条直连腿各中继一次（post/postJson/detect GET/unbind DELETE/active PUT/scenario-minds GET"
+                        + "/复盘 by-run GET；算法执行复用 post 腿），多一次即出现第二套真值");
     }
 }

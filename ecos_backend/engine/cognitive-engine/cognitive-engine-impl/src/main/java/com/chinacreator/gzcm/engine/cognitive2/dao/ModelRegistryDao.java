@@ -191,7 +191,7 @@ public class ModelRegistryDao extends JdbcTemplateDaoSupport {
     public Map<String, Object> findLifecycleStateById(String id) {
         try {
             return jdbcTemplate.queryForMap(
-                "SELECT id, model_id, model_type, version, status, registry_state, lifecycle_state " +
+                "SELECT id, model_id, model_type, version, status, registry_state, lifecycle_state, update_time " +
                 "FROM ecos_cognitive.ecos_cognitive_model WHERE id = ? AND is_deleted = 0", id);
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             return null;

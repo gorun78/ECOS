@@ -64,6 +64,43 @@ public class DcchengClient {
         }
     }
 
+    /** V367 批次 C：按 run 取认知侧复盘聚合（{@code GET /cognitive/mental-reviews/by-run/{runId}}）。 */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> mentalReviewByRun(String runId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        CallerCredentialSource.applyTo(headers);
+        try {
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    "/cognitive/mental-reviews/by-run/" + encode(runId),
+                    org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            Map<String, Object> body = resp.getBody();
+            if (body == null) {
+                throw new CognitiveEngineUnavailableException("认知复盘应答为空体");
+            }
+            Object code = body.get("code");
+            if (code instanceof Number n && n.intValue() != 0) {
+                throw new CognitiveEngineUnavailableException("认知复盘业务错误 code=" + n);
+            }
+            Object data = body.get("data");
+            return data instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        } catch (CognitiveEngineUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new CognitiveEngineUnavailableException("认知复盘不可用: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * V367 批次 A：认知算法通用执行（{@code POST {base}/cognitive/algorithms/{code}/execute}）。
+     * 返回 {@code data} 原值；传输/业务错误 → 503 载体（由调用方折成算法 FAILED，不阻断整轮运行）。
+     */
+    public Map<String, Object> executeAlgorithm(String code, Map<String, Object> inputs) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("inputs", inputs == null ? Map.of() : inputs);
+        return post("/cognitive/algorithms/" + encode(code) + "/execute", body);
+    }
+
     /** B44/P1-20：认知域 Mind 注册（{@code POST {base}/cognitive/minds}，V187+V188 权威写面）。 */
     @SuppressWarnings("unchecked")
     public Map<String, Object> registerMind(Map<String, Object> payload) {

@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.cognitive2.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalReviewService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,6 +40,12 @@ public class MentalReviewController {
      * evidence[], runImpacts[], summary{} }——供周一故障复盘流水线消费
      * （用户确认决策 ②：faultContext/reviewTag 聚合口径本 Phase 定稿落地点）。</p>
      */
+    /** V367 批次 C：按 run 的场景复盘聚合（无数据返回空段，不 400）。 */
+    @GetMapping("/mental-reviews/by-run/{runId}")
+    public ApiResponse<Map<String, Object>> mentalReviewsByRun(@PathVariable("runId") String runId) {
+        return ApiResponse.success(reviewService.aggregateByRun(runId));
+    }
+
     @GetMapping("/mental-reviews")
     public ApiResponse<Map<String, Object>> mentalReviews(
             @RequestParam String tag,

@@ -14,7 +14,7 @@
 # Prereq: JDK 17 on the host (JAVA_HOME -> PATH, same order as _win_tasks).
 
 param(
-    [string]$Tag = 'ecos-research-sandbox:1.0.0'
+    [string]$Tag = 'ecos-research-sandbox:1.1.1'
 )
 $ErrorActionPreference = 'Stop'
 

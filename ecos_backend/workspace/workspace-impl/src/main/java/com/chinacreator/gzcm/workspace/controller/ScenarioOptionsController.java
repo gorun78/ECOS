@@ -93,6 +93,28 @@ public class ScenarioOptionsController {
         return callRemote(dcchengRest, path, "dccheng", "id", "title");
     }
 
+    /** 知识文章（V367 批次 E：KNOWLEDGE_ARTICLE 候选；dccheng 知识资产同源）。 */
+    @GetMapping("/available/knowledge-articles")
+    public ApiResponse<?> availableKnowledgeArticles() {
+        return callRemote(dcchengRest, "/knowledge/assets?status=active", "dccheng", "id", "name");
+    }
+
+    /** 认知资产实例（V367 批次 E：COGNITIVE_ASSET 候选；bel/hyp/mod 只读投影）。 */
+    @GetMapping("/available/cognitive-assets")
+    public ApiResponse<?> availableCognitiveAssets(@RequestParam(required = false) String type,
+                                                   @RequestParam(required = false) String domain) {
+        String path = "/cognitive/assets/instances";
+        String sep = "?";
+        if (type != null && !type.isBlank()) {
+            path += sep + "type=" + type;
+            sep = "&";
+        }
+        if (domain != null && !domain.isBlank()) {
+            path += sep + "domain=" + domain;
+        }
+        return callRemote(aimingRest, path, "aiming", "id", "name");
+    }
+
     /** 可用 AI Agent（aiming agent profiles）。 */
     @GetMapping("/available/agents")
     public ApiResponse<?> availableAgents() {

@@ -85,6 +85,45 @@ public class AipPipelineRunClient {
         }
     }
 
+    /**
+     * 调用 AI 工作台托管智能体（V367 批次 H）：{@code POST /aip/agents/{id}/invoke}。
+     * body 固定 {@code {message, context}}；返回 data 段（answer/turns/tokens/toolCalls/elapsedMs）。
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Map<String, Object> invokeAgent(String agentId, Map<String, Object> payload) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        CallerCredentialSource.applyTo(headers);
+        try {
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    "/aip/agents/" + encode(agentId) + "/invoke",
+                    HttpMethod.POST, new HttpEntity<>(payload == null ? Map.of() : payload, headers), Map.class);
+            Map<String, Object> envelope = resp.getBody();
+            if (envelope == null) {
+                throw new AipPipelineUnavailableException("智能体调用应答为空体: " + agentId);
+            }
+            Object code = envelope.get("code");
+            if (code instanceof Number n && n.intValue() != 0) {
+                throw new AipPipelineUnavailableException(
+                        "智能体调用业务错误 code=" + n.intValue() + " " + envelope.get("message"));
+            }
+            Object data = envelope.get("data");
+            if (!(data instanceof Map<?, ?> dm)) {
+                throw new AipPipelineUnavailableException("智能体调用应答缺 data 段: " + agentId);
+            }
+            Map<String, Object> out = new LinkedHashMap<>();
+            ((Map<String, Object>) dm).forEach(out::put);
+            log.info("智能体调用 agent={} success={}", agentId, out.get("success"));
+            return out;
+        } catch (AipPipelineUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("智能体调用通道不可用 agent={} err={}", agentId, e.getMessage());
+            throw new AipPipelineUnavailableException("ai-engine 智能体调用不可用: " + e.getMessage(), e);
+        }
+    }
+
     private static String encode(String value) {
         return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
