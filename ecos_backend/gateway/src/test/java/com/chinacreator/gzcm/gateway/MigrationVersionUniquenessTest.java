@@ -211,9 +211,12 @@ class MigrationVersionUniquenessTest {
      * + 心智模型目录）、V364（五个心智模型承载编排）落地 ⇒ 按实测订正至 364 / 下一号 365。
      * 2026-11-25 场景运行 L3 研究循环首切片：V365（运行分级/谱系控制列 + 运行产物引用表）落地
      * ⇒ 按实测订正 364→365 / 下一号 365→366。
+     * 2026-11-26 场景工作台下一步落地批次 A/B1：V366（研究候选审批）后 V367（算法结果/执行载体列
+     * + 算法目录 category/description/executor_kind）、V368（六类算法目录种子）落地
+     * ⇒ 按实测订正 366→368 / 下一号 368→369。
      */
-    private static final int MAX_BASELINE_VERSION = 366;
-    private static final int NEXT_FREE_VERSION = 367;
+    private static final int MAX_BASELINE_VERSION = 372;
+    private static final int NEXT_FREE_VERSION = 373;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

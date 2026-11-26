@@ -184,7 +184,11 @@ class Mc03TimeFormTest {
     // 2026-11-18 DQ 并入数据引擎：V350 清退 ecos_dq schema 落地 ⇒ 单源实测 299 枚，同批订正 298→299（三枚同步）。
 // V349 只用 DO/RAISE NOTICE/ALTER ... DROP|ADD CONSTRAINT 与 psql \if 开关，无 ::/ON CONFLICT/RETURNING
 // /gen_random_uuid/JSON 运算符 ⇒ 对 PG 方言名录零贡献。
-    private static final int SCRIPT_FLOOR = 314;
+    // 2026-11-26 场景工作台下一步落地：V367~V370 落地时本锚漏改（实测 318 ≠ 314 恒红），
+    // 同批补 V371/V372 两枚纯 DML ⇒ 按实测订正 314→320（Mc02/Mc03/Dr 三枚同步）。
+    // 两枚正文零 :: cast / ON CONFLICT / RETURNING / gen_random_uuid / JSONB 运算符 / 带时区时间形态
+    //（注释中的判据名会被 stripLineComments 剥离），对 GOVERNED_PG_SYNTAX_PIN 零贡献。
+    private static final int SCRIPT_FLOOR = 320;
     // 2026-11-23 场景工作台简化续：V362（新读端点 RLS 策略种子，纯 INSERT 无 DDL）落地
     // ⇒ 按实测订正 309→310（Mc02/Mc03/Dr 三枚同步）。
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。

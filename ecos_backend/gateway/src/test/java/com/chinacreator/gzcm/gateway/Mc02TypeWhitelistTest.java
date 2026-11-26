@@ -213,7 +213,11 @@ class Mc02TypeWhitelistTest {
 // 两 legacy schema，术语关系外键改指权威副本）落地 ⇒ 单源实测 298 枚，同批订正 297→298（三枚同步）。
     // 2026-11-18 DQ 并入数据引擎：V350 清退 ecos_dq schema 落地 ⇒ 单源实测 299 枚，同批订正 298→299（三枚同步）。
 // V349 纯 DROP/ADD CONSTRAINT，零列类型头 ⇒ 对类型白名单零新增违例。
-    private static final int SCRIPT_FLOOR = 314;
+    // 2026-11-26 场景工作台下一步落地：V367~V370 落地时本锚漏改（实测 318 ≠ 314 恒红），
+    // 同批补 V371（Context 来源 RLS 策略种子）+ V372（旧内置 Agent 元数据模型名对齐）两枚纯 DML，
+    // ⇒ 按实测订正 314→320（Mc02/Mc03/Dr 三枚同步；MigrationVersionUniquenessTest 走
+    // MAX_BASELINE_VERSION=372 口径，不参与本锚）。两枚均零 CREATE/ALTER 类型头 ⇒ 类型白名单零新增。
+    private static final int SCRIPT_FLOOR = 320;
     // 2026-11-23 场景工作台简化续：V362（新读端点 RLS 策略种子，纯 INSERT 无 DDL）落地
     // ⇒ 按实测订正 309→310（Mc02/Mc03/Dr 三枚同步）。
     // 2026-11-13 产品级逐功能验证批：V330~V332 三枚入库 ⇒ 按实测订正 275→282（四枚同批锚）。
