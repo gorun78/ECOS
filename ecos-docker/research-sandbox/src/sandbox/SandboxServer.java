@@ -57,6 +57,38 @@ public final class SandboxServer {
         server.setExecutor(Executors.newFixedThreadPool(4));
         server.start();
         log("ecos-research-sandbox v" + VERSION + " listening on " + bind + ":" + port);
+        startHeartbeat();
+    }
+
+    /**
+     * 心跳文件：容器健康检查用。
+     *
+     * <p><b>为什么不走 HTTP 探活</b>：JRE 精简镜像里既没有 bash（{@code /dev/tcp} 不可用），
+     * 也没有 javac（无法跑单文件源码），而 compose 的 {@code healthcheck} 只能用 sh 执行。
+     * 因此由进程自身往 writable 的 tmpfs 写心跳，健康检查退化为「文件是否新鲜」——
+     * 这同时能捕获「端口在听但主循环卡死」的假活状态，比端口探测更严格。</p>
+     */
+    static void startHeartbeat() {
+        String path = envOr("SANDBOX_HEARTBEAT_FILE", "/tmp/sandbox.heartbeat");
+        Thread t = new Thread(() -> {
+            while (true) {
+                try {
+                    java.nio.file.Files.writeString(java.nio.file.Path.of(path),
+                            String.valueOf(System.currentTimeMillis()));
+                    Thread.sleep(5000L);
+                } catch (Exception e) {
+                    log("heartbeat write failed: " + e);
+                    try {
+                        Thread.sleep(5000L);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
+        }, "sandbox-heartbeat");
+        t.setDaemon(true);
+        t.start();
     }
 
     // ── 路由 ────────────────────────────────────────────────────────────────
