@@ -1,0 +1,4 @@
+# 编译产物：由 build.ps1 用本机 javac 生成，不入库
+out/
+# Python 遗留（首版探针用过，已改用 Java）
+__pycache__/

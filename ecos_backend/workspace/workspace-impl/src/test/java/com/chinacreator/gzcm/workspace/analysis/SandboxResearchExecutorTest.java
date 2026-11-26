@@ -44,6 +44,29 @@ class SandboxResearchExecutorTest {
     }
 
     @Test
+    @DisplayName("快照行只含已有事实：场景/轮次/假设条数，不臆造业务列")
+    void snapshotRowsContainOnlyKnownFacts() {
+        List<Map<String, Object>> rows = SandboxResearchExecutor.rowsForSnapshot(
+                "sc-1", 2, List.of(Map.of("text", "a"), Map.of("text", "b")));
+        assertEquals(1, rows.size());
+        Map<String, Object> row = rows.get(0);
+        assertEquals("sc-1", row.get("scenarioId"));
+        assertEquals(2, row.get("loopIndex"));
+        assertEquals(2, row.get("hypothesisCount"));
+        // 关键：不得出现业务度量列（没有的数据就是没有）
+        assertEquals(3, row.size(), "快照行应只有 3 个键，实际: " + row.keySet());
+    }
+
+    @Test
+    @DisplayName("快照行对 null 输入不抛异常，如实记 0/空串")
+    void snapshotRowsTolerateNulls() {
+        Map<String, Object> row = SandboxResearchExecutor.rowsForSnapshot(null, 0, null).get(0);
+        assertEquals("", row.get("scenarioId"));
+        assertEquals(0, row.get("loopIndex"));
+        assertEquals(0, row.get("hypothesisCount"));
+    }
+
+    @Test
     @DisplayName("自述如实：codeExecution=true / network=false，并标明执行发生在外部沙盒")
     void describeIsHonest() {
         Map<String, Object> desc = withTemplate(mock(RestTemplate.class)).describe();
@@ -99,15 +122,16 @@ class SandboxResearchExecutorTest {
     }
 
     @Test
-    @DisplayName("成功路径：data 段原样透出（含 metric），评估走与只读档同一套口径")
+    @DisplayName("成功路径：与服务层契约同构（必须有 trace/advice/experimentSpec，否则 exec_trace 落 null）")
     @SuppressWarnings({"unchecked", "rawtypes"})
-    void successPassesDataThroughAndSharesEvaluation() {
+    void successProducesServiceContractShape() {
         RestTemplate template = mock(RestTemplate.class);
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("metric", Map.of("bindingCount", 2, "docHitCount", 1));
-        data.put("trace", List.of(Map.of("step", "run", "status", "success")));
-        data.put("experimentSpec", Map.of("loopIndex", 0));
-        data.put("advice", Map.of("summary", "from sandbox"));
+        data.put("metric", Map.of("rowsIn", 2, "rowsAfterFilter", 2,
+                "results", List.of(Map.of("op", "count", "value", 2))));
+        data.put("insight", Map.of("metric", "sum(amt)", "spread", 220));
+        data.put("snapshotDigest", "sha256:abc");
+        data.put("sandbox", Map.of("version", "1.0.0"));
         Map<String, Object> envelope = new LinkedHashMap<>();
         envelope.put("code", 0);
         envelope.put("data", data);
@@ -117,8 +141,14 @@ class SandboxResearchExecutorTest {
         SandboxResearchExecutor executor = withTemplate(template);
         Map<String, Object> out = executor.executeRound("sc-1", "q", List.of(), 0);
 
-        assertEquals("from sandbox", ((Map) out.get("advice")).get("summary"));
+        // 服务层靠这三个键落库；缺任一即证据丢失（本轮修复的真实缺陷）
+        assertTrue(out.get("trace") instanceof List, "必须有 trace");
+        assertTrue(out.get("advice") instanceof Map, "必须有 advice");
+        assertTrue(out.get("experimentSpec") instanceof Map, "必须有 experimentSpec");
+        assertEquals("SANDBOX", ((Map) out.get("experimentSpec")).get("executor"));
         assertTrue(out.get("metric") instanceof Map);
+        assertEquals("sha256:abc", out.get("snapshotDigest"));
+        assertEquals(3, ((List) out.get("trace")).size(), "trace 应含 sandbox_call/metric/insight 三步");
 
         // 评估口径同源：绑定>0 且 命中>0 ⇒ accepted，且恒定降级（无业务真值）
         Map<String, Object> eval = executor.evaluate("sc-1", out, List.of());

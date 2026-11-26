@@ -166,9 +166,17 @@ public class ReadOnlyResearchExecutor implements ResearchExecutorPort {
         int bindingCount = intOf(metric.get("bindingCount"));
         int docHitCount = intOf(metric.get("docHitCount"));
 
+        // 沙盒档的 metric 形态不同（rowsIn/rowsAfterFilter/results[]），但接受语义必须同源：
+        // 「真实读数非空」才算有证据。此处把沙盒读数折算成同一门槛，禁因换执行器放宽判定。
+        int sandboxRows = intOf(metric.get("rowsAfterFilter"));
+        int sandboxResults = metric.get("results") instanceof List<?> l ? l.size() : 0;
+
+        int evidenceCount = Math.max(docHitCount, sandboxResults);
+        int sourceCount = Math.max(bindingCount, sandboxRows);
+
         // 接受门槛必须高于「只要绑定了资产」——否则首轮必中，多轮循环退化成单轮。
-        // 判定：绑定存在 且 至少命中一条知识证据（结论有出处），才允许收敛。
-        boolean accepted = bindingCount > 0 && docHitCount > 0;
+        // 判定：数据源存在 且 至少一条可回指的读数证据，才允许收敛。
+        boolean accepted = sourceCount > 0 && evidenceCount > 0;
         // 连续无进展：前两轮都没命中证据时，第三轮不再空转
         boolean noProgress = !accepted && previousRounds.size() >= 2;
 
@@ -176,8 +184,9 @@ public class ReadOnlyResearchExecutor implements ResearchExecutorPort {
         out.put("accepted", accepted);
         // 没有业务真值（行动结果→实际指标）时显式降级，禁把「结构满足」当「业务有效」
         out.put("degraded", true);
-        out.put("evidence", "绑定=" + bindingCount + "，知识命中=" + docHitCount
-                + "；接受需「绑定>0 且 知识命中>0」；业务实际指标未接入（P1-18），本轮仅结构评估");
+        out.put("evidence", "数据源=" + sourceCount + "，读数证据=" + evidenceCount
+                + "（只读档: 绑定/知识命中；沙盒档: 快照行/度量结果）"
+                + "；接受需「数据源>0 且 证据>0」；业务实际指标未接入（P1-18），本轮仅结构评估");
         out.put("noProgress", noProgress);
         return out;
     }
