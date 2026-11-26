@@ -227,7 +227,9 @@ services:
     # 仅回环发布：沙盒不对外网暴露，只给本机 workspace 调用
     read_only: true
     tmpfs:
-      - /tmp:size=16m,noexec,nosuid
+      # 代码执行需要可写的编译目录与 JVM 临时区（只读根下唯一可写处）。
+      # 60m 上限：超出的源码/产物直接写失败，倒逼小规模实验。
+      - /tmp:size=60m,exec,nosuid
     cap_drop:
       - ALL
     security_opt:
@@ -237,10 +239,12 @@ services:
       - 127.0.0.1
     dns_search:
       - "."
-    mem_limit: 192m
-    memswap_limit: 192m
-    pids_limit: 48
-    cpus: 0.5
+    mem_limit: 640m
+    memswap_limit: 640m
+    # 代码执行需要编译期内存：javac 自身 + 子 JVM(-Xmx96m 默认) + 本进程。
+    # 640m 是按「本进程 70% + 子进程 256m 上限 + 余量」估的，仍限制在可控范围。
+    pids_limit: 128
+    cpus: 1.0
     healthcheck:
       # 不用 HTTP 探活：JRE 镜像无 bash（/dev/tcp 不可用）也无 javac（跑不了单文件源码）。
       # 改查心跳文件是否新鲜（10s 内写过）——这还能捕获「端口在听但主循环卡死」的假活。

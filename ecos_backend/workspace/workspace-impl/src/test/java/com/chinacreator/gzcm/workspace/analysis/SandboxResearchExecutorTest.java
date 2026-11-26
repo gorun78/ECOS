@@ -67,13 +67,19 @@ class SandboxResearchExecutorTest {
     }
 
     @Test
-    @DisplayName("自述如实：codeExecution=true / network=false，并标明执行发生在外部沙盒")
+    @DisplayName("自述如实：codeExecution=true / network=false，且不隐瞒受控代码执行能力")
     void describeIsHonest() {
         Map<String, Object> desc = withTemplate(mock(RestTemplate.class)).describe();
         assertEquals("SANDBOX", desc.get("kind"));
         assertEquals(Boolean.TRUE, desc.get("codeExecution"));
         assertEquals(Boolean.FALSE, desc.get("network"));
-        assertTrue(String.valueOf(desc.get("note")).contains("外部隔离沙盒"));
+        // 自述必须如实：
+        // ①ECOS 本进程不执行代码（责任边界）；②能力枚举含受控代码执行（不隐瞒能力）。
+        String note = String.valueOf(desc.get("note"));
+        assertTrue(note.contains("不执行任何代码"), "须声明 ECOS 本进程不执行代码: " + note);
+        Object caps = desc.get("capabilities");
+        assertTrue(caps instanceof List && ((List<?>) caps).contains("CONTROLLED_CODE_EXECUTION"),
+                "须如实列出受控代码执行能力: " + caps);
     }
 
     @Test

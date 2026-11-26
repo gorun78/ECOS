@@ -69,7 +69,8 @@ public class SandboxResearchExecutor implements ResearchExecutorPort {
         out.put("codeExecution", true);
         out.put("network", false);
         out.put("sandbox", baseUrl);
-        out.put("note", "代码执行发生在外部隔离沙盒；ECOS 仅编排与留痕，不执行代码");
+        out.put("capabilities", List.of("DECLARATIVE_OPERATORS", "CONTROLLED_CODE_EXECUTION"));
+        out.put("note", "声明式算子 + 受控 Java 代码执行；ECOS 本进程不执行任何代码，只编排与留痕");
         return out;
     }
 

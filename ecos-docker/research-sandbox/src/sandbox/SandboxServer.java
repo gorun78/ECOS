@@ -54,6 +54,7 @@ public final class SandboxServer {
         server.createContext("/health", new HealthHandler());
         server.createContext("/healthz", new HealthHandler());
         server.createContext("/research/rounds", new RoundHandler());
+        server.createContext("/research/execute", new CodeHandler());
         server.setExecutor(Executors.newFixedThreadPool(4));
         server.start();
         log("ecos-research-sandbox v" + VERSION + " listening on " + bind + ":" + port);
@@ -102,8 +103,50 @@ public final class SandboxServer {
             data.put("codeExecution", false);
             data.put("network", false);
             data.put("operators", new ArrayList<>(new TreeSet<>(ALLOWED_OPS)));
+            data.put("codeExecution", true);
+            data.put("codeExecutionNote",
+                    "受控 Java 代码执行：容器无网络/只读根/cap-drop/非 root，"
+                            + "单次执行硬超时强杀；静态筛查仅防呆，安全边界在容器");
             data.put("note", "声明式算子沙盒：不接受任意代码，不连库，不出网");
             respond(ex, 200, envelope(0, data, null));
+        }
+    }
+
+    /**
+     * 受控代码执行端点 {@code POST /research/execute}。
+     *
+     * <p>请求 {@code {code, timeoutMs?, heapMb?}}；返回编译/运行结果与可解析指标。
+     * 安全边界在容器（无网络/只读根/cap-drop/非 root），本端点只做防呆与超时。</p>
+     */
+    static final class CodeHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange ex) throws IOException {
+            if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
+                respond(ex, 200, envelope(405, null, "仅支持 POST"));
+                return;
+            }
+            try {
+                Object parsed = MiniJson.parse(new String(readLimited(ex), StandardCharsets.UTF_8));
+                if (!(parsed instanceof Map<?, ?> payload)) {
+                    throw new SandboxError(400, "请求体必须是 JSON 对象");
+                }
+                String code = asText(payload.get("code"));
+                Long timeoutMs = payload.get("timeoutMs") instanceof BigDecimal b
+                        ? b.longValue() : null;
+                Integer heapMb = payload.get("heapMb") instanceof BigDecimal b
+                        ? b.intValue() : null;
+
+                Map<String, Object> result = CodeExecutor.run(code, timeoutMs, heapMb);
+                respond(ex, 200, envelope(0, result, null));
+            } catch (SandboxError e) {
+                respond(ex, 200, envelope(e.code, null, e.getMessage()));
+            } catch (IllegalArgumentException e) {
+                respond(ex, 200, envelope(400, null, "请求体解析失败: " + e.getMessage()));
+            } catch (RuntimeException e) {
+                log("execute failed: " + e);
+                respond(ex, 200, envelope(500, null,
+                        e.getClass().getSimpleName() + ": " + e.getMessage()));
+            }
         }
     }
 
@@ -465,16 +508,6 @@ public final class SandboxServer {
 
     static void log(String msg) {
         System.err.println("[" + java.time.Instant.now() + "] " + msg);
-    }
-
-    /** 业务错误：显式 code，绝不被当成成功。 */
-    static final class SandboxError extends RuntimeException {
-        final int code;
-
-        SandboxError(int code, String message) {
-            super(message);
-            this.code = code;
-        }
     }
 
     private SandboxServer() {
