@@ -74,6 +74,10 @@ class HypothesisWriteWhitelistGateTest {
     void v299DdlShapeIsFrozen() throws IOException {
         assertTrue(Files.isRegularFile(V299), "V299 单源文件缺失：" + V299);
         String ddl = CogScope.stripComments(Files.readString(V299));
+        // 换行归一（2026-11-27）：归档文件在 Windows 工作树为 CRLF，而本断言用 "\n" 拼接多行骨架，
+        // 未归一则恒不匹配 —— 与 DDL 内容无关的假红（实测 V299 正文 ALTER 语句完好）。
+        // 归档面只读，修的是判定口径不是文件。
+        ddl = ddl.replace("\r\n", "\n").replace('\r', '\n');
         assertTrue(ddl.contains("ALTER TABLE " + CARRIER + "\n    ALTER COLUMN status SET DEFAULT 'PROPOSED'"),
                 "V299 缺权威载体 status 默认值 'PROPOSED' 归一");
         // 只判 DDL 骨架行（ALTER/COLUMN/SET/DEFAULT）像，注释/COMMENT 正文描述骨架

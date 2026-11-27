@@ -212,7 +212,8 @@ public class AiModelCatalogController {
      */
     @PostMapping(AiCapabilityApiPaths.MODELS_REL)
     public ResponseEntity<ApiResponse<Map<String, Object>>> registerLlmModel(
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) Map<String, Object> body)
+            throws com.fasterxml.jackson.core.JsonProcessingException {
         String traceId = AiTraceSupport.currentTraceId();
 
         if (modelRegistryDao == null || !modelRegistryDao.tableReady()) {
@@ -272,35 +273,33 @@ public class AiModelCatalogController {
         // ② Git 版本归档：表只承载「在用版本」，历史版本按铁律 §2.5 走 Git。
         //    归档失败**不回滚落库**（数据面已成功），但如实返回 gitRef=null + 原因，
         //    禁编造 ref 让调用方误以为已归档。
-        String gitRef = null;
-        String archiveNote = null;
-        if (designAssetArchiver != null) {
-            try {
-                Map<String, Object> snapshot = new LinkedHashMap<>();
-                snapshot.put("modelKey", modelKey);
-                snapshot.put("provider", provider);
-                snapshot.put("endpoint", endpoint);
-                // 密钥只存引用名（X-49）；表与 Git 一致口径。
-                snapshot.put("apiKeyRef", apiKeyRef);
-                snapshot.put("contextLimit", contextLimit);
-                snapshot.put("costClass", costClass);
-                snapshot.put("version", String.valueOf(nextVersion));
-                var outcome = designAssetArchiver.archive(MODEL_ARCHIVE_REPO_ID, "models", modelKey,
-                        String.valueOf(nextVersion), MAPPER.writeValueAsString(snapshot),
-                        "chore(models): register " + modelKey + " v" + nextVersion, actor);
-                gitRef = outcome == null ? null : outcome.commitId();
-                if (gitRef == null) {
-                    archiveNote = outcome == null ? "归档器返回空" : String.valueOf(outcome.reason());
-                    log.warn("[AiModelCatalogController] Git 归档未完成（落库已成功）: modelKey={} note={}",
-                            modelKey, archiveNote);
-                }
-            } catch (Exception e) {
-                archiveNote = "Git 归档异常: " + e.getMessage();
-                log.warn("[AiModelCatalogController] Git 归档异常（落库已成功）: modelKey={}", modelKey, e);
-            }
-        } else {
-            archiveNote = "DesignAssetArchiver 未装配";
-        }
+        //    异常收口在非 Controller 的 DesignAssetArchiveSupport（F06-15 卫生门禁要求
+        //    控制器类内零 catch-all）：归档器抛错时不得把已成功的落库渲染成 5xx。
+        DesignAssetArchiveSupport.Outcome archive = DesignAssetArchiveSupport.tryArchive(
+                "models/" + modelKey,
+                designAssetArchiver == null ? null : () -> {
+                    Map<String, Object> snapshot = new LinkedHashMap<>();
+                    snapshot.put("modelKey", modelKey);
+                    snapshot.put("provider", provider);
+                    snapshot.put("endpoint", endpoint);
+                    // 密钥只存引用名（X-49）；表与 Git 一致口径。
+                    snapshot.put("apiKeyRef", apiKeyRef);
+                    snapshot.put("contextLimit", contextLimit);
+                    snapshot.put("costClass", costClass);
+                    snapshot.put("version", String.valueOf(nextVersion));
+                    var outcome = designAssetArchiver.archive(MODEL_ARCHIVE_REPO_ID, "models", modelKey,
+                            String.valueOf(nextVersion),
+                            MAPPER.writeValueAsString(snapshot),
+                            "chore(models): register " + modelKey + " v" + nextVersion, actor);
+                    if (outcome == null) {
+                        return new DesignAssetArchiveSupport.Outcome(null, null);
+                    }
+                    return new DesignAssetArchiveSupport.Outcome(
+                            outcome.commitId(), outcome.reason());
+                },
+                DesignAssetArchiveSupport.absentReason("DesignAssetArchiver"));
+        String gitRef = archive.gitRef();
+        String archiveNote = archive.note();
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("modelId", id);
@@ -338,15 +337,16 @@ public class AiModelCatalogController {
         return fallback;
     }
 
-    private static String jsonOf(Object v) {
-        if (v == null) {
-            return null;
-        }
-        try {
-            return MAPPER.writeValueAsString(v);
-        } catch (Exception e) {
-            return null;
-        }
+    /**
+     * 能力清单序列化。
+     *
+     * <p><b>失败即上抛</b>（2026-11-27）：原实现 {@code catch (Exception) → return null} 既违
+     * F06-15「控制器类内零 catch-all」，又是静默降级（序列化失败被伪装成「该列无值」）。
+     * 改由 {@code AiErrorAdvice} 统一分类渲染，与 {@code AIPAgentController} 的
+     * {@code throws JsonProcessingException} 同形。</p>
+     */
+    private static String jsonOf(Object v) throws com.fasterxml.jackson.core.JsonProcessingException {
+        return v == null ? null : MAPPER.writeValueAsString(v);
     }
 
     /**
