@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
-import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useCognition } from '../../../hooks/useCognition';
 import { apiFetchData } from '../../../api';
 import { WORKSPACE_SCENARIOS_BASE, deleteWorkspaceScenario } from '../../../services/scenarioActionClient';
@@ -30,8 +29,10 @@ import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { showToastGlobal } from '../../../components/common/Toast';
 import DefinitionTab from './definition/DefinitionTab';
 import RunTab from './run/RunTab';
+import ResearchRunPanel from './run/ResearchRunPanel';
+import ScenarioHeaderActions, { formatTimestampSeconds } from './ScenarioHeaderActions';
 
-type TabKey = 'definition' | 'run';
+type TabKey = 'definition' | 'run' | 'research';
 
 interface ScenarioDetailVO {
   id: string;
@@ -52,7 +53,6 @@ export default function WorkbenchScenarioDetail() {
   const navigate = useNavigate();
   const { styles } = useTheme();
   const { t } = useLanguage();
-  const isMobile = useMediaQuery('(max-width: 767px)');
 
   const [scenario, setScenario] = useState<ScenarioDetailVO | null>(null);
   const [definition, setDefinition] = useState<Awaited<ReturnType<typeof fetchScenarioDefinition>> | null>(null);
@@ -67,7 +67,11 @@ export default function WorkbenchScenarioDetail() {
   const tab = useMemo<TabKey>(() => {
     // 2026-11-24：Tab 栏摘除，默认落运行面；定义编辑保留为次级入口（?tab=definition 深链可达，
     // 运行页内「编辑场景定义」链接切换）。摘按钮 ≠ 摘能力：绑定/成功标准仍需可维护。
-    return searchParams.get('tab') === 'definition' ? 'definition' : 'run';
+    // 2026-11-27 用户裁决：研究模式与场景运行为平行互斥两页（?tab=research），不再合到运行页内。
+    const raw = searchParams.get('tab');
+    if (raw === 'definition') return 'definition';
+    if (raw === 'research') return 'research';
+    return 'run';
   }, [searchParams]);
 
   useEffect(() => {
@@ -117,6 +121,14 @@ export default function WorkbenchScenarioDetail() {
   };
 
   /**
+   * 研究模式（L3 研究循环，2026-11-27 用户裁决）：与场景运行**平行互斥**的独立页
+   * （`?tab=research`），不再嵌入运行页；数值状态统一由名称右侧「场景状态」按钮呈现。
+   */
+  const enterResearchMode = () => {
+    switchTab('research');
+  };
+
+  /**
    * 删除场景：后端为逻辑删除（级联绑定）。
    * 成功后回 L1 并刷新列表（navigate 到 /workbench，L1 挂载即重新取数）；
    * 失败如实 toast 后端 message，**不**本地移除卡片伪装成功。
@@ -157,11 +169,12 @@ export default function WorkbenchScenarioDetail() {
           {t('workspace.l2.back')}
         </Link>
         {/*
-          2026-11-24 裁决：顶部只留「场景运行」+「场景配置」两枚并排按钮。
-          「场景定义」Tab 摘除——定义编辑改由「场景配置」页承接（config 页已含模板/算法库，
-          定义编辑能力随本批迁入）。运行按钮直接进运行页，不做 Tab 切换。
+          2026-11-24 裁决：「场景定义」Tab 摘除，运行按钮直接进运行页。
+          2026-11-27 二次裁决：场景编辑/历史版本/场景状态/研究模式四枚按钮移入本工具条，
+          与「场景运行」同排平行排列；同日原「场景配置」按钮摘除，
+          配置能力统一迁至 L1「场景引擎配置」页。
         */}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 flex-wrap justify-end">
           <button
             type="button"
             onClick={() => switchTab('run')}
@@ -169,16 +182,24 @@ export default function WorkbenchScenarioDetail() {
           >
             {t('workspace.l2.tab.run')}
           </button>
-          <button
-            type="button"
-            onClick={() => navigate('/workbench/config')}
-            className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
-          >
-            {t('workspace.l2.config')}
-          </button>
+          {/* 四枚操作按钮随场景加载后出现（404/403 态不渲染死按钮） */}
+          {scenario && (
+            <ScenarioHeaderActions
+              scenarioId={scenario.id}
+              editActive={tab === 'definition'}
+              researchActive={tab === 'research'}
+              safety={fmt(scenario.actualSafetyIndex)}
+              integrity={integrity}
+              pending={evalRowCount(operationEval.data)}
+              updated={formatTimestampSeconds(scenario.createdAt)}
+              onEditDefinition={() => switchTab('definition')}
+              onResearchMode={enterResearchMode}
+            />
+          )}
           {/*
             删除场景（2026-11-25 用户要求）：危险操作，必走 ConfirmDialog；
             仅在场景已成功加载（scenario 非空）时可点，加载/404/403 态不渲染死按钮。
+            2026-11-27 用户裁决：原「场景配置」按钮摘除，能力迁至 L1「场景引擎配置」页。
           */}
           {scenario && (
             <button
@@ -230,16 +251,13 @@ export default function WorkbenchScenarioDetail() {
                   {scenario.status}
                 </span>
               ) : null}
+              {/* 四枚操作按钮已上移至顶部工具条（2026-11-27 二次裁决），名称行只留标题与状态徽标 */}
             </div>
             <p className={`text-xs ${styles.cardTextMuted} mt-1 max-w-3xl leading-relaxed`}>
               {scenario.businessGoal || scenario.description || '—'}
             </p>
-            <div className={`grid gap-3 ${isMobile ? 'grid-cols-2' : 'grid-cols-4'} mt-3`}>
-              <StatCard label={t('workspace.l2.stat.safety')} value={fmt(scenario.actualSafetyIndex)} color={styles.infoText} />
-              <StatCard label={t('workspace.l2.stat.integrity')} value={integrity} color={styles.accentText} />
-              <StatCard label={t('workspace.l2.stat.pending')} value={evalRowCount(operationEval.data)} color={styles.warningText} />
-              <StatCard label={t('workspace.l2.stat.updated')} value={(scenario.createdAt ?? '').split(' ')[0] || '—'} color={styles.successText} />
-            </div>
+            {/* 2026-11-27 用户裁决：四项状态（安全指标/本体完整度/待决策/最近更新时间）
+                不再在页面上默认平铺展示，统一由名称右侧「场景状态」按钮弹层提供。 */}
           </div>
 
           {/*
@@ -307,6 +325,12 @@ export default function WorkbenchScenarioDetail() {
                 </div>
               </section>
             </>
+          ) : tab === 'research' ? (
+            /* 2026-11-27 用户裁决：研究模式 = 与场景运行平行的互斥页（?tab=research），
+               独立页形态恒展开、不渲染折叠开关；与运行页二选一渲染。 */
+            <div className="p-4">
+              <ResearchRunPanel scenarioId={scenario.id} standalone />
+            </div>
           ) : (
             <RunTab
               scenarioId={scenario.id}
@@ -397,16 +421,6 @@ function OperationEvalView({ data }: { data: { rows?: OperationEvalRow[]; trunca
       {data.truncated === true && (
         <p className={`mt-1 text-[11px] ${styles.warningText}`}>{t('workspace.l2.eval.truncated')}</p>
       )}
-    </div>
-  );
-}
-
-function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
-  const { styles } = useTheme();
-  return (
-    <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
-      <span className={`block text-[10px] ${styles.cardTextMuted} font-bold uppercase`}>{label}</span>
-      <span className={`text-lg font-extrabold ${color}`}>{value}</span>
     </div>
   );
 }

@@ -11,7 +11,6 @@ import React from 'react';
 import { useLanguage } from '../../../../components/LanguageContext';
 import { useTheme } from '../../../../components/ThemeContext';
 import QuestionRunPanel from './QuestionRunPanel';
-import ResearchRunPanel from './ResearchRunPanel';
 
 interface Props {
   scenarioId: string;
@@ -37,8 +36,8 @@ export default function RunTab({ scenarioId, onEditDefinition }: Props) {
         </div>
       )}
       <QuestionRunPanel scenarioId={scenarioId} />
-      {/* L3 研究循环（RD-Agent 模式首切片）：默认折叠，不改既有 L1/L2 使用路径 */}
-      <ResearchRunPanel scenarioId={scenarioId} />
+      {/* 2026-11-27 用户裁决：研究模式改为与场景运行平行的独立页（?tab=research），
+          不再嵌在本页底部；两页互斥渲染，入口见名称右侧「研究模式」按钮。 */}
     </div>
   );
 }

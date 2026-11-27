@@ -29,11 +29,16 @@ import {
 
 interface Props {
   scenarioId: string;
+  /**
+   * 独立页面形态（2026-11-27 用户裁决：研究模式与场景运行是平行互斥的两页）：
+   * 恒展开、不渲染折叠开关；默认形态（无此 prop）保留折叠行为。
+   */
+  standalone?: boolean;
 }
 
 const COLLAPSE_KEY = 'ecos.research.panel.open';
 
-export default function ResearchRunPanel({ scenarioId }: Props) {
+export default function ResearchRunPanel({ scenarioId, standalone = false }: Props) {
   const { styles } = useTheme();
   const { t } = useLanguage();
 
@@ -44,6 +49,8 @@ export default function ResearchRunPanel({ scenarioId }: Props) {
       return false;
     }
   });
+  /** 独立页形态恒展开；折叠形态按本地记忆位 */
+  const expanded = standalone || open;
   const [question, setQuestion] = useState('');
   const [prep, setPrep] = useState<ResearchPrepare | null>(null);
   const [busy, setBusy] = useState(false);
@@ -64,6 +71,11 @@ export default function ResearchRunPanel({ scenarioId }: Props) {
       // 隐私模式/存储禁用：仅内存态，不影响功能
     }
   };
+
+  /**
+   * 折叠记忆位仅在折叠形态使用。独立页形态由 `standalone` 恒展开，
+   * 不再需要事件唤起（2026-11-27 研究模式改为与场景运行平行的独立页）。
+   */
 
   const loadHistory = useCallback(async () => {
     try {
@@ -179,24 +191,34 @@ export default function ResearchRunPanel({ scenarioId }: Props) {
 
   return (
     <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg`}>
-      <button
-        type="button"
-        onClick={() => toggle(!open)}
-        className={`w-full flex items-center justify-between px-4 py-2.5 text-left cursor-pointer ${styles.cardText}`}
-      >
-        <span className="flex items-center gap-1.5 text-sm font-bold">
+      {standalone ? (
+        <div className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-bold ${styles.cardText}`}>
           <FlaskConical size={14} />
           {t('workspace.research.title')}
           <span className={`text-[10px] font-normal ${styles.cardTextMuted}`}>
             {t('workspace.research.level')}
           </span>
-        </span>
-        <span className={`text-[11px] ${styles.cardTextMuted}`}>
-          {open ? t('workspace.research.collapse') : t('workspace.research.expand')}
-        </span>
-      </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => toggle(!open)}
+          className={`w-full flex items-center justify-between px-4 py-2.5 text-left cursor-pointer ${styles.cardText}`}
+        >
+          <span className="flex items-center gap-1.5 text-sm font-bold">
+            <FlaskConical size={14} />
+            {t('workspace.research.title')}
+            <span className={`text-[10px] font-normal ${styles.cardTextMuted}`}>
+              {t('workspace.research.level')}
+            </span>
+          </span>
+          <span className={`text-[11px] ${styles.cardTextMuted}`}>
+            {open ? t('workspace.research.collapse') : t('workspace.research.expand')}
+          </span>
+        </button>
+      )}
 
-      {open && (
+      {expanded && (
         <div className="px-4 pb-4 space-y-3">
           <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed`}>
             {t('workspace.research.hint')}
