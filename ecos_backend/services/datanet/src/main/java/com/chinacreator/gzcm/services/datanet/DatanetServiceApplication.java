@@ -54,12 +54,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // （无跨域 Bean 依赖，逐一核过），定向补扫本包不复活上方排除的 sysman 域服务。
         "com.chinacreator.gzcm.sysman.dao"
 }, excludeFilters = {
-        // PMO-49 P3-A 修正：datanet 不跨领域扫 sysman 安全域 (security 域 JwtProvider/JWT filter bean 独立启动 JWT DI 现实无运行时 JWT 注入).
-        // 跨域 controller 治理：DataEngineConfigController 依赖 sysman 域 SysConfigService 具体类, 属 sysman 而非 data 职责.
-        // 独立 datanet 启动下 exclude 该孤 controller, /api/v1/data-engine/config/* 暂下 (P5/6 sysman REST 补).
-        // 不影响 P3-A 迁迁的 DqDashboard/Git/DataLake 三大 controller.
-        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
-                value = com.chinacreator.gzcm.engine.data.controller.DataEngineConfigController.class),
+        // W42 清偿 (2026-11-27)：原排除 DataEngineConfigController 的理由（依赖 sysman 具体类
+        // SysConfigService）已随 CD-3 接口化失效 —— 该 controller 现按接口注入 ISysConfigService，
+        // 其实现 SysConfigService(@Service) 就在已扫的 sysman.config.service.impl 包内。
+        // 保留排除将导致 dev 代理（route-manifest /api/v1/engine/data → :18082）下
+        // GET /api/v1/engine/data/settings/** 恒 404（数据工作台"引擎配置"加载失败）。
         // sysman.config.service.impl 定向扫描的配套排除（理由见上方 basePackages 注释）
         @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
                 com.chinacreator.gzcm.sysman.config.service.impl.ConfigServiceImpl.class,
