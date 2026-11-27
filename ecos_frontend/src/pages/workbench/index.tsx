@@ -23,6 +23,7 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Plus,
+  Settings2,
   WifiOff
 } from 'lucide-react';
 import { Icon } from '../../components/LucideIcon';
@@ -128,6 +129,14 @@ export default function WorkbenchHome() {
             <LayoutDashboard size={16} />
           </span>
           <h1 className={`text-lg font-bold tracking-tight ${styles.appText}`}>{t('workspace.l1.title')}</h1>
+          {/* 2026-11-27 用户裁决：场景引擎配置入口靠右（算法池/场景模板/认知资产，全局单份） */}
+          <Link
+            to="/workbench/scenario-engine"
+            className={`ml-auto inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
+          >
+            <Settings2 size={12} />
+            {t('workspace.l1.entry.scenario_engine')}
+          </Link>
         </div>
         <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('workspace.l1.subtitle')}</p>
       </div>
@@ -141,9 +150,9 @@ export default function WorkbenchHome() {
       )}
 
       {/*
-        快捷入口（2026-11-24 裁决）：首两格为「新建场景」+「场景模板」，同排对齐。
-        「场景模板」= 模板管理页（/workbench/templates，模板维护从「场景配置」迁来），
-        点它不再执行新建场景动作；模板选择仍发生在新建场景模态内（那是新建流程的一环）。
+        快捷入口（2026-11-24 裁决；2026-11-27 改指向）：首两格为「新建场景」+「场景模板」。
+        「场景模板」= 场景引擎配置页的模板 Tab（/workbench/scenario-engine?tab=templates），
+        模板维护已并入全局「场景引擎配置」，不再有独立页面。
       */}
       <section className="p-4">
         <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} mb-2`}>{t('workspace.l1.quick_entries')}</h2>
@@ -158,7 +167,7 @@ export default function WorkbenchHome() {
             <span className="text-xs font-bold">{t('workspace.l1.entry.new_scenario')}</span>
           </button>
           <Link
-            to="/workbench/templates"
+            to="/workbench/scenario-engine?tab=templates"
             className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 flex items-center gap-2 transition-all hover:opacity-90 cursor-pointer`}
             aria-label={t('workspace.l1.entry.templates')}
           >
@@ -184,14 +193,7 @@ export default function WorkbenchHome() {
       <section className="px-4 pb-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted}`}>{t('workspace.l1.my_scenarios')}</h2>
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded border ${styles.accentBg} ${styles.accentBorder} ${styles.accentText} cursor-pointer hover:opacity-90 transition`}
-          >
-            <Plus size={12} />
-            {t('workspace.l1.entry.new_scenario')}
-          </button>
+          {/* 2026-11-27 用户要求：摘除「我的场景」右侧新建场景按钮——新建入口保留在上方快捷入口格 */}
         </div>
 
         {/* 加载态 */}

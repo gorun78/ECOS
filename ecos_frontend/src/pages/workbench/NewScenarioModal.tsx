@@ -2,7 +2,7 @@
  * 新建场景模态（L1「我的场景」，原型 v2.0 §新建场景；2026-11-24 接真实模板）。
  *
  * <p>模板只作为新建流程的预填包出现（选模板 → 预填目标/成功标准）；
- * 模板本身的增删改在独立「场景模板」页（{@code /workbench/templates}）。</p>
+ * 模板本身的增删改在「场景引擎配置」页的模板 Tab（{@code /workbench/scenario-engine?tab=templates}）。</p>
  *
  * <p>模板来源：{@code GET /api/v1/workspace/scenario-templates}（真实端点）。
  * 选中模板后用其 {@code definitionDefaults.goalStatement / successCriteria} 预填表单，

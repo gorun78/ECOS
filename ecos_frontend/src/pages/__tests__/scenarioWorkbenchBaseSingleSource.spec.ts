@@ -69,9 +69,9 @@ const SITES_PER_FILE: Readonly<Record<string, number>> = {
 /** 本批闭合的两个目录根与其生产文件数（实跑读出，扫描根漂移成空集即红）。 */
 const DOMAIN_ROOTS: ReadonlyArray<{ dir: string; files: number }> = [
   { dir: 'scenario', files: 4 }, // 2026-11-26 孤儿清理：仅保留 ScenarioEditor/ScenarioList/SimulationResultPanel/CognitionStateViews
-  { dir: 'workbench', files: 23 }, // 2026-11-26：+RetrospectiveDrawer 后删 9 枚 blueprint 孤儿（32→23）
-  // 2026-11-25 定义页高级/调试下线批：删 [scenarioId]/advanced/AdvancedDebugPanel.tsx ⇒ workbench 31→30 实跑重设
-  // 2026-11-25 场景运行 L3 首切片：新增 [scenarioId]/run/ResearchRunPanel.tsx ⇒ 30→31 实跑重设
+  { dir: 'workbench', files: 26 }, // 2026-11-26：+RetrospectiveDrawer 后删 9 枚 blueprint 孤儿（32→23）
+  // 2026-11-27 L2 名称右侧四按钮批：新增 [scenarioId]/ScenarioHeaderActions.tsx ⇒ 23→24 实跑重设
+  // 2026-11-27 场景引擎配置批：删 config.tsx/templates.tsx（−2）+ 新增 scenario-engine/ 四件（+4）⇒ 24→26 实跑重设
 ];
 
 /** 私设基址判据：引号/反引号后紧跟 `/api`（与 `api-base-single-source` 同口径）。 */
